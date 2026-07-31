@@ -9,9 +9,11 @@ import {
   Clock,
   Mail,
   MapPin,
+  Menu,
   MessageCircle,
   Sparkles,
   Users,
+  X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
@@ -24,7 +26,7 @@ const STUDIO = {
   city: 'San Miguel de Tucumán',
   address: 'Av. Aconquija 1200, Yerba Buena, Tucumán',
   mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Av.+Aconquija+1200+Yerba+Buena+Tucuman',
-  whatsapp: '5493815550000', // solo dígitos, con código de país
+  whatsapp: '5493813007791', // solo dígitos, con código de país
   instagram: 'pilatestudio',
   facebook: 'pilatestudio',
   email: 'hola@pilatestudio.com',
@@ -237,6 +239,7 @@ function TiltCard({ children, className }: { children: React.ReactNode; classNam
 // ---------------------------------------------------------------
 function Nav() {
   const [scrolled, setScrolled] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24)
     onScroll()
@@ -256,11 +259,13 @@ function Nav() {
     <header
       className={cn(
         'fixed top-0 inset-x-0 z-50 transition-all duration-500',
-        scrolled ? 'bg-background/85 backdrop-blur-md shadow-sm py-2.5' : 'bg-transparent py-5'
+        scrolled || menuOpen
+          ? 'bg-background/90 backdrop-blur-md shadow-sm py-2.5'
+          : 'bg-transparent py-5'
       )}
     >
       <div className="max-w-6xl mx-auto px-5 flex items-center justify-between">
-        <a href="#" className="flex items-center gap-2.5">
+        <a href="#" className="flex items-center gap-2.5" onClick={() => setMenuOpen(false)}>
           <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
             <span className="text-primary-foreground font-serif font-bold text-base">P</span>
           </div>
@@ -279,12 +284,47 @@ function Nav() {
           ))}
         </nav>
 
-        <Link
-          href="/sistema"
-          className="px-4 py-2 rounded-xl border border-foreground/15 text-sm font-semibold text-foreground hover:bg-foreground hover:text-background transition-colors"
-        >
-          Ingresar
-        </Link>
+        <div className="flex items-center gap-2.5">
+          <Link
+            href="/sistema"
+            className="px-4 py-2 rounded-xl border border-foreground/15 text-sm font-semibold text-foreground hover:bg-foreground hover:text-background transition-colors"
+          >
+            Ingresar
+          </Link>
+          <button
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}
+            aria-expanded={menuOpen}
+            className="md:hidden w-10 h-10 rounded-xl border border-foreground/15 flex items-center justify-center text-foreground"
+          >
+            {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Menú mobile */}
+      <div
+        className={cn(
+          'md:hidden overflow-hidden transition-all duration-400',
+          menuOpen ? 'max-h-96' : 'max-h-0'
+        )}
+      >
+        <nav className="px-5 pt-3 pb-5 flex flex-col gap-1 bg-background/90 backdrop-blur-md">
+          {links.map((l, i) => (
+            <a
+              key={l.href}
+              href={l.href}
+              onClick={() => setMenuOpen(false)}
+              className={cn(
+                'py-3 px-2 rounded-xl text-base font-medium text-foreground/80 hover:bg-primary/8 hover:text-primary transition-all border-b border-border/60 last:border-0',
+                menuOpen && 'fade-up'
+              )}
+              style={{ animationDelay: `${i * 60}ms` }}
+            >
+              {l.label}
+            </a>
+          ))}
+        </nav>
       </div>
     </header>
   )
