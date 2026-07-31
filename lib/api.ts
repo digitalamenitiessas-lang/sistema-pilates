@@ -1,0 +1,604 @@
+import { supabase } from './supabase'
+import type {
+  Teacher,
+  Plan,
+  Student,
+  Membership,
+  ClassSession,
+  Reservation,
+  Payment,
+  Alert,
+  MonthlyRevenue,
+  Discipline,
+} from './types'
+
+// ---------------------------------------------------------------
+// Helpers de fechas (en hora local, no UTC, por el huso de AR)
+// ---------------------------------------------------------------
+export function localISO(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+export function addDays(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const date = new Date(y, m - 1, d + days)
+  return localISO(date)
+}
+
+/** Lunes de la semana que contiene la fecha dada (dayOfWeek 0 = lunes). */
+export function mondayOf(d: Date = new Date()): string {
+  const diff = (d.getDay() + 6) % 7
+  return localISO(new Date(d.getFullYear(), d.getMonth(), d.getDate() - diff))
+}
+
+/** Índice de día 0=lunes .. 6=domingo para hoy. */
+export function todayDayIndex(): number {
+  return (new Date().getDay() + 6) % 7
+}
+
+const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+
+export function initials(name: string): string {
+  return (
+    name
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0].toUpperCase())
+      .join('') || '?'
+  )
+}
+
+// ---------------------------------------------------------------
+// Estados derivados
+// ---------------------------------------------------------------
+const EXPIRY_WARNING_DAYS = 5
+
+function deriveMembershipStatus(status: string, endDate: string): Membership['status'] {
+  if (status === 'suspendida') return 'suspendida'
+  const today = localISO()
+  if (endDate < today) return 'vencida'
+  if (endDate <= addDays(today, EXPIRY_WARNING_DAYS)) return 'por vencer'
+  return 'activa'
+}
+
+function derivePaymentStatus(status: string, dueDate: string): Payment['status'] {
+  if (status === 'pagado') return 'pagado'
+  if (dueDate < localISO()) return 'vencido'
+  return 'pendiente'
+}
+
+// ---------------------------------------------------------------
+// Carga del paquete completo de datos del estudio
+// ---------------------------------------------------------------
+export interface StudioData {
+  teachers: Teacher[]
+  plans: Plan[]
+  students: Student[]
+  memberships: Membership[]
+  classes: ClassSession[]
+  reservations: Reservation[]
+  payments: Payment[]
+  monthlyRevenue: MonthlyRevenue[]
+  alerts: Alert[]
+  /** true si el estudio ya cargó credenciales de Mercado Pago */
+  mpConfigured: boolean
+}
+
+export async function fetchStudioData(): Promise<StudioData> {
+  const [teachersRes, plansRes, studentsRes, membershipsRes, classesRes, reservationsRes, paymentsRes, revenueRes] =
+    await Promise.all([
+      supabase.from('teachers').select('*').eq('active', true).order('name'),
+      supabase.from('plans').select('*').eq('active', true).order('price'),
+      supabase.from('students').select('*').eq('active', true).order('name'),
+      supabase.from('memberships').select('*, plans(name)').order('end_date', { ascending: false }),
+      supabase.from('class_sessions').select('*, teachers(name)').eq('active', true).order('start_time'),
+      supabase.from('reservations').select('*, students(name), class_sessions(title, discipline, start_time, teachers(name))').order('date', { ascending: false }),
+      supabase.from('payments').select('*, students(name)').order('due_date', { ascending: false }),
+      supabase.from('monthly_revenue').select('*'),
+    ])
+
+  const firstError =
+    teachersRes.error || plansRes.error || studentsRes.error || membershipsRes.error ||
+    classesRes.error || reservationsRes.error || paymentsRes.error || revenueRes.error
+  if (firstError) throw firstError
+
+  const teachers: Teacher[] = (teachersRes.data ?? []).map((t) => ({
+    id: t.id,
+    name: t.name,
+    avatar: initials(t.name),
+    disciplines: t.disciplines as Discipline[],
+    phone: t.phone,
+    email: t.email,
+    color: t.color,
+  }))
+
+  const plans: Plan[] = (plansRes.data ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    price: Number(p.price),
+    classCount: p.class_count,
+    durationDays: p.duration_days,
+    disciplines: p.disciplines as Discipline[],
+    description: p.description,
+    color: p.color,
+    popular: p.popular,
+    isTrial: p.is_trial,
+  }))
+
+  const memberships: Membership[] = (membershipsRes.data ?? []).map((m) => ({
+    id: m.id,
+    studentId: m.student_id,
+    planId: m.plan_id,
+    planName: (m.plans as { name: string } | null)?.name ?? '',
+    startDate: m.start_date,
+    endDate: m.end_date,
+    classesTotal: m.classes_total,
+    classesUsed: m.classes_used,
+    status: deriveMembershipStatus(m.status, m.end_date),
+    price: Number(m.price),
+  }))
+
+  // A cada alumno se le adjunta su membresía más reciente
+  const latestMembership = new Map<string, Membership>()
+  for (const m of memberships) {
+    if (!latestMembership.has(m.studentId)) latestMembership.set(m.studentId, m)
+  }
+
+  const students: Student[] = (studentsRes.data ?? []).map((s) => ({
+    id: s.id,
+    name: s.name,
+    avatar: initials(s.name),
+    email: s.email,
+    phone: s.phone,
+    dni: s.dni,
+    birthdate: s.birthdate ?? '',
+    joinDate: s.join_date,
+    role: 'alumno',
+    membership: latestMembership.get(s.id),
+    observations: s.observations ?? undefined,
+    medicalNotes: s.medical_notes ?? undefined,
+    emergencyContact: s.emergency_contact ?? undefined,
+  }))
+
+  const studentName = (id: string) => students.find((s) => s.id === id)?.name ?? '—'
+
+  const reservations: Reservation[] = (reservationsRes.data ?? []).map((r) => {
+    const cls = r.class_sessions as {
+      title: string
+      discipline: string
+      start_time: string
+      teachers: { name: string } | null
+    } | null
+    return {
+      id: r.id,
+      studentId: r.student_id,
+      studentName: (r.students as { name: string } | null)?.name ?? studentName(r.student_id),
+      classId: r.class_id,
+      className: cls?.title ?? '—',
+      date: r.date,
+      time: cls?.start_time?.slice(0, 5) ?? '',
+      status: r.status,
+      discipline: (cls?.discipline ?? 'Pilates Mat') as Discipline,
+      teacherName: cls?.teachers?.name ?? '—',
+    }
+  })
+
+  // Cupos de la semana actual por clase (confirmadas + asistencias)
+  const weekStart = mondayOf()
+  const weekEnd = addDays(weekStart, 6)
+  const classes: ClassSession[] = (classesRes.data ?? []).map((c) => {
+    const classDate = addDays(weekStart, c.day_of_week)
+    const ofWeek = reservations.filter(
+      (r) => r.classId === c.id && r.date >= weekStart && r.date <= weekEnd
+    )
+    return {
+      id: c.id,
+      title: c.title,
+      discipline: c.discipline as Discipline,
+      teacherId: c.teacher_id,
+      teacherName: (c.teachers as { name: string } | null)?.name ?? '—',
+      dayOfWeek: c.day_of_week,
+      time: c.start_time.slice(0, 5),
+      durationMinutes: c.duration_minutes,
+      capacity: c.capacity,
+      enrolled: ofWeek.filter((r) => r.status === 'confirmada' || r.status === 'asistió').length,
+      waitlist: ofWeek.filter((r) => r.status === 'lista de espera').length,
+      room: c.room,
+      color: c.color ?? '#C4735A',
+      // fecha concreta de esta clase en la semana actual (para reservar)
+      weekDate: classDate,
+    } as ClassSession & { weekDate: string }
+  })
+
+  const payments: Payment[] = (paymentsRes.data ?? []).map((p) => ({
+    id: p.id,
+    studentId: p.student_id,
+    studentName: (p.students as { name: string } | null)?.name ?? studentName(p.student_id),
+    membershipId: p.membership_id ?? '',
+    planName: p.concept,
+    amount: Number(p.amount),
+    date: p.paid_date ?? '',
+    dueDate: p.due_date,
+    status: derivePaymentStatus(p.status, p.due_date),
+    method: p.method ?? undefined,
+    receiptNumber: p.receipt_number,
+    mpLink: p.mp_link ?? null,
+  }))
+
+  // La configuración solo es legible por admin/recepción; para otros
+  // roles (o antes de correr la migración 0002) queda en false.
+  let mpConfigured = false
+  try {
+    const { data: mpSetting } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'mp_access_token')
+      .maybeSingle()
+    mpConfigured = !!mpSetting?.value
+  } catch {
+    mpConfigured = false
+  }
+
+  const monthlyRevenue: MonthlyRevenue[] = (revenueRes.data ?? [])
+    .slice(-6)
+    .map((r) => {
+      const [, month] = (r.month as string).split('-').map(Number)
+      return { month: MONTH_LABELS[month - 1] ?? r.month, amount: Number(r.amount) }
+    })
+
+  const alerts = buildAlerts(students, memberships, payments, classes)
+
+  return { teachers, plans, students, memberships, classes, reservations, payments, monthlyRevenue, alerts, mpConfigured }
+}
+
+function buildAlerts(
+  students: Student[],
+  memberships: Membership[],
+  payments: Payment[],
+  classes: ClassSession[]
+): Alert[] {
+  const alerts: Alert[] = []
+  const name = (id: string) => students.find((s) => s.id === id)?.name
+  const today = localISO()
+
+  for (const m of memberships) {
+    // solo la membresía más reciente de cada alumno genera alerta
+    if (students.find((s) => s.id === m.studentId)?.membership?.id !== m.id) continue
+    if (m.status === 'vencida' && m.endDate >= addDays(today, -30)) {
+      alerts.push({
+        id: `mv-${m.id}`, type: 'danger',
+        message: `Membresía vencida el ${m.endDate}`,
+        studentId: m.studentId, studentName: name(m.studentId),
+      })
+    } else if (m.status === 'por vencer') {
+      alerts.push({
+        id: `mp-${m.id}`, type: 'warning',
+        message: `Membresía vence el ${m.endDate}`,
+        studentId: m.studentId, studentName: name(m.studentId),
+      })
+    } else if (m.status === 'activa' && m.classesTotal - m.classesUsed <= 1) {
+      const left = m.classesTotal - m.classesUsed
+      alerts.push({
+        id: `mc-${m.id}`, type: 'warning',
+        message: left === 0 ? 'No le quedan clases disponibles' : 'Solo le queda 1 clase disponible',
+        studentId: m.studentId, studentName: name(m.studentId),
+      })
+    }
+  }
+
+  for (const p of payments) {
+    if (p.status === 'vencido') {
+      alerts.push({
+        id: `pv-${p.id}`, type: 'danger',
+        message: `Pago vencido desde ${p.dueDate} — $${p.amount.toLocaleString('es-AR')}`,
+        studentId: p.studentId, studentName: p.studentName,
+      })
+    }
+  }
+
+  for (const c of classes) {
+    if (c.enrolled >= c.capacity && c.waitlist > 0) {
+      alerts.push({
+        id: `cf-${c.id}`, type: 'info',
+        message: `Clase ${c.title} completa — ${c.waitlist} en lista de espera`,
+      })
+    }
+  }
+
+  return alerts.slice(0, 12)
+}
+
+// ---------------------------------------------------------------
+// Mutaciones (Fase 1: operación manual del estudio)
+// ---------------------------------------------------------------
+export interface NewStudentInput {
+  name: string
+  email: string
+  phone: string
+  dni: string
+  birthdate?: string
+  observations?: string
+  medicalNotes?: string
+  planId?: string
+}
+
+export async function createStudent(input: NewStudentInput, plans: Plan[]): Promise<void> {
+  const { data: student, error } = await supabase
+    .from('students')
+    .insert({
+      name: input.name,
+      email: input.email,
+      phone: input.phone,
+      dni: input.dni,
+      birthdate: input.birthdate || null,
+      observations: input.observations || null,
+      medical_notes: input.medicalNotes || null,
+    })
+    .select()
+    .single()
+  if (error) throw error
+
+  if (input.planId) {
+    await assignMembership(student.id, input.planId, plans)
+  }
+}
+
+export async function updateStudent(id: string, input: Omit<NewStudentInput, 'planId'>): Promise<void> {
+  const { error } = await supabase
+    .from('students')
+    .update({
+      name: input.name,
+      email: input.email,
+      phone: input.phone,
+      dni: input.dni,
+      birthdate: input.birthdate || null,
+      observations: input.observations || null,
+      medical_notes: input.medicalNotes || null,
+    })
+    .eq('id', id)
+  if (error) throw error
+}
+
+/** Crea la membresía y deja generada la deuda (pago pendiente). */
+export async function assignMembership(studentId: string, planId: string, plans: Plan[]): Promise<void> {
+  const plan = plans.find((p) => p.id === planId)
+  if (!plan) throw new Error('Plan inexistente')
+
+  const start = localISO()
+  const { data: membership, error } = await supabase
+    .from('memberships')
+    .insert({
+      student_id: studentId,
+      plan_id: planId,
+      start_date: start,
+      end_date: addDays(start, plan.durationDays),
+      classes_total: plan.classCount,
+      classes_used: 0,
+      price: plan.price,
+    })
+    .select()
+    .single()
+  if (error) throw error
+
+  if (plan.price > 0) {
+    const { error: payError } = await supabase.from('payments').insert({
+      student_id: studentId,
+      membership_id: membership.id,
+      concept: plan.name,
+      amount: plan.price,
+      due_date: addDays(start, 5),
+      status: 'pendiente',
+    })
+    if (payError) throw payError
+  }
+}
+
+export interface NewPaymentInput {
+  studentId: string
+  membershipId?: string
+  concept: string
+  amount: number
+  method: 'efectivo' | 'transferencia' | 'tarjeta'
+}
+
+/** Registra un cobro; devuelve el número de comprobante asignado. */
+export async function registerPayment(input: NewPaymentInput): Promise<number> {
+  const { data, error } = await supabase
+    .from('payments')
+    .insert({
+      student_id: input.studentId,
+      membership_id: input.membershipId || null,
+      concept: input.concept,
+      amount: input.amount,
+      due_date: localISO(),
+      paid_date: localISO(),
+      status: 'pagado',
+      method: input.method,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return data.receipt_number
+}
+
+/** Cobra un pago pendiente existente; devuelve el número de comprobante. */
+export async function collectPayment(
+  paymentId: string,
+  method: 'efectivo' | 'transferencia' | 'tarjeta'
+): Promise<number> {
+  const { data, error } = await supabase
+    .from('payments')
+    .update({ status: 'pagado', method, paid_date: localISO() })
+    .eq('id', paymentId)
+    .select()
+    .single()
+  if (error) throw error
+  return data.receipt_number
+}
+
+export interface PlanInput {
+  name: string
+  price: number
+  classCount: number
+  durationDays: number
+  disciplines: Discipline[]
+  description: string
+  color: string
+  isTrial: boolean
+}
+
+export async function createPlan(input: PlanInput): Promise<void> {
+  const { error } = await supabase.from('plans').insert({
+    name: input.name,
+    price: input.price,
+    class_count: input.classCount,
+    duration_days: input.durationDays,
+    disciplines: input.disciplines,
+    description: input.description,
+    color: input.color,
+    is_trial: input.isTrial,
+  })
+  if (error) throw error
+}
+
+export async function updatePlan(id: string, input: PlanInput): Promise<void> {
+  const { error } = await supabase
+    .from('plans')
+    .update({
+      name: input.name,
+      price: input.price,
+      class_count: input.classCount,
+      duration_days: input.durationDays,
+      disciplines: input.disciplines,
+      description: input.description,
+      color: input.color,
+      is_trial: input.isTrial,
+    })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function deactivatePlan(id: string): Promise<void> {
+  const { error } = await supabase.from('plans').update({ active: false }).eq('id', id)
+  if (error) throw error
+}
+
+export async function createReservation(
+  studentId: string,
+  classId: string,
+  date: string,
+  status: 'confirmada' | 'lista de espera' = 'confirmada'
+): Promise<void> {
+  const { error } = await supabase
+    .from('reservations')
+    .insert({ student_id: studentId, class_id: classId, date, status })
+  if (error) {
+    if (error.code === '23505') throw new Error('El alumno ya tiene una reserva para esa clase.')
+    throw error
+  }
+}
+
+export async function updateReservationStatus(
+  reservationId: string,
+  status: Reservation['status']
+): Promise<void> {
+  const { error } = await supabase.from('reservations').update({ status }).eq('id', reservationId)
+  if (error) throw error
+}
+
+/** Marca asistencia y descuenta una clase de la membresía vigente del alumno. */
+export async function markAttendance(reservation: Reservation): Promise<void> {
+  await updateReservationStatus(reservation.id, 'asistió')
+
+  const { data: memberships, error } = await supabase
+    .from('memberships')
+    .select('id, classes_used, classes_total')
+    .eq('student_id', reservation.studentId)
+    .eq('status', 'activa')
+    .gte('end_date', localISO())
+    .order('end_date', { ascending: false })
+    .limit(1)
+  if (error) throw error
+
+  const m = memberships?.[0]
+  if (m && m.classes_used < m.classes_total) {
+    const { error: updError } = await supabase
+      .from('memberships')
+      .update({ classes_used: m.classes_used + 1 })
+      .eq('id', m.id)
+    if (updError) throw updError
+  }
+}
+
+// ---------------------------------------------------------------
+// Mercado Pago (las llamadas a la API de MP pasan por /api/mp/*
+// del servidor; acá solo viaja el JWT del usuario logueado)
+// ---------------------------------------------------------------
+async function mpApi<T>(path: string, body?: object): Promise<T> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) throw new Error('Sesión expirada, volvé a ingresar')
+
+  const res = await fetch(`/api/mp/${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify(body ?? {}),
+  })
+  const json = await res.json().catch(() => null)
+  if (!res.ok) {
+    throw new Error(json?.error ?? `Error del servidor (${res.status})`)
+  }
+  return json as T
+}
+
+export interface MpSettings {
+  accessToken: string
+  publicKey: string
+}
+
+export async function getMpSettings(): Promise<MpSettings> {
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('key, value')
+    .in('key', ['mp_access_token', 'mp_public_key'])
+  if (error) throw error
+  const map = new Map((data ?? []).map((r) => [r.key, r.value]))
+  return {
+    accessToken: map.get('mp_access_token') ?? '',
+    publicKey: map.get('mp_public_key') ?? '',
+  }
+}
+
+export async function saveMpSettings(settings: MpSettings): Promise<void> {
+  const { error } = await supabase.from('app_settings').upsert([
+    { key: 'mp_access_token', value: settings.accessToken.trim(), updated_at: new Date().toISOString() },
+    { key: 'mp_public_key', value: settings.publicKey.trim(), updated_at: new Date().toISOString() },
+  ])
+  if (error) throw error
+}
+
+export interface MpAccountInfo {
+  nickname: string
+  email: string
+  site: string
+}
+
+/** Valida credenciales contra MP; si no se pasa token usa el guardado. */
+export async function testMpConnection(accessToken?: string): Promise<MpAccountInfo> {
+  return mpApi<MpAccountInfo>('test', accessToken ? { accessToken } : {})
+}
+
+/** Genera (o recupera) el link de pago de un pago pendiente. */
+export async function createMpLink(paymentId: string): Promise<string> {
+  const { link } = await mpApi<{ link: string }>('create-link', { paymentId })
+  return link
+}
+
+/** Acredita en la base los links ya pagados en MP. Devuelve cuántos acreditó. */
+export async function syncMpPayments(): Promise<number> {
+  const { updated } = await mpApi<{ updated: number }>('sync')
+  return updated
+}
