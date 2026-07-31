@@ -117,6 +117,11 @@ export interface Profile {
   role: Role
 }
 
+export interface Room {
+  id: string
+  name: string
+}
+
 export interface MonthlyRevenue {
   month: string
   amount: number

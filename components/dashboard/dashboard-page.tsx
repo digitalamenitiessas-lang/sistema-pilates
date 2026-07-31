@@ -10,11 +10,21 @@ import {
   ArrowUpRight,
   Flame,
   CreditCard,
+  MessageCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStudio } from '@/lib/data-context'
 import { todayDayIndex } from '@/lib/api'
+import { paymentReminderLink } from '../pagos/pagos-page'
 import type { PageKey } from '../layout/sidebar'
+
+/** Link de WhatsApp para avisar al alumno lo que dice la alerta. */
+function alertReminderLink(message: string, name: string, phone: string): string | null {
+  const digits = phone.replace(/\D/g, '')
+  if (!digits) return null
+  const text = `¡Hola ${name.split(' ')[0]}! Te escribimos del estudio 🙂 ${message}. Cualquier cosa respondenos por acá.`
+  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
+}
 
 interface DashboardPageProps {
   onNavigate: (page: PageKey) => void
@@ -200,26 +210,45 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
                   Sin alertas por ahora
                 </div>
               )}
-              {alerts.map((alert) => (
-                <div key={alert.id} className="flex items-start gap-3 px-4 py-3">
-                  <div
-                    className={cn(
-                      'w-1.5 h-1.5 rounded-full mt-1.5 shrink-0',
-                      alert.type === 'danger' && 'bg-destructive',
-                      alert.type === 'warning' && 'bg-amber-500',
-                      alert.type === 'info' && 'bg-accent'
+              {alerts.map((alert) => {
+                const phone = alert.studentId
+                  ? students.find((s) => s.id === alert.studentId)?.phone ?? ''
+                  : ''
+                const waLink = alert.studentName
+                  ? alertReminderLink(alert.message, alert.studentName, phone)
+                  : null
+                return (
+                  <div key={alert.id} className="flex items-start gap-3 px-4 py-3">
+                    <div
+                      className={cn(
+                        'w-1.5 h-1.5 rounded-full mt-1.5 shrink-0',
+                        alert.type === 'danger' && 'bg-destructive',
+                        alert.type === 'warning' && 'bg-amber-500',
+                        alert.type === 'info' && 'bg-accent'
+                      )}
+                    />
+                    <div className="min-w-0 flex-1">
+                      {alert.studentName && (
+                        <p className="text-xs font-semibold text-foreground truncate">
+                          {alert.studentName}
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground leading-snug">{alert.message}</p>
+                    </div>
+                    {waLink && (
+                      <a
+                        href={waLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        title="Avisar por WhatsApp"
+                        className="shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-[#25D366]/15 hover:text-[#25D366] transition-colors"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                      </a>
                     )}
-                  />
-                  <div className="min-w-0">
-                    {alert.studentName && (
-                      <p className="text-xs font-semibold text-foreground truncate">
-                        {alert.studentName}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground leading-snug">{alert.message}</p>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
 
@@ -328,33 +357,48 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
             </button>
           </div>
           <div className="divide-y divide-border overflow-y-auto max-h-56">
-            {pendingPayments.map((p) => (
-              <div key={p.id} className="flex items-center gap-3 px-5 py-3">
-                <div
-                  className={cn(
-                    'w-2 h-2 rounded-full shrink-0',
-                    p.status === 'vencido' ? 'bg-destructive' : 'bg-amber-500'
-                  )}
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-foreground truncate">{p.studentName}</p>
-                  <p className="text-[10px] text-muted-foreground truncate">{p.planName}</p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-xs font-semibold text-foreground">
-                    ${p.amount.toLocaleString('es-AR')}
-                  </p>
-                  <p
+            {pendingPayments.map((p) => {
+              const phone = students.find((s) => s.id === p.studentId)?.phone ?? ''
+              const waLink = paymentReminderLink(p, phone)
+              return (
+                <div key={p.id} className="flex items-center gap-3 px-5 py-3">
+                  <div
                     className={cn(
-                      'text-[10px] font-medium',
-                      p.status === 'vencido' ? 'text-destructive' : 'text-amber-600'
+                      'w-2 h-2 rounded-full shrink-0',
+                      p.status === 'vencido' ? 'bg-destructive' : 'bg-amber-500'
                     )}
-                  >
-                    {p.status === 'vencido' ? 'Vencido' : `Vence ${p.dueDate}`}
-                  </p>
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-foreground truncate">{p.studentName}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">{p.planName}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-xs font-semibold text-foreground">
+                      ${p.amount.toLocaleString('es-AR')}
+                    </p>
+                    <p
+                      className={cn(
+                        'text-[10px] font-medium',
+                        p.status === 'vencido' ? 'text-destructive' : 'text-amber-600'
+                      )}
+                    >
+                      {p.status === 'vencido' ? 'Vencido' : `Vence ${p.dueDate}`}
+                    </p>
+                  </div>
+                  {waLink && (
+                    <a
+                      href={waLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Enviar recordatorio por WhatsApp"
+                      className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-[#25D366]/15 hover:text-[#25D366] transition-colors"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                    </a>
+                  )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
           <div className="px-5 py-3 border-t border-border bg-muted/40">
             <div className="flex items-center justify-between">

@@ -1,10 +1,31 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Users, Clock, X, MapPin, User, Loader2 } from 'lucide-react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  Users,
+  Clock,
+  X,
+  MapPin,
+  User,
+  Loader2,
+  Plus,
+  Pencil,
+  Trash2,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
-import { addDays, mondayOf, createReservation, localISO } from '@/lib/api'
+import {
+  addDays,
+  mondayOf,
+  createReservation,
+  localISO,
+  createClassSession,
+  updateClassSession,
+  deactivateClassSession,
+  type ClassInput,
+} from '@/lib/api'
 import type { ClassSession, Discipline } from '@/lib/types'
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
@@ -87,7 +108,172 @@ function ClassCard({ cls, onClick }: { cls: WeekClass; onClick: () => void }) {
   )
 }
 
-function ClassDetailModal({ cls, onClose }: { cls: WeekClass; onClose: () => void }) {
+function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => void }) {
+  const { refresh } = useData()
+  const { teachers, rooms } = useStudio()
+  const isEdit = !!cls
+
+  const [title, setTitle] = useState(cls?.title ?? '')
+  const [discipline, setDiscipline] = useState<Discipline>(cls?.discipline ?? 'Pilates Mat')
+  const [teacherId, setTeacherId] = useState(cls?.teacherId ?? '')
+  const [dayOfWeek, setDayOfWeek] = useState(cls?.dayOfWeek ?? 0)
+  const [startTime, setStartTime] = useState(cls?.time ?? '09:00')
+  const [duration, setDuration] = useState(String(cls?.durationMinutes ?? 55))
+  const [capacity, setCapacity] = useState(String(cls?.capacity ?? 10))
+  const [room, setRoom] = useState(cls?.room ?? (rooms[0]?.name ?? ''))
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const inputClass =
+    'w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors'
+  const labelClass =
+    'text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block'
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!teacherId) {
+      setError('Seleccioná profesor/a')
+      return
+    }
+    setSaving(true)
+    setError(null)
+    const input: ClassInput = {
+      title,
+      discipline,
+      teacherId,
+      dayOfWeek,
+      startTime,
+      durationMinutes: Number(duration) || 55,
+      capacity: Number(capacity) || 10,
+      room,
+      color: DISCIPLINE_COLORS[discipline].dot,
+    }
+    try {
+      if (isEdit) await updateClassSession(cls.id, input)
+      else await createClassSession(input)
+      await refresh()
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar la clase')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/20 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <form
+        onSubmit={handleSubmit}
+        className="bg-card rounded-2xl shadow-2xl w-full max-w-md border border-border overflow-hidden max-h-[90vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
+          <h2 className="text-base font-bold text-foreground">{isEdit ? 'Editar clase' : 'Nueva clase'}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4 overflow-y-auto">
+          <div>
+            <label className={labelClass}>Nombre de la clase *</label>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="Ej: Reformer Intermedio" className={inputClass} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>Disciplina</label>
+              <select value={discipline} onChange={(e) => setDiscipline(e.target.value as Discipline)} className={inputClass}>
+                {ALL_DISCIPLINES.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelClass}>Profesor/a *</label>
+              <select value={teacherId} onChange={(e) => setTeacherId(e.target.value)} required className={inputClass}>
+                <option value="">Seleccionar...</option>
+                {teachers.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelClass}>Día</label>
+              <select value={dayOfWeek} onChange={(e) => setDayOfWeek(Number(e.target.value))} className={inputClass}>
+                {DAYS.map((d, i) => (
+                  <option key={d} value={i}>{d}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelClass}>Hora de inicio</label>
+              <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} required className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Duración (min)</label>
+              <input type="number" min="15" step="5" value={duration} onChange={(e) => setDuration(e.target.value)} required className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Cupo máximo</label>
+              <input type="number" min="1" value={capacity} onChange={(e) => setCapacity(e.target.value)} required className={inputClass} />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelClass}>Sala</label>
+            {rooms.length > 0 ? (
+              <select value={room} onChange={(e) => setRoom(e.target.value)} className={inputClass}>
+                {!rooms.some((r) => r.name === room) && room && <option value={room}>{room}</option>}
+                {rooms.map((r) => (
+                  <option key={r.id} value={r.name}>{r.name}</option>
+                ))}
+              </select>
+            ) : (
+              <input value={room} onChange={(e) => setRoom(e.target.value)} placeholder="Ej: Sala 1" className={inputClass} />
+            )}
+          </div>
+
+          {error && <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
+        </div>
+
+        <div className="flex gap-3 px-6 py-4 border-t border-border shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+          >
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            {isEdit ? 'Guardar cambios' : 'Crear clase'}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function ClassDetailModal({
+  cls,
+  onClose,
+  onEdit,
+}: {
+  cls: WeekClass
+  onClose: () => void
+  onEdit: (cls: ClassSession) => void
+}) {
   const { refresh } = useData()
   const { students } = useStudio()
   const colors = DISCIPLINE_COLORS[cls.discipline]
@@ -113,6 +299,19 @@ function ClassDetailModal({ cls, onClose }: { cls: WeekClass; onClose: () => voi
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo crear la reserva')
     } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!window.confirm(`¿Eliminar "${cls.title}" de la grilla? El historial de reservas se conserva.`)) return
+    setSaving(true)
+    try {
+      await deactivateClassSession(cls.id)
+      await refresh()
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo eliminar la clase')
       setSaving(false)
     }
   }
@@ -144,12 +343,28 @@ function ClassDetailModal({ cls, onClose }: { cls: WeekClass; onClose: () => voi
             <h3 className="text-base font-bold text-foreground">{cls.title}</h3>
             <p className="text-xs text-muted-foreground mt-0.5">{shortDate(cls.date)}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="w-7 h-7 rounded-full hover:bg-black/10 flex items-center justify-center text-muted-foreground"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => onEdit(cls)}
+              title="Editar clase"
+              className="w-7 h-7 rounded-full hover:bg-black/10 flex items-center justify-center text-muted-foreground"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={handleDelete}
+              title="Eliminar clase"
+              className="w-7 h-7 rounded-full hover:bg-destructive/15 flex items-center justify-center text-muted-foreground hover:text-destructive"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={onClose}
+              className="w-7 h-7 rounded-full hover:bg-black/10 flex items-center justify-center text-muted-foreground"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         <div className="px-5 py-4 space-y-3">
@@ -268,6 +483,8 @@ export function AgendaPage() {
   const [selectedDisciplines, setSelectedDisciplines] = useState<Discipline[]>([])
   const [selectedClass, setSelectedClass] = useState<WeekClass | null>(null)
   const [weekOffset, setWeekOffset] = useState(0)
+  const [showForm, setShowForm] = useState(false)
+  const [editingClass, setEditingClass] = useState<ClassSession | undefined>(undefined)
 
   const weekStart = addDays(mondayOf(), weekOffset * 7)
   const weekEnd = addDays(weekStart, 5)
@@ -339,6 +556,17 @@ export function AgendaPage() {
             </button>
           )}
         </div>
+
+        <button
+          onClick={() => {
+            setEditingClass(undefined)
+            setShowForm(true)
+          }}
+          className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity shrink-0"
+        >
+          <Plus className="w-4 h-4" />
+          <span className="hidden sm:inline">Nueva clase</span>
+        </button>
       </div>
 
       {/* Week navigation */}
@@ -452,8 +680,18 @@ export function AgendaPage() {
 
       {/* Class detail modal */}
       {selectedClass && (
-        <ClassDetailModal cls={selectedClass} onClose={() => setSelectedClass(null)} />
+        <ClassDetailModal
+          cls={selectedClass}
+          onClose={() => setSelectedClass(null)}
+          onEdit={(cls) => {
+            setSelectedClass(null)
+            setEditingClass(cls)
+            setShowForm(true)
+          }}
+        />
       )}
+
+      {showForm && <ClassFormModal cls={editingClass} onClose={() => setShowForm(false)} />}
     </div>
   )
 }

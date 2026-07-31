@@ -45,6 +45,20 @@ const METHOD_LABEL: Record<AnyMethod, string> = {
 // Métodos que se registran a mano (MP se acredita solo)
 const MANUAL_METHODS: Method[] = ['efectivo', 'transferencia', 'tarjeta']
 
+/** Link de WhatsApp con el recordatorio de deuda ya escrito. */
+export function paymentReminderLink(payment: Payment, phone: string): string | null {
+  const digits = phone.replace(/\D/g, '')
+  if (!digits) return null
+  const firstName = payment.studentName.split(' ')[0]
+  const text =
+    `¡Hola ${firstName}! Te escribimos del estudio 🙂 ` +
+    `Te recordamos que tenés pendiente el pago de ${payment.planName} ` +
+    `($${payment.amount.toLocaleString('es-AR')}).` +
+    (payment.mpLink ? ` Podés abonarlo con este link: ${payment.mpLink}` : '') +
+    ` ¡Gracias!`
+  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
+}
+
 const METHOD_COLORS: Record<AnyMethod, string> = {
   transferencia: '#7D9B76',
   efectivo: '#D4A854',
@@ -468,7 +482,7 @@ function MpLinkModal({ payment, onClose }: { payment: Payment; onClose: () => vo
 
 export function PagosPage() {
   const { refresh } = useData()
-  const { payments: PAYMENTS, monthlyRevenue, mpConfigured } = useStudio()
+  const { payments: PAYMENTS, monthlyRevenue, mpConfigured, students } = useStudio()
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('todos')
   const [showRegistrar, setShowRegistrar] = useState(false)
@@ -727,6 +741,21 @@ export function PagosPage() {
                                     <Link2 className="w-3.5 h-3.5" />
                                   </button>
                                 )}
+                                {(() => {
+                                  const phone = students.find((s) => s.id === p.studentId)?.phone ?? ''
+                                  const link = paymentReminderLink(p, phone)
+                                  return link ? (
+                                    <a
+                                      href={link}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      title="Enviar recordatorio por WhatsApp"
+                                      className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-[#25D366]/15 hover:text-[#25D366] transition-colors"
+                                    >
+                                      <MessageCircle className="w-3.5 h-3.5" />
+                                    </a>
+                                  ) : null
+                                })()}
                               </div>
                             )}
                           </td>

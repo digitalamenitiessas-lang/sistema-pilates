@@ -38,6 +38,7 @@ SQL Editor del dashboard de Supabase:
 1. `0001_fase1.sql` — esquema completo + RLS + datos de arranque
 2. `0002_fase2_mercadopago.sql` — configuración y columnas de Mercado Pago
 3. `0003_landing_publica.sql` — vistas públicas para la landing
+4. `0004_autogestion.sql` — catálogo de salas + email en perfiles (gestión de usuarios)
 
 ## Deploy (Vercel)
 
@@ -45,9 +46,10 @@ SQL Editor del dashboard de Supabase:
 2. Variables de entorno:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY` *(opcional — habilita el webhook de Mercado
-     Pago para acreditación instantánea; sin ella la acreditación corre al
-     abrir la pantalla Pagos)*
+   - `SUPABASE_SERVICE_ROLE_KEY` *(habilita el webhook de Mercado Pago para
+     acreditación instantánea y la gestión de usuarios desde Configuración;
+     sin ella la acreditación corre al abrir Pagos y los usuarios se crean
+     desde el dashboard de Supabase)*
 3. Con el sitio desplegado, registrar el webhook en la aplicación de Mercado
    Pago: `https://<dominio>/api/mp/webhook` (evento: Pagos).
 

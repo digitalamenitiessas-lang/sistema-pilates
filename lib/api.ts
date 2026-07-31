@@ -10,6 +10,9 @@ import type {
   Alert,
   MonthlyRevenue,
   Discipline,
+  Profile,
+  Role,
+  Room,
 } from './types'
 
 // ---------------------------------------------------------------
@@ -81,6 +84,7 @@ export interface StudioData {
   payments: Payment[]
   monthlyRevenue: MonthlyRevenue[]
   alerts: Alert[]
+  rooms: Room[]
   /** true si el estudio ya cargó credenciales de Mercado Pago */
   mpConfigured: boolean
 }
@@ -240,6 +244,19 @@ export async function fetchStudioData(): Promise<StudioData> {
     mpConfigured = false
   }
 
+  // Catálogo de salas (vacío si aún no corrió la migración 0004)
+  let rooms: Room[] = []
+  try {
+    const { data: roomRows } = await supabase
+      .from('rooms')
+      .select('id, name')
+      .eq('active', true)
+      .order('name')
+    rooms = (roomRows ?? []).map((r) => ({ id: r.id, name: r.name }))
+  } catch {
+    rooms = []
+  }
+
   const monthlyRevenue: MonthlyRevenue[] = (revenueRes.data ?? [])
     .slice(-6)
     .map((r) => {
@@ -249,7 +266,7 @@ export async function fetchStudioData(): Promise<StudioData> {
 
   const alerts = buildAlerts(students, memberships, payments, classes)
 
-  return { teachers, plans, students, memberships, classes, reservations, payments, monthlyRevenue, alerts, mpConfigured }
+  return { teachers, plans, students, memberships, classes, reservations, payments, monthlyRevenue, alerts, rooms, mpConfigured }
 }
 
 function buildAlerts(
@@ -601,4 +618,156 @@ export async function createMpLink(paymentId: string): Promise<string> {
 export async function syncMpPayments(): Promise<number> {
   const { updated } = await mpApi<{ updated: number }>('sync')
   return updated
+}
+
+// ---------------------------------------------------------------
+// Profesores
+// ---------------------------------------------------------------
+export interface TeacherInput {
+  name: string
+  disciplines: Discipline[]
+  phone: string
+  email: string
+  color: string
+}
+
+export async function createTeacher(input: TeacherInput): Promise<void> {
+  const { error } = await supabase.from('teachers').insert(input)
+  if (error) throw error
+}
+
+export async function updateTeacher(id: string, input: TeacherInput): Promise<void> {
+  const { error } = await supabase.from('teachers').update(input).eq('id', id)
+  if (error) throw error
+}
+
+export async function deactivateTeacher(id: string): Promise<void> {
+  const { error } = await supabase.from('teachers').update({ active: false }).eq('id', id)
+  if (error) throw error
+}
+
+// ---------------------------------------------------------------
+// Salas
+// ---------------------------------------------------------------
+export async function createRoom(name: string): Promise<void> {
+  const { error } = await supabase.from('rooms').insert({ name: name.trim() })
+  if (error) {
+    if (error.code === '23505') throw new Error('Ya existe una sala con ese nombre')
+    throw error
+  }
+}
+
+/** Renombra la sala y actualiza en cascada las clases que la usan. */
+export async function renameRoom(id: string, oldName: string, newName: string): Promise<void> {
+  const { error } = await supabase.from('rooms').update({ name: newName.trim() }).eq('id', id)
+  if (error) {
+    if (error.code === '23505') throw new Error('Ya existe una sala con ese nombre')
+    throw error
+  }
+  const { error: cascadeError } = await supabase
+    .from('class_sessions')
+    .update({ room: newName.trim() })
+    .eq('room', oldName)
+  if (cascadeError) throw cascadeError
+}
+
+export async function deactivateRoom(id: string): Promise<void> {
+  const { error } = await supabase.from('rooms').update({ active: false }).eq('id', id)
+  if (error) throw error
+}
+
+// ---------------------------------------------------------------
+// Clases (agenda semanal)
+// ---------------------------------------------------------------
+export interface ClassInput {
+  title: string
+  discipline: Discipline
+  teacherId: string
+  dayOfWeek: number
+  startTime: string // HH:MM
+  durationMinutes: number
+  capacity: number
+  room: string
+  color: string
+}
+
+function classRow(input: ClassInput) {
+  return {
+    title: input.title,
+    discipline: input.discipline,
+    teacher_id: input.teacherId,
+    day_of_week: input.dayOfWeek,
+    start_time: input.startTime,
+    duration_minutes: input.durationMinutes,
+    capacity: input.capacity,
+    room: input.room,
+    color: input.color,
+  }
+}
+
+export async function createClassSession(input: ClassInput): Promise<void> {
+  const { error } = await supabase.from('class_sessions').insert(classRow(input))
+  if (error) throw error
+}
+
+export async function updateClassSession(id: string, input: ClassInput): Promise<void> {
+  const { error } = await supabase.from('class_sessions').update(classRow(input)).eq('id', id)
+  if (error) throw error
+}
+
+/** La clase deja de aparecer en la agenda; el historial de reservas se conserva. */
+export async function deactivateClassSession(id: string): Promise<void> {
+  const { error } = await supabase.from('class_sessions').update({ active: false }).eq('id', id)
+  if (error) throw error
+}
+
+// ---------------------------------------------------------------
+// Usuarios del sistema (solo admin)
+// ---------------------------------------------------------------
+export async function fetchProfiles(): Promise<Profile[]> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, role, email')
+    .order('created_at')
+  if (error) throw error
+  return (data ?? []).map((p) => ({
+    id: p.id,
+    fullName: p.full_name,
+    email: p.email ?? '',
+    role: p.role as Role,
+  }))
+}
+
+async function adminApi<T>(body: object, method: 'POST' | 'DELETE' = 'POST'): Promise<T> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) throw new Error('Sesión expirada, volvé a ingresar')
+  const res = await fetch('/api/admin/users', {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify(body),
+  })
+  const json = await res.json().catch(() => null)
+  if (!res.ok) throw new Error(json?.error ?? `Error del servidor (${res.status})`)
+  return json as T
+}
+
+export async function createSystemUser(input: {
+  email: string
+  password: string
+  fullName: string
+  role: Role
+}): Promise<void> {
+  await adminApi(input)
+}
+
+export async function deleteSystemUser(userId: string): Promise<void> {
+  await adminApi({ userId }, 'DELETE')
+}
+
+export async function updateUserRole(userId: string, role: Role): Promise<void> {
+  const { error } = await supabase.from('profiles').update({ role }).eq('id', userId)
+  if (error) throw error
 }
