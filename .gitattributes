@@ -1,0 +1,8 @@
+# Binarios: nunca normalizar saltos de línea
+*.pdf binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.ico binary
+*.woff binary
+*.woff2 binary
