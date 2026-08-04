@@ -16,6 +16,12 @@ export const metadata: Metadata = {
   title: 'PilatesStudio — Estudio de Pilates y Movimiento',
   description:
     'Pilates Mat, Reformer, Clínico, Yoga y más. Clases en grupos reducidos con seguimiento personalizado. Probá tu primera clase.',
+  icons: { apple: '/apple-icon.png' },
+  appleWebApp: {
+    capable: true,
+    title: 'PilatesStudio',
+    statusBarStyle: 'default',
+  },
 }
 
 export const viewport: Viewport = {

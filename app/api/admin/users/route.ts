@@ -7,7 +7,7 @@ import { supabaseAdmin, supabaseForRequest } from '@/lib/mp-server'
 // usuario con rol admin puede invocar estos endpoints.
 
 async function authorize(request: Request): Promise<
-  | { ok: true; caller: SupabaseClient; admin: SupabaseClient; callerId: string }
+  | { ok: true; caller: SupabaseClient; admin: SupabaseClient; callerId: string; callerRole: string }
   | { ok: false; response: NextResponse }
 > {
   const caller = supabaseForRequest(request)
@@ -25,10 +25,11 @@ async function authorize(request: Request): Promise<
     .select('role')
     .eq('id', userData.user.id)
     .single()
-  if (profile?.role !== 'admin') {
+  const callerRole = profile?.role ?? ''
+  if (!['admin', 'recepcion'].includes(callerRole)) {
     return {
       ok: false,
-      response: NextResponse.json({ error: 'Solo el rol admin puede gestionar usuarios' }, { status: 403 }),
+      response: NextResponse.json({ error: 'No tenés permisos para gestionar usuarios' }, { status: 403 }),
     }
   }
 
@@ -46,7 +47,7 @@ async function authorize(request: Request): Promise<
     }
   }
 
-  return { ok: true, caller, admin, callerId: userData.user.id }
+  return { ok: true, caller, admin, callerId: userData.user.id, callerRole }
 }
 
 const VALID_ROLES = ['admin', 'recepcion', 'profesor', 'alumno']
@@ -55,15 +56,19 @@ export async function POST(request: Request) {
   const auth = await authorize(request)
   if (!auth.ok) return auth.response
 
-  const { email, password, fullName, role } = await request.json().catch(() => ({}))
+  const { email, password, fullName, role, studentId } = await request.json().catch(() => ({}))
   if (!email || !password || !VALID_ROLES.includes(role)) {
     return NextResponse.json({ error: 'Faltan datos: email, contraseña y rol' }, { status: 400 })
   }
   if (String(password).length < 6) {
     return NextResponse.json({ error: 'La contraseña debe tener al menos 6 caracteres' }, { status: 400 })
   }
+  // Recepción solo puede crear accesos de alumnos; roles de staff, solo el admin
+  if (auth.callerRole !== 'admin' && role !== 'alumno') {
+    return NextResponse.json({ error: 'Solo el admin puede crear usuarios de staff' }, { status: 403 })
+  }
 
-  const { error } = await auth.admin.auth.admin.createUser({
+  const { data: created, error } = await auth.admin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
@@ -76,6 +81,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: msg }, { status: 400 })
   }
 
+  // Vincula la cuenta con la ficha del alumno para el portal
+  if (studentId && created.user) {
+    const { error: linkError } = await auth.admin
+      .from('students')
+      .update({ user_id: created.user.id })
+      .eq('id', studentId)
+    if (linkError) {
+      return NextResponse.json(
+        { error: `Usuario creado pero no se pudo vincular la ficha: ${linkError.message}` },
+        { status: 500 }
+      )
+    }
+  }
+
   return NextResponse.json({ ok: true })
 }
 
@@ -86,6 +105,9 @@ export async function DELETE(request: Request) {
   const { userId } = await request.json().catch(() => ({}))
   if (!userId) {
     return NextResponse.json({ error: 'Falta userId' }, { status: 400 })
+  }
+  if (auth.callerRole !== 'admin') {
+    return NextResponse.json({ error: 'Solo el admin puede eliminar usuarios' }, { status: 403 })
   }
   if (userId === auth.callerId) {
     return NextResponse.json({ error: 'No podés eliminar tu propio usuario' }, { status: 400 })

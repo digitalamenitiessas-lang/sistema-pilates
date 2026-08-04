@@ -15,11 +15,119 @@ import {
   XCircle,
   Clock,
   Edit3,
+  Smartphone,
+  Loader2,
+  X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useData } from '@/lib/data-context'
+import { createSystemUser } from '@/lib/api'
 import type { Student, Reservation, Payment } from '@/lib/types'
 import { AlumnoFormModal } from './alumno-form-modal'
 import { AsignarPlanModal } from './asignar-plan-modal'
+
+function PortalAccessModal({ student, onClose }: { student: Student; onClose: () => void }) {
+  const { refresh } = useData()
+  const [email, setEmail] = useState(student.email)
+  const [password, setPassword] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [done, setDone] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    setError(null)
+    try {
+      await createSystemUser({
+        email,
+        password,
+        fullName: student.name,
+        role: 'alumno',
+        studentId: student.id,
+      })
+      await refresh()
+      setDone(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo crear el acceso')
+      setSaving(false)
+    }
+  }
+
+  const inputClass =
+    'w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors'
+  const labelClass =
+    'text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/20 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="bg-card rounded-2xl shadow-2xl w-full max-w-md border border-border overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {done ? (
+          <div className="px-6 py-8 text-center">
+            <CheckCircle2 className="w-10 h-10 mx-auto mb-3 text-[#2E6040]" />
+            <h3 className="text-base font-bold text-foreground mb-1">Acceso creado</h3>
+            <p className="text-sm text-muted-foreground mb-5">
+              Pasale a {student.name.split(' ')[0]} el email y la contraseña. Entra desde el mismo
+              login del sistema y ve su propio portal.
+            </p>
+            <button
+              onClick={onClose}
+              className="px-8 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90"
+            >
+              Listo
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <div>
+                <h2 className="text-base font-bold text-foreground">Acceso al portal</h2>
+                <p className="text-xs text-muted-foreground">{student.name}</p>
+              </div>
+              <button type="button" onClick={onClose} className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className={labelClass}>Email de acceso *</label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>Contraseña inicial *</label>
+                <input
+                  type="text"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  placeholder="Mínimo 6 caracteres"
+                  className={inputClass}
+                />
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  Se la compartís al alumno; con ella entra a su portal para reservar y ver sus pagos.
+                </p>
+              </div>
+              {error && <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
+            </div>
+            <div className="flex gap-3 px-6 py-4 border-t border-border">
+              <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors">
+                Cancelar
+              </button>
+              <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2">
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                Crear acceso
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  )
+}
 
 const TABS = [
   { key: 'resumen', label: 'Resumen', icon: User },
@@ -55,6 +163,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
   const [activeTab, setActiveTab] = useState('resumen')
   const [showEdit, setShowEdit] = useState(false)
   const [showAssignPlan, setShowAssignPlan] = useState(false)
+  const [showPortalAccess, setShowPortalAccess] = useState(false)
   const ms = student.membership
   const classesLeft = ms ? ms.classesTotal - ms.classesUsed : 0
   const attended = reservations.filter((r) => r.status === 'asistió').length
@@ -177,6 +286,38 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                       <p className="text-sm text-foreground">{value}</p>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {/* Acceso al portal */}
+              <div className="bg-card rounded-2xl border border-border p-5">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-accent/10 flex items-center justify-center">
+                      <Smartphone className="w-4.5 h-4.5 text-accent" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">Acceso al portal</h3>
+                      <p className="text-xs text-muted-foreground">
+                        {student.userId
+                          ? 'Tiene cuenta activa: reserva y ve sus pagos desde el celular.'
+                          : 'Todavía no tiene cuenta para reservar por su cuenta.'}
+                      </p>
+                    </div>
+                  </div>
+                  {student.userId ? (
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-[#2E6040] bg-[#E8F2EB] px-2.5 py-1 rounded-full">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Activo
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => setShowPortalAccess(true)}
+                      className="px-3.5 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity"
+                    >
+                      Crear acceso
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -392,6 +533,9 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
 
       {showEdit && <AlumnoFormModal student={student} onClose={() => setShowEdit(false)} />}
       {showAssignPlan && <AsignarPlanModal student={student} onClose={() => setShowAssignPlan(false)} />}
+      {showPortalAccess && (
+        <PortalAccessModal student={student} onClose={() => setShowPortalAccess(false)} />
+      )}
     </div>
   )
 }

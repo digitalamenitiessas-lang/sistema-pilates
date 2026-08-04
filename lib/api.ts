@@ -163,6 +163,7 @@ export async function fetchStudioData(): Promise<StudioData> {
     observations: s.observations ?? undefined,
     medicalNotes: s.medical_notes ?? undefined,
     emergencyContact: s.emergency_contact ?? undefined,
+    userId: s.user_id ?? null,
   }))
 
   const studentName = (id: string) => students.find((s) => s.id === id)?.name ?? '—'
@@ -759,8 +760,39 @@ export async function createSystemUser(input: {
   password: string
   fullName: string
   role: Role
+  /** si se pasa, vincula la cuenta creada con esta ficha de alumno */
+  studentId?: string
 }): Promise<void> {
   await adminApi(input)
+}
+
+// ---------------------------------------------------------------
+// Portal del alumno
+// ---------------------------------------------------------------
+export interface Occupancy {
+  confirmed: number
+  waitlist: number
+}
+
+/** Ocupación por clase para una semana; clave `${classId}|${date}`. */
+export async function fetchWeekOccupancy(weekStart: string): Promise<Map<string, Occupancy>> {
+  const map = new Map<string, Occupancy>()
+  try {
+    const { data } = await supabase
+      .from('class_occupancy')
+      .select('*')
+      .gte('date', weekStart)
+      .lte('date', addDays(weekStart, 6))
+    for (const row of data ?? []) {
+      map.set(`${row.class_id}|${row.date}`, {
+        confirmed: Number(row.confirmed),
+        waitlist: Number(row.waitlist),
+      })
+    }
+  } catch {
+    // vista inexistente (migración 0005 pendiente): cupos desconocidos
+  }
+  return map
 }
 
 export async function deleteSystemUser(userId: string): Promise<void> {

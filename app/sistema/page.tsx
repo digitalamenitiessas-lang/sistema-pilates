@@ -12,6 +12,7 @@ import { ReservasPage } from '@/components/reservas/reservas-page'
 import { PagosPage } from '@/components/pagos/pagos-page'
 import { LoginPage } from '@/components/auth/login-page'
 import { ConfiguracionPage } from '@/components/configuracion/configuracion-page'
+import { PortalPage } from '@/components/portal/portal-page'
 import { DataProvider, useData } from '@/lib/data-context'
 
 const PAGE_COMPONENTS: Record<PageKey, React.ComponentType<{ onNavigate: (page: PageKey) => void }>> = {
@@ -34,13 +35,16 @@ function FullScreenLoader({ message }: { message: string }) {
 }
 
 function AppShell() {
-  const { session, sessionLoading, data, dataLoading, dataError, refresh } = useData()
+  const { session, sessionLoading, profile, data, dataLoading, dataError, refresh } = useData()
   const [currentPage, setCurrentPage] = useState<PageKey>('dashboard')
   const [collapsed, setCollapsed] = useState(false)
 
   if (sessionLoading) return <FullScreenLoader message="Iniciando..." />
   if (!session) return <LoginPage />
   if (dataLoading || (!data && !dataError)) return <FullScreenLoader message="Cargando datos del estudio..." />
+
+  // Los alumnos ven su portal, no el sistema de gestión
+  if (profile?.role === 'alumno' && data) return <PortalPage />
 
   if (dataError || !data) {
     return (

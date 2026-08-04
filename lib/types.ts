@@ -64,6 +64,8 @@ export interface Student {
   observations?: string
   medicalNotes?: string
   emergencyContact?: string
+  /** id del usuario de Auth vinculado (acceso al portal), si tiene */
+  userId?: string | null
 }
 
 export interface ClassSession {
