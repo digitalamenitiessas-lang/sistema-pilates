@@ -35,13 +35,15 @@ function FullScreenLoader({ message }: { message: string }) {
 }
 
 function AppShell() {
-  const { session, sessionLoading, profile, data, dataLoading, dataError, refresh } = useData()
+  const { session, sessionLoading, profile, profileReady, data, dataLoading, dataError, refresh } = useData()
   const [currentPage, setCurrentPage] = useState<PageKey>('dashboard')
   const [collapsed, setCollapsed] = useState(false)
 
   if (sessionLoading) return <FullScreenLoader message="Iniciando..." />
   if (!session) return <LoginPage />
   if (dataLoading || (!data && !dataError)) return <FullScreenLoader message="Cargando datos del estudio..." />
+  // No mostrar ninguna interfaz hasta conocer el rol del usuario
+  if (!profileReady && !dataError) return <FullScreenLoader message="Cargando tu perfil..." />
 
   // Los alumnos ven su portal, no el sistema de gestión
   if (profile?.role === 'alumno' && data) return <PortalPage />

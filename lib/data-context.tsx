@@ -9,6 +9,8 @@ import type { Profile, Role } from './types'
 interface DataContextValue {
   session: Session | null
   profile: Profile | null
+  /** true cuando ya se resolvió la carga del perfil (con o sin resultado) */
+  profileReady: boolean
   sessionLoading: boolean
   data: StudioData | null
   dataLoading: boolean
@@ -22,6 +24,7 @@ const DataContext = createContext<DataContextValue | null>(null)
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [profileReady, setProfileReady] = useState(false)
   const [sessionLoading, setSessionLoading] = useState(true)
   const [data, setData] = useState<StudioData | null>(null)
   const [dataLoading, setDataLoading] = useState(false)
@@ -54,6 +57,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     if (!session) {
       setData(null)
       setProfile(null)
+      setProfileReady(false)
       return
     }
     let cancelled = false
@@ -67,7 +71,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         .eq('id', session.user.id)
         .single()
         .then(({ data: p }) => {
-          if (!cancelled && p) {
+          if (cancelled) return
+          if (p) {
             setProfile({
               id: p.id,
               fullName: p.full_name || session.user.email || '',
@@ -75,6 +80,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
               role: p.role as Role,
             })
           }
+          setProfileReady(true)
         }),
     ]).finally(() => {
       if (!cancelled) setDataLoading(false)
@@ -91,7 +97,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <DataContext.Provider
-      value={{ session, profile, sessionLoading, data, dataLoading, dataError, refresh, signOut }}
+      value={{ session, profile, profileReady, sessionLoading, data, dataLoading, dataError, refresh, signOut }}
     >
       {children}
     </DataContext.Provider>
