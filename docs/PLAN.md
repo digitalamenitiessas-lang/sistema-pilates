@@ -1,15 +1,24 @@
 # Plan de avance — PilatesStudio
 
 > Documento vivo. Se actualiza con cada bloque de trabajo.
-> Última actualización: **04/08/2026** (portal del alumno verificado end-to-end).
-> Snapshot para compartir: `docs/PilatesStudio-integraciones-y-etapas.pdf`.
+> Última actualización: **24/08/2026** (rol profesor en modo solo consulta).
+> Documento para la clienta: `docs/PilatesStudio-integraciones-y-etapas.pdf`
+> (versión presentable, no este plan interno).
 
 ## Estado general
 
 Sistema desplegado en Vercel y operativo con datos de ejemplo. Núcleo completo
 (gestión + cobros + landing + autogestión + portal del alumno). Lo que falta se
-divide en: trabajo nuestro (avisos automáticos, mostrador) y cosas bloqueadas
-por la clienta (cuenta MP, datos reales, decisiones de negocio).
+divide en: trabajo nuestro (renovación y avisos automáticos, huecos del portal,
+mostrador) y cosas bloqueadas por la clienta (cuenta MP, datos reales,
+decisiones de negocio).
+
+Límite de fondo a tener presente: **hoy no corre ningún proceso solo**. No hay
+cron ni envíos; las alertas se calculan en el navegador al abrir el sistema
+(`buildAlerts` en `lib/api.ts`) y los estados "vencida"/"por vencer" se derivan
+al leer, no están guardados. Lo único automático es el webhook de MP, el cupo
+por trigger, la numeración de comprobantes y el descuento de clase al marcar
+asistencia. Todo lo demás pasa porque alguien lo hace.
 
 ## Etapas
 
@@ -40,12 +49,36 @@ incluido) en deudas y alertas. Migración `0004`.
   ficha por staff. PWA instalable con ícono de marca. Migración `0005`.
 - Cuenta demo: `camila.portal@pilatestudio.com` (borrar o usar para demos).
 
+### ✅ Rol profesor en modo solo consulta (24/08/2026)
+La base ya lo protegía (las políticas de escritura son solo `admin` y
+`recepcion`), pero la interfaz mostraba igual los botones de alta, edición y
+cobro: un profesor los veía y al tocarlos recibía un error de permisos.
+Ahora `canWrite` sale del contexto (`lib/data-context.tsx`) replicando esa
+misma regla, y esconde las acciones en agenda, alumnos, ficha, planes,
+reservas, pagos, configuración y los avisos de WhatsApp del inicio. El header
+muestra el distintivo "Solo consulta". La base sigue siendo la que manda —
+esto solo evita ofrecer acciones que iban a fallar.
+
 ### 🔜 Etapa 2 — Cobranza que se cobra sola *(próximo bloque nuestro)*
+- [ ] **Renovación automática de membresías** con generación de la cuota del
+      mes. Hoy al vencer hay que reasignar el plan a mano, alumna por alumna
+      — es el trabajo manual más pesado del ciclo mensual. **No depende de
+      nadie.** Comprometido con la clienta en el mensaje del 24/08.
 - [ ] Avisos automáticos por email (cron diario en Vercel + Resend):
       membresía por vencer, deuda generada, pago recibido. **No depende de
       nadie** (sandbox ahora, dominio del estudio después).
-- [ ] Débito automático mensual (Suscripciones MP). **Bloqueado**: requiere
-      la cuenta MP real de la clienta para probar con cobros de verdad.
+- [ ] Débito automático mensual (Suscripciones MP). Se puede **desarrollar y
+      probar ya** con las credenciales de prueba de MP; solo el primer cobro
+      real necesita la cuenta de la clienta.
+
+### 🔜 Portal del alumno — lo que falta para que escale *(nuestro)*
+- [ ] **Auto-registro.** No existe ningún `signUp`: hoy el acceso lo crea el
+      staff desde la ficha, uno por uno, y le pasa la clave a mano. Con
+      volumen y rotación pasa a ser trabajo permanente.
+- [ ] **Recuperar contraseña.** No hay reset ni cambio de clave desde el
+      portal. Si una alumna pierde la suya, la única salida hoy es el
+      dashboard de Supabase. Va a generar pedidos de soporte desde el día
+      uno.
 
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
@@ -75,3 +108,5 @@ incluido) en deudas y alertas. Migración `0004`.
 | `SUPABASE_SERVICE_ROLE_KEY` | En `.env.local` ✅ · verificar en Vercel |
 | Webhook MP | Programado; registrar URL en MP al conectar la cuenta real |
 | Usuarios de prueba | `admin@pilatestudio.com` (cambiar clave) · `camila.portal@…` (demo) |
+| Roles | 4: admin y recepción escriben; profesor y alumno son de solo consulta (UI + RLS) ✅ |
+| Acceso enviado a la clienta | 24/08/2026, cuenta admin + demo del portal |
