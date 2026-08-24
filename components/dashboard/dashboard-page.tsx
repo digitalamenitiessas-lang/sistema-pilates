@@ -13,7 +13,7 @@ import {
   MessageCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useStudio } from '@/lib/data-context'
+import { useData, useStudio } from '@/lib/data-context'
 import { todayDayIndex } from '@/lib/api'
 import { paymentReminderLink } from '../pagos/pagos-page'
 import type { PageKey } from '../layout/sidebar'
@@ -82,6 +82,7 @@ function StatCard({
 }
 
 export function DashboardPage({ onNavigate }: DashboardPageProps) {
+  const { canWrite } = useData()
   const { students, payments, alerts, monthlyRevenue, classes } = useStudio()
 
   const TODAY_CLASSES = classes
@@ -235,7 +236,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
                       )}
                       <p className="text-xs text-muted-foreground leading-snug">{alert.message}</p>
                     </div>
-                    {waLink && (
+                    {canWrite && waLink && (
                       <a
                         href={waLink}
                         target="_blank"
@@ -385,7 +386,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
                       {p.status === 'vencido' ? 'Vencido' : `Vence ${p.dueDate}`}
                     </p>
                   </div>
-                  {waLink && (
+                  {canWrite && waLink && (
                     <a
                       href={waLink}
                       target="_blank"

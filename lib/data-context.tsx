@@ -11,6 +11,12 @@ interface DataContextValue {
   profile: Profile | null
   /** true cuando ya se resolvió la carga del perfil (con o sin resultado) */
   profileReady: boolean
+  /**
+   * El rol puede modificar datos. Refleja las políticas RLS: escriben admin y
+   * recepción; profesor y alumno son de solo consulta. La base es la que manda
+   * — esto solo evita mostrar acciones que la base va a rechazar.
+   */
+  canWrite: boolean
   sessionLoading: boolean
   data: StudioData | null
   dataLoading: boolean
@@ -91,13 +97,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [session, refresh])
 
+  const canWrite = profile?.role === 'admin' || profile?.role === 'recepcion'
+
   const signOut = useCallback(async () => {
     await supabase.auth.signOut()
   }, [])
 
   return (
     <DataContext.Provider
-      value={{ session, profile, profileReady, sessionLoading, data, dataLoading, dataError, refresh, signOut }}
+      value={{ session, profile, profileReady, canWrite, sessionLoading, data, dataLoading, dataError, refresh, signOut }}
     >
       {children}
     </DataContext.Provider>

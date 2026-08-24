@@ -380,7 +380,7 @@ function TeacherFormModal({ teacher, onClose }: { teacher?: Teacher; onClose: ()
 }
 
 function TeachersSection() {
-  const { refresh } = useData()
+  const { refresh, canWrite } = useData()
   const { teachers } = useStudio()
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<Teacher | undefined>(undefined)
@@ -403,16 +403,18 @@ function TeachersSection() {
             <p className="text-xs text-muted-foreground">Equipo del estudio y sus disciplinas</p>
           </div>
         </div>
-        <button
-          onClick={() => {
-            setEditing(undefined)
-            setShowForm(true)
-          }}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Agregar
-        </button>
+        {canWrite && (
+          <button
+            onClick={() => {
+              setEditing(undefined)
+              setShowForm(true)
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Agregar
+          </button>
+        )}
       </div>
 
       <div className="divide-y divide-border">
@@ -426,23 +428,27 @@ function TeachersSection() {
               <p className="text-sm font-semibold text-foreground truncate">{t.name}</p>
               <p className="text-xs text-muted-foreground truncate">{t.disciplines.join(' · ')}</p>
             </div>
-            <button
-              onClick={() => {
-                setEditing(t)
-                setShowForm(true)
-              }}
-              className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-              aria-label={`Editar ${t.name}`}
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => handleDelete(t)}
-              className="w-8 h-8 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
-              aria-label={`Dar de baja a ${t.name}`}
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
+            {canWrite && (
+              <>
+                <button
+                  onClick={() => {
+                    setEditing(t)
+                    setShowForm(true)
+                  }}
+                  className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={`Editar ${t.name}`}
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => handleDelete(t)}
+                  className="w-8 h-8 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
+                  aria-label={`Dar de baja a ${t.name}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
           </div>
         ))}
       </div>
@@ -453,7 +459,7 @@ function TeachersSection() {
 }
 
 function RoomsSection() {
-  const { refresh } = useData()
+  const { refresh, canWrite } = useData()
   const { rooms } = useStudio()
   const [newName, setNewName] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -526,53 +532,59 @@ function RoomsSection() {
             ) : (
               <>
                 <span className="flex-1 text-sm text-foreground">{r.name}</span>
-                <button
-                  onClick={() => {
-                    setEditingId(r.id)
-                    setEditName(r.name)
-                  }}
-                  className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground"
-                  aria-label={`Renombrar ${r.name}`}
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  disabled={busy}
-                  onClick={() => {
-                    if (window.confirm(`¿Dar de baja la sala "${r.name}"?`)) {
-                      run(() => deactivateRoom(r.id))
-                    }
-                  }}
-                  className="w-7 h-7 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive"
-                  aria-label={`Dar de baja ${r.name}`}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                {canWrite && (
+                  <>
+                    <button
+                      onClick={() => {
+                        setEditingId(r.id)
+                        setEditName(r.name)
+                      }}
+                      className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground"
+                      aria-label={`Renombrar ${r.name}`}
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      disabled={busy}
+                      onClick={() => {
+                        if (window.confirm(`¿Dar de baja la sala "${r.name}"?`)) {
+                          run(() => deactivateRoom(r.id))
+                        }
+                      }}
+                      className="w-7 h-7 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive"
+                      aria-label={`Dar de baja ${r.name}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
               </>
             )}
           </div>
         ))}
 
-        <div className="flex items-center gap-2 pt-1">
-          <input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Nueva sala..."
-            className={cn(inputClass, 'flex-1')}
-          />
-          <button
-            disabled={busy || !newName.trim()}
-            onClick={() =>
-              run(async () => {
-                await createRoom(newName)
-                setNewName('')
-              })
-            }
-            className="px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
-          >
-            Agregar
-          </button>
-        </div>
+        {canWrite && (
+          <div className="flex items-center gap-2 pt-1">
+            <input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Nueva sala..."
+              className={cn(inputClass, 'flex-1')}
+            />
+            <button
+              disabled={busy || !newName.trim()}
+              onClick={() =>
+                run(async () => {
+                  await createRoom(newName)
+                  setNewName('')
+                })
+              }
+              className="px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              Agregar
+            </button>
+          </div>
+        )}
         {error && <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
       </div>
     </div>

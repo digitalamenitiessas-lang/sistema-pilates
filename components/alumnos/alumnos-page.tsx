@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Search, Plus, Filter, ChevronRight, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useStudio } from '@/lib/data-context'
+import { useData, useStudio } from '@/lib/data-context'
 import type { Student } from '@/lib/types'
 import { FichaAlumno } from './ficha-alumno'
 import { AlumnoFormModal } from './alumno-form-modal'
@@ -78,6 +78,7 @@ function StudentCard({ student, onClick }: { student: Student; onClick: () => vo
 }
 
 export function AlumnosPage() {
+  const { canWrite } = useData()
   const { students: STUDENTS, reservations: RESERVATIONS, payments: PAYMENTS } = useStudio()
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('todos')
@@ -156,13 +157,15 @@ export function AlumnosPage() {
           ))}
         </div>
 
-        <button
-          onClick={() => setShowNewStudent(true)}
-          className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Nuevo alumno</span>
-        </button>
+        {canWrite && (
+          <button
+            onClick={() => setShowNewStudent(true)}
+            className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Nuevo alumno</span>
+          </button>
+        )}
       </div>
 
       {/* Count */}

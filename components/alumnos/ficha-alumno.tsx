@@ -160,6 +160,7 @@ interface FichaAlumnoProps {
 }
 
 export function FichaAlumno({ student, reservations, payments, onBack }: FichaAlumnoProps) {
+  const { canWrite } = useData()
   const [activeTab, setActiveTab] = useState('resumen')
   const [showEdit, setShowEdit] = useState(false)
   const [showAssignPlan, setShowAssignPlan] = useState(false)
@@ -197,13 +198,15 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                     Alumno desde {new Date(student.joinDate).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}
                   </p>
                 </div>
-                <button
-                  onClick={() => setShowEdit(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shrink-0"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  Editar
-                </button>
+                {canWrite && (
+                  <button
+                    onClick={() => setShowEdit(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shrink-0"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    Editar
+                  </button>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-3 mt-3">
@@ -310,14 +313,14 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       Activo
                     </span>
-                  ) : (
+                  ) : canWrite ? (
                     <button
                       onClick={() => setShowPortalAccess(true)}
                       className="px-3.5 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity"
                     >
                       Crear acceso
                     </button>
-                  )}
+                  ) : null}
                 </div>
               </div>
 
@@ -499,31 +502,35 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                     </div>
                   </div>
 
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => setShowAssignPlan(true)}
-                      className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors"
-                    >
-                      Cambiar plan
-                    </button>
-                    <button
-                      onClick={() => setShowAssignPlan(true)}
-                      className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
-                    >
-                      Renovar membresía
-                    </button>
-                  </div>
+                  {canWrite && (
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setShowAssignPlan(true)}
+                        className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors"
+                      >
+                        Cambiar plan
+                      </button>
+                      <button
+                        onClick={() => setShowAssignPlan(true)}
+                        className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+                      >
+                        Renovar membresía
+                      </button>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="text-center py-12">
                   <BookOpen className="w-10 h-10 mx-auto mb-3 text-muted-foreground opacity-30" />
                   <p className="text-sm text-muted-foreground mb-4">Sin membresía activa</p>
-                  <button
-                    onClick={() => setShowAssignPlan(true)}
-                    className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
-                  >
-                    Asignar membresía
-                  </button>
+                  {canWrite && (
+                    <button
+                      onClick={() => setShowAssignPlan(true)}
+                      className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+                    >
+                      Asignar membresía
+                    </button>
+                  )}
                 </div>
               )}
             </div>

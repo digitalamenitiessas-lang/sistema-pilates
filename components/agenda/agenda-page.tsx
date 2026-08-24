@@ -274,7 +274,7 @@ function ClassDetailModal({
   onClose: () => void
   onEdit: (cls: ClassSession) => void
 }) {
-  const { refresh } = useData()
+  const { refresh, canWrite } = useData()
   const { students } = useStudio()
   const colors = DISCIPLINE_COLORS[cls.discipline]
   const isFull = cls.enrolled >= cls.capacity
@@ -344,20 +344,24 @@ function ClassDetailModal({
             <p className="text-xs text-muted-foreground mt-0.5">{shortDate(cls.date)}</p>
           </div>
           <div className="flex items-center gap-1">
-            <button
-              onClick={() => onEdit(cls)}
-              title="Editar clase"
-              className="w-7 h-7 rounded-full hover:bg-black/10 flex items-center justify-center text-muted-foreground"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={handleDelete}
-              title="Eliminar clase"
-              className="w-7 h-7 rounded-full hover:bg-destructive/15 flex items-center justify-center text-muted-foreground hover:text-destructive"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
+            {canWrite && (
+              <>
+                <button
+                  onClick={() => onEdit(cls)}
+                  title="Editar clase"
+                  className="w-7 h-7 rounded-full hover:bg-black/10 flex items-center justify-center text-muted-foreground"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={handleDelete}
+                  title="Eliminar clase"
+                  className="w-7 h-7 rounded-full hover:bg-destructive/15 flex items-center justify-center text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
             <button
               onClick={onClose}
               className="w-7 h-7 rounded-full hover:bg-black/10 flex items-center justify-center text-muted-foreground"
@@ -421,7 +425,7 @@ function ClassDetailModal({
             )}
           </div>
 
-          {done ? (
+          {!canWrite ? null : done ? (
             <p className="text-sm text-center font-semibold text-[#2E6040] bg-[#E8F2EB] rounded-xl px-3 py-3">
               {done}
             </p>
@@ -479,6 +483,7 @@ function ClassDetailModal({
 }
 
 export function AgendaPage() {
+  const { canWrite } = useData()
   const { classes, reservations } = useStudio()
   const [selectedDisciplines, setSelectedDisciplines] = useState<Discipline[]>([])
   const [selectedClass, setSelectedClass] = useState<WeekClass | null>(null)
@@ -557,16 +562,18 @@ export function AgendaPage() {
           )}
         </div>
 
-        <button
-          onClick={() => {
-            setEditingClass(undefined)
-            setShowForm(true)
-          }}
-          className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Nueva clase</span>
-        </button>
+        {canWrite && (
+          <button
+            onClick={() => {
+              setEditingClass(undefined)
+              setShowForm(true)
+            }}
+            className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Nueva clase</span>
+          </button>
+        )}
       </div>
 
       {/* Week navigation */}

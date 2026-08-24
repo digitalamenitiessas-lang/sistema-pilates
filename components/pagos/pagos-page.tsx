@@ -481,7 +481,7 @@ function MpLinkModal({ payment, onClose }: { payment: Payment; onClose: () => vo
 }
 
 export function PagosPage() {
-  const { refresh } = useData()
+  const { refresh, canWrite } = useData()
   const { payments: PAYMENTS, monthlyRevenue, mpConfigured, students } = useStudio()
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('todos')
@@ -492,7 +492,7 @@ export function PagosPage() {
 
   // Al abrir Pagos, acredita los links de MP que ya fueron pagados
   useEffect(() => {
-    if (!mpConfigured) return
+    if (!mpConfigured || !canWrite) return
     syncMpPayments()
       .then(async (updated) => {
         if (updated > 0) {
@@ -615,13 +615,15 @@ export function PagosPage() {
           ))}
         </div>
 
-        <button
-          onClick={() => setShowRegistrar(true)}
-          className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Registrar pago</span>
-        </button>
+        {canWrite && (
+          <button
+            onClick={() => setShowRegistrar(true)}
+            className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Registrar pago</span>
+          </button>
+        )}
       </div>
 
       {syncMsg && (
@@ -719,7 +721,7 @@ export function PagosPage() {
                             <PaymentStatusBadge status={p.status} />
                           </td>
                           <td className="px-4 py-3">
-                            {(p.status === 'pendiente' || p.status === 'vencido') && (
+                            {canWrite && (p.status === 'pendiente' || p.status === 'vencido') && (
                               <div className="flex items-center gap-1">
                                 <button
                                   onClick={() => setCollectingPayment(p)}

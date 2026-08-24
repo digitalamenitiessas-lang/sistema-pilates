@@ -33,6 +33,7 @@ const ALL_DISCIPLINES: Discipline[] = [
 const PLAN_COLORS = ['#C4735A', '#7D9B76', '#D4A854', '#9B6E8E', '#5E8FA8', '#B8956A']
 
 function PlanCard({ plan, onEdit, onDelete }: { plan: Plan; onEdit: () => void; onDelete: () => void }) {
+  const { canWrite } = useData()
   const { memberships } = useStudio()
   const activeCount = memberships.filter(
     (m) => m.planId === plan.id && (m.status === 'activa' || m.status === 'por vencer')
@@ -126,20 +127,22 @@ function PlanCard({ plan, onEdit, onDelete }: { plan: Plan; onEdit: () => void; 
               {activeCount !== 1 ? 's' : ''} activo{activeCount !== 1 ? 's' : ''}
             </span>
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={onEdit}
-              className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={onDelete}
-              className="w-8 h-8 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          {canWrite && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={onEdit}
+                className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={onDelete}
+                className="w-8 h-8 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -337,7 +340,7 @@ function PlanFormModal({ plan, onClose }: { plan?: Plan; onClose: () => void }) 
 }
 
 export function PlanesPage() {
-  const { refresh } = useData()
+  const { refresh, canWrite } = useData()
   const { plans: PLANS, memberships, students } = useStudio()
   const [activeTab, setActiveTab] = useState<Tab>('planes')
   const [showForm, setShowForm] = useState(false)
@@ -384,7 +387,7 @@ export function PlanesPage() {
           </button>
         </div>
 
-        {activeTab === 'planes' && (
+        {activeTab === 'planes' && canWrite && (
           <button
             onClick={() => {
               setEditingPlan(undefined)

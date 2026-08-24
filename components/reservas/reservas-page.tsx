@@ -38,7 +38,7 @@ const DISCIPLINE_COLORS: Record<string, string> = {
 }
 
 export function ReservasPage() {
-  const { refresh } = useData()
+  const { refresh, canWrite } = useData()
   const { reservations: RESERVATIONS, students: STUDENTS } = useStudio()
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('todas')
@@ -246,7 +246,7 @@ export function ReservasPage() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1">
-                            {r.status === 'confirmada' && (
+                            {canWrite && r.status === 'confirmada' && (
                               <>
                                 <button
                                   disabled={busyId === r.id}
@@ -278,7 +278,7 @@ export function ReservasPage() {
                                 </button>
                               </>
                             )}
-                            {r.status === 'lista de espera' && (
+                            {canWrite && r.status === 'lista de espera' && (
                               <button
                                 disabled={busyId === r.id}
                                 onClick={() =>
