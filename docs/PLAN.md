@@ -120,16 +120,18 @@ esto solo evita ofrecer acciones que iban a fallar.
 - [ ] Dominio propio elegido (conectar en Vercel).
 - [ ] Cambiar la contraseña admin de prueba y pasar la lista del equipo real.
 
-## Pendiente inmediato (Matías, antes de pushear a main)
+## Pendiente inmediato (Matías)
 
-1. Aplicar en el SQL Editor de Supabase, en orden: `0006`, `0007`, `0008`.
-2. Supabase → Authentication → Sign In / Up → **deshabilitar signups públicos**.
+1. **URGENTE**: aplicar `0006` en el SQL Editor — quedó sin correr el 26/08
+   (verificado en vivo: un signup con `role: admin` en la metadata todavía
+   crea un admin). Aplicar también `0009` (fix formato de montos).
+   `0007` y `0008` ya están aplicadas y verificadas ✅.
+2. Supabase → Authentication → Sign In / Up → **deshabilitar signups
+   públicos** (hoy siguen habilitados, verificado el 26/08).
 3. Vercel → Environment Variables: `NEXT_PUBLIC_VAPID_PUBLIC_KEY`,
    `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET` (los valores están en
    `.env.local`; elegir un `CRON_SECRET`). Cuando active Resend:
    `RESEND_API_KEY` y `EMAIL_FROM`.
-4. Recién ahí `git push` (main auto-deploya) y borrar el usuario de prueba
-   `claude.test@pilatestudio.com` si quedó.
 
 ## Estado técnico
 
