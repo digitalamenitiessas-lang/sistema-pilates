@@ -8,6 +8,7 @@ import type {
   Reservation,
   Payment,
   Alert,
+  AppNotification,
   MonthlyRevenue,
   Discipline,
   Profile,
@@ -107,6 +108,18 @@ export async function fetchStudioData(): Promise<StudioData> {
     classesRes.error || reservationsRes.error || paymentsRes.error || revenueRes.error
   if (firstError) throw firstError
 
+  // Datos sensibles de la ficha (tabla aparte desde 0008; RLS: staff y la
+  // propia alumna). Para el profesor viene vacío; si la migración no corrió
+  // todavía, los campos siguen llegando en students.
+  const privateMap = new Map<string, { medicalNotes?: string; emergencyContact?: string }>()
+  const privRes = await supabase.from('student_private').select('*')
+  for (const p of privRes.data ?? []) {
+    privateMap.set(p.student_id, {
+      medicalNotes: p.medical_notes || undefined,
+      emergencyContact: p.emergency_contact || undefined,
+    })
+  }
+
   const teachers: Teacher[] = (teachersRes.data ?? []).map((t) => ({
     id: t.id,
     name: t.name,
@@ -161,8 +174,8 @@ export async function fetchStudioData(): Promise<StudioData> {
     role: 'alumno',
     membership: latestMembership.get(s.id),
     observations: s.observations ?? undefined,
-    medicalNotes: s.medical_notes ?? undefined,
-    emergencyContact: s.emergency_contact ?? undefined,
+    medicalNotes: s.medical_notes ?? privateMap.get(s.id)?.medicalNotes,
+    emergencyContact: s.emergency_contact ?? privateMap.get(s.id)?.emergencyContact,
     userId: s.user_id ?? null,
   }))
 
@@ -341,6 +354,19 @@ export interface NewStudentInput {
   planId?: string
 }
 
+/**
+ * Lo médico vive en student_private (0008, el profesor no lo lee).
+ * Si la migración todavía no corrió, cae a la columna vieja de students.
+ */
+async function saveMedicalNotes(studentId: string, medicalNotes: string): Promise<void> {
+  const { error } = await supabase
+    .from('student_private')
+    .upsert({ student_id: studentId, medical_notes: medicalNotes, updated_at: new Date().toISOString() })
+  if (error) {
+    await supabase.from('students').update({ medical_notes: medicalNotes || null }).eq('id', studentId)
+  }
+}
+
 export async function createStudent(input: NewStudentInput, plans: Plan[]): Promise<void> {
   const { data: student, error } = await supabase
     .from('students')
@@ -351,11 +377,12 @@ export async function createStudent(input: NewStudentInput, plans: Plan[]): Prom
       dni: input.dni,
       birthdate: input.birthdate || null,
       observations: input.observations || null,
-      medical_notes: input.medicalNotes || null,
     })
     .select()
     .single()
   if (error) throw error
+
+  if (input.medicalNotes) await saveMedicalNotes(student.id, input.medicalNotes)
 
   if (input.planId) {
     await assignMembership(student.id, input.planId, plans)
@@ -372,10 +399,10 @@ export async function updateStudent(id: string, input: Omit<NewStudentInput, 'pl
       dni: input.dni,
       birthdate: input.birthdate || null,
       observations: input.observations || null,
-      medical_notes: input.medicalNotes || null,
     })
     .eq('id', id)
   if (error) throw error
+  await saveMedicalNotes(id, input.medicalNotes ?? '')
 }
 
 /** Crea la membresía y deja generada la deuda (pago pendiente). */
@@ -802,4 +829,106 @@ export async function deleteSystemUser(userId: string): Promise<void> {
 export async function updateUserRole(userId: string, role: Role): Promise<void> {
   const { error } = await supabase.from('profiles').update({ role }).eq('id', userId)
   if (error) throw error
+}
+
+// ---------------------------------------------------------------
+// Notificaciones (migración 0007)
+// ---------------------------------------------------------------
+
+/** Últimas notificaciones visibles para el usuario, con su estado de lectura. */
+export async function fetchNotifications(userId: string): Promise<AppNotification[]> {
+  const [notifRes, readsRes] = await Promise.all([
+    supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(30),
+    supabase.from('notification_reads').select('notification_id').eq('user_id', userId),
+  ])
+  if (notifRes.error) throw notifRes.error
+  const readSet = new Set((readsRes.data ?? []).map((r) => r.notification_id))
+  return (notifRes.data ?? []).map((n) => ({
+    id: n.id,
+    type: n.type,
+    title: n.title,
+    body: n.body,
+    studentId: n.student_id,
+    paymentId: n.payment_id,
+    createdAt: n.created_at,
+    read: readSet.has(n.id),
+  }))
+}
+
+export async function markNotificationsRead(userId: string, ids: string[]): Promise<void> {
+  if (ids.length === 0) return
+  const { error } = await supabase.from('notification_reads').upsert(
+    ids.map((id) => ({ notification_id: id, user_id: userId })),
+    { onConflict: 'notification_id,user_id', ignoreDuplicates: true }
+  )
+  if (error) throw error
+}
+
+// ---------------------------------------------------------------
+// Web Push: suscripción del dispositivo actual
+// ---------------------------------------------------------------
+
+function urlBase64ToUint8Array(base64: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64.length % 4)) % 4)
+  const raw = atob((base64 + padding).replace(/-/g, '+').replace(/_/g, '/'))
+  return Uint8Array.from(raw, (c) => c.charCodeAt(0))
+}
+
+export function pushSupported(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    'Notification' in window &&
+    'serviceWorker' in navigator &&
+    'PushManager' in window &&
+    Boolean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY)
+  )
+}
+
+async function pushApi(body: object, method: 'POST' | 'DELETE'): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) throw new Error('Sesión expirada, volvé a ingresar')
+  const res = await fetch('/api/push/subscribe', {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const json = await res.json().catch(() => null)
+    throw new Error(json?.error ?? `Error del servidor (${res.status})`)
+  }
+}
+
+/** true si este dispositivo ya está suscripto a push. */
+export async function getPushSubscription(): Promise<PushSubscription | null> {
+  if (!pushSupported()) return null
+  const reg = await navigator.serviceWorker.ready
+  return reg.pushManager.getSubscription()
+}
+
+/** Pide permiso, suscribe el dispositivo y lo registra en el servidor. */
+export async function enablePush(): Promise<void> {
+  if (!pushSupported()) throw new Error('Este navegador no soporta notificaciones push')
+  const permission = await Notification.requestPermission()
+  if (permission !== 'granted') {
+    throw new Error('Permiso de notificaciones denegado')
+  }
+  const reg = await navigator.serviceWorker.ready
+  const subscription =
+    (await reg.pushManager.getSubscription()) ??
+    (await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!) as BufferSource,
+    }))
+  await pushApi({ subscription: subscription.toJSON() }, 'POST')
+}
+
+/** Da de baja el push de este dispositivo (navegador y servidor). */
+export async function disablePush(): Promise<void> {
+  const subscription = await getPushSubscription()
+  if (!subscription) return
+  await pushApi({ endpoint: subscription.endpoint }, 'DELETE')
+  await subscription.unsubscribe()
 }

@@ -137,3 +137,22 @@ export interface Alert {
   studentId?: string
   date?: string
 }
+
+export type NotificationType =
+  | 'pago_acreditado'
+  | 'nuevo_alumno'
+  | 'membresia_por_vencer'
+  | 'membresia_vencida'
+  | 'deuda_vencida'
+
+/** Notificación persistida (tabla notifications, migración 0007). */
+export interface AppNotification {
+  id: string
+  type: NotificationType
+  title: string
+  body: string
+  studentId?: string | null
+  paymentId?: string | null
+  createdAt: string
+  read: boolean
+}

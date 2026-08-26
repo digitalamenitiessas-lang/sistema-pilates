@@ -78,6 +78,13 @@ function MercadoPagoSection() {
   const [savedMsg, setSavedMsg] = useState(false)
 
   useEffect(() => {
+    // Desde 0008 solo el admin lee las credenciales; recepción solo ve el
+    // estado de conexión (el servidor prueba con el token guardado).
+    if (!isAdmin) {
+      testMpConnection().then(setAccount).catch(() => setAccount(null))
+      setLoading(false)
+      return
+    }
     getMpSettings()
       .then((s) => {
         setAccessToken(s.accessToken)
@@ -89,7 +96,7 @@ function MercadoPagoSection() {
       })
       .catch(() => setError('No se pudo leer la configuración (¿corriste la migración 0002?)'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [isAdmin])
 
   const handleTest = async () => {
     setTesting(true)
@@ -196,14 +203,16 @@ function MercadoPagoSection() {
                   disabled={!isAdmin}
                   className={cn(inputClass, 'pr-10', !isAdmin && 'opacity-60')}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowToken((s) => !s)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  aria-label={showToken ? 'Ocultar token' : 'Mostrar token'}
-                >
-                  {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setShowToken((s) => !s)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label={showToken ? 'Ocultar token' : 'Mostrar token'}
+                  >
+                    {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                )}
               </div>
             </div>
 

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getMpAccessToken, mpFetch, requireStaff, supabaseForRequest } from '@/lib/mp-server'
+import { getMpAccessToken, mpFetch, requireStaff, supabaseAdmin, supabaseForRequest } from '@/lib/mp-server'
 
 // Genera un link de pago (Checkout Pro) para un pago pendiente.
 // external_reference = uuid del pago interno, para poder acreditarlo después.
@@ -18,7 +18,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Falta paymentId' }, { status: 400 })
   }
 
-  const accessToken = await getMpAccessToken(supabase)
+  // Desde 0008 solo el admin lee app_settings por RLS; el token se lee acá
+  // con el service role para que recepción pueda seguir generando links.
+  const accessToken = await getMpAccessToken(supabaseAdmin() ?? supabase)
   if (!accessToken) {
     return NextResponse.json(
       { error: 'Mercado Pago no está configurado. Cargá las credenciales en Configuración.' },

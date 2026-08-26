@@ -2,6 +2,8 @@
 // Solo se importa desde app/api/** — el access token de MP nunca
 // llega al navegador.
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { pushToStaff } from './push-server'
+import { sendEmail, emailLayout } from './email-server'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
@@ -127,5 +129,51 @@ export async function applyApprovedPayment(
     .eq('status', 'pendiente')
     .select()
   if (error) throw error
-  return (data?.length ?? 0) > 0
+  const applied = (data?.length ?? 0) > 0
+  // La notificación in-app la crea el trigger de la base; acá sumamos los
+  // avisos salientes (push al staff, email a la alumna). Best-effort: un
+  // fallo acá jamás debe deshacer la acreditación.
+  if (applied) {
+    await notifyPaymentCredited(supabase, data![0]).catch(() => {})
+  }
+  return applied
+}
+
+interface PaidPaymentRow {
+  student_id: string
+  amount: number
+  concept: string | null
+  receipt_number: number | null
+}
+
+async function notifyPaymentCredited(supabase: SupabaseClient, payment: PaidPaymentRow): Promise<void> {
+  const { data: student } = await supabase
+    .from('students')
+    .select('name, email')
+    .eq('id', payment.student_id)
+    .maybeSingle()
+  const amount = `$${Number(payment.amount).toLocaleString('es-AR')}`
+  const name = student?.name ?? 'Un alumno'
+
+  const admin = supabaseAdmin()
+  if (admin) {
+    await pushToStaff(admin, {
+      title: 'Pago acreditado',
+      body: `${name} pagó ${amount} por Mercado Pago${payment.concept ? ` — ${payment.concept}` : ''}`,
+      url: '/sistema',
+    })
+  }
+
+  if (student?.email) {
+    await sendEmail(
+      student.email,
+      'Recibimos tu pago 💚',
+      emailLayout(
+        `¡Gracias, ${name.split(' ')[0]}!`,
+        `<p>Registramos tu pago de <strong>${amount}</strong>${payment.concept ? ` por <strong>${payment.concept}</strong>` : ''}.</p>
+         ${payment.receipt_number ? `<p>Comprobante N° <strong>${String(payment.receipt_number).padStart(8, '0')}</strong>.</p>` : ''}
+         <p>¡Nos vemos en clase!</p>`
+      )
+    )
+  }
 }

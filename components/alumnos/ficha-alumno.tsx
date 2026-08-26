@@ -246,7 +246,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
         {/* Tabs */}
         <div className="border-b border-border bg-card px-4 md:px-6 overflow-x-auto">
           <div className="flex gap-0 -mb-px min-w-max">
-            {TABS.map(({ key, label, icon: Icon }) => (
+            {TABS.filter((t) => t.key !== 'pagos' || canWrite).map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
                 onClick={() => setActiveTab(key)}

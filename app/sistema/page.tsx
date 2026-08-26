@@ -84,7 +84,6 @@ function AppShell() {
   }
 
   const PageComponent = PAGE_COMPONENTS[currentPage]
-  const alertCount = data.alerts.filter((a) => a.type === 'danger' || a.type === 'warning').length
 
   return (
     <div className="flex h-screen overflow-hidden bg-background font-sans">
@@ -103,7 +102,7 @@ function AppShell() {
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <Header
           currentPage={currentPage}
-          alertCount={alertCount}
+          onNavigate={setCurrentPage}
           onOpenMobileMenu={() => setMobileMenuOpen(true)}
         />
 

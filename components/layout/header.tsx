@@ -1,7 +1,8 @@
 'use client'
 
-import { Bell, Eye, Menu, Search } from 'lucide-react'
+import { Eye, Menu, Search } from 'lucide-react'
 import { useData } from '@/lib/data-context'
+import { NotificationsBell } from './notifications-bell'
 import type { PageKey } from './sidebar'
 
 const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
@@ -16,11 +17,11 @@ const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
 
 interface HeaderProps {
   currentPage: PageKey
-  alertCount?: number
+  onNavigate: (page: PageKey) => void
   onOpenMobileMenu: () => void
 }
 
-export function Header({ currentPage, alertCount = 0, onOpenMobileMenu }: HeaderProps) {
+export function Header({ currentPage, onNavigate, onOpenMobileMenu }: HeaderProps) {
   const { canWrite } = useData()
   const { title, subtitle } = PAGE_TITLES[currentPage]
 
@@ -58,17 +59,7 @@ export function Header({ currentPage, alertCount = 0, onOpenMobileMenu }: Header
         </div>
 
         {/* Notifications */}
-        <button
-          className="relative w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          aria-label="Notificaciones"
-        >
-          <Bell className="w-5 h-5" />
-          {alertCount > 0 && (
-            <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center">
-              {alertCount > 9 ? '9+' : alertCount}
-            </span>
-          )}
-        </button>
+        <NotificationsBell onNavigate={onNavigate} />
 
         {/* Date badge */}
         <div className="hidden sm:flex flex-col items-end">

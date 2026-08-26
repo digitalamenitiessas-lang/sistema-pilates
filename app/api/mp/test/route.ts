@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getMpAccessToken, mpFetch, requireStaff, supabaseForRequest } from '@/lib/mp-server'
+import { getMpAccessToken, mpFetch, requireStaff, supabaseAdmin, supabaseForRequest } from '@/lib/mp-server'
 
 // Prueba credenciales de Mercado Pago: las recibidas en el body
 // (antes de guardar) o las ya guardadas en la configuración.
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   }
 
   const { accessToken: candidate } = await request.json().catch(() => ({}))
-  const accessToken = candidate || (await getMpAccessToken(supabase))
+  const accessToken = candidate || (await getMpAccessToken(supabaseAdmin() ?? supabase))
   if (!accessToken) {
     return NextResponse.json(
       { error: 'Mercado Pago no está configurado todavía' },

@@ -4,6 +4,7 @@ import {
   findApprovedMpPayment,
   getMpAccessToken,
   requireStaff,
+  supabaseAdmin,
   supabaseForRequest,
 } from '@/lib/mp-server'
 
@@ -19,7 +20,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: denied }, { status: 403 })
   }
 
-  const accessToken = await getMpAccessToken(supabase)
+  // El token se lee con service role: desde 0008 recepción no lee app_settings
+  const accessToken = await getMpAccessToken(supabaseAdmin() ?? supabase)
   if (!accessToken) {
     return NextResponse.json({ updated: 0, configured: false })
   }

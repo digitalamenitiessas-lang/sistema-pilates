@@ -66,9 +66,11 @@ export function Sidebar({
   mobileOpen,
   onMobileClose,
 }: SidebarProps) {
-  const { profile, signOut } = useData()
+  const { profile, canWrite, signOut } = useData()
   // El drawer mobile siempre se muestra expandido; el colapso es cosa de desktop
   const showLabels = !collapsed || mobileOpen
+  // El profesor no ve datos económicos ni configuración (rol solo consulta)
+  const navItems = NAV_ITEMS.filter((item) => item.key !== 'pagos' || canWrite)
 
   return (
     <>
@@ -144,7 +146,7 @@ export function Sidebar({
 
       {/* Navigation */}
       <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto" aria-label="Navegación principal">
-        {NAV_ITEMS.map(({ key, label, icon: Icon }) => {
+        {navItems.map(({ key, label, icon: Icon }) => {
           const isActive = currentPage === key
           return (
             <button
@@ -169,6 +171,7 @@ export function Sidebar({
 
       {/* Bottom actions */}
       <div className="px-2 py-3 border-t border-sidebar-border space-y-0.5">
+        {canWrite && (
         <button
           onClick={() => onNavigate('configuracion')}
           className={cn(
@@ -180,6 +183,7 @@ export function Sidebar({
           <Settings className={cn('shrink-0', !showLabels ? 'w-5 h-5' : 'w-4 h-4')} />
           {showLabels && <span>Configuración</span>}
         </button>
+        )}
         <button
           onClick={() => signOut()}
           className={cn(

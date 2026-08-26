@@ -120,20 +120,24 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
           sub={`${todayTotal} reservas confirmadas`}
           accent="#7D9B76"
         />
-        <StatCard
-          icon={TrendingUp}
-          label={`Ingresos ${currentMonth?.month ?? ''}`}
-          value={`$${(currentMonthRevenue / 1000).toFixed(0)}k`}
-          sub={`${Number(revenueDiff) >= 0 ? '+' : ''}${revenueDiff}% vs ${prevMonth?.month ?? 'mes anterior'}`}
-          accent="#D4A854"
-        />
-        <StatCard
-          icon={AlertTriangle}
-          label="Pagos pendientes"
-          value={String(pendingPayments.length)}
-          sub={`$${pendingPayments.reduce((a, p) => a + p.amount, 0).toLocaleString('es-AR')} total`}
-          accent="#EF4444"
-        />
+        {canWrite && (
+          <StatCard
+            icon={TrendingUp}
+            label={`Ingresos ${currentMonth?.month ?? ''}`}
+            value={`$${(currentMonthRevenue / 1000).toFixed(0)}k`}
+            sub={`${Number(revenueDiff) >= 0 ? '+' : ''}${revenueDiff}% vs ${prevMonth?.month ?? 'mes anterior'}`}
+            accent="#D4A854"
+          />
+        )}
+        {canWrite && (
+          <StatCard
+            icon={AlertTriangle}
+            label="Pagos pendientes"
+            value={String(pendingPayments.length)}
+            sub={`$${pendingPayments.reduce((a, p) => a + p.amount, 0).toLocaleString('es-AR')} total`}
+            accent="#EF4444"
+          />
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
