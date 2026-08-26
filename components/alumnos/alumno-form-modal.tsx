@@ -76,7 +76,7 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
         </div>
 
         <div className="px-6 py-5 space-y-4 overflow-y-auto">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className={labelClass}>Nombre completo *</label>
               <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="Ej: Ana García" className={inputClass} />

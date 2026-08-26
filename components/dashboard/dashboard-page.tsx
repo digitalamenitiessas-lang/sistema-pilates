@@ -103,7 +103,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
   const maxRevenue = Math.max(1, ...monthlyRevenue.map((m) => m.amount))
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-6 p-4 md:p-6">
       {/* Stats row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard

@@ -229,7 +229,7 @@ function PlanFormModal({ plan, onClose }: { plan?: Plan; onClose: () => void }) 
         </div>
 
         <div className="px-6 py-5 space-y-4 overflow-y-auto">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className={labelClass}>Nombre del plan *</label>
               <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="Ej: Reformer Plus" className={inputClass} />
@@ -401,9 +401,9 @@ export function PlanesPage() {
         )}
       </div>
 
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 md:p-6">
         {activeTab === 'planes' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {PLANS.map((plan) => (
               <PlanCard
                 key={plan.id}

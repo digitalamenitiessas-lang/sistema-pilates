@@ -316,7 +316,7 @@ function CobrarModal({ payment, onClose }: { payment: Payment; onClose: () => vo
       onClick={onClose}
     >
       <div
-        className="bg-card rounded-2xl shadow-2xl w-full max-w-sm border border-border overflow-hidden"
+        className="bg-card rounded-2xl shadow-2xl w-full max-w-sm border border-border max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {receiptNumber !== null ? (
@@ -418,7 +418,7 @@ function MpLinkModal({ payment, onClose }: { payment: Payment; onClose: () => vo
       onClick={onClose}
     >
       <div
-        className="bg-card rounded-2xl shadow-2xl w-full max-w-md border border-border overflow-hidden"
+        className="bg-card rounded-2xl shadow-2xl w-full max-w-md border border-border max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
@@ -586,7 +586,7 @@ export function PagosPage() {
       </div>
 
       {/* Toolbar */}
-      <div className="px-6 py-4 border-b border-border bg-card flex items-center gap-3 flex-wrap">
+      <div className="px-4 md:px-6 py-4 border-b border-border bg-card flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-background text-sm flex-1 min-w-48 max-w-xs">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
           <input
@@ -633,7 +633,7 @@ export function PagosPage() {
         </div>
       )}
 
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 md:p-6">
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Table */}
           <div className="xl:col-span-2 bg-card rounded-2xl border border-border overflow-hidden">

@@ -617,7 +617,7 @@ function UserFormModal({ onClose, onCreated }: { onClose: () => void; onCreated:
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/20 backdrop-blur-sm" onClick={onClose}>
       <form
         onSubmit={handleSubmit}
-        className="bg-card rounded-2xl shadow-2xl w-full max-w-md border border-border overflow-hidden"
+        className="bg-card rounded-2xl shadow-2xl w-full max-w-md border border-border max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
@@ -790,7 +790,7 @@ function UsersSection() {
 
 export function ConfiguracionPage() {
   return (
-    <div className="p-6 max-w-2xl space-y-8">
+    <div className="p-4 md:p-6 max-w-2xl space-y-8">
       <div>
         <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
           <Users className="w-4 h-4" />

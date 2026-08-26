@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Sidebar, type PageKey } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
@@ -38,6 +38,19 @@ function AppShell() {
   const { session, sessionLoading, profile, profileReady, data, dataLoading, dataError, refresh } = useData()
   const [currentPage, setCurrentPage] = useState<PageKey>('dashboard')
   const [collapsed, setCollapsed] = useState(false)
+  // En mobile el sidebar es un drawer superpuesto; acá vive su apertura
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  useEffect(() => {
+    // Si el viewport pasa a desktop con el drawer abierto, cerrarlo:
+    // en desktop el sidebar vuelve al flujo y el estado quedaría pegado
+    const mq = window.matchMedia('(min-width: 768px)')
+    const onChange = (e: MediaQueryListEvent) => {
+      if (e.matches) setMobileMenuOpen(false)
+    }
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
 
   if (sessionLoading) return <FullScreenLoader message="Iniciando..." />
   if (!session) return <LoginPage />
@@ -69,13 +82,22 @@ function AppShell() {
     <div className="flex h-screen overflow-hidden bg-background font-sans">
       <Sidebar
         currentPage={currentPage}
-        onNavigate={setCurrentPage}
+        onNavigate={(page) => {
+          setCurrentPage(page)
+          setMobileMenuOpen(false)
+        }}
         collapsed={collapsed}
         onToggleCollapse={() => setCollapsed((c) => !c)}
+        mobileOpen={mobileMenuOpen}
+        onMobileClose={() => setMobileMenuOpen(false)}
       />
 
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        <Header currentPage={currentPage} alertCount={alertCount} />
+        <Header
+          currentPage={currentPage}
+          alertCount={alertCount}
+          onOpenMobileMenu={() => setMobileMenuOpen(true)}
+        />
 
         <main className="flex-1 overflow-auto">
           <PageComponent onNavigate={setCurrentPage} />

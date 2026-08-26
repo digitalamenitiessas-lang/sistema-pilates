@@ -119,9 +119,9 @@ export function AlumnosPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="px-6 py-4 border-b border-border bg-card flex items-center gap-3 flex-wrap">
+      <div className="px-4 md:px-6 py-4 border-b border-border bg-card flex items-center gap-3 flex-wrap">
         {/* Search */}
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-background text-sm flex-1 min-w-48 max-w-xs">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-background text-sm flex-1 min-w-36 max-w-xs">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
           <input
             type="text"
@@ -169,7 +169,7 @@ export function AlumnosPage() {
       </div>
 
       {/* Count */}
-      <div className="px-6 py-3 flex items-center justify-between border-b border-border">
+      <div className="px-4 md:px-6 py-3 flex items-center justify-between gap-3 flex-wrap border-b border-border">
         <p className="text-sm text-muted-foreground">
           <strong className="text-foreground">{filtered.length}</strong> alumno
           {filtered.length !== 1 ? 's' : ''}
@@ -197,14 +197,14 @@ export function AlumnosPage() {
       </div>
 
       {/* Grid */}
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 md:p-6">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
             <Search className="w-10 h-10 mb-3 opacity-30" />
             <p className="text-sm">No se encontraron alumnos</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filtered.map((student) => (
               <StudentCard
                 key={student.id}

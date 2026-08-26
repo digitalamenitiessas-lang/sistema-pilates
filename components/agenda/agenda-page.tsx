@@ -322,7 +322,7 @@ function ClassDetailModal({
       onClick={onClose}
     >
       <div
-        className="bg-card rounded-2xl shadow-2xl w-full max-w-sm border border-border overflow-hidden"
+        className="bg-card rounded-2xl shadow-2xl w-full max-w-sm border border-border max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -490,6 +490,11 @@ export function AgendaPage() {
   const [weekOffset, setWeekOffset] = useState(0)
   const [showForm, setShowForm] = useState(false)
   const [editingClass, setEditingClass] = useState<ClassSession | undefined>(undefined)
+  // Día visible en la vista mobile (0=Lun..5=Sáb); arranca en hoy, o lunes si es domingo
+  const [mobileDay, setMobileDay] = useState(() => {
+    const dow = (new Date().getDay() + 6) % 7
+    return dow > 5 ? 0 : dow
+  })
 
   const weekStart = addDays(mondayOf(), weekOffset * 7)
   const weekEnd = addDays(weekStart, 5)
@@ -525,7 +530,7 @@ export function AgendaPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Filters */}
-      <div className="px-6 py-4 border-b border-border bg-card flex items-center gap-3 flex-wrap">
+      <div className="px-4 md:px-6 py-4 border-b border-border bg-card flex items-center gap-3 flex-wrap">
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
           Disciplinas:
         </span>
@@ -577,7 +582,7 @@ export function AgendaPage() {
       </div>
 
       {/* Week navigation */}
-      <div className="px-6 py-3 border-b border-border flex items-center justify-between bg-card">
+      <div className="px-4 md:px-6 py-3 border-b border-border flex items-center justify-between bg-card">
         <button
           onClick={() => setWeekOffset((w) => w - 1)}
           className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
@@ -605,8 +610,55 @@ export function AgendaPage() {
         </button>
       </div>
 
-      {/* Grid */}
-      <div className="flex-1 overflow-auto p-4">
+      {/* Vista mobile: un día a la vez, sin paneo horizontal */}
+      <div className="md:hidden flex-1 overflow-auto p-4 flex flex-col gap-3">
+        <div className="grid grid-cols-6 gap-1.5">
+          {DAYS_SHORT.map((day, i) => {
+            const dayDate = addDays(weekStart, i)
+            const isToday = dayDate === today
+            const isSelected = mobileDay === i
+            return (
+              <button
+                key={day}
+                onClick={() => setMobileDay(i)}
+                className={cn(
+                  'flex flex-col items-center py-2 rounded-xl border text-xs font-semibold transition-colors',
+                  isSelected
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : isToday
+                    ? 'bg-card text-primary border-primary'
+                    : 'bg-card text-muted-foreground border-border'
+                )}
+              >
+                <span>{day}</span>
+                <span className={cn('text-[10px] font-normal', isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
+                  {dayDate.slice(8, 10)}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        <div className="flex flex-col gap-0">
+          {(() => {
+            const dayCls = filtered
+              .filter((c) => c.dayOfWeek === mobileDay)
+              .sort((a, b) => a.time.localeCompare(b.time))
+            if (dayCls.length === 0) {
+              return (
+                <div className="h-24 rounded-xl border border-dashed border-border flex items-center justify-center">
+                  <span className="text-xs text-muted-foreground">Sin clases este día</span>
+                </div>
+              )
+            }
+            return dayCls.map((cls) => (
+              <ClassCard key={cls.id} cls={cls} onClick={() => setSelectedClass(cls)} />
+            ))
+          })()}
+        </div>
+      </div>
+
+      {/* Grid semanal (desktop) */}
+      <div className="hidden md:block flex-1 overflow-auto p-4">
         <div className="grid grid-cols-6 gap-3 min-w-[720px]">
           {/* Day headers */}
           {DAYS.map((day, i) => {
@@ -661,7 +713,7 @@ export function AgendaPage() {
       </div>
 
       {/* Summary row */}
-      <div className="px-6 py-3 border-t border-border bg-card flex items-center gap-6 text-xs text-muted-foreground flex-wrap">
+      <div className="px-4 md:px-6 py-3 border-t border-border bg-card flex items-center gap-x-6 gap-y-1 text-xs text-muted-foreground flex-wrap">
         <span>
           <strong className="text-foreground">{filtered.length}</strong> clases esta semana
         </span>

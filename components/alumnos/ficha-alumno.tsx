@@ -62,7 +62,7 @@ function PortalAccessModal({ student, onClose }: { student: Student; onClose: ()
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/20 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="bg-card rounded-2xl shadow-2xl w-full max-w-md border border-border overflow-hidden"
+        className="bg-card rounded-2xl shadow-2xl w-full max-w-md border border-border max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {done ? (
@@ -185,7 +185,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
 
       <div className="flex-1 overflow-auto">
         {/* Profile header */}
-        <div className="bg-card border-b border-border px-6 py-6">
+        <div className="bg-card border-b border-border px-4 md:px-6 py-6">
           <div className="flex items-start gap-4">
             <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
               <span className="text-primary font-bold text-xl">{student.avatar}</span>
@@ -244,14 +244,14 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-border bg-card px-6">
-          <div className="flex gap-0 -mb-px">
+        <div className="border-b border-border bg-card px-4 md:px-6 overflow-x-auto">
+          <div className="flex gap-0 -mb-px min-w-max">
             {TABS.map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
                 onClick={() => setActiveTab(key)}
                 className={cn(
-                  'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors',
+                  'flex items-center gap-2 px-3 md:px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap shrink-0',
                   activeTab === key
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -265,7 +265,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
         </div>
 
         {/* Tab content */}
-        <div className="p-6">
+        <div className="p-4 md:p-6">
           {/* Resumen */}
           {activeTab === 'resumen' && (
             <div className="space-y-4 max-w-2xl">
@@ -275,7 +275,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                   <User className="w-4 h-4 text-primary" />
                   Datos personales
                 </h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {[
                     { label: 'Nombre completo', value: student.name },
                     { label: 'Email', value: student.email },
@@ -484,7 +484,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3 mt-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
                       <div className="bg-muted rounded-xl p-3 text-center">
                         <p className="text-xl font-bold text-foreground">{ms.classesTotal}</p>
                         <p className="text-[10px] text-muted-foreground">Total clases</p>

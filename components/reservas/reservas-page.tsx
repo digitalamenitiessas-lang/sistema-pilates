@@ -79,7 +79,7 @@ export function ReservasPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="px-6 py-4 border-b border-border bg-card flex items-center gap-3 flex-wrap">
+      <div className="px-4 md:px-6 py-4 border-b border-border bg-card flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-background text-sm flex-1 min-w-48 max-w-xs">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
           <input
@@ -156,7 +156,7 @@ export function ReservasPage() {
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 md:p-6">
         <div className="bg-card rounded-2xl border border-border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
