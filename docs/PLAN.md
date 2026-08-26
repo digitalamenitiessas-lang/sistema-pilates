@@ -1,24 +1,26 @@
 # Plan de avance — PilatesStudio
 
 > Documento vivo. Se actualiza con cada bloque de trabajo.
-> Última actualización: **24/08/2026** (rol profesor en modo solo consulta).
+> Última actualización: **26/08/2026** (responsive + PWA + notificaciones + roles).
 > Documento para la clienta: `docs/PilatesStudio-integraciones-y-etapas.pdf`
 > (versión presentable, no este plan interno).
 
 ## Estado general
 
 Sistema desplegado en Vercel y operativo con datos de ejemplo. Núcleo completo
-(gestión + cobros + landing + autogestión + portal del alumno). Lo que falta se
-divide en: trabajo nuestro (renovación y avisos automáticos, huecos del portal,
-mostrador) y cosas bloqueadas por la clienta (cuenta MP, datos reales,
+(gestión + cobros + landing + autogestión + portal del alumno), ahora también
+usable desde el celular, instalable como app y con notificaciones reales.
+Lo que falta se divide en: trabajo nuestro (renovación automática, huecos del
+portal, mostrador) y cosas bloqueadas por la clienta (cuenta MP, datos reales,
 decisiones de negocio).
 
-Límite de fondo a tener presente: **hoy no corre ningún proceso solo**. No hay
-cron ni envíos; las alertas se calculan en el navegador al abrir el sistema
-(`buildAlerts` en `lib/api.ts`) y los estados "vencida"/"por vencer" se derivan
-al leer, no están guardados. Lo único automático es el webhook de MP, el cupo
-por trigger, la numeración de comprobantes y el descuento de clase al marcar
-asistencia. Todo lo demás pasa porque alguien lo hace.
+Desde el 26/08 **sí corre un proceso solo**: el cron diario de Vercel
+(`/api/cron/diario`) genera las notificaciones de membresías por vencer /
+vencidas y deudas, manda push al staff y emails a las alumnas (cuando Resend
+esté configurado). Además los triggers de la base crean notificaciones al
+acreditarse un pago y al darse de alta un alumno. Las alertas del tablero de
+inicio siguen derivándose al leer (`buildAlerts` en `lib/api.ts`) — conviven:
+el tablero muestra el estado, la campana muestra los eventos.
 
 ## Etapas
 
@@ -58,6 +60,25 @@ misma regla, y esconde las acciones en agenda, alumnos, ficha, planes,
 reservas, pagos, configuración y los avisos de WhatsApp del inicio. El header
 muestra el distintivo "Solo consulta". La base sigue siendo la que manda —
 esto solo evita ofrecer acciones que iban a fallar.
+
+### ✅ Bloque 26/08 — Seguridad, responsive, PWA, notificaciones y roles
+- **Seguridad**: el trigger de perfiles ya no toma el rol de la metadata del
+  registro (cualquiera con la anon key podía nacer admin si los signups
+  públicos estaban habilitados — migración `0006`); checks explícitos de rol
+  staff en los endpoints de MP.
+- **Responsive**: sidebar drawer en mobile con hamburguesa (la causa del
+  "se desconfigura todo"), agenda con vista por día, tabs de la ficha con
+  scroll, modales que ya no cortan contenido, grids y paddings.
+- **PWA**: invitación post-login a agregar la app al inicio (pasos de Safari
+  en iPhone, diálogo nativo en Android; `pwa-debug`=`ios` en localStorage la
+  fuerza para demos) + service worker con push.
+- **Notificaciones** (migración `0007`): campana funcional con panel, leídas
+  por usuario, Realtime, push por dispositivo (VAPID), cron diario de
+  vencimientos, emails Resend (pago recibido, por vencer, deuda) — no-op sin
+  `RESEND_API_KEY`.
+- **Roles** (migración `0008`): profesor sin pagos ni datos médicos
+  (`student_private`), credenciales MP legibles solo por admin (recepción
+  opera vía service role), chip "Solo consulta" visible en mobile.
 
 ### 🔜 Etapa 2 — Cobranza que se cobra sola *(próximo bloque nuestro)*
 - [ ] **Renovación automática de membresías** con generación de la cuota del
@@ -99,14 +120,27 @@ esto solo evita ofrecer acciones que iban a fallar.
 - [ ] Dominio propio elegido (conectar en Vercel).
 - [ ] Cambiar la contraseña admin de prueba y pasar la lista del equipo real.
 
+## Pendiente inmediato (Matías, antes de pushear a main)
+
+1. Aplicar en el SQL Editor de Supabase, en orden: `0006`, `0007`, `0008`.
+2. Supabase → Authentication → Sign In / Up → **deshabilitar signups públicos**.
+3. Vercel → Environment Variables: `NEXT_PUBLIC_VAPID_PUBLIC_KEY`,
+   `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET` (los valores están en
+   `.env.local`; elegir un `CRON_SECRET`). Cuando active Resend:
+   `RESEND_API_KEY` y `EMAIL_FROM`.
+4. Recién ahí `git push` (main auto-deploya) y borrar el usuario de prueba
+   `claude.test@pilatestudio.com` si quedó.
+
 ## Estado técnico
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a `0005` ✅ |
-| Deploy | Vercel, auto-deploy desde `main` ✅ |
+| Migraciones aplicadas | `0001` a `0005` ✅ · `0006`–`0008` escritas, **pendientes de aplicar** |
+| Deploy | Vercel, auto-deploy desde `main` ✅ · cron diario en `vercel.json` |
 | `SUPABASE_SERVICE_ROLE_KEY` | En `.env.local` ✅ · verificar en Vercel |
+| VAPID / push | Claves generadas en `.env.local` · cargar en Vercel |
+| Resend | Código listo, sin cuenta todavía (no-op hasta poner la key) |
 | Webhook MP | Programado; registrar URL en MP al conectar la cuenta real |
 | Usuarios de prueba | `admin@pilatestudio.com` (cambiar clave) · `camila.portal@…` (demo) |
-| Roles | 4: admin y recepción escriben; profesor y alumno son de solo consulta (UI + RLS) ✅ |
+| Roles | admin y recepción escriben; profesor consulta sin pagos ni datos médicos; alumno → portal (UI + RLS) ✅ |
 | Acceso enviado a la clienta | 24/08/2026, cuenta admin + demo del portal |
