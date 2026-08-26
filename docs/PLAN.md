@@ -124,10 +124,14 @@ esto solo evita ofrecer acciones que iban a fallar.
 
 ## Pendiente inmediato
 
-- **Aplicar `0010` en el SQL Editor** (renovación automática). El cron ya
-  deployado la saltea con gracia hasta entonces (`renewalsSkipped`).
-- Resend: cuando se active la cuenta, cargar `RESEND_API_KEY` y
-  `EMAIL_FROM` en Vercel — los emails arrancan solos, el código ya está.
+- ~~Migración `0010`~~ ✅ aplicada; renovación verificada end-to-end el
+  26/08 (renueva, genera cuota, notifica, email entregado, idempotente).
+- **Cargar `RESEND_API_KEY` en Vercel** (mismo valor que `.env.local`) para
+  que producción también mande emails.
+- Resend en sandbox: sin dominio verificado solo entrega a
+  `digitalamenitiessas@gmail.com`. Al tener el dominio del estudio:
+  Resend → Domains → verificar DNS → `EMAIL_FROM` en Vercel, y los emails
+  a las alumnas fluyen solos.
 
 ## Estado técnico
 
@@ -137,7 +141,7 @@ esto solo evita ofrecer acciones que iban a fallar.
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |
 | `SUPABASE_SERVICE_ROLE_KEY` | En `.env.local` ✅ · verificar en Vercel |
 | VAPID / push | Claves generadas en `.env.local` · cargar en Vercel |
-| Resend | Código listo, sin cuenta todavía (no-op hasta poner la key) |
+| Resend | ✅ Activo en sandbox (26/08, email real entregado) · key en `.env.local`, cargar en Vercel · dominio del estudio pendiente para emails a alumnas |
 | Webhook MP | Programado; registrar URL en MP al conectar la cuenta real |
 | Usuarios de prueba | `admin@pilatestudio.com` (cambiar clave) · `camila.portal@…` (demo) |
 | Roles | admin y recepción escriben; profesor consulta sin pagos ni datos médicos; alumno → portal (UI + RLS) ✅ |
