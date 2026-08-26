@@ -120,25 +120,20 @@ esto solo evita ofrecer acciones que iban a fallar.
 - [ ] Dominio propio elegido (conectar en Vercel).
 - [ ] Cambiar la contraseña admin de prueba y pasar la lista del equipo real.
 
-## Pendiente inmediato (Matías)
+## Pendiente inmediato
 
-1. **URGENTE**: aplicar `0006` en el SQL Editor — quedó sin correr el 26/08
-   (verificado en vivo: un signup con `role: admin` en la metadata todavía
-   crea un admin). Aplicar también `0009` (fix formato de montos).
-   `0007` y `0008` ya están aplicadas y verificadas ✅.
-2. Supabase → Authentication → Sign In / Up → **deshabilitar signups
-   públicos** (hoy siguen habilitados, verificado el 26/08).
-3. Vercel → Environment Variables: `NEXT_PUBLIC_VAPID_PUBLIC_KEY`,
-   `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET` (los valores están en
-   `.env.local`; elegir un `CRON_SECRET`). Cuando active Resend:
-   `RESEND_API_KEY` y `EMAIL_FROM`.
+- ~~Migraciones 0006–0009~~ ✅ aplicadas y verificadas en vivo el 26/08
+  (el signup con rol admin en metadata quedó neutralizado por partida
+  doble: signups públicos deshabilitados + trigger que ignora la metadata).
+- Resend: cuando se active la cuenta, cargar `RESEND_API_KEY` y
+  `EMAIL_FROM` en Vercel — los emails arrancan solos, el código ya está.
 
 ## Estado técnico
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a `0005` ✅ · `0006`–`0008` escritas, **pendientes de aplicar** |
-| Deploy | Vercel, auto-deploy desde `main` ✅ · cron diario en `vercel.json` |
+| Migraciones aplicadas | `0001` a `0009` ✅ (verificadas 26/08) |
+| Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |
 | `SUPABASE_SERVICE_ROLE_KEY` | En `.env.local` ✅ · verificar en Vercel |
 | VAPID / push | Claves generadas en `.env.local` · cargar en Vercel |
 | Resend | Código listo, sin cuenta todavía (no-op hasta poner la key) |
