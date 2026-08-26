@@ -13,6 +13,7 @@ import { PagosPage } from '@/components/pagos/pagos-page'
 import { LoginPage } from '@/components/auth/login-page'
 import { ConfiguracionPage } from '@/components/configuracion/configuracion-page'
 import { PortalPage } from '@/components/portal/portal-page'
+import { InstallPrompt } from '@/components/pwa/install-prompt'
 import { DataProvider, useData } from '@/lib/data-context'
 
 const PAGE_COMPONENTS: Record<PageKey, React.ComponentType<{ onNavigate: (page: PageKey) => void }>> = {
@@ -59,7 +60,14 @@ function AppShell() {
   if (!profileReady && !dataError) return <FullScreenLoader message="Cargando tu perfil..." />
 
   // Los alumnos ven su portal, no el sistema de gestión
-  if (profile?.role === 'alumno' && data) return <PortalPage />
+  if (profile?.role === 'alumno' && data) {
+    return (
+      <>
+        <PortalPage />
+        <InstallPrompt />
+      </>
+    )
+  }
 
   if (dataError || !data) {
     return (
@@ -103,6 +111,8 @@ function AppShell() {
           <PageComponent onNavigate={setCurrentPage} />
         </main>
       </div>
+
+      <InstallPrompt />
     </div>
   )
 }
