@@ -2,8 +2,9 @@
 
 > Documento vivo. Se actualiza con cada bloque de trabajo.
 > Última actualización: **26/08/2026** (responsive + PWA + notificaciones + roles).
-> Documento para la clienta: `docs/PilatesStudio-integraciones-y-etapas.pdf`
-> (versión presentable, no este plan interno).
+> Documentos para la clienta (presentables, no este plan interno):
+> `docs/PilatesStudio-que-incluye-el-sistema.pdf` (qué abarca hoy + roles) ·
+> `docs/PilatesStudio-integraciones-y-etapas.pdf` (integraciones y etapas).
 
 ## Estado general
 
