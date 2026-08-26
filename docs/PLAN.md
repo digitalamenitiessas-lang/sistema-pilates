@@ -94,14 +94,17 @@ esto solo evita ofrecer acciones que iban a fallar.
       real necesita la cuenta de la clienta. *(Evaluar si hace falta: la
       renovación + link de pago en el email ya cubre gran parte.)*
 
-### 🔜 Portal del alumno — lo que falta para que escale *(nuestro)*
-- [ ] **Auto-registro.** No existe ningún `signUp`: hoy el acceso lo crea el
-      staff desde la ficha, uno por uno, y le pasa la clave a mano. Con
-      volumen y rotación pasa a ser trabajo permanente.
-- [ ] **Recuperar contraseña.** No hay reset ni cambio de clave desde el
-      portal. Si una alumna pierde la suya, la única salida hoy es el
-      dashboard de Supabase. Va a generar pedidos de soporte desde el día
-      uno.
+### ✅ Portal del alumno — acceso autogestionado (26/08)
+- [x] **Auto-registro**: "Creá tu acceso" en el login. Valida email + DNI
+      contra la ficha del estudio vía `/api/portal/registro` (service role)
+      — los signups públicos de Supabase siguen deshabilitados, nadie puede
+      registrarse sin ficha previa, y la cuenta nace vinculada y con rol
+      alumno. Verificado E2E con casos negativos (DNI/email erróneos,
+      duplicado → 409).
+- [x] **Recuperar contraseña**: "¿Olvidaste tu contraseña?" en el login →
+      email con enlace (mailer de Supabase, con límite de frecuencia hasta
+      configurar SMTP propio) → `/sistema/recuperar` para elegir la nueva.
+- [x] **Cambiar contraseña** desde el portal (ícono de llave en el header).
 
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
@@ -124,14 +127,19 @@ esto solo evita ofrecer acciones que iban a fallar.
 
 ## Pendiente inmediato
 
-- ~~Migración `0010`~~ ✅ aplicada; renovación verificada end-to-end el
-  26/08 (renueva, genera cuota, notifica, email entregado, idempotente).
-- **Cargar `RESEND_API_KEY` en Vercel** (mismo valor que `.env.local`) para
-  que producción también mande emails.
+- **Supabase → Authentication → URL Configuration → Redirect URLs**:
+  agregar `https://<dominio-de-vercel>/sistema/recuperar` y
+  `http://localhost:3000/sistema/recuperar` (sin esto, el enlace de
+  "olvidé mi contraseña" cae en la home en vez de la pantalla de reset).
+- Vercel → Environment Variables: `RESEND_API_KEY` ✅ cargada ·
+  faltan `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`,
+  `VAPID_SUBJECT` y `CRON_SECRET` (valores en `.env.local`).
 - Resend en sandbox: sin dominio verificado solo entrega a
   `digitalamenitiessas@gmail.com`. Al tener el dominio del estudio:
   Resend → Domains → verificar DNS → `EMAIL_FROM` en Vercel, y los emails
-  a las alumnas fluyen solos.
+  a las alumnas fluyen solos. (Opcional en ese momento: usar Resend
+  también como SMTP de Supabase para los emails de reset, sin límite de
+  frecuencia y con la marca del estudio.)
 
 ## Estado técnico
 

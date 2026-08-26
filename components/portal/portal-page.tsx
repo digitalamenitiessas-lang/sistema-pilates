@@ -9,12 +9,15 @@ import {
   ChevronRight,
   Clock,
   CreditCard,
+  KeyRound,
   Loader2,
   LogOut,
   MapPin,
+  X,
   XCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
 import { useData, useStudio } from '@/lib/data-context'
 import {
   addDays,
@@ -42,6 +45,102 @@ const DISCIPLINE_DOT: Record<Discipline, string> = {
 function pretty(iso: string): string {
   const [, m, d] = iso.split('-').map(Number)
   return `${d} ${MONTHS[m - 1]}`
+}
+
+function ChangePasswordModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const [password, setPassword] = useState('')
+  const [password2, setPassword2] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const inputClass =
+    'w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors'
+  const labelClass = 'text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block'
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    if (password !== password2) {
+      setError('Las contraseñas no coinciden')
+      return
+    }
+    setSaving(true)
+    const { error } = await supabase.auth.updateUser({ password })
+    setSaving(false)
+    if (error) {
+      setError(
+        /same.*password|different from the old/i.test(error.message)
+          ? 'La contraseña nueva tiene que ser distinta a la actual'
+          : 'No se pudo cambiar la contraseña. Probá de nuevo.'
+      )
+      return
+    }
+    onDone()
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/20 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <form
+        onSubmit={handleSubmit}
+        className="bg-card rounded-2xl shadow-2xl w-full max-w-sm border border-border max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h2 className="text-base font-bold text-foreground">Cambiar contraseña</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
+            aria-label="Cerrar"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="px-5 py-5 space-y-4">
+          <div>
+            <label className={labelClass}>Contraseña nueva</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Mínimo 6 caracteres"
+              required
+              minLength={6}
+              autoComplete="new-password"
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Repetir contraseña</label>
+            <input
+              type="password"
+              value={password2}
+              onChange={(e) => setPassword2(e.target.value)}
+              placeholder="••••••••"
+              required
+              minLength={6}
+              autoComplete="new-password"
+              className={inputClass}
+            />
+          </div>
+          {error && (
+            <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
+          )}
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+          >
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            {saving ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
 }
 
 function MembershipCard({ student }: { student: Student }) {
@@ -160,6 +259,7 @@ export function PortalPage() {
   const [occupancy, setOccupancy] = useState<Map<string, Occupancy>>(new Map())
   const [busyId, setBusyId] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
+  const [showChangePassword, setShowChangePassword] = useState(false)
 
   const weekStart = addDays(mondayOf(), weekOffset * 7)
   const today = localISO()
@@ -269,6 +369,14 @@ export function PortalPage() {
             <p className="text-[10px] text-muted-foreground">PilatesStudio</p>
           </div>
           <button
+            onClick={() => setShowChangePassword(true)}
+            aria-label="Cambiar contraseña"
+            title="Cambiar contraseña"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            <KeyRound className="w-4 h-4" />
+          </button>
+          <button
             onClick={() => signOut()}
             aria-label="Cerrar sesión"
             className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
@@ -277,6 +385,16 @@ export function PortalPage() {
           </button>
         </div>
       </header>
+
+      {showChangePassword && (
+        <ChangePasswordModal
+          onClose={() => setShowChangePassword(false)}
+          onDone={() => {
+            setShowChangePassword(false)
+            flash('ok', 'Contraseña actualizada')
+          }}
+        />
+      )}
 
       <main className="max-w-lg mx-auto px-4 py-5 space-y-6 pb-16">
         {notice && (
