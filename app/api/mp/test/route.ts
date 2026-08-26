@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getMpAccessToken, mpFetch, supabaseForRequest } from '@/lib/mp-server'
+import { getMpAccessToken, mpFetch, requireStaff, supabaseForRequest } from '@/lib/mp-server'
 
 // Prueba credenciales de Mercado Pago: las recibidas en el body
 // (antes de guardar) o las ya guardadas en la configuración.
@@ -7,6 +7,10 @@ export async function POST(request: Request) {
   const supabase = supabaseForRequest(request)
   if (!supabase) {
     return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+  }
+  const denied = await requireStaff(supabase)
+  if (denied) {
+    return NextResponse.json({ error: denied }, { status: 403 })
   }
 
   const { accessToken: candidate } = await request.json().catch(() => ({}))

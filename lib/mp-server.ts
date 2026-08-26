@@ -31,6 +31,26 @@ export function supabaseAdmin(): SupabaseClient | null {
   })
 }
 
+/**
+ * Verifica que el usuario del request sea staff (admin o recepción).
+ * RLS ya lo garantiza de fondo (app_settings solo lo lee staff), pero el
+ * check explícito es defensa en profundidad y da un error claro en vez de
+ * un "no configurado" engañoso cuando el rol no alcanza.
+ */
+export async function requireStaff(supabase: SupabaseClient): Promise<string | null> {
+  const { data: userData, error } = await supabase.auth.getUser()
+  if (error || !userData.user) return 'Sesión inválida'
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', userData.user.id)
+    .single()
+  if (!profile || !['admin', 'recepcion'].includes(profile.role)) {
+    return 'Tu rol no puede operar con Mercado Pago'
+  }
+  return null
+}
+
 /** Lee el access token de MP guardado por el admin en app_settings. */
 export async function getMpAccessToken(supabase: SupabaseClient): Promise<string | null> {
   const { data } = await supabase

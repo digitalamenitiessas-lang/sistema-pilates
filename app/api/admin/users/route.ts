@@ -81,6 +81,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: msg }, { status: 400 })
   }
 
+  // El trigger de la base crea el perfil siempre como 'alumno' (migración
+  // 0006, la metadata no es confiable); el rol pedido se asigna acá con el
+  // service role, ya autorizado arriba.
+  if (created.user && role !== 'alumno') {
+    const { error: roleError } = await auth.admin
+      .from('profiles')
+      .update({ role })
+      .eq('id', created.user.id)
+    if (roleError) {
+      return NextResponse.json(
+        { error: `Usuario creado pero no se pudo asignar el rol: ${roleError.message}` },
+        { status: 500 }
+      )
+    }
+  }
+
   // Vincula la cuenta con la ficha del alumno para el portal
   if (studentId && created.user) {
     const { error: linkError } = await auth.admin

@@ -3,6 +3,7 @@ import {
   applyApprovedPayment,
   findApprovedMpPayment,
   getMpAccessToken,
+  requireStaff,
   supabaseForRequest,
 } from '@/lib/mp-server'
 
@@ -12,6 +13,10 @@ export async function POST(request: Request) {
   const supabase = supabaseForRequest(request)
   if (!supabase) {
     return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+  }
+  const denied = await requireStaff(supabase)
+  if (denied) {
+    return NextResponse.json({ error: denied }, { status: 403 })
   }
 
   const accessToken = await getMpAccessToken(supabase)
