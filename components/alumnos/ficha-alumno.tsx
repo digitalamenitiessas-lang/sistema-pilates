@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData } from '@/lib/data-context'
-import { createSystemUser } from '@/lib/api'
+import { createSystemUser, setMembershipAutoRenew } from '@/lib/api'
 import type { Student, Reservation, Payment } from '@/lib/types'
 import { AlumnoFormModal } from './alumno-form-modal'
 import { AsignarPlanModal } from './asignar-plan-modal'
@@ -160,12 +160,24 @@ interface FichaAlumnoProps {
 }
 
 export function FichaAlumno({ student, reservations, payments, onBack }: FichaAlumnoProps) {
-  const { canWrite } = useData()
+  const { canWrite, refresh } = useData()
   const [activeTab, setActiveTab] = useState('resumen')
   const [showEdit, setShowEdit] = useState(false)
   const [showAssignPlan, setShowAssignPlan] = useState(false)
   const [showPortalAccess, setShowPortalAccess] = useState(false)
+  const [savingAutoRenew, setSavingAutoRenew] = useState(false)
   const ms = student.membership
+
+  const toggleAutoRenew = async () => {
+    if (!ms || savingAutoRenew) return
+    setSavingAutoRenew(true)
+    try {
+      await setMembershipAutoRenew(ms.id, !ms.autoRenew)
+      await refresh()
+    } finally {
+      setSavingAutoRenew(false)
+    }
+  }
   const classesLeft = ms ? ms.classesTotal - ms.classesUsed : 0
   const attended = reservations.filter((r) => r.status === 'asistió').length
   const upcoming = reservations.filter((r) => r.status === 'confirmada').length
@@ -499,6 +511,40 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                         </p>
                         <p className="text-[10px] text-muted-foreground">Precio mensual</p>
                       </div>
+                    </div>
+
+                    {/* Renovación automática */}
+                    <div className="flex items-center justify-between gap-3 mt-4 pt-4 border-t border-border">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground">Renovación automática</p>
+                        <p className="text-xs text-muted-foreground">
+                          Al vencer, el sistema renueva el plan y genera la cuota del mes.
+                        </p>
+                      </div>
+                      {canWrite ? (
+                        <button
+                          onClick={toggleAutoRenew}
+                          disabled={savingAutoRenew}
+                          role="switch"
+                          aria-checked={ms.autoRenew}
+                          aria-label="Renovación automática"
+                          className={cn(
+                            'relative w-11 h-6 rounded-full transition-colors shrink-0 disabled:opacity-60',
+                            ms.autoRenew ? 'bg-primary' : 'bg-muted border border-border'
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              'absolute top-0.5 w-5 h-5 rounded-full bg-card shadow transition-transform',
+                              ms.autoRenew ? 'translate-x-[22px]' : 'translate-x-0.5'
+                            )}
+                          />
+                        </button>
+                      ) : (
+                        <span className="text-xs font-semibold text-muted-foreground shrink-0">
+                          {ms.autoRenew ? 'Activada' : 'Desactivada'}
+                        </span>
+                      )}
                     </div>
                   </div>
 

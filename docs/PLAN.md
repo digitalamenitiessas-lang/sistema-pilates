@@ -80,17 +80,19 @@ esto solo evita ofrecer acciones que iban a fallar.
   (`student_private`), credenciales MP legibles solo por admin (recepción
   opera vía service role), chip "Solo consulta" visible en mobile.
 
-### 🔜 Etapa 2 — Cobranza que se cobra sola *(próximo bloque nuestro)*
-- [ ] **Renovación automática de membresías** con generación de la cuota del
-      mes. Hoy al vencer hay que reasignar el plan a mano, alumna por alumna
-      — es el trabajo manual más pesado del ciclo mensual. **No depende de
-      nadie.** Comprometido con la clienta en el mensaje del 24/08.
-- [ ] Avisos automáticos por email (cron diario en Vercel + Resend):
-      membresía por vencer, deuda generada, pago recibido. **No depende de
-      nadie** (sandbox ahora, dominio del estudio después).
+### 🔜 Etapa 2 — Cobranza que se cobra sola *(casi completa)*
+- [x] **Renovación automática de membresías** (26/08, migración `0010`): el
+      cron renueva las vencidas con `auto_renew` (mismo plan, precio actual
+      del plan), genera la cuota pendiente a 5 días con link de MP si está
+      conectado, avisa al staff y le manda el email a la alumna con el botón
+      de pagar. Interruptor por membresía en la ficha (si una alumna deja,
+      se apaga y listo). Los planes de prueba nunca se renuevan solos.
+- [x] Avisos automáticos por email (26/08): código listo con Resend —
+      arrancan solos al cargar `RESEND_API_KEY` en Vercel.
 - [ ] Débito automático mensual (Suscripciones MP). Se puede **desarrollar y
       probar ya** con las credenciales de prueba de MP; solo el primer cobro
-      real necesita la cuenta de la clienta.
+      real necesita la cuenta de la clienta. *(Evaluar si hace falta: la
+      renovación + link de pago en el email ya cubre gran parte.)*
 
 ### 🔜 Portal del alumno — lo que falta para que escale *(nuestro)*
 - [ ] **Auto-registro.** No existe ningún `signUp`: hoy el acceso lo crea el
@@ -122,9 +124,8 @@ esto solo evita ofrecer acciones que iban a fallar.
 
 ## Pendiente inmediato
 
-- ~~Migraciones 0006–0009~~ ✅ aplicadas y verificadas en vivo el 26/08
-  (el signup con rol admin en metadata quedó neutralizado por partida
-  doble: signups públicos deshabilitados + trigger que ignora la metadata).
+- **Aplicar `0010` en el SQL Editor** (renovación automática). El cron ya
+  deployado la saltea con gracia hasta entonces (`renewalsSkipped`).
 - Resend: cuando se active la cuenta, cargar `RESEND_API_KEY` y
   `EMAIL_FROM` en Vercel — los emails arrancan solos, el código ya está.
 

@@ -1,17 +1,23 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/mp-server'
+import { createMpCheckoutLink, getMpAccessToken, supabaseAdmin } from '@/lib/mp-server'
 import { pushToStaff } from '@/lib/push-server'
 import { sendEmail, emailLayout } from '@/lib/email-server'
 
-// Cron diario (vercel.json lo dispara todas las mañanas): genera las
-// notificaciones de vencimientos y avisa por push al staff y por email
-// a las alumnas. Es idempotente — dedupe_key en la base garantiza que
-// correrlo N veces no duplica nada — así que también se puede invocar
-// a mano para probar.
+// Cron diario (vercel.json lo dispara todas las mañanas):
+//   1. Renueva las membresías vencidas con auto_renew: mismo plan a precio
+//      actual, cuota del mes como pago pendiente (con link de MP si está
+//      conectado), aviso al staff y email a la alumna.
+//   2. Genera las notificaciones de membresías por vencer / vencidas y
+//      deudas vencidas, con push al staff y email a las alumnas.
+// Es idempotente — el dedupe_key y el control de "membresía más reciente"
+// garantizan que correrlo N veces no duplica nada — así que también se
+// puede invocar a mano para probar.
 
 export const dynamic = 'force-dynamic'
 
 const EXPIRY_WARNING_DAYS = 5
+const RENEWAL_CATCHUP_DAYS = 7
+const PAYMENT_GRACE_DAYS = 5
 
 /** Fecha de hoy en el huso del estudio (el server corre en UTC). */
 function todayAR(): string {
@@ -44,6 +50,12 @@ interface NotificationRow {
   dedupe_key: string
 }
 
+interface StudentRef {
+  name: string
+  email: string
+  active?: boolean
+}
+
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET
   if (secret && request.headers.get('authorization') !== `Bearer ${secret}`) {
@@ -59,7 +71,127 @@ export async function GET(request: Request) {
   const rows: NotificationRow[] = []
   const emails: Array<{ to: string; subject: string; html: string; key: string }> = []
 
-  // ── Membresías por vencer (ventana de aviso) ──────────────────────────
+  // Fin de membresía más reciente por alumna: solo esa genera renovación o
+  // avisos (las anteriores ya fueron reemplazadas y no son noticia).
+  const { data: allMems } = await admin.from('memberships').select('student_id, end_date')
+  const maxEnd = new Map<string, string>()
+  for (const m of allMems ?? []) {
+    if ((maxEnd.get(m.student_id) ?? '') < m.end_date) maxEnd.set(m.student_id, m.end_date)
+  }
+  const isLatest = (m: { student_id: string; end_date: string }) =>
+    maxEnd.get(m.student_id) === m.end_date
+
+  // ── 1. Renovación automática ──────────────────────────────────────────
+  let renewed = 0
+  const mpToken = await getMpAccessToken(admin)
+  const { data: toRenew, error: renewError } = await admin
+    .from('memberships')
+    .select(
+      'id, student_id, end_date, auto_renew, students(name, email, active), plans(id, name, price, class_count, duration_days, active, is_trial)'
+    )
+    .eq('status', 'activa')
+    .eq('auto_renew', true)
+    .lt('end_date', today)
+    .gte('end_date', addDaysISO(today, -RENEWAL_CATCHUP_DAYS))
+
+  // renewError = migración 0010 pendiente: se saltea la renovación pero el
+  // resto del cron sigue andando.
+  for (const m of renewError ? [] : toRenew ?? []) {
+    const student = m.students as unknown as StudentRef | null
+    const plan = m.plans as unknown as {
+      id: string
+      name: string
+      price: number
+      class_count: number
+      duration_days: number
+      active: boolean
+      is_trial: boolean
+    } | null
+    if (!isLatest(m)) continue
+    if (!plan?.active || plan.is_trial || student?.active === false) continue
+
+    const endDate = addDaysISO(today, plan.duration_days)
+    const { data: newMembership, error: memError } = await admin
+      .from('memberships')
+      .insert({
+        student_id: m.student_id,
+        plan_id: plan.id,
+        start_date: today,
+        end_date: endDate,
+        classes_total: plan.class_count,
+        classes_used: 0,
+        price: plan.price,
+        auto_renew: true,
+      })
+      .select('id')
+      .single()
+    if (memError || !newMembership) continue
+    renewed++
+    maxEnd.set(m.student_id, endDate) // la vieja deja de ser "la más reciente"
+
+    // Cuota del mes (igual que la asignación manual: pendiente, 5 días)
+    let paymentId: string | null = null
+    let mpLink: string | null = null
+    const dueDate = addDaysISO(today, PAYMENT_GRACE_DAYS)
+    if (Number(plan.price) > 0) {
+      const { data: payment } = await admin
+        .from('payments')
+        .insert({
+          student_id: m.student_id,
+          membership_id: newMembership.id,
+          concept: plan.name,
+          amount: plan.price,
+          due_date: dueDate,
+          status: 'pendiente',
+        })
+        .select('id')
+        .single()
+      paymentId = payment?.id ?? null
+
+      // Link de pago listo en el email si MP está conectado (best-effort)
+      if (paymentId && mpToken) {
+        const pref = await createMpCheckoutLink(mpToken, {
+          id: paymentId,
+          title: `${plan.name}${student?.name ? ` — ${student.name}` : ''}`,
+          amount: Number(plan.price),
+        })
+        if (pref) {
+          await admin
+            .from('payments')
+            .update({ mp_preference_id: pref.preferenceId, mp_link: pref.link })
+            .eq('id', paymentId)
+          mpLink = pref.link
+        }
+      }
+    }
+
+    rows.push({
+      type: 'membresia_renovada',
+      title: 'Membresía renovada',
+      body: `${student?.name ?? '—'}: ${plan.name} renovada, cuota de ${formatAmount(plan.price)} generada`,
+      student_id: m.student_id,
+      membership_id: newMembership.id,
+      payment_id: paymentId,
+      audience: 'staff',
+      dedupe_key: `renov-${m.id}`,
+    })
+    if (student?.email) {
+      emails.push({
+        to: student.email,
+        key: `renov-${m.id}`,
+        subject: `Renovamos tu membresía ${plan.name}`,
+        html: emailLayout(
+          `¡Hola ${student.name.split(' ')[0]}!`,
+          `<p>Tu membresía <strong>${plan.name}</strong> se renovó automáticamente hasta el <strong>${formatDate(endDate)}</strong>.</p>
+           ${Number(plan.price) > 0 ? `<p>La cuota es de <strong>${formatAmount(plan.price)}</strong> y vence el <strong>${formatDate(dueDate)}</strong>.</p>` : ''}
+           ${mpLink ? `<p><a href="${mpLink}" style="display:inline-block;background:#A9552F;color:#fff;text-decoration:none;padding:10px 20px;border-radius:10px;font-weight:600;">Pagar online</a></p>` : ''}
+           <p>Si no querés renovarla, avisanos en el estudio y la damos de baja. ¡Nos vemos en clase!</p>`
+        ),
+      })
+    }
+  }
+
+  // ── 2. Membresías por vencer (ventana de aviso) ───────────────────────
   const { data: expiring } = await admin
     .from('memberships')
     .select('id, end_date, student_id, students(name, email), plans(name)')
@@ -68,7 +200,8 @@ export async function GET(request: Request) {
     .lte('end_date', addDaysISO(today, EXPIRY_WARNING_DAYS))
 
   for (const m of expiring ?? []) {
-    const student = m.students as unknown as { name: string; email: string } | null
+    if (!isLatest(m)) continue
+    const student = m.students as unknown as StudentRef | null
     const plan = (m.plans as unknown as { name: string } | null)?.name ?? 'membresía'
     rows.push({
       type: 'membresia_por_vencer',
@@ -93,16 +226,17 @@ export async function GET(request: Request) {
     }
   }
 
-  // ── Membresías recién vencidas (últimos 7 días) ───────────────────────
+  // ── 3. Membresías recién vencidas y sin renovar (últimos 7 días) ──────
   const { data: expired } = await admin
     .from('memberships')
     .select('id, end_date, student_id, students(name, email), plans(name)')
     .eq('status', 'activa')
     .lt('end_date', today)
-    .gte('end_date', addDaysISO(today, -7))
+    .gte('end_date', addDaysISO(today, -RENEWAL_CATCHUP_DAYS))
 
   for (const m of expired ?? []) {
-    const student = m.students as unknown as { name: string; email: string } | null
+    if (!isLatest(m)) continue // renovada (recién o antes): no es noticia
+    const student = m.students as unknown as StudentRef | null
     const plan = (m.plans as unknown as { name: string } | null)?.name ?? 'membresía'
     rows.push({
       type: 'membresia_vencida',
@@ -115,7 +249,7 @@ export async function GET(request: Request) {
     })
   }
 
-  // ── Deudas vencidas (últimos 30 días, una sola vez por pago) ──────────
+  // ── 4. Deudas vencidas (últimos 30 días, una sola vez por pago) ───────
   const { data: overdue } = await admin
     .from('payments')
     .select('id, amount, concept, due_date, mp_link, student_id, students(name, email)')
@@ -124,7 +258,7 @@ export async function GET(request: Request) {
     .gte('due_date', addDaysISO(today, -30))
 
   for (const p of overdue ?? []) {
-    const student = p.students as unknown as { name: string; email: string } | null
+    const student = p.students as unknown as StudentRef | null
     rows.push({
       type: 'deuda_vencida',
       title: 'Pago vencido',
@@ -171,6 +305,7 @@ export async function GET(request: Request) {
   if (created.length > 0) {
     const byType = (t: string) => created.filter((c) => c.type === t).length
     const parts = [
+      byType('membresia_renovada') && `${byType('membresia_renovada')} renovada(s)`,
       byType('membresia_por_vencer') && `${byType('membresia_por_vencer')} por vencer`,
       byType('membresia_vencida') && `${byType('membresia_vencida')} vencida(s)`,
       byType('deuda_vencida') && `${byType('deuda_vencida')} deuda(s) vencida(s)`,
@@ -184,6 +319,8 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     date: today,
+    renewed,
+    renewalsSkipped: renewError ? 'migración 0010 pendiente' : undefined,
     evaluated: rows.length,
     created: created.length,
     emailsSent,

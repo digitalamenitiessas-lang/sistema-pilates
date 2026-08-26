@@ -154,6 +154,7 @@ export async function fetchStudioData(): Promise<StudioData> {
     classesUsed: m.classes_used,
     status: deriveMembershipStatus(m.status, m.end_date),
     price: Number(m.price),
+    autoRenew: m.auto_renew ?? true,
   }))
 
   // A cada alumno se le adjunta su membresía más reciente
@@ -403,6 +404,15 @@ export async function updateStudent(id: string, input: Omit<NewStudentInput, 'pl
     .eq('id', id)
   if (error) throw error
   await saveMedicalNotes(id, input.medicalNotes ?? '')
+}
+
+/** Prende o apaga la renovación automática de una membresía. */
+export async function setMembershipAutoRenew(membershipId: string, autoRenew: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('memberships')
+    .update({ auto_renew: autoRenew })
+    .eq('id', membershipId)
+  if (error) throw error
 }
 
 /** Crea la membresía y deja generada la deuda (pago pendiente). */

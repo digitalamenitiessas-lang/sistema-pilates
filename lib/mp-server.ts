@@ -95,6 +95,28 @@ interface MpSearchResult {
 }
 
 /**
+ * Crea una preferencia de Checkout Pro para un pago interno y devuelve el
+ * link, o null si MP la rechaza. external_reference = uuid del pago, para
+ * poder acreditarlo después (webhook/sync).
+ */
+export async function createMpCheckoutLink(
+  accessToken: string,
+  payment: { id: string; title: string; amount: number }
+): Promise<{ preferenceId: string; link: string } | null> {
+  const { ok, body } = await mpFetch(accessToken, '/checkout/preferences', {
+    method: 'POST',
+    body: JSON.stringify({
+      items: [{ title: payment.title, quantity: 1, unit_price: Number(payment.amount), currency_id: 'ARS' }],
+      external_reference: payment.id,
+      statement_descriptor: 'PILATESSTUDIO',
+    }),
+  })
+  if (!ok) return null
+  const pref = body as { id: string; init_point: string }
+  return { preferenceId: pref.id, link: pref.init_point }
+}
+
+/**
  * Busca en MP un pago aprobado para el comprobante interno dado
  * (external_reference = uuid de public.payments).
  */

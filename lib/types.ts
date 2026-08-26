@@ -48,6 +48,8 @@ export interface Membership {
   classesUsed: number
   status: MembershipStatus
   price: number
+  /** Al vencer, el cron la renueva y genera la cuota (migración 0010) */
+  autoRenew: boolean
 }
 
 export interface Student {
