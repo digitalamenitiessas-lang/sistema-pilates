@@ -232,38 +232,39 @@ Propuesta de orden. Respeta las prioridades de la clienta, pero corregida por
 dependencias técnicas: hay cosas que si no van primero, obligan a rehacer lo que
 venga después.
 
-### Bloque 0 — La mesa de control  🔄 en curso
-Nada de esto se "ve" en pantallas nuevas, pero todo lo demás se apoya acá, y es
-lo que permite que el estudio ajuste sus reglas sin pedirnos un desarrollo.
+### Bloque 0 — Los cimientos  🔄 casi cerrado
+Nada de esto se "ve" como una función nueva, pero todo lo demás se apoya acá, y
+es lo que permite que el estudio ajuste sus reglas sin pedirnos un desarrollo.
 
-**Primer tramo — hecho (05/09/2026, migración `0011_configurable.sql`):**
+**Hecho y verificado contra la base real (05/09/2026):**
 
-- [x] **Parámetros del negocio configurables**: tabla `studio_settings` con 21
-      parámetros (plazos, anticipaciones, ventana de pago del 1 al 9, cuándo se
-      consume la clase) y su pantalla en Configuración. La pantalla se arma sola
-      con lo que trae la tabla: sumar un parámetro nuevo es un `INSERT`, no un
-      deploy.
-- [x] **Datos del estudio fuera del código**: nombre, dirección, mapa, WhatsApp,
-      Instagram, email y horarios salen de la base. La landing los lee de la vista
-      pública `public_studio_settings`, con respaldo a los valores actuales.
-- [x] **Catálogo de disciplinas** editable, con color y descripción, y renombrado
-      en cascada a clases, planes y profesoras. Reemplazó las seis constantes
-      duplicadas del código (agenda, planes, configuración, reservas, portal y
-      landing). Requisito explícito de la sección 1 del documento.
-- [x] **Catálogo de medios de pago** editable, base de los tres precios por plan
-      (Bloque 3) y de la caja diaria (Bloque 4).
-- [x] **El proceso diario lee los parámetros** en vez de sus constantes.
-- [x] **Arreglo**: un pago anulado ya no se cuenta como deuda en el tablero ni
-      dispara alertas.
+| | Migración |
+|---|---|
+| ✅ **21 parámetros del negocio configurables** — plazos, anticipaciones, ventana de pago del 1 al 9, cuándo se consume la clase. La pantalla se arma sola con lo que trae la tabla: sumar un parámetro es un `INSERT`, no un deploy | `0011` |
+| ✅ **Datos del estudio fuera del código** — nombre, dirección, mapa, WhatsApp, Instagram, email, horarios. La web los lee de una vista pública, con respaldo | `0011` |
+| ✅ **Catálogo de disciplinas** editable con color y descripción, con renombrado en cascada. Reemplazó seis constantes duplicadas en el código | `0011` |
+| ✅ **Catálogo de medios de pago** editable | `0011` |
+| ✅ **Motor de permisos** por rol y por persona: 71 claves, matriz configurable, excepciones por persona con vencimiento, bitácora, guardias anti auto-elevación e invariante de que nunca quede sin admin | `0012` |
+| ✅ **Las políticas de la base preguntan al motor** — 13 políticas reescritas, los `for all` abiertos en crear/editar/borrar, y el corte real de "anular movimientos" | `0013` |
+| ✅ **Pantalla de la matriz** de permisos en Configuración | — |
+| ✅ **El cron lee los parámetros** en vez de sus constantes | — |
 
-**Segundo tramo — pendiente:**
+**Arreglos que salieron del camino:**
 
-- [ ] **Permisos configurables** por rol y por persona, reemplazando los roles
-      fijos. Resuelve solo la pregunta de qué puede hacer la profesora.
-- [ ] **Auditoría "quién hizo qué"** en reservas, asistencias, cobros y anulaciones.
-- [ ] **Baja lógica de usuarios** en vez del borrado físico actual.
-- [ ] **Momento exacto del cobro** y día único en huso argentino, antes de la caja.
-- [ ] **Configuración reorganizada** para que soporte los 20 catálogos que vienen.
+- El cron diario quedaba abierto si faltaba su variable de entorno (`if (secret && ...)`). Ahora es fail-closed.
+- Las notas médicas se podían **perder en silencio**: la función que las guarda caía a una columna que la migración 0008 había eliminado y se tragaba el error, y además se guardaban vacías cada vez que alguien editaba la ficha sin traer ese campo.
+- Un pago anulado se contaba como deuda en el tablero.
+- El borrado de suscripciones push no filtraba por usuario.
+- `can()` traía un caché que la rompía (migración `0014`): la función declara `search_path` vacío, y al salir Postgres restaura las variables — pero una variable personalizada no vuelve a "no existe" sino a cadena vacía. Desde la segunda llamada el caché se leía vacío y respondía que no a todo.
+
+**Falta para cerrar el bloque:**
+
+- [ ] Probar el portal de la alumna: **cancelar una reserva** es lo que ejercita la rama de aislamiento de la política restrictiva nueva.
+- [ ] Unificar los chequeos del servidor: los endpoints de Mercado Pago y de usuarios todavía verifican el rol a mano. Mientras siga así, un permiso destildado en la pantalla lo sigue permitiendo el servidor.
+- [ ] Encendido gradual de los permisos, grupo por grupo, empezando por Catálogos.
+- [ ] Tolerancia a fallo del bundle: hoy si una tabla niega el acceso, se cae la pantalla entera en vez de mostrar el resto.
+- [ ] Baja lógica de usuarios (hoy se borran físicamente).
+- [ ] Momento exacto del cobro en huso argentino, prerrequisito de la caja diaria.
 
 ### Bloque 1 — Agenda y asistencias (prioridad 1 de la clienta, ≈ 3 semanas)
 - Clases especiales y talleres con fecha puntual; instancia de clase por fecha
