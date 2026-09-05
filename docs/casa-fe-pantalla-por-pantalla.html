@@ -318,7 +318,7 @@
 
     <div class="cifras">
       <div class="cifra">
-        <span class="n hecho">11</span>
+        <span class="n hecho">12</span>
         <span class="q">pantallas funcionando</span>
       </div>
       <div class="cifra">
@@ -326,11 +326,11 @@
         <span class="q">roles protegidos en la base</span>
       </div>
       <div class="cifra">
-        <span class="n parcial">75</span>
+        <span class="n parcial">58</span>
         <span class="q">permisos configurables</span>
       </div>
       <div class="cifra">
-        <span class="n falta">8</span>
+        <span class="n falta">7</span>
         <span class="q">módulos por construir</span>
       </div>
     </div>
@@ -420,6 +420,13 @@
             <td class="rol"><span class="marca-no">—</span></td>
           </tr>
           <tr>
+            <td class="pantalla">Reportes <span>Nueve reportes con descarga</span></td>
+            <td class="rol"><span class="marca-si">Todo</span></td>
+            <td class="rol"><span class="marca-si">Todo</span></td>
+            <td class="rol"><span class="marca-no">No entra</span></td>
+            <td class="rol"><span class="marca-no">—</span></td>
+          </tr>
+          <tr>
             <td class="pantalla">Configuración <span>Reglas, catálogos, accesos</span></td>
             <td class="rol"><span class="marca-si">Todo</span></td>
             <td class="rol"><span class="marca-parcial">Sin accesos</span></td>
@@ -439,10 +446,12 @@
 
     <div class="aviso">
       <p>
-        <strong>Esto se puede cambiar sin programar.</strong> Los 75 permisos
-        del sistema se configuran desde Configuración → Permisos, con casilleros
-        por rol. Y si hace falta una excepción con una persona puntual —una
-        profesora que además cobra los sábados— también se puede.
+        <strong>Esto se puede cambiar sin programar.</strong> De los 75 permisos
+        del sistema, 58 se configuran desde Configuración → Permisos con
+        casilleros por rol. Y si hace falta una excepción con una persona
+        puntual —una profesora que además cobra los sábados— también se puede.
+        Los 17 restantes están con candado a propósito: son los que, si se
+        apagaran, romperían el sistema o abrirían datos que nadie debería ver.
       </p>
       <p>
         Hoy están en modo prueba: la matriz se puede dejar armada como se
@@ -603,6 +612,23 @@
       </article>
 
       <article class="ficha">
+        <h3>Reportes</h3>
+        <p class="quien">Admin · Recepción</p>
+        <ul>
+          <li><strong>Nueve reportes</strong> en tres grupos. <em>Plata</em>: cobros, deudas, egresos, resultado por mes y cobrado por medio. <em>Alumnas</em>: altas nuevas y membresías que vencen. <em>Clases</em>: asistencias y ocupación por clase.</li>
+          <li>El período se elige una vez y se pasa de un reporte a otro sin volver a cargarlo.</li>
+          <li>Cada reporte cierra con su total —lo cobrado, lo adeudado, cuántas asistieron— al pie.</li>
+          <li><strong>Descarga a Excel</strong> con el período en el nombre del archivo, y a PDF para imprimir o archivar.</li>
+          <li>Los montos bajan como número, listos para sumar en Excel, no como texto.</li>
+        </ul>
+        <p class="nota-rol">
+          Si un rol no puede ver información financiera, el reporte de plata no
+          muestra cero: avisa que no tiene acceso. Un cero mentiroso es peor que
+          un cartel, porque hace creer que no hubo movimientos.
+        </p>
+      </article>
+
+      <article class="ficha">
         <h3>Configuración</h3>
         <p class="quien">Admin · Recepción (parcial)</p>
         <ul>
@@ -686,9 +712,21 @@
       </div>
 
       <div class="bloque">
+        <p class="etiqueta">Reportes</p>
+        <div>
+          <p class="titulo">Nueve reportes y un botón</p>
+          <p class="detalle">
+            Cobros, deudas, egresos, resultado del mes, medios de pago, altas,
+            vencimientos, asistencias y ocupación. Se elige el período, se mira
+            en pantalla y se baja a Excel.
+          </p>
+        </div>
+      </div>
+
+      <div class="bloque">
         <p class="etiqueta">Permisos</p>
         <div>
-          <p class="titulo">75 permisos con casilleros</p>
+          <p class="titulo">58 permisos con casilleros</p>
           <p class="detalle">
             Quién puede hacer qué, configurable por rol y por persona, sin
             depender de programación. Y 30 reglas del negocio que el estudio
@@ -702,7 +740,7 @@
   <section>
     <h2>Lo que falta</h2>
     <p class="intro">
-      Del documento de requerimientos quedan ocho módulos por construir. Este
+      Del documento de requerimientos quedan siete módulos por construir. Este
       es el orden propuesto, corregido por dependencias técnicas: hay cosas que
       si no van primero obligan a rehacer lo que venga después.
     </p>
@@ -742,18 +780,6 @@
             datos físicos y de salud en campos separados, bitácora de
             observaciones, baja de alumna con motivo, lista de recuperación y
             cumpleaños del mes.
-          </p>
-        </div>
-      </div>
-
-      <div class="bloque">
-        <p class="etiqueta">Sigue</p>
-        <div>
-          <p class="titulo">Reportes descargables</p>
-          <p class="detalle">
-            Módulo propio con filtros por rango de fechas y descarga a Excel y
-            PDF: ventas, cobros, deudas, egresos y resultado, asistencias y
-            ocupación. Ya se puede construir, porque caja y gastos existen.
           </p>
         </div>
       </div>
