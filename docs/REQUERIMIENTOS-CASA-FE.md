@@ -70,6 +70,10 @@ De las 10 prioridades que la clienta puso en la página 16, las **1, 2, 3, 4, 9 
 
 ## 3. Estado por sección del documento
 
+> Esta tabla es la **foto del análisis inicial**, contra el documento de
+> requerimientos. No se actualiza: sirve de línea de base para medir el avance.
+> El estado vivo, bloque por bloque, está en §8.
+
 | Sección | Estado | Qué hay hoy | Lo grande que falta |
 |---|---|---|---|
 | 1 · Agenda, clases, reservas, asistencias | 🟡 | Grilla semanal, ABM de clases, reserva por recepción, cupo por trigger, estados de asistencia | Disciplinas como catálogo editable; clases especiales/talleres con fecha puntual; 5 campos de la clase (descripción, nivel, precio, requisitos, sede); que la profesora pueda marcar asistencia y agregar alumnas; cancelación dentro/fuera de plazo y clase recuperada; auditoría de quién registró |
@@ -357,10 +361,32 @@ es lo que permite que el estudio ajuste sus reglas sin pedirnos un desarrollo.
       aparte).
 - [ ] Avisos de caja en el proceso diario: caja sin cerrar, diferencia.
 
-### Bloque 5 — Reportes (prioridad 8, ≈ 2 semanas para lo construible)
-Módulo propio con filtros por rango de fechas y exportación a Excel y PDF. Se hace
-acá porque ya existirían caja y gastos; los reportes de personal e inventario
-quedan para cuando existan esos módulos.
+### Bloque 5 — Reportes (prioridad 8)  ✅ hecho
+
+**Hecho (05/09/2026, migración `0021`):**
+
+- [x] **Nueve reportes** en tres grupos. *Plata*: cobros, deudas con la
+      antigüedad de cada una, egresos, resultado por mes y cobrado por medio.
+      *Alumnas*: altas del período y membresías que vencen. *Clases*:
+      asistencias y ocupación por clase sobre el cupo.
+- [x] **Todos por rango de fechas y contra la base**, nunca filtrando en
+      memoria el paquete del estudio: un reporte tiene que poder mirar años de
+      historia sin traérsela entera al navegador.
+- [x] **Descarga a Excel** (CSV con BOM y punto y coma, así los acentos y los
+      montos no se rompen en un Excel en español) y a PDF por impresión. El
+      nombre del archivo lleva el período adentro.
+- [x] **Los montos bajan como número**, no como texto: se pueden sumar.
+- [x] `reportes.ver` dejó de ser una clave `futuro` y pasó a configurable,
+      tildada para admin y recepción. Cada número de adentro lo sigue
+      gobernando su propio permiso: un rol sin `finanzas.ver` entra y no ve un
+      peso, y la pantalla lo dice en vez de mostrar cero.
+
+**Verificado contra la base** (rango 2026-01-01 a 2026-12-31): cobros 58 filas
+por $1.793.000, deudas 5 por $165.000, resultado 6 meses, cobrado por medio
+$1.793.000 — los tres totales cuadran entre sí y con el tablero.
+
+**Falta, cuando existan los módulos que los alimentan:** reportes de personal y
+remuneraciones, y de inventario y ventas de mostrador.
 
 ### Después, según lo que decida la clienta
 - **Comercial** (cupones, beneficios, gift cards, promociones): ≈ 4 semanas.
