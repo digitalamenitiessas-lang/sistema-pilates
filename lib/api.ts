@@ -661,6 +661,31 @@ export async function registerPayment(input: NewPaymentInput): Promise<number> {
   return data.receipt_number
 }
 
+/**
+ * Anula un cobro. No se borra ni se toca el comprobante: el número emitido
+ * queda, el pago pasa a 'anulado' y deja de contar como plata entrada.
+ *
+ * Si el cobro era de un día que ya se arqueó, ese arqueo NO cambia — dice
+ * lo que se contó ese día y sigue siendo cierto. Lo que haya que devolver
+ * se registra hoy, como movimiento de caja.
+ */
+export async function voidPayment(paymentId: string, motivo: string): Promise<void> {
+  const { data: actual } = await supabase
+    .from('payments')
+    .select('notes')
+    .eq('id', paymentId)
+    .single()
+  const previo = (actual?.notes ?? '').trim()
+  const { error } = await supabase
+    .from('payments')
+    .update({
+      status: 'anulado',
+      notes: [previo, `Anulado: ${motivo.trim()}`].filter(Boolean).join(' · '),
+    })
+    .eq('id', paymentId)
+  if (error) throw error
+}
+
 /** Cobra un pago pendiente existente; devuelve el número de comprobante. */
 export async function collectPayment(
   paymentId: string,
