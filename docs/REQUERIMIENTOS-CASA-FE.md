@@ -266,7 +266,37 @@ es lo que permite que el estudio ajuste sus reglas sin pedirnos un desarrollo.
 - [x] **Baja lógica de accesos** (05/09, migración `0015`): se marca el perfil inactivo y se bloquea el ingreso, con reversión si una de las dos falla, y se puede reactivar. Antes se borraba la cuenta y el perfil se iba en cascada, contra lo que pide el documento.
 - [x] **Un solo "día" para el dinero** (05/09, migración `0016`): el cobro guarda el instante exacto y el día se deriva del huso del estudio. Antes se calculaba de cuatro maneras distintas según quién escribiera; para un arqueo de caja eso significa cobros en el cierre equivocado.
 
-### Bloque 1 — Agenda y asistencias (prioridad 1 de la clienta, ≈ 3 semanas)
+### Bloque 1 — Agenda y asistencias  🔄 en curso
+
+**Hecho (05/09/2026):**
+
+- [x] **Clases especiales y talleres con fecha propia** (migración `0017`).
+      Antes una clase era solo una plantilla semanal: un taller del sábado 12
+      no se podía representar.
+- [x] **Los cinco campos que faltaban**: descripción, nivel o público,
+      precio (vacío = la cubre la membresía), requisitos y "la alumna puede
+      reservarla sola" — que el portal respeta.
+- [x] **Suspender un día y cambiar la profesora** sin tocar la clase entera
+      (migración `0018`). La suspensión la hace cumplir la base: rechaza
+      reservas nuevas en esa fecha.
+- [x] **Tomar asistencia desde el celular**, con su propia clave de permiso
+      para que la profesora pueda marcar sin poder tocar nada más.
+- [x] Arreglo: deshacer un "presente" ahora devuelve la clase a la alumna.
+- [x] Arreglo (migración `0019`): `reservas.eliminar` y `membresias.eliminar`
+      no existían en el catálogo, así que nadie podía borrar esas filas y el
+      borrado fallaba en silencio.
+
+**Falta, y depende de las respuestas de la clienta:**
+
+- [ ] Estados de cancelación dentro y fuera de plazo, y clase recuperada.
+      El plazo ya es un parámetro configurable; falta definir si la ausencia
+      consume la clase y cuántos recuperos se permiten.
+- [ ] Que la profesora agregue a una alumna que llega sin reserva, con
+      validación de membresía y excepción autorizada.
+- [ ] Instancias con cambio de horario por fecha (la tabla ya lo soporta,
+      falta la pantalla).
+
+### Bloque 1 — resto (prioridad 1 de la clienta)
 - Clases especiales y talleres con fecha puntual; instancia de clase por fecha
   (suspender un día, reemplazo de profesora).
 - Campos que faltan en la clase: descripción, nivel, precio, requisitos.

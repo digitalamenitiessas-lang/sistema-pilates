@@ -16,10 +16,12 @@ import {
   Sparkles,
   UserCheck,
   CalendarOff,
+  ClipboardCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { disciplineStyle } from '@/lib/disciplines'
+import { TomarAsistencia } from '@/components/asistencia/tomar-asistencia'
 import {
   addDays,
   mondayOf,
@@ -47,6 +49,8 @@ type WeekClass = ClassSession & {
   suspended?: boolean
   /** Ese día la da otra profesora */
   substitute?: boolean
+  /** La profesora de siempre, para saber a quién se vuelve */
+  titularName?: string
   occurrenceReason?: string
 }
 
@@ -426,12 +430,15 @@ function ClassDetailModal({
   onClose: () => void
   onEdit: (cls: ClassSession) => void
 }) {
-  const { refresh, canWrite } = useData()
+  const { refresh, canWrite, can } = useData()
   const { students, disciplines, teachers } = useStudio()
   const colors = disciplineStyle(disciplines, cls.discipline)
   const isFull = cls.enrolled >= cls.capacity
   const [dayBusy, setDayBusy] = useState(false)
   const [dayError, setDayError] = useState<string | null>(null)
+  const [tomandoAsistencia, setTomandoAsistencia] = useState(false)
+  // La profesora puede tomar asistencia sin poder editar nada más.
+  const puedeMarcarAsistencia = can('reservas.asistencia') || canWrite
 
   // Excepciones de esa fecha: suspender el día o cambiar la profesora
   // (migración 0018). Solo tocan ESE día, no la clase entera.
@@ -466,6 +473,7 @@ function ClassDetailModal({
     }
     runDay(() => setClassDateTeacher(cls.id, cls.date, teacherId, 'Reemplazo'))
   }
+
   const pct = Math.round((cls.enrolled / cls.capacity) * 100)
 
   const [studentId, setStudentId] = useState('')
@@ -502,6 +510,18 @@ function ClassDetailModal({
       setError(err instanceof Error ? err.message : 'No se pudo eliminar la clase')
       setSaving(false)
     }
+  }
+
+  if (tomandoAsistencia) {
+    return (
+      <TomarAsistencia
+        classId={cls.id}
+        date={cls.date}
+        title={cls.title}
+        time={cls.time}
+        onClose={() => setTomandoAsistencia(false)}
+      />
+    )
   }
 
   return (
@@ -668,7 +688,9 @@ function ClassDetailModal({
                     onChange={(e) => reemplazar(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs text-foreground outline-none focus:border-primary"
                   >
-                    <option value="">La da {cls.teacherName} (como siempre)</option>
+                    <option value="">
+                      La da {cls.titularName ?? cls.teacherName} (como siempre)
+                    </option>
                     {teachers.map((t) => (
                       <option key={t.id} value={t.id}>
                         Ese día la da {t.name}
@@ -696,6 +718,16 @@ function ClassDetailModal({
 
               {dayError && <p className="text-xs text-destructive">{dayError}</p>}
             </div>
+          )}
+
+          {puedeMarcarAsistencia && !cls.suspended && cls.enrolled > 0 && (
+            <button
+              onClick={() => setTomandoAsistencia(true)}
+              className="w-full py-3 rounded-xl border-2 border-primary text-primary text-sm font-bold flex items-center justify-center gap-2 hover:bg-primary/5 transition-colors"
+            >
+              <ClipboardCheck className="w-4 h-4" />
+              Tomar asistencia
+            </button>
           )}
 
           {!canWrite ? null : cls.suspended ? (
@@ -764,6 +796,7 @@ export function AgendaPage() {
   const { classes, reservations, disciplines, occurrences } = useStudio()
   const [selectedDisciplines, setSelectedDisciplines] = useState<Discipline[]>([])
   const [selectedClass, setSelectedClass] = useState<WeekClass | null>(null)
+
   const [weekOffset, setWeekOffset] = useState(0)
   const [showForm, setShowForm] = useState(false)
   const [editingClass, setEditingClass] = useState<ClassSession | undefined>(undefined)
@@ -795,6 +828,7 @@ export function AgendaPage() {
           time: occ?.startTime ?? c.time,
           capacity: occ?.capacity ?? c.capacity,
           teacherName: occ?.teacherId ? occ.teacherName : c.teacherName,
+          titularName: c.teacherName,
           suspended: occ?.status === 'suspendida',
           substitute: !!occ?.teacherId,
           occurrenceReason: occ?.reason ?? '',
@@ -803,6 +837,14 @@ export function AgendaPage() {
         }
       })
   }, [classes, reservations, occurrences, weekStart])
+
+  // El detalle se re-lee de la semana en cada render: si se suspende el día
+  // o se cambia la profesora, el modal abierto muestra el cambio al toque
+  // en vez de quedarse con la copia del momento en que se abrió.
+  const detalle = selectedClass
+    ? weekClasses.find((c) => c.id === selectedClass.id && c.date === selectedClass.date) ??
+      selectedClass
+    : null
 
   const toggleDiscipline = (d: Discipline) => {
     setSelectedDisciplines((prev) =>
@@ -1030,9 +1072,9 @@ export function AgendaPage() {
       </div>
 
       {/* Class detail modal */}
-      {selectedClass && (
+      {detalle && (
         <ClassDetailModal
-          cls={selectedClass}
+          cls={detalle}
           onClose={() => setSelectedClass(null)}
           onEdit={(cls) => {
             setSelectedClass(null)
