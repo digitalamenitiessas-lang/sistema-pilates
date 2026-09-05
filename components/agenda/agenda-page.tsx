@@ -471,7 +471,7 @@ function ClassDetailModal({
       runDay(() => clearClassDate(cls.id, cls.date))
       return
     }
-    runDay(() => setClassDateTeacher(cls.id, cls.date, teacherId, 'Reemplazo'))
+    runDay(() => setClassDateTeacher(cls.id, cls.date, teacherId))
   }
 
   const pct = Math.round((cls.enrolled / cls.capacity) * 100)
