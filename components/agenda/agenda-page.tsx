@@ -14,6 +14,8 @@ import {
   Pencil,
   Trash2,
   Sparkles,
+  UserCheck,
+  CalendarOff,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
@@ -22,8 +24,11 @@ import {
   addDays,
   mondayOf,
   createReservation,
+  clearClassDate,
   localISO,
   createClassSession,
+  setClassDateTeacher,
+  suspendClassDate,
   updateClassSession,
   deactivateClassSession,
   type ClassInput,
@@ -36,7 +41,14 @@ const MONTH_NAMES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'jul
 
 
 /** Clase con cupos calculados para una semana determinada. */
-type WeekClass = ClassSession & { date: string }
+type WeekClass = ClassSession & {
+  date: string
+  /** Ese día no se dicta (migración 0018) */
+  suspended?: boolean
+  /** Ese día la da otra profesora */
+  substitute?: boolean
+  occurrenceReason?: string
+}
 
 function shortDate(iso: string): string {
   const [, m, d] = iso.split('-').map(Number)
@@ -57,14 +69,21 @@ function ClassCard({ cls, onClick }: { cls: WeekClass; onClick: () => void }) {
         'border-transparent hover:border-current/20'
       )}
       style={{
-        backgroundColor: colors.bg,
-        borderLeftColor: colors.dot,
+        backgroundColor: cls.suspended ? undefined : colors.bg,
+        borderLeftColor: cls.suspended ? '#9CA3AF' : colors.dot,
         borderLeftWidth: '3px',
       }}
     >
       <div className="flex items-start justify-between gap-1 mb-1">
-        <p className="text-xs font-semibold leading-tight line-clamp-2" style={{ color: colors.text }}>
+        <p
+          className={cn(
+            'text-xs font-semibold leading-tight line-clamp-2',
+            cls.suspended && 'line-through'
+          )}
+          style={{ color: cls.suspended ? '#6B7280' : colors.text }}
+        >
           {cls.kind === 'especial' && <Sparkles className="w-3 h-3 inline-block mr-1 -mt-0.5" />}
+          {cls.substitute && <UserCheck className="w-3 h-3 inline-block mr-1 -mt-0.5" />}
           {cls.title}
         </p>
         {isFull && (
@@ -408,9 +427,45 @@ function ClassDetailModal({
   onEdit: (cls: ClassSession) => void
 }) {
   const { refresh, canWrite } = useData()
-  const { students, disciplines } = useStudio()
+  const { students, disciplines, teachers } = useStudio()
   const colors = disciplineStyle(disciplines, cls.discipline)
   const isFull = cls.enrolled >= cls.capacity
+  const [dayBusy, setDayBusy] = useState(false)
+  const [dayError, setDayError] = useState<string | null>(null)
+
+  // Excepciones de esa fecha: suspender el día o cambiar la profesora
+  // (migración 0018). Solo tocan ESE día, no la clase entera.
+  const runDay = async (action: () => Promise<void>) => {
+    setDayBusy(true)
+    setDayError(null)
+    try {
+      await action()
+      await refresh()
+    } catch (err) {
+      setDayError(err instanceof Error ? err.message : 'No se pudo guardar')
+    } finally {
+      setDayBusy(false)
+    }
+  }
+
+  const suspender = () => {
+    const motivo = window.prompt(
+      'Motivo de la suspensión (lo va a ver la alumna):',
+      cls.occurrenceReason || 'Feriado'
+    )
+    if (motivo === null) return
+    runDay(() => suspendClassDate(cls.id, cls.date, motivo))
+  }
+
+  const reactivar = () => runDay(() => clearClassDate(cls.id, cls.date))
+
+  const reemplazar = (teacherId: string) => {
+    if (!teacherId) {
+      runDay(() => clearClassDate(cls.id, cls.date))
+      return
+    }
+    runDay(() => setClassDateTeacher(cls.id, cls.date, teacherId, 'Reemplazo'))
+  }
   const pct = Math.round((cls.enrolled / cls.capacity) * 100)
 
   const [studentId, setStudentId] = useState('')
@@ -584,7 +639,70 @@ function ClassDetailModal({
             )}
           </div>
 
-          {!canWrite ? null : done ? (
+          {/* Ese día en particular: suspender o cambiar la profesora */}
+          {canWrite && (
+            <div className="rounded-xl border border-border p-3 space-y-2.5">
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                Solo para el {shortDate(cls.date)}
+              </p>
+
+              {cls.suspended ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-foreground">
+                    Suspendida
+                    {cls.occurrenceReason && `: ${cls.occurrenceReason}`}
+                  </p>
+                  <button
+                    disabled={dayBusy}
+                    onClick={reactivar}
+                    className="w-full py-2 rounded-xl border border-border text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"
+                  >
+                    Volver a dictarla
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <select
+                    value={cls.substitute ? teachers.find((t) => t.name === cls.teacherName)?.id ?? '' : ''}
+                    disabled={dayBusy}
+                    onChange={(e) => reemplazar(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs text-foreground outline-none focus:border-primary"
+                  >
+                    <option value="">La da {cls.teacherName} (como siempre)</option>
+                    {teachers.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        Ese día la da {t.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    disabled={dayBusy}
+                    onClick={suspender}
+                    className="w-full py-2 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:text-destructive hover:border-destructive/40 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  >
+                    <CalendarOff className="w-3.5 h-3.5" />
+                    Suspender este día
+                  </button>
+                </>
+              )}
+
+              {cls.enrolled > 0 && (
+                <p className="text-[11px] text-muted-foreground leading-tight">
+                  Hay {cls.enrolled} {cls.enrolled === 1 ? 'reserva' : 'reservas'} para ese día. Suspender
+                  no las cancela: avisales vos y decidí si les devolvés la clase.
+                </p>
+              )}
+
+              {dayError && <p className="text-xs text-destructive">{dayError}</p>}
+            </div>
+          )}
+
+          {!canWrite ? null : cls.suspended ? (
+            <p className="text-sm text-center font-semibold text-muted-foreground bg-muted rounded-xl px-3 py-3">
+              Clase suspendida ese día
+            </p>
+          ) : done ? (
             <p className="text-sm text-center font-semibold text-[#2E6040] bg-[#E8F2EB] rounded-xl px-3 py-3">
               {done}
             </p>
@@ -643,7 +761,7 @@ function ClassDetailModal({
 
 export function AgendaPage() {
   const { canWrite } = useData()
-  const { classes, reservations, disciplines } = useStudio()
+  const { classes, reservations, disciplines, occurrences } = useStudio()
   const [selectedDisciplines, setSelectedDisciplines] = useState<Discipline[]>([])
   const [selectedClass, setSelectedClass] = useState<WeekClass | null>(null)
   const [weekOffset, setWeekOffset] = useState(0)
@@ -669,14 +787,22 @@ export function AgendaPage() {
       .map((c) => {
         const date = c.kind === 'especial' && c.date ? c.date : addDays(weekStart, c.dayOfWeek)
         const ofDay = reservations.filter((r) => r.classId === c.id && r.date === date)
+        // Si ese día se aparta de la norma, manda la excepción (0018).
+        const occ = occurrences.find((o) => o.classId === c.id && o.date === date)
         return {
           ...c,
           date,
+          time: occ?.startTime ?? c.time,
+          capacity: occ?.capacity ?? c.capacity,
+          teacherName: occ?.teacherId ? occ.teacherName : c.teacherName,
+          suspended: occ?.status === 'suspendida',
+          substitute: !!occ?.teacherId,
+          occurrenceReason: occ?.reason ?? '',
           enrolled: ofDay.filter((r) => r.status === 'confirmada' || r.status === 'asistió').length,
           waitlist: ofDay.filter((r) => r.status === 'lista de espera').length,
         }
       })
-  }, [classes, reservations, weekStart])
+  }, [classes, reservations, occurrences, weekStart])
 
   const toggleDiscipline = (d: Discipline) => {
     setSelectedDisciplines((prev) =>

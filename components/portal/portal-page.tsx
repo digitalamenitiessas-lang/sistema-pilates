@@ -242,7 +242,7 @@ function UpcomingList({
 
 export function PortalPage() {
   const { profile, refresh, signOut } = useData()
-  const { students, classes, reservations, payments, disciplines } = useStudio()
+  const { students, classes, reservations, payments, disciplines, occurrences } = useStudio()
 
   // Con RLS, el alumno solo recibe su propia ficha
   const me = students.find((s) => s.userId === profile?.id) ?? students[0] ?? null
@@ -288,15 +288,30 @@ export function PortalPage() {
     const date = addDays(weekStart, day)
     return classes
       .filter((c) => c.dayOfWeek === day)
+      // Un taller solo aparece el día que se dicta (migración 0017)
+      .filter((c) => c.kind !== 'especial' || c.date === date)
       .map((c) => {
         const occ = occupancy.get(`${c.id}|${date}`) ?? { confirmed: 0, waitlist: 0 }
         const mine = reservations.find(
           (r) => r.studentId === me?.id && r.classId === c.id && r.date === date && r.status !== 'cancelada'
         )
-        return { ...c, date, occ, mine }
+        // Excepción de ese día: suspensión, reemplazo o cambio de horario
+        // (migración 0018).
+        const exc = occurrences.find((o) => o.classId === c.id && o.date === date)
+        return {
+          ...c,
+          date,
+          occ,
+          mine,
+          time: exc?.startTime ?? c.time,
+          capacity: exc?.capacity ?? c.capacity,
+          teacherName: exc?.teacherId ? exc.teacherName : c.teacherName,
+          suspended: exc?.status === 'suspendida',
+          suspendedReason: exc?.reason ?? '',
+        }
       })
       .sort((a, b) => a.time.localeCompare(b.time))
-  }, [classes, occupancy, reservations, me, weekStart, day])
+  }, [classes, occupancy, occurrences, reservations, me, weekStart, day])
 
   const flash = (type: 'ok' | 'error', text: string) => {
     setNotice({ type, text })
@@ -531,7 +546,7 @@ export function PortalPage() {
                   key={c.id}
                   className={cn(
                     'bg-card rounded-2xl border border-border px-4 py-3 flex items-center gap-3',
-                    isPast && 'opacity-50'
+                    (isPast || c.suspended) && 'opacity-60'
                   )}
                 >
                   <div className="w-12 shrink-0 text-center">
@@ -558,6 +573,11 @@ export function PortalPage() {
                       <span className="flex items-center gap-1 text-[10px] font-bold text-[#2E6040]">
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         {c.mine.status === 'lista de espera' ? 'En espera' : 'Reservada'}
+                      </span>
+                    ) : c.suspended ? (
+                      <span className="text-[10px] font-semibold text-muted-foreground text-right leading-tight block max-w-[92px]">
+                        Suspendida
+                        {c.suspendedReason ? `: ${c.suspendedReason}` : ''}
                       </span>
                     ) : isPast || !canBook ? null : !c.bookable ? (
                       <span className="text-[10px] font-semibold text-muted-foreground text-right leading-tight block max-w-[92px]">
