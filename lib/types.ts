@@ -1,12 +1,54 @@
 export type Role = 'admin' | 'recepcion' | 'profesor' | 'alumno'
 
-export type Discipline =
-  | 'Pilates Mat'
-  | 'Pilates Reformer'
-  | 'Pilates Clínico'
-  | 'Yoga'
-  | 'Stretching'
-  | 'Funcional'
+/**
+ * El nombre de la disciplina. Desde la migración 0011 son un catálogo
+ * editable desde Configuración, así que es texto libre y no una lista fija.
+ */
+export type Discipline = string
+
+/** Disciplina del catálogo (tabla disciplines, migración 0011). */
+export interface DisciplineItem {
+  id: string
+  name: string
+  /** Color del punto/etiqueta */
+  color: string
+  bgColor: string
+  textColor: string
+  /** Texto breve que se muestra en la web */
+  blurb: string
+  sortOrder: number
+}
+
+/** Medio de pago del catálogo (tabla payment_methods, migración 0011). */
+export interface PaymentMethod {
+  code: string
+  name: string
+  /** false = lo acredita una integración (Mercado Pago), no se cobra a mano */
+  isManual: boolean
+  active: boolean
+  sortOrder: number
+}
+
+export type SettingKind = 'text' | 'number' | 'boolean' | 'time' | 'choice' | 'textarea'
+export type SettingGroup = 'estudio' | 'reservas' | 'membresias' | 'cobros' | 'avisos' | 'general'
+
+/**
+ * Parámetro configurable del negocio (tabla studio_settings, migración 0011).
+ * Trae su propia etiqueta y ayuda: la pantalla de Configuración se arma sola
+ * a partir de estas filas, así que sumar un parámetro es un INSERT.
+ */
+export interface StudioSetting {
+  key: string
+  value: string
+  kind: SettingKind
+  /** Para kind 'choice': pares "Etiqueta visible|valor" */
+  options: string[]
+  label: string
+  help: string
+  group: SettingGroup
+  sortOrder: number
+  isPublic: boolean
+}
 
 export type MembershipStatus = 'activa' | 'vencida' | 'por vencer' | 'suspendida'
 

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createMpCheckoutLink, getMpAccessToken, supabaseAdmin } from '@/lib/mp-server'
 import { pushToStaff } from '@/lib/push-server'
 import { sendEmail, emailLayout } from '@/lib/email-server'
@@ -15,9 +16,26 @@ import { sendEmail, emailLayout } from '@/lib/email-server'
 
 export const dynamic = 'force-dynamic'
 
+// Valores por defecto: los usa si la migración 0011 todavía no corrió o si
+// la clave está vacía. Los reales los edita el estudio desde Configuración.
 const EXPIRY_WARNING_DAYS = 5
 const RENEWAL_CATCHUP_DAYS = 7
 const PAYMENT_GRACE_DAYS = 5
+
+/** Parámetros del negocio (tabla studio_settings, migración 0011). */
+async function loadSettings(admin: SupabaseClient): Promise<Record<string, string>> {
+  try {
+    const { data } = await admin.from('studio_settings').select('key, value')
+    return Object.fromEntries((data ?? []).map((r) => [r.key, r.value]))
+  } catch {
+    return {}
+  }
+}
+
+function num(settings: Record<string, string>, key: string, fallback: number): number {
+  const n = Number(settings[key])
+  return Number.isFinite(n) && n > 0 ? n : fallback
+}
 
 /** Fecha de hoy en el huso del estudio (el server corre en UTC). */
 function todayAR(): string {
@@ -67,6 +85,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Falta SUPABASE_SERVICE_ROLE_KEY' }, { status: 501 })
   }
 
+  const settings = await loadSettings(admin)
+  const expiryWarningDays = num(settings, 'expiry_warning_days', EXPIRY_WARNING_DAYS)
+  const renewalCatchupDays = num(settings, 'renewal_catchup_days', RENEWAL_CATCHUP_DAYS)
+  const paymentGraceDays = num(settings, 'payment_grace_days', PAYMENT_GRACE_DAYS)
+
   const today = todayAR()
   const rows: NotificationRow[] = []
   const emails: Array<{ to: string; subject: string; html: string; key: string }> = []
@@ -92,7 +115,7 @@ export async function GET(request: Request) {
     .eq('status', 'activa')
     .eq('auto_renew', true)
     .lt('end_date', today)
-    .gte('end_date', addDaysISO(today, -RENEWAL_CATCHUP_DAYS))
+    .gte('end_date', addDaysISO(today, -renewalCatchupDays))
 
   // renewError = migración 0010 pendiente: se saltea la renovación pero el
   // resto del cron sigue andando.
@@ -132,7 +155,7 @@ export async function GET(request: Request) {
     // Cuota del mes (igual que la asignación manual: pendiente, 5 días)
     let paymentId: string | null = null
     let mpLink: string | null = null
-    const dueDate = addDaysISO(today, PAYMENT_GRACE_DAYS)
+    const dueDate = addDaysISO(today, paymentGraceDays)
     if (Number(plan.price) > 0) {
       const { data: payment } = await admin
         .from('payments')
@@ -197,7 +220,7 @@ export async function GET(request: Request) {
     .select('id, end_date, student_id, students(name, email), plans(name)')
     .eq('status', 'activa')
     .gte('end_date', today)
-    .lte('end_date', addDaysISO(today, EXPIRY_WARNING_DAYS))
+    .lte('end_date', addDaysISO(today, expiryWarningDays))
 
   for (const m of expiring ?? []) {
     if (!isLatest(m)) continue
@@ -232,7 +255,7 @@ export async function GET(request: Request) {
     .select('id, end_date, student_id, students(name, email), plans(name)')
     .eq('status', 'activa')
     .lt('end_date', today)
-    .gte('end_date', addDaysISO(today, -RENEWAL_CATCHUP_DAYS))
+    .gte('end_date', addDaysISO(today, -renewalCatchupDays))
 
   for (const m of expired ?? []) {
     if (!isLatest(m)) continue // renovada (recién o antes): no es noticia

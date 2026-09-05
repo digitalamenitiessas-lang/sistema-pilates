@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
+import { disciplineStyle } from '@/lib/disciplines'
 import {
   addDays,
   mondayOf,
@@ -32,23 +33,6 @@ const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 const DAYS_SHORT = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 const MONTH_NAMES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 
-const DISCIPLINE_COLORS: Record<Discipline, { bg: string; text: string; dot: string }> = {
-  'Pilates Mat': { bg: 'bg-[#FDEEE8]', text: 'text-[#8B3A25]', dot: '#C4735A' },
-  'Pilates Reformer': { bg: 'bg-[#E8F2EB]', text: 'text-[#2E6040]', dot: '#7D9B76' },
-  'Pilates Clínico': { bg: 'bg-[#F0EAF5]', text: 'text-[#5A2F72]', dot: '#9B6E8E' },
-  Yoga: { bg: 'bg-[#FDF5E6]', text: 'text-[#7A5A1A]', dot: '#D4A854' },
-  Stretching: { bg: 'bg-[#E6EFF5]', text: 'text-[#1A4D6A]', dot: '#5E8FA8' },
-  Funcional: { bg: 'bg-[#F5EDE0]', text: 'text-[#6A4A1A]', dot: '#B8956A' },
-}
-
-const ALL_DISCIPLINES: Discipline[] = [
-  'Pilates Mat',
-  'Pilates Reformer',
-  'Pilates Clínico',
-  'Yoga',
-  'Stretching',
-  'Funcional',
-]
 
 /** Clase con cupos calculados para una semana determinada. */
 type WeekClass = ClassSession & { date: string }
@@ -59,7 +43,8 @@ function shortDate(iso: string): string {
 }
 
 function ClassCard({ cls, onClick }: { cls: WeekClass; onClick: () => void }) {
-  const colors = DISCIPLINE_COLORS[cls.discipline]
+  const { disciplines } = useStudio()
+  const colors = disciplineStyle(disciplines, cls.discipline)
   const isFull = cls.enrolled >= cls.capacity
   const pct = (cls.enrolled / cls.capacity) * 100
 
@@ -68,13 +53,16 @@ function ClassCard({ cls, onClick }: { cls: WeekClass; onClick: () => void }) {
       onClick={onClick}
       className={cn(
         'w-full text-left rounded-xl p-2.5 mb-1.5 border transition-all hover:shadow-md hover:-translate-y-0.5 group',
-        colors.bg,
         'border-transparent hover:border-current/20'
       )}
-      style={{ borderLeftColor: colors.dot, borderLeftWidth: '3px' }}
+      style={{
+        backgroundColor: colors.bg,
+        borderLeftColor: colors.dot,
+        borderLeftWidth: '3px',
+      }}
     >
       <div className="flex items-start justify-between gap-1 mb-1">
-        <p className={cn('text-xs font-semibold leading-tight line-clamp-2', colors.text)}>
+        <p className="text-xs font-semibold leading-tight line-clamp-2" style={{ color: colors.text }}>
           {cls.title}
         </p>
         {isFull && (
@@ -110,7 +98,7 @@ function ClassCard({ cls, onClick }: { cls: WeekClass; onClick: () => void }) {
 
 function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => void }) {
   const { refresh } = useData()
-  const { teachers, rooms } = useStudio()
+  const { teachers, rooms, disciplines } = useStudio()
   const isEdit = !!cls
 
   const [title, setTitle] = useState(cls?.title ?? '')
@@ -146,7 +134,7 @@ function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => v
       durationMinutes: Number(duration) || 55,
       capacity: Number(capacity) || 10,
       room,
-      color: DISCIPLINE_COLORS[discipline].dot,
+      color: disciplineStyle(disciplines, discipline).dot,
     }
     try {
       if (isEdit) await updateClassSession(cls.id, input)
@@ -190,8 +178,8 @@ function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => v
             <div>
               <label className={labelClass}>Disciplina</label>
               <select value={discipline} onChange={(e) => setDiscipline(e.target.value as Discipline)} className={inputClass}>
-                {ALL_DISCIPLINES.map((d) => (
-                  <option key={d} value={d}>{d}</option>
+                {disciplines.map((d) => (
+                  <option key={d.id} value={d.name}>{d.name}</option>
                 ))}
               </select>
             </div>
@@ -275,8 +263,8 @@ function ClassDetailModal({
   onEdit: (cls: ClassSession) => void
 }) {
   const { refresh, canWrite } = useData()
-  const { students } = useStudio()
-  const colors = DISCIPLINE_COLORS[cls.discipline]
+  const { students, disciplines } = useStudio()
+  const colors = disciplineStyle(disciplines, cls.discipline)
   const isFull = cls.enrolled >= cls.capacity
   const pct = Math.round((cls.enrolled / cls.capacity) * 100)
 
@@ -332,11 +320,8 @@ function ClassDetailModal({
         >
           <div>
             <span
-              className={cn(
-                'text-[10px] font-semibold px-2 py-0.5 rounded-full mb-2 inline-block',
-                colors.bg,
-                colors.text
-              )}
+              className="text-[10px] font-semibold px-2 py-0.5 rounded-full mb-2 inline-block"
+              style={{ backgroundColor: colors.bg, color: colors.text }}
             >
               {cls.discipline}
             </span>
@@ -484,7 +469,7 @@ function ClassDetailModal({
 
 export function AgendaPage() {
   const { canWrite } = useData()
-  const { classes, reservations } = useStudio()
+  const { classes, reservations, disciplines } = useStudio()
   const [selectedDisciplines, setSelectedDisciplines] = useState<Discipline[]>([])
   const [selectedClass, setSelectedClass] = useState<WeekClass | null>(null)
   const [weekOffset, setWeekOffset] = useState(0)
@@ -535,19 +520,21 @@ export function AgendaPage() {
           Disciplinas:
         </span>
         <div className="flex flex-wrap gap-1.5">
-          {ALL_DISCIPLINES.map((d) => {
-            const colors = DISCIPLINE_COLORS[d]
+          {disciplines.map((item) => {
+            const d = item.name
+            const colors = disciplineStyle(disciplines, d)
             const active = selectedDisciplines.includes(d)
             return (
               <button
-                key={d}
+                key={item.id}
                 onClick={() => toggleDiscipline(d)}
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all border',
                   active
-                    ? `${colors.bg} ${colors.text} border-transparent`
+                    ? 'border-transparent'
                     : 'bg-muted text-muted-foreground border-border hover:border-primary/30'
                 )}
+                style={active ? { backgroundColor: colors.bg, color: colors.text } : undefined}
               >
                 <span
                   className="w-1.5 h-1.5 rounded-full"
