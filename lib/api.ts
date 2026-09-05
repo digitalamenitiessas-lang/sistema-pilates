@@ -17,6 +17,9 @@ import type {
   DisciplineItem,
   PaymentMethod,
   StudioSetting,
+  PermissionKey,
+  PermissionMatrix,
+  UserPermission,
 } from './types'
 
 // ---------------------------------------------------------------
@@ -1161,4 +1164,85 @@ export async function disablePush(): Promise<void> {
   if (!subscription) return
   await pushApi({ endpoint: subscription.endpoint }, 'DELETE')
   await subscription.unsubscribe()
+}
+
+// ---------------------------------------------------------------
+// Motor de permisos (migración 0012)
+//
+// No entra en fetchStudioData a propósito: solo lo necesita la pantalla de
+// Configuración, y las políticas de la base lo reservan al admin.
+// ---------------------------------------------------------------
+export async function fetchPermissionMatrix(): Promise<PermissionMatrix> {
+  const [keysRes, rolesRes, usersRes] = await Promise.all([
+    supabase.from('permission_keys').select('*').order('grupo').order('orden'),
+    supabase.from('role_permissions').select('role, clave'),
+    supabase.from('user_permissions').select('*'),
+  ])
+  const firstError = keysRes.error || rolesRes.error || usersRes.error
+  if (firstError) throw firstError
+
+  const keys: PermissionKey[] = (keysRes.data ?? []).map((k) => ({
+    clave: k.clave,
+    etiqueta: k.etiqueta,
+    ayuda: k.ayuda ?? '',
+    grupo: k.grupo,
+    orden: k.orden,
+    tipo: k.tipo,
+    legacyRoles: k.legacy_roles ?? [],
+    modo: k.enforce_mode,
+  }))
+
+  const granted = new Set((rolesRes.data ?? []).map((r) => `${r.role}|${r.clave}`))
+
+  const overrides: UserPermission[] = (usersRes.data ?? []).map((u) => ({
+    userId: u.user_id,
+    clave: u.clave,
+    allow: u.allow,
+    motivo: u.motivo ?? '',
+    expiresAt: u.expires_at ?? null,
+  }))
+
+  return { keys, granted, overrides }
+}
+
+/** Tildar es insertar la fila; destildar es borrarla. */
+export async function setRolePermission(
+  role: string,
+  clave: string,
+  granted: boolean
+): Promise<void> {
+  if (granted) {
+    const { error } = await supabase.from('role_permissions').insert({ role, clave })
+    if (error && error.code !== '23505') throw error
+  } else {
+    const { error } = await supabase
+      .from('role_permissions')
+      .delete()
+      .eq('role', role)
+      .eq('clave', clave)
+    if (error) throw error
+  }
+}
+
+/** Excepción para una persona: allow true suma, false resta. */
+export async function setUserPermission(
+  userId: string,
+  clave: string,
+  allow: boolean,
+  motivo: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('user_permissions')
+    .upsert({ user_id: userId, clave, allow, motivo }, { onConflict: 'user_id,clave' })
+  if (error) throw error
+}
+
+/** Saca la excepción: vuelve a mandar el rol. */
+export async function clearUserPermission(userId: string, clave: string): Promise<void> {
+  const { error } = await supabase
+    .from('user_permissions')
+    .delete()
+    .eq('user_id', userId)
+    .eq('clave', clave)
+  if (error) throw error
 }

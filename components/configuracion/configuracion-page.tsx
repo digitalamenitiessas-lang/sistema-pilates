@@ -22,6 +22,9 @@ import {
   Building2,
   Shapes,
   Wallet,
+  ShieldCheck,
+  Info,
+  Lock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
@@ -46,6 +49,10 @@ import {
   renamePaymentMethod,
   setPaymentMethodActive,
   saveSettings,
+  fetchPermissionMatrix,
+  setRolePermission,
+  clearUserPermission,
+  setUserPermission,
   type MpAccountInfo,
   type TeacherInput,
   type DisciplineInput,
@@ -53,6 +60,8 @@ import {
 import type {
   Discipline,
   DisciplineItem,
+  PermissionKey,
+  PermissionMatrix,
   Profile,
   Role,
   SettingGroup,
@@ -1347,6 +1356,214 @@ function PaymentMethodsSection() {
   )
 }
 
+const ROLES_MATRIZ: Array<{ key: Role; label: string }> = [
+  { key: 'admin', label: 'Admin' },
+  { key: 'recepcion', label: 'Recepción' },
+  { key: 'profesor', label: 'Profesora' },
+  { key: 'alumno', label: 'Alumna' },
+]
+
+/** Por qué una clave no se puede tocar. */
+const MOTIVO_BLOQUEO: Record<string, string> = {
+  fija: 'La necesitan todos para que el portal y la web funcionen',
+  estructural: 'Tildarla dejaría a alguien elevarse a sí mismo',
+  servicio: 'Es del sistema (procesos automáticos), no de una persona',
+  futuro: 'El módulo todavía no existe',
+}
+
+function PermisosSection() {
+  const { profile } = useData()
+  const [matriz, setMatriz] = useState<PermissionMatrix | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [abierto, setAbierto] = useState<string | null>(null)
+
+  const load = () => {
+    fetchPermissionMatrix()
+      .then((m) => {
+        setMatriz(m)
+        setLoadError(null)
+      })
+      .catch((err) => setLoadError(err instanceof Error ? err.message : 'No se pudo cargar'))
+  }
+
+  useEffect(load, [])
+
+  // Solo el admin administra permisos, y la base lo exige igual.
+  if (profile?.role !== 'admin') return null
+
+  const toggle = async (role: Role, k: PermissionKey, granted: boolean) => {
+    const id = `${role}|${k.clave}`
+    setBusy(id)
+    setError(null)
+    try {
+      await setRolePermission(role, k.clave, !granted)
+      setMatriz((m) => {
+        if (!m) return m
+        const next = new Set(m.granted)
+        if (granted) next.delete(id)
+        else next.add(id)
+        return { ...m, granted: next }
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const grupos = matriz
+    ? [...new Set(matriz.keys.map((k) => k.grupo))]
+    : []
+  const enSombra = matriz?.keys.filter((k) => k.modo === 'sombra').length ?? 0
+  const total = matriz?.keys.length ?? 0
+
+  return (
+    <div className="bg-card rounded-2xl border border-border overflow-hidden">
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+          <ShieldCheck className="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <h2 className="text-sm font-bold text-foreground">Permisos</h2>
+          <p className="text-xs text-muted-foreground">Qué puede hacer cada rol</p>
+        </div>
+      </div>
+
+      {loadError && (
+        <p className="px-5 py-4 text-xs text-destructive">
+          {loadError} — si dice que la tabla no existe, falta correr la migración 0012.
+        </p>
+      )}
+
+      {matriz && enSombra > 0 && (
+        <div className="mx-5 mt-4 rounded-xl bg-[#FDF5E6] border border-[#D4A854]/40 px-4 py-3 flex gap-2.5">
+          <Info className="w-4 h-4 text-[#7A5A1A] shrink-0 mt-0.5" />
+          <div className="text-xs text-[#7A5A1A] leading-relaxed">
+            <strong>
+              {enSombra === total
+                ? 'Los permisos todavía no están en vigencia.'
+                : `${enSombra} de ${total} permisos todavía no están en vigencia.`}
+            </strong>{' '}
+            Cada rol sigue funcionando como venía. Podés dejar la matriz como la
+            querés y recién después se activa, de a un grupo por vez, para que si
+            algo queda mal se vea en el momento y no en medio de la jornada.
+          </div>
+        </div>
+      )}
+
+      {error && <p className="px-5 pt-4 text-xs text-destructive">{error}</p>}
+
+      <div className="px-5 py-4 space-y-5">
+        {grupos.map((grupo) => {
+          const claves = matriz!.keys.filter((k) => k.grupo === grupo)
+          return (
+            <div key={grupo}>
+              <h3 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide mb-2">
+                {grupo}
+              </h3>
+
+              <div className="rounded-xl border border-border overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/40">
+                      <th className="text-left font-semibold text-muted-foreground px-3 py-2">
+                        Puede…
+                      </th>
+                      {ROLES_MATRIZ.map((r) => (
+                        <th
+                          key={r.key}
+                          className="font-semibold text-muted-foreground px-2 py-2 w-20 text-center"
+                        >
+                          {r.label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {claves.map((k) => {
+                      const bloqueada = k.tipo !== 'permiso'
+                      return (
+                        <tr key={k.clave} className="border-b border-border last:border-0">
+                          <td className="px-3 py-2 align-top">
+                            <button
+                              type="button"
+                              onClick={() => setAbierto(abierto === k.clave ? null : k.clave)}
+                              className="text-left"
+                            >
+                              <span className="text-foreground font-medium flex items-center gap-1.5">
+                                {k.etiqueta}
+                                {bloqueada && <Lock className="w-3 h-3 text-muted-foreground" />}
+                              </span>
+                              {abierto === k.clave && (
+                                <span className="block text-[11px] text-muted-foreground mt-1 max-w-md">
+                                  {bloqueada && (
+                                    <strong className="block text-foreground/70">
+                                      No se puede cambiar: {MOTIVO_BLOQUEO[k.tipo]}.
+                                    </strong>
+                                  )}
+                                  {k.ayuda}
+                                </span>
+                              )}
+                            </button>
+                          </td>
+
+                          {ROLES_MATRIZ.map((r) => {
+                            const id = `${r.key}|${k.clave}`
+                            const granted = matriz!.granted.has(id)
+                            return (
+                              <td key={r.key} className="px-2 py-2 text-center">
+                                <button
+                                  type="button"
+                                  disabled={bloqueada || busy === id}
+                                  onClick={() => toggle(r.key, k, granted)}
+                                  aria-label={`${k.etiqueta} — ${r.label}`}
+                                  className={cn(
+                                    'w-5 h-5 rounded-md border transition-colors inline-flex items-center justify-center',
+                                    granted
+                                      ? 'bg-primary border-primary text-primary-foreground'
+                                      : 'bg-background border-border',
+                                    bloqueada
+                                      ? 'opacity-40 cursor-not-allowed'
+                                      : 'hover:border-primary/60'
+                                  )}
+                                >
+                                  {busy === id ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : granted ? (
+                                    <Check className="w-3 h-3" />
+                                  ) : null}
+                                </button>
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )
+        })}
+
+        {matriz && (
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Tocá el nombre de un permiso para ver qué hace exactamente. Los que
+            tienen candado no se pueden cambiar, y el motivo está ahí explicado.
+            <br />
+            Ojo con una cosa: sacarle <strong>Ver información financiera</strong> a
+            un rol le esconde los pagos y la facturación, pero no el precio que
+            figura en la membresía de cada alumna. La base filtra por dato, no por
+            campo suelto.
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function ConfiguracionPage() {
   return (
     <div className="p-4 md:p-6 max-w-2xl space-y-8">
@@ -1398,7 +1615,10 @@ export function ConfiguracionPage() {
           <UserPlus className="w-4 h-4" />
           Accesos
         </div>
-        <UsersSection />
+        <div className="space-y-5">
+          <UsersSection />
+          <PermisosSection />
+        </div>
       </div>
 
       <div>
