@@ -257,14 +257,14 @@ es lo que permite que el estudio ajuste sus reglas sin pedirnos un desarrollo.
 - El borrado de suscripciones push no filtraba por usuario.
 - `can()` traía un caché que la rompía (migración `0014`): la función declara `search_path` vacío, y al salir Postgres restaura las variables — pero una variable personalizada no vuelve a "no existe" sino a cadena vacía. Desde la segunda llamada el caché se leía vacío y respondía que no a todo.
 
-**Falta para cerrar el bloque:**
+**Falta para cerrar el bloque — solo lo que depende del estudio:**
 
 - [ ] Probar el portal de la alumna: **cancelar una reserva** es lo que ejercita la rama de aislamiento de la política restrictiva nueva.
 - [x] **Unificar los chequeos del servidor** (05/09): los endpoints preguntan al motor con la misma clave que la pantalla, vía `lib/permisos-server.ts`. Antes verificaban el rol a mano, así que un permiso destildado desaparecía del navegador pero el endpoint lo seguía aceptando. De paso se cerró una filtración: `/api/mp/test` devuelve el alias y el email de la cuenta de Mercado Pago del estudio, y con el chequeo viejo recepción los veía sin tener acceso a las credenciales — ahora exige su propia clave.
 - [ ] Encendido gradual de los permisos, grupo por grupo, empezando por Catálogos.
-- [ ] Tolerancia a fallo del bundle: hoy si una tabla niega el acceso, se cae la pantalla entera en vez de mostrar el resto.
-- [ ] Baja lógica de usuarios (hoy se borran físicamente).
-- [ ] Momento exacto del cobro en huso argentino, prerrequisito de la caja diaria.
+- [x] **Distinguir "sin acceso" de "vacío"** (05/09): las políticas devuelven cero filas cuando no hay permiso, no un error, así que un rol sin acceso al dinero veía un $0 que miente. El tablero ahora dice "Sin acceso". Además, el error de una tabla ya no tira la pantalla entera.
+- [x] **Baja lógica de accesos** (05/09, migración `0015`): se marca el perfil inactivo y se bloquea el ingreso, con reversión si una de las dos falla, y se puede reactivar. Antes se borraba la cuenta y el perfil se iba en cascada, contra lo que pide el documento.
+- [x] **Un solo "día" para el dinero** (05/09, migración `0016`): el cobro guarda el instante exacto y el día se deriva del huso del estudio. Antes se calculaba de cuatro maneras distintas según quién escribiera; para un arqueo de caja eso significa cobros en el cierre equivocado.
 
 ### Bloque 1 — Agenda y asistencias (prioridad 1 de la clienta, ≈ 3 semanas)
 - Clases especiales y talleres con fecha puntual; instancia de clase por fecha
