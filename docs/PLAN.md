@@ -185,9 +185,9 @@ esto solo evita ofrecer acciones que iban a fallar.
   agregar `https://<dominio-de-vercel>/sistema/recuperar` y
   `http://localhost:3000/sistema/recuperar` (sin esto, el enlace de
   "olvidé mi contraseña" cae en la home en vez de la pantalla de reset).
-- Vercel → Environment Variables: `RESEND_API_KEY` ✅ cargada ·
-  faltan `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`,
-  `VAPID_SUBJECT` y `CRON_SECRET` (valores en `.env.local`).
+- Vercel → Environment Variables: **todas cargadas** ✅ (verificado
+  05/09/2026): `RESEND_API_KEY`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`,
+  `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` y `CRON_SECRET`.
 - Resend en sandbox: sin dominio verificado solo entrega a
   `digitalamenitiessas@gmail.com`. Al tener el dominio del estudio:
   Resend → Domains → verificar DNS → `EMAIL_FROM` en Vercel, y los emails
