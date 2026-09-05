@@ -18,10 +18,11 @@ import {
   Copy,
   MessageCircle,
   Wallet,
+  Ban,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
-import { registerPayment, collectPayment, createMpLink, syncMpPayments } from '@/lib/api'
+import { registerPayment, collectPayment, createMpLink, syncMpPayments, voidPayment } from '@/lib/api'
 import type { Payment } from '@/lib/types'
 
 type FilterStatus = 'todos' | 'pagado' | 'pendiente' | 'vencido'
@@ -487,14 +488,106 @@ function MpLinkModal({ payment, onClose }: { payment: Payment; onClose: () => vo
   )
 }
 
+function AnularCobroModal({
+  pago,
+  onClose,
+  onAnulado,
+}: {
+  pago: Payment
+  onClose: () => void
+  onAnulado: () => void
+}) {
+  const { refresh } = useData()
+  const [motivo, setMotivo] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const confirmar = async () => {
+    if (!motivo.trim()) {
+      setError('Escribí por qué se anula')
+      return
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      await voidPayment(pago.id, motivo)
+      await refresh()
+      onAnulado()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo anular')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-foreground/20 backdrop-blur-sm flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div
+        className="bg-card w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl shadow-2xl border border-border"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-5 py-4 border-b border-border">
+          <h2 className="text-base font-bold text-foreground">Anular cobro</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {pago.studentName} · ${pago.amount.toLocaleString('es-AR')}
+            {pago.receiptNumber ? ` · comprobante #${String(pago.receiptNumber).padStart(6, '0')}` : ''}
+          </p>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          {/* Decir qué pasa, antes de que pase */}
+          <div className="rounded-xl bg-muted/50 px-4 py-3 text-xs text-foreground/80 space-y-1.5">
+            <p>El cobro deja de contar como plata entrada y baja el saldo de su cuenta.</p>
+            <p>No se borra: queda tachado, con el motivo y el comprobante que ya se emitió.</p>
+            <p>
+              Si ese día ya se arqueó, <strong>el cierre firmado no cambia</strong>: dice lo que se
+              contó y sigue siendo cierto. Lo que haya que devolver se registra hoy, desde Caja.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1.5">
+              ¿Por qué se anula?
+            </label>
+            <input
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              autoFocus
+              placeholder="Ej: se cobró dos veces por error"
+              className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary"
+            />
+          </div>
+
+          {error && <p className="text-xs text-destructive">{error}</p>}
+        </div>
+
+        <div className="px-5 py-4 border-t border-border flex gap-2">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground">
+            Cancelar
+          </button>
+          <button
+            onClick={confirmar}
+            disabled={saving}
+            className="flex-1 py-2.5 rounded-xl bg-destructive text-destructive-foreground text-sm font-semibold disabled:opacity-40 flex items-center justify-center gap-2"
+          >
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            Anular
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function PagosPage() {
-  const { refresh, canWrite } = useData()
+  const { refresh, canWrite, can } = useData()
   const { payments: PAYMENTS, monthlyRevenue, mpConfigured, students } = useStudio()
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('todos')
   const [showRegistrar, setShowRegistrar] = useState(false)
   const [collectingPayment, setCollectingPayment] = useState<Payment | null>(null)
   const [linkPayment, setLinkPayment] = useState<Payment | null>(null)
+  const [anulando, setAnulando] = useState<Payment | null>(null)
+  const puedeAnular = can('pagos.anular') || canWrite
   const [syncMsg, setSyncMsg] = useState<string | null>(null)
 
   // Al abrir Pagos, acredita los links de MP que ya fueron pagados
@@ -735,6 +828,17 @@ export function PagosPage() {
                             <PaymentStatusBadge status={p.status} />
                           </td>
                           <td className="px-4 py-3">
+                            {/* Un cobro ya hecho se puede anular; el
+                                comprobante emitido queda igual. */}
+                            {p.status === 'pagado' && puedeAnular && (
+                              <button
+                                onClick={() => setAnulando(p)}
+                                title="Anular este cobro"
+                                className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                              >
+                                <Ban className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                             {canWrite && (p.status === 'pendiente' || p.status === 'vencido') && (
                               <div className="flex items-center gap-1">
                                 <button
@@ -865,6 +969,13 @@ export function PagosPage() {
         <CobrarModal payment={collectingPayment} onClose={() => setCollectingPayment(null)} />
       )}
       {linkPayment && <MpLinkModal payment={linkPayment} onClose={() => setLinkPayment(null)} />}
+      {anulando && (
+        <AnularCobroModal
+          pago={anulando}
+          onClose={() => setAnulando(null)}
+          onAnulado={() => setAnulando(null)}
+        />
+      )}
     </div>
   )
 }

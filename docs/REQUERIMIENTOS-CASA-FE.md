@@ -349,7 +349,10 @@ es lo que permite que el estudio ajuste sus reglas sin pedirnos un desarrollo.
       gasto de hoy, el resultado y dónde está la plata cuenta por cuenta. Si
       al rol le falta ver cobros o gastos, lo dice en vez de mostrar un
       resultado que no incluye lo que no puede ver.
-- [ ] Botón de anular cobro en Pagos.
+- [x] **Anular un cobro desde Pagos** (05/09): pide el motivo y explica qué
+      va a pasar antes de hacerlo. El comprobante emitido queda, el cobro
+      deja de contar como plata entrada y baja el saldo de su cuenta. Si ese
+      día ya se arqueó, el cierre firmado no cambia.
 - [ ] Adjuntar la foto del comprobante (primer uso de Storage, en migración
       aparte).
 - [ ] Avisos de caja en el proceso diario: caja sin cerrar, diferencia.
