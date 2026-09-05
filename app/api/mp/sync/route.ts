@@ -3,22 +3,16 @@ import {
   applyApprovedPayment,
   findApprovedMpPayment,
   getMpAccessToken,
-  requireStaff,
   supabaseAdmin,
-  supabaseForRequest,
 } from '@/lib/mp-server'
+import { esDenegado, exigir } from '@/lib/permisos-server'
 
 // Revisa en Mercado Pago los pagos pendientes que tienen link generado
 // y acredita los que ya fueron aprobados. Se llama al abrir Pagos.
 export async function POST(request: Request) {
-  const supabase = supabaseForRequest(request)
-  if (!supabase) {
-    return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-  }
-  const denied = await requireStaff(supabase)
-  if (denied) {
-    return NextResponse.json({ error: denied }, { status: 403 })
-  }
+  const caller = await exigir(request, 'pagos.acreditar')
+  if (esDenegado(caller)) return caller.error
+  const supabase = caller.supabase
 
   // El token se lee con service role: desde 0008 recepción no lee app_settings
   const accessToken = await getMpAccessToken(supabaseAdmin() ?? supabase)

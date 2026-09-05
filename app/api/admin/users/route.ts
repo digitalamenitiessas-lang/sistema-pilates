@@ -1,37 +1,23 @@
 import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { supabaseAdmin, supabaseForRequest } from '@/lib/mp-server'
+import { supabaseAdmin } from '@/lib/mp-server'
+import { esDenegado, exigir } from '@/lib/permisos-server'
 
 // Crear y eliminar usuarios requiere la Admin API de Supabase
 // (SUPABASE_SERVICE_ROLE_KEY en el entorno del servidor). Solo un
 // usuario con rol admin puede invocar estos endpoints.
 
-async function authorize(request: Request): Promise<
-  | { ok: true; caller: SupabaseClient; admin: SupabaseClient; callerId: string; callerRole: string }
+async function authorize(
+  request: Request,
+  clave: string
+): Promise<
+  | { ok: true; caller: SupabaseClient; admin: SupabaseClient; callerId: string; callerRole: string; can: (c: string) => boolean }
   | { ok: false; response: NextResponse }
 > {
-  const caller = supabaseForRequest(request)
-  if (!caller) {
-    return { ok: false, response: NextResponse.json({ error: 'No autenticado' }, { status: 401 }) }
-  }
-
-  const { data: userData, error: userError } = await caller.auth.getUser()
-  if (userError || !userData.user) {
-    return { ok: false, response: NextResponse.json({ error: 'Sesión inválida' }, { status: 401 }) }
-  }
-
-  const { data: profile } = await caller
-    .from('profiles')
-    .select('role')
-    .eq('id', userData.user.id)
-    .single()
-  const callerRole = profile?.role ?? ''
-  if (!['admin', 'recepcion'].includes(callerRole)) {
-    return {
-      ok: false,
-      response: NextResponse.json({ error: 'No tenés permisos para gestionar usuarios' }, { status: 403 }),
-    }
-  }
+  // La clave la exige el motor de permisos; los roles de atrás son el
+  // respaldo por si la migración 0012 todavía no corrió.
+  const caller = await exigir(request, clave, clave === 'usuarios.eliminar' ? ['admin'] : ['admin', 'recepcion'])
+  if (esDenegado(caller)) return { ok: false, response: caller.error }
 
   const admin = supabaseAdmin()
   if (!admin) {
@@ -47,13 +33,20 @@ async function authorize(request: Request): Promise<
     }
   }
 
-  return { ok: true, caller, admin, callerId: userData.user.id, callerRole }
+  return {
+    ok: true,
+    caller: caller.supabase,
+    admin,
+    callerId: caller.userId,
+    callerRole: caller.role,
+    can: caller.can,
+  }
 }
 
 const VALID_ROLES = ['admin', 'recepcion', 'profesor', 'alumno']
 
 export async function POST(request: Request) {
-  const auth = await authorize(request)
+  const auth = await authorize(request, 'usuarios.crear_alumno')
   if (!auth.ok) return auth.response
 
   const { email, password, fullName, role, studentId } = await request.json().catch(() => ({}))
@@ -63,8 +56,10 @@ export async function POST(request: Request) {
   if (String(password).length < 6) {
     return NextResponse.json({ error: 'La contraseña debe tener al menos 6 caracteres' }, { status: 400 })
   }
-  // Recepción solo puede crear accesos de alumnos; roles de staff, solo el admin
-  if (auth.callerRole !== 'admin' && role !== 'alumno') {
+  // Crear un acceso de alumna y crear un usuario de staff son dos permisos
+  // distintos: el segundo es la puerta a fabricarse un admin, y por eso la
+  // clave está marcada como no configurable desde la pantalla.
+  if (role !== 'alumno' && !auth.can('usuarios.crear_staff')) {
     return NextResponse.json({ error: 'Solo el admin puede crear usuarios de staff' }, { status: 403 })
   }
 
@@ -115,15 +110,12 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const auth = await authorize(request)
+  const auth = await authorize(request, 'usuarios.eliminar')
   if (!auth.ok) return auth.response
 
   const { userId } = await request.json().catch(() => ({}))
   if (!userId) {
     return NextResponse.json({ error: 'Falta userId' }, { status: 400 })
-  }
-  if (auth.callerRole !== 'admin') {
-    return NextResponse.json({ error: 'Solo el admin puede eliminar usuarios' }, { status: 403 })
   }
   if (userId === auth.callerId) {
     return NextResponse.json({ error: 'No podés eliminar tu propio usuario' }, { status: 400 })

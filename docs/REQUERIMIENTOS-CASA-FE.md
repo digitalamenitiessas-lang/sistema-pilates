@@ -260,7 +260,7 @@ es lo que permite que el estudio ajuste sus reglas sin pedirnos un desarrollo.
 **Falta para cerrar el bloque:**
 
 - [ ] Probar el portal de la alumna: **cancelar una reserva** es lo que ejercita la rama de aislamiento de la política restrictiva nueva.
-- [ ] Unificar los chequeos del servidor: los endpoints de Mercado Pago y de usuarios todavía verifican el rol a mano. Mientras siga así, un permiso destildado en la pantalla lo sigue permitiendo el servidor.
+- [x] **Unificar los chequeos del servidor** (05/09): los endpoints preguntan al motor con la misma clave que la pantalla, vía `lib/permisos-server.ts`. Antes verificaban el rol a mano, así que un permiso destildado desaparecía del navegador pero el endpoint lo seguía aceptando. De paso se cerró una filtración: `/api/mp/test` devuelve el alias y el email de la cuenta de Mercado Pago del estudio, y con el chequeo viejo recepción los veía sin tener acceso a las credenciales — ahora exige su propia clave.
 - [ ] Encendido gradual de los permisos, grupo por grupo, empezando por Catálogos.
 - [ ] Tolerancia a fallo del bundle: hoy si una tabla niega el acceso, se cae la pantalla entera en vez de mostrar el resto.
 - [ ] Baja lógica de usuarios (hoy se borran físicamente).
