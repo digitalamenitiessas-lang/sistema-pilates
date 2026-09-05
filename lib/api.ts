@@ -608,7 +608,9 @@ export async function registerPayment(input: NewPaymentInput): Promise<number> {
       concept: input.concept,
       amount: input.amount,
       due_date: localISO(),
-      paid_date: localISO(),
+      // El día lo deriva la base del instante, en el huso del estudio
+      // (migración 0016). Una sola definición de "día" para todos.
+      paid_at: new Date().toISOString(),
       status: 'pagado',
       method: input.method,
     })
@@ -625,7 +627,7 @@ export async function collectPayment(
 ): Promise<number> {
   const { data, error } = await supabase
     .from('payments')
-    .update({ status: 'pagado', method, paid_date: localISO() })
+    .update({ status: 'pagado', method, paid_at: new Date().toISOString() })
     .eq('id', paymentId)
     .select()
     .single()

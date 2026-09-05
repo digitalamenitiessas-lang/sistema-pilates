@@ -125,7 +125,9 @@ export async function applyApprovedPayment(
       status: 'pagado',
       method: mapMpMethod(mp.payment_type_id),
       mp_payment_id: String(mp.id),
-      paid_date: (mp.date_approved ?? new Date().toISOString()).slice(0, 10),
+      // El instante que informa Mercado Pago; la base deriva de ahí el día
+      // del estudio (migración 0016), en vez de recortar una fecha UTC.
+      paid_at: mp.date_approved ?? new Date().toISOString(),
     })
     .eq('id', paymentId)
     .eq('status', 'pendiente')
