@@ -21,15 +21,6 @@ import type { Plan, Discipline } from '@/lib/types'
 
 type Tab = 'planes' | 'membresias'
 
-const ALL_DISCIPLINES: Discipline[] = [
-  'Pilates Mat',
-  'Pilates Reformer',
-  'Pilates Clínico',
-  'Yoga',
-  'Stretching',
-  'Funcional',
-]
-
 const PLAN_COLORS = ['#C4735A', '#7D9B76', '#D4A854', '#9B6E8E', '#5E8FA8', '#B8956A']
 
 function PlanCard({ plan, onEdit, onDelete }: { plan: Plan; onEdit: () => void; onDelete: () => void }) {
@@ -151,6 +142,7 @@ function PlanCard({ plan, onEdit, onDelete }: { plan: Plan; onEdit: () => void; 
 
 function PlanFormModal({ plan, onClose }: { plan?: Plan; onClose: () => void }) {
   const { refresh } = useData()
+  const { disciplines: catalog } = useStudio()
   const isEdit = !!plan
 
   const [name, setName] = useState(plan?.name ?? '')
@@ -268,11 +260,12 @@ function PlanFormModal({ plan, onClose }: { plan?: Plan; onClose: () => void }) 
           <div>
             <label className={labelClass}>Disciplinas habilitadas *</label>
             <div className="flex flex-wrap gap-2">
-              {ALL_DISCIPLINES.map((d) => {
+              {catalog.map((item) => {
+                const d = item.name
                 const active = disciplines.includes(d)
                 return (
                   <button
-                    key={d}
+                    key={item.id}
                     type="button"
                     onClick={() => toggleDiscipline(d)}
                     className={cn(

@@ -14,6 +14,9 @@ import type {
   Profile,
   Role,
   Room,
+  DisciplineItem,
+  PaymentMethod,
+  StudioSetting,
 } from './types'
 
 // ---------------------------------------------------------------
@@ -56,18 +59,44 @@ export function initials(name: string): string {
 // ---------------------------------------------------------------
 // Estados derivados
 // ---------------------------------------------------------------
+/** Valor por defecto si la migración 0011 todavía no corrió. */
 const EXPIRY_WARNING_DAYS = 5
 
-function deriveMembershipStatus(status: string, endDate: string): Membership['status'] {
+// ---------------------------------------------------------------
+// Parámetros configurables (studio_settings, migración 0011)
+// ---------------------------------------------------------------
+export type Settings = Record<string, string>
+
+export function settingNum(settings: Settings, key: string, fallback: number): number {
+  const n = Number(settings[key])
+  return Number.isFinite(n) ? n : fallback
+}
+
+export function settingBool(settings: Settings, key: string, fallback = false): boolean {
+  const v = settings[key]
+  return v === undefined || v === '' ? fallback : v === 'true'
+}
+
+export function settingText(settings: Settings, key: string, fallback = ''): string {
+  return settings[key]?.trim() || fallback
+}
+
+function deriveMembershipStatus(
+  status: string,
+  endDate: string,
+  warningDays: number = EXPIRY_WARNING_DAYS
+): Membership['status'] {
   if (status === 'suspendida') return 'suspendida'
   const today = localISO()
   if (endDate < today) return 'vencida'
-  if (endDate <= addDays(today, EXPIRY_WARNING_DAYS)) return 'por vencer'
+  if (endDate <= addDays(today, warningDays)) return 'por vencer'
   return 'activa'
 }
 
 function derivePaymentStatus(status: string, dueDate: string): Payment['status'] {
-  if (status === 'pagado') return 'pagado'
+  // 'anulado' no es deuda: se muestra como pagado para que no sume al total
+  // adeudado ni dispare alertas (el listado de Pagos lo distingue aparte).
+  if (status === 'pagado' || status === 'anulado') return 'pagado'
   if (dueDate < localISO()) return 'vencido'
   return 'pendiente'
 }
@@ -86,6 +115,13 @@ export interface StudioData {
   monthlyRevenue: MonthlyRevenue[]
   alerts: Alert[]
   rooms: Room[]
+  /** Catálogo editable desde Configuración (migración 0011) */
+  disciplines: DisciplineItem[]
+  paymentMethods: PaymentMethod[]
+  /** Parámetros del negocio, listos para leer con settingNum/settingBool */
+  settings: Settings
+  /** Los mismos parámetros con su etiqueta y ayuda, para armar la pantalla */
+  settingsMeta: StudioSetting[]
   /** true si el estudio ya cargó credenciales de Mercado Pago */
   mpConfigured: boolean
 }
@@ -120,6 +156,52 @@ export async function fetchStudioData(): Promise<StudioData> {
     })
   }
 
+  // ── Catálogos configurables (migración 0011) ────────────────────────────
+  // Tolerantes: si la migración todavía no corrió, el sistema sigue andando
+  // con los valores por defecto que tenía escritos en el código.
+  let disciplines: DisciplineItem[] = []
+  let paymentMethods: PaymentMethod[] = []
+  let settings: Settings = {}
+  let settingsMeta: StudioSetting[] = []
+  try {
+    const [discRes, methodRes, settingsRes] = await Promise.all([
+      supabase.from('disciplines').select('*').eq('active', true).order('sort_order').order('name'),
+      supabase.from('payment_methods').select('*').order('sort_order'),
+      supabase.from('studio_settings').select('*').order('group_key').order('sort_order'),
+    ])
+    disciplines = (discRes.data ?? []).map((d) => ({
+      id: d.id,
+      name: d.name,
+      color: d.color,
+      bgColor: d.bg_color,
+      textColor: d.text_color,
+      blurb: d.blurb ?? '',
+      sortOrder: d.sort_order,
+    }))
+    paymentMethods = (methodRes.data ?? []).map((m) => ({
+      code: m.code,
+      name: m.name,
+      isManual: m.is_manual,
+      active: m.active,
+      sortOrder: m.sort_order,
+    }))
+    settingsMeta = (settingsRes.data ?? []).map((r) => ({
+      key: r.key,
+      value: r.value,
+      kind: r.kind,
+      options: r.options ?? [],
+      label: r.label,
+      help: r.help ?? '',
+      group: r.group_key,
+      sortOrder: r.sort_order,
+      isPublic: r.is_public,
+    }))
+    settings = Object.fromEntries(settingsMeta.map((r) => [r.key, r.value]))
+  } catch {
+    // sin catálogos: valores por defecto
+  }
+  const warningDays = settingNum(settings, 'expiry_warning_days', EXPIRY_WARNING_DAYS)
+
   const teachers: Teacher[] = (teachersRes.data ?? []).map((t) => ({
     id: t.id,
     name: t.name,
@@ -152,7 +234,7 @@ export async function fetchStudioData(): Promise<StudioData> {
     endDate: m.end_date,
     classesTotal: m.classes_total,
     classesUsed: m.classes_used,
-    status: deriveMembershipStatus(m.status, m.end_date),
+    status: deriveMembershipStatus(m.status, m.end_date, warningDays),
     price: Number(m.price),
     autoRenew: m.auto_renew ?? true,
   }))
@@ -281,7 +363,11 @@ export async function fetchStudioData(): Promise<StudioData> {
 
   const alerts = buildAlerts(students, memberships, payments, classes)
 
-  return { teachers, plans, students, memberships, classes, reservations, payments, monthlyRevenue, alerts, rooms, mpConfigured }
+  return {
+    teachers, plans, students, memberships, classes, reservations, payments,
+    monthlyRevenue, alerts, rooms, disciplines, paymentMethods, settings, settingsMeta,
+    mpConfigured,
+  }
 }
 
 function buildAlerts(
@@ -712,6 +798,127 @@ export async function renameRoom(id: string, oldName: string, newName: string): 
 export async function deactivateRoom(id: string): Promise<void> {
   const { error } = await supabase.from('rooms').update({ active: false }).eq('id', id)
   if (error) throw error
+}
+
+// ---------------------------------------------------------------
+// Disciplinas (catálogo editable — migración 0011)
+// ---------------------------------------------------------------
+export interface DisciplineInput {
+  name: string
+  color: string
+  bgColor: string
+  textColor: string
+  blurb: string
+}
+
+function disciplineRow(input: DisciplineInput) {
+  return {
+    name: input.name.trim(),
+    color: input.color,
+    bg_color: input.bgColor,
+    text_color: input.textColor,
+    blurb: input.blurb.trim(),
+  }
+}
+
+export async function createDiscipline(input: DisciplineInput): Promise<void> {
+  const { error } = await supabase.from('disciplines').insert(disciplineRow(input))
+  if (error) {
+    if (error.code === '23505') throw new Error('Ya existe una disciplina con ese nombre')
+    throw error
+  }
+}
+
+/**
+ * Renombra la disciplina y arrastra el cambio a clases, planes y profesores.
+ * Las tres tablas guardan el nombre como texto (igual que las salas), así que
+ * la cascada la hace la app.
+ */
+export async function updateDiscipline(
+  id: string,
+  oldName: string,
+  input: DisciplineInput
+): Promise<void> {
+  const row = disciplineRow(input)
+  const { error } = await supabase.from('disciplines').update(row).eq('id', id)
+  if (error) {
+    if (error.code === '23505') throw new Error('Ya existe una disciplina con ese nombre')
+    throw error
+  }
+  if (row.name === oldName) return
+
+  const { error: classError } = await supabase
+    .from('class_sessions')
+    .update({ discipline: row.name })
+    .eq('discipline', oldName)
+  if (classError) throw classError
+
+  // plans.disciplines y teachers.disciplines son arrays de texto: se
+  // reemplaza el valor viejo en las filas que lo contienen.
+  for (const table of ['plans', 'teachers'] as const) {
+    const { data: rows, error: readError } = await supabase
+      .from(table)
+      .select('id, disciplines')
+      .contains('disciplines', [oldName])
+    if (readError) throw readError
+    for (const r of rows ?? []) {
+      const next = (r.disciplines as string[]).map((d) => (d === oldName ? row.name : d))
+      const { error: writeError } = await supabase
+        .from(table)
+        .update({ disciplines: next })
+        .eq('id', r.id)
+      if (writeError) throw writeError
+    }
+  }
+}
+
+/** Baja lógica: las clases y los planes que la usan siguen intactos. */
+export async function deactivateDiscipline(id: string): Promise<void> {
+  const { error } = await supabase.from('disciplines').update({ active: false }).eq('id', id)
+  if (error) throw error
+}
+
+// ---------------------------------------------------------------
+// Medios de pago (catálogo editable — migración 0011)
+// ---------------------------------------------------------------
+export async function createPaymentMethod(code: string, name: string): Promise<void> {
+  const clean = code
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+  if (!clean) throw new Error('El código no puede quedar vacío')
+  const { error } = await supabase
+    .from('payment_methods')
+    .insert({ code: clean, name: name.trim(), is_manual: true, sort_order: 99 })
+  if (error) {
+    if (error.code === '23505') throw new Error('Ya existe un medio de pago con ese código')
+    throw error
+  }
+}
+
+export async function renamePaymentMethod(code: string, name: string): Promise<void> {
+  const { error } = await supabase.from('payment_methods').update({ name: name.trim() }).eq('code', code)
+  if (error) throw error
+}
+
+export async function setPaymentMethodActive(code: string, active: boolean): Promise<void> {
+  const { error } = await supabase.from('payment_methods').update({ active }).eq('code', code)
+  if (error) throw error
+}
+
+// ---------------------------------------------------------------
+// Parámetros del negocio (studio_settings — migración 0011)
+// ---------------------------------------------------------------
+/** Guarda solo las claves que cambiaron. */
+export async function saveSettings(changes: Record<string, string>): Promise<void> {
+  const entries = Object.entries(changes)
+  if (!entries.length) return
+  for (const [key, value] of entries) {
+    const { error } = await supabase.from('studio_settings').update({ value }).eq('key', key)
+    if (error) throw error
+  }
 }
 
 // ---------------------------------------------------------------

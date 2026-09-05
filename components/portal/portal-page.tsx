@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useData, useStudio } from '@/lib/data-context'
+import { disciplineStyle } from '@/lib/disciplines'
 import {
   addDays,
   mondayOf,
@@ -32,15 +33,6 @@ import type { Discipline, Reservation, Student } from '@/lib/types'
 
 const DAYS_SHORT = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
-
-const DISCIPLINE_DOT: Record<Discipline, string> = {
-  'Pilates Mat': '#C4735A',
-  'Pilates Reformer': '#7D9B76',
-  'Pilates Clínico': '#9B6E8E',
-  Yoga: '#D4A854',
-  Stretching: '#5E8FA8',
-  Funcional: '#B8956A',
-}
 
 function pretty(iso: string): string {
   const [, m, d] = iso.split('-').map(Number)
@@ -208,6 +200,7 @@ function UpcomingList({
   onCancel: (r: Reservation) => void
   busyId: string | null
 }) {
+  const { disciplines } = useStudio()
   if (reservations.length === 0) {
     return (
       <p className="text-xs text-muted-foreground text-center py-4">
@@ -221,7 +214,7 @@ function UpcomingList({
         <div key={r.id} className="bg-card rounded-2xl border border-border px-4 py-3 flex items-center gap-3">
           <div
             className="w-1 self-stretch rounded-full shrink-0"
-            style={{ backgroundColor: DISCIPLINE_DOT[r.discipline] ?? '#C4735A' }}
+            style={{ backgroundColor: disciplineStyle(disciplines, r.discipline).dot }}
           />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground truncate">{r.className}</p>
@@ -249,7 +242,7 @@ function UpcomingList({
 
 export function PortalPage() {
   const { profile, refresh, signOut } = useData()
-  const { students, classes, reservations, payments } = useStudio()
+  const { students, classes, reservations, payments, disciplines } = useStudio()
 
   // Con RLS, el alumno solo recibe su propia ficha
   const me = students.find((s) => s.userId === profile?.id) ?? students[0] ?? null
@@ -547,7 +540,7 @@ export function PortalPage() {
                   </div>
                   <div
                     className="w-1 self-stretch rounded-full shrink-0"
-                    style={{ backgroundColor: DISCIPLINE_DOT[c.discipline] ?? '#C4735A' }}
+                    style={{ backgroundColor: disciplineStyle(disciplines, c.discipline).dot }}
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground truncate">{c.title}</p>

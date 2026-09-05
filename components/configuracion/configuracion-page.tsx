@@ -18,6 +18,10 @@ import {
   Trash2,
   Check,
   X,
+  SlidersHorizontal,
+  Building2,
+  Shapes,
+  Wallet,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
@@ -35,19 +39,26 @@ import {
   createSystemUser,
   deleteSystemUser,
   updateUserRole,
+  createDiscipline,
+  updateDiscipline,
+  deactivateDiscipline,
+  createPaymentMethod,
+  renamePaymentMethod,
+  setPaymentMethodActive,
+  saveSettings,
   type MpAccountInfo,
   type TeacherInput,
+  type DisciplineInput,
 } from '@/lib/api'
-import type { Discipline, Profile, Role, Teacher } from '@/lib/types'
-
-const ALL_DISCIPLINES: Discipline[] = [
-  'Pilates Mat',
-  'Pilates Reformer',
-  'Pilates Clínico',
-  'Yoga',
-  'Stretching',
-  'Funcional',
-]
+import type {
+  Discipline,
+  DisciplineItem,
+  Profile,
+  Role,
+  SettingGroup,
+  StudioSetting,
+  Teacher,
+} from '@/lib/types'
 
 const TEACHER_COLORS = ['#C4735A', '#7D9B76', '#D4A854', '#9B6E8E', '#5E8FA8', '#B8956A']
 
@@ -270,6 +281,7 @@ function MercadoPagoSection() {
 
 function TeacherFormModal({ teacher, onClose }: { teacher?: Teacher; onClose: () => void }) {
   const { refresh } = useData()
+  const { disciplines: catalog } = useStudio()
   const isEdit = !!teacher
   const [name, setName] = useState(teacher?.name ?? '')
   const [disciplines, setDisciplines] = useState<Discipline[]>(teacher?.disciplines ?? [])
@@ -324,11 +336,12 @@ function TeacherFormModal({ teacher, onClose }: { teacher?: Teacher; onClose: ()
           <div>
             <label className={labelClass}>Disciplinas que dicta *</label>
             <div className="flex flex-wrap gap-2">
-              {ALL_DISCIPLINES.map((d) => {
+              {catalog.map((item) => {
+                const d = item.name
                 const active = disciplines.includes(d)
                 return (
                   <button
-                    key={d}
+                    key={item.id}
                     type="button"
                     onClick={() => toggleDiscipline(d)}
                     className={cn(
@@ -797,9 +810,578 @@ function UsersSection() {
   )
 }
 
+const SETTING_GROUPS: Array<{ key: SettingGroup; title: string; help: string }> = [
+  { key: 'estudio', title: 'Datos del estudio', help: 'Lo que se muestra en la web pública y en los emails' },
+  { key: 'reservas', title: 'Reservas y clases', help: 'Reglas de cancelación y lista de espera' },
+  { key: 'membresias', title: 'Membresías', help: 'Avisos de vencimiento, congelamientos y recuperación' },
+  { key: 'cobros', title: 'Cobros y prioridad del horario', help: 'Vencimiento de cuotas y ventana de pago mensual' },
+  { key: 'avisos', title: 'Avisos automáticos', help: 'Con cuánta anticipación sale cada recordatorio' },
+]
+
+/**
+ * Los parámetros del negocio. La pantalla se arma sola con lo que trae la
+ * tabla studio_settings (etiqueta, ayuda y tipo de campo vienen con cada
+ * fila), así que sumar un parámetro nuevo no requiere tocar este archivo.
+ */
+function SettingsSection({ group }: { group: SettingGroup }) {
+  const { refresh, canWrite } = useData()
+  const { settingsMeta } = useStudio()
+  const meta = settingsMeta.filter((s) => s.group === group)
+  const info = SETTING_GROUPS.find((g) => g.key === group)
+
+  const [draft, setDraft] = useState<Record<string, string>>({})
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+
+  const valueOf = (s: StudioSetting) => draft[s.key] ?? s.value
+  const dirty = Object.keys(draft).some((k) => draft[k] !== meta.find((s) => s.key === k)?.value)
+
+  const set = (key: string, value: string) => {
+    setDraft((d) => ({ ...d, [key]: value }))
+    setSaved(false)
+  }
+
+  const save = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const changes = Object.fromEntries(
+        Object.entries(draft).filter(([k, v]) => v !== meta.find((s) => s.key === k)?.value)
+      )
+      await saveSettings(changes)
+      await refresh()
+      setDraft({})
+      setSaved(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (meta.length === 0) return null
+
+  return (
+    <div className="bg-card rounded-2xl border border-border overflow-hidden">
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+          {group === 'estudio' ? (
+            <Building2 className="w-5 h-5 text-primary" />
+          ) : (
+            <SlidersHorizontal className="w-5 h-5 text-primary" />
+          )}
+        </div>
+        <div>
+          <h2 className="text-sm font-bold text-foreground">{info?.title ?? group}</h2>
+          <p className="text-xs text-muted-foreground">{info?.help}</p>
+        </div>
+      </div>
+
+      <div className="px-5 py-4 space-y-4">
+        {meta.map((s) => (
+          <div key={s.key}>
+            <label className="block text-xs font-semibold text-foreground mb-1.5">
+              {s.label}
+            </label>
+
+            {s.kind === 'boolean' ? (
+              <button
+                type="button"
+                disabled={!canWrite}
+                onClick={() => set(s.key, valueOf(s) === 'true' ? 'false' : 'true')}
+                className={cn(
+                  'relative w-11 h-6 rounded-full transition-colors',
+                  valueOf(s) === 'true' ? 'bg-primary' : 'bg-muted',
+                  !canWrite && 'opacity-50 cursor-not-allowed'
+                )}
+                aria-label={s.label}
+              >
+                <span
+                  className={cn(
+                    'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform',
+                    valueOf(s) === 'true' ? 'translate-x-5' : 'translate-x-0.5'
+                  )}
+                />
+              </button>
+            ) : s.kind === 'choice' ? (
+              <select
+                value={valueOf(s)}
+                disabled={!canWrite}
+                onChange={(e) => set(s.key, e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary/50 disabled:opacity-50"
+              >
+                {s.options.map((opt) => {
+                  const [label, value] = opt.split('|')
+                  return (
+                    <option key={value ?? label} value={value ?? label}>
+                      {label}
+                    </option>
+                  )
+                })}
+              </select>
+            ) : s.kind === 'textarea' ? (
+              <textarea
+                value={valueOf(s)}
+                disabled={!canWrite}
+                rows={2}
+                onChange={(e) => set(s.key, e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary/50 disabled:opacity-50"
+              />
+            ) : (
+              <input
+                type={s.kind === 'number' ? 'number' : s.kind === 'time' ? 'time' : 'text'}
+                value={valueOf(s)}
+                disabled={!canWrite}
+                onChange={(e) => set(s.key, e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary/50 disabled:opacity-50"
+              />
+            )}
+
+            {s.help && <p className="text-[11px] text-muted-foreground mt-1">{s.help}</p>}
+          </div>
+        ))}
+
+        {error && <p className="text-xs text-destructive">{error}</p>}
+
+        {canWrite && (
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              onClick={save}
+              disabled={busy || !dirty}
+              className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 flex items-center gap-2"
+            >
+              {busy && <Loader2 className="w-4 h-4 animate-spin" />}
+              Guardar
+            </button>
+            {saved && !dirty && (
+              <span className="text-xs text-[#2E6040] flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Guardado
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function DisciplineFormModal({
+  discipline,
+  onClose,
+}: {
+  discipline?: DisciplineItem
+  onClose: () => void
+}) {
+  const { refresh } = useData()
+  const isEdit = !!discipline
+  const [name, setName] = useState(discipline?.name ?? '')
+  const [color, setColor] = useState(discipline?.color ?? TEACHER_COLORS[0])
+  const [bgColor, setBgColor] = useState(discipline?.bgColor ?? '#FDEEE8')
+  const [textColor, setTextColor] = useState(discipline?.textColor ?? '#8B3A25')
+  const [blurb, setBlurb] = useState(discipline?.blurb ?? '')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    setError(null)
+    const input: DisciplineInput = { name, color, bgColor, textColor, blurb }
+    try {
+      if (isEdit) await updateDiscipline(discipline.id, discipline.name, input)
+      else await createDiscipline(input)
+      await refresh()
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="bg-card rounded-2xl shadow-2xl w-full max-w-sm border border-border max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-5 py-4 border-b border-border">
+          <h2 className="text-base font-bold text-foreground">
+            {isEdit ? 'Editar disciplina' : 'Nueva disciplina'}
+          </h2>
+          {isEdit && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Si cambiás el nombre, se actualiza en las clases, los planes y los profesores.
+            </p>
+          )}
+        </div>
+
+        <form onSubmit={submit} className="px-5 py-4 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1.5">Nombre *</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              placeholder="Ej: Pilates para embarazadas"
+              className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary/50"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1.5">
+              Descripción para la web
+            </label>
+            <textarea
+              value={blurb}
+              onChange={(e) => setBlurb(e.target.value)}
+              rows={2}
+              placeholder="Una línea que explique de qué se trata"
+              className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary/50"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1.5">Color</label>
+            <div className="flex flex-wrap gap-2">
+              {TEACHER_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setColor(c)}
+                  className={cn(
+                    'w-8 h-8 rounded-full border-2 transition-transform',
+                    color === c ? 'border-foreground scale-110' : 'border-transparent'
+                  )}
+                  style={{ backgroundColor: c }}
+                  aria-label={`Color ${c}`}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-foreground mb-1.5">
+                Fondo de la etiqueta
+              </label>
+              <input
+                type="color"
+                value={bgColor}
+                onChange={(e) => setBgColor(e.target.value)}
+                className="w-full h-9 rounded-xl border border-border bg-background"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-foreground mb-1.5">
+                Texto de la etiqueta
+              </label>
+              <input
+                type="color"
+                value={textColor}
+                onChange={(e) => setTextColor(e.target.value)}
+                className="w-full h-9 rounded-xl border border-border bg-background"
+              />
+            </div>
+          </div>
+
+          <div
+            className="rounded-xl px-3 py-2 text-xs font-semibold inline-block"
+            style={{ backgroundColor: bgColor, color: textColor }}
+          >
+            {name || 'Así se va a ver'}
+          </div>
+
+          {error && <p className="text-xs text-destructive">{error}</p>}
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isEdit ? 'Guardar' : 'Crear'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function DisciplinesSection() {
+  const { refresh, canWrite } = useData()
+  const { disciplines } = useStudio()
+  const [showForm, setShowForm] = useState(false)
+  const [editing, setEditing] = useState<DisciplineItem | undefined>()
+  const [busy, setBusy] = useState(false)
+
+  const remove = async (d: DisciplineItem) => {
+    if (!window.confirm(`¿Dar de baja la disciplina "${d.name}"? Las clases que la usan no se tocan.`)) return
+    setBusy(true)
+    try {
+      await deactivateDiscipline(d.id)
+      await refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="bg-card rounded-2xl border border-border overflow-hidden">
+      <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-border">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-accent/10 flex items-center justify-center">
+            <Shapes className="w-5 h-5 text-accent" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-foreground">Disciplinas</h2>
+            <p className="text-xs text-muted-foreground">
+              Las que aparecen en la agenda, los planes y la web
+            </p>
+          </div>
+        </div>
+        {canWrite && (
+          <button
+            onClick={() => {
+              setEditing(undefined)
+              setShowForm(true)
+            }}
+            className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 transition-colors"
+            aria-label="Nueva disciplina"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      <div className="px-5 py-4 space-y-2">
+        {disciplines.length === 0 && (
+          <p className="text-xs text-muted-foreground">
+            Sin disciplinas cargadas. Corré la migración 0011 para importar las que ya usabas.
+          </p>
+        )}
+        {disciplines.map((d) => (
+          <div key={d.id} className="flex items-center gap-2 rounded-xl border border-border px-3 py-2">
+            <span
+              className="text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0"
+              style={{ backgroundColor: d.bgColor, color: d.textColor }}
+            >
+              {d.name}
+            </span>
+            <span className="flex-1 text-xs text-muted-foreground truncate">{d.blurb}</span>
+            {canWrite && (
+              <>
+                <button
+                  onClick={() => {
+                    setEditing(d)
+                    setShowForm(true)
+                  }}
+                  className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground"
+                  aria-label={`Editar ${d.name}`}
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={() => remove(d)}
+                  className="w-7 h-7 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive"
+                  aria-label={`Dar de baja ${d.name}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {showForm && <DisciplineFormModal discipline={editing} onClose={() => setShowForm(false)} />}
+    </div>
+  )
+}
+
+function PaymentMethodsSection() {
+  const { refresh, canWrite } = useData()
+  const { paymentMethods } = useStudio()
+  const [newName, setNewName] = useState('')
+  const [editingCode, setEditingCode] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const run = async (action: () => Promise<void>) => {
+    setBusy(true)
+    setError(null)
+    try {
+      await action()
+      await refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="bg-card rounded-2xl border border-border overflow-hidden">
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+        <div className="w-9 h-9 rounded-xl bg-accent/10 flex items-center justify-center">
+          <Wallet className="w-5 h-5 text-accent" />
+        </div>
+        <div>
+          <h2 className="text-sm font-bold text-foreground">Medios de pago</h2>
+          <p className="text-xs text-muted-foreground">Con los que se puede cobrar en el mostrador</p>
+        </div>
+      </div>
+
+      <div className="px-5 py-4 space-y-2">
+        {paymentMethods.length === 0 && (
+          <p className="text-xs text-muted-foreground">
+            Sin medios cargados. Corré la migración 0011.
+          </p>
+        )}
+        {paymentMethods.map((m) => (
+          <div key={m.code} className="flex items-center gap-2 rounded-xl border border-border px-3 py-2">
+            {editingCode === m.code ? (
+              <>
+                <input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="flex-1 bg-transparent text-sm text-foreground outline-none"
+                  autoFocus
+                />
+                <button
+                  disabled={busy || !editName.trim()}
+                  onClick={() =>
+                    run(async () => {
+                      await renamePaymentMethod(m.code, editName)
+                      setEditingCode(null)
+                    })
+                  }
+                  className="w-7 h-7 rounded-lg hover:bg-[#E8F2EB] flex items-center justify-center text-muted-foreground hover:text-[#2E6040]"
+                  aria-label="Guardar nombre"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => setEditingCode(null)}
+                  className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground"
+                  aria-label="Cancelar"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </>
+            ) : (
+              <>
+                <span className={cn('flex-1 text-sm', m.active ? 'text-foreground' : 'text-muted-foreground line-through')}>
+                  {m.name}
+                </span>
+                {!m.isManual && (
+                  <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                    automático
+                  </span>
+                )}
+                {canWrite && (
+                  <>
+                    <button
+                      onClick={() => {
+                        setEditingCode(m.code)
+                        setEditName(m.name)
+                      }}
+                      className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground"
+                      aria-label={`Renombrar ${m.name}`}
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      disabled={busy}
+                      onClick={() => run(() => setPaymentMethodActive(m.code, !m.active))}
+                      className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground"
+                      aria-label={m.active ? `Desactivar ${m.name}` : `Activar ${m.name}`}
+                    >
+                      {m.active ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        ))}
+
+        {canWrite && (
+          <div className="flex items-center gap-2 pt-1">
+            <input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Nuevo medio de pago (ej: Cuenta DNI)"
+              className="flex-1 px-3 py-2 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary/50"
+            />
+            <button
+              disabled={busy || !newName.trim()}
+              onClick={() =>
+                run(async () => {
+                  await createPaymentMethod(newName, newName)
+                  setNewName('')
+                })
+              }
+              className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 disabled:opacity-40"
+              aria-label="Agregar medio de pago"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {error && <p className="text-xs text-destructive">{error}</p>}
+      </div>
+    </div>
+  )
+}
+
 export function ConfiguracionPage() {
   return (
     <div className="p-4 md:p-6 max-w-2xl space-y-8">
+      <div>
+        <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+          <Building2 className="w-4 h-4" />
+          El estudio
+        </div>
+        <SettingsSection group="estudio" />
+      </div>
+
+      <div>
+        <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+          <SlidersHorizontal className="w-4 h-4" />
+          Reglas del negocio
+        </div>
+        <div className="space-y-5">
+          <SettingsSection group="reservas" />
+          <SettingsSection group="membresias" />
+          <SettingsSection group="cobros" />
+          <SettingsSection group="avisos" />
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+          <Shapes className="w-4 h-4" />
+          Catálogos
+        </div>
+        <div className="space-y-5">
+          <DisciplinesSection />
+          <PaymentMethodsSection />
+        </div>
+      </div>
+
       <div>
         <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
           <Users className="w-4 h-4" />

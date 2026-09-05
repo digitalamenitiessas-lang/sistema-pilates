@@ -1,10 +1,63 @@
 # Plan de avance — PilatesStudio
 
 > Documento vivo. Se actualiza con cada bloque de trabajo.
-> Última actualización: **26/08/2026** (responsive + PWA + notificaciones + roles).
+> Última actualización: **05/09/2026** (cruce del documento de requerimientos de Casa Fé).
 > Documentos para la clienta (presentables, no este plan interno):
 > `docs/PilatesStudio-que-incluye-el-sistema.pdf` (qué abarca hoy + roles) ·
 > `docs/PilatesStudio-integraciones-y-etapas.pdf` (integraciones y etapas).
+
+## ⚠️ 05/09/2026 — Llegó el documento de requerimientos de Casa Fé
+
+La clienta pasó **“Requerimientos y ajustes del sistema Casa Fé”** (17 secciones +
+4 agregados de último momento). Ese documento pasa a ser la hoja de ruta y este
+plan queda como registro de lo construido hasta acá.
+
+- **Qué cubrimos y cómo arrancamos**: [`REQUERIMIENTOS-CASA-FE.md`](REQUERIMIENTOS-CASA-FE.md)
+- **Estado ítem por ítem** (178 requerimientos): [`requerimientos-casa-fe-detalle.md`](requerimientos-casa-fe-detalle.md)
+
+Resumen del cruce: 16 cubiertos · 64 parciales · 98 nuevos ≈ 210-250 días de
+desarrollo. Lo operativo (agenda, membresías, cobros, portal, avisos, roles) está
+hecho; falta todo lo de negocio (caja y gastos, personal y sueldos, inventario,
+comercial, reportes) más los cuatro agregados (lista de espera con aviso
+automático, horarios fijos, prioridad de pago del 1 al 9, vigencia por activación).
+
+El criterio de trabajo: **lo que es un número o un texto se configura desde el
+sistema**, así casi nada queda bloqueado esperando respuestas. Quedan 5 preguntas
+de forma para la clienta (§7 del documento); el resto lo carga ella.
+
+**Ojo con dos cosas del plan viejo que el documento cambia**: la renovación
+automática choca con la regla de pago del 1 al 9, y el rol profesor en modo solo
+consulta choca con que la profesora marque asistencia y agregue alumnas.
+
+### Decisiones tomadas (05/09/2026)
+
+Un solo local (no se modela multi-sede) · arrancamos por las prioridades 1 a 4 ·
+los horarios fijos son días fijos de la semana · el plan es pago mensual por X
+clases por semana · **todo lo que sea un número o un texto se configura desde el
+sistema en vez de escribirse en el código**, así el estudio ajusta sus reglas sin
+esperar un desarrollo y nosotros no quedamos bloqueados esperando respuestas.
+
+### 🔄 Bloque 0 — La mesa de control (primer tramo hecho)
+
+Migración **`0011_configurable.sql`** — *pendiente de correr en el SQL Editor
+del dashboard de Supabase*. Hasta que corra, el sistema sigue andando igual con
+los valores que tenía escritos en el código.
+
+- Tabla `studio_settings`: 21 parámetros del negocio (plazo de cancelación,
+  anticipación de cada aviso, ventana de pago del 1 al 9, cuándo se consume la
+  clase…) con su etiqueta y su ayuda. La pantalla de Configuración se arma sola
+  con esas filas, así que sumar un parámetro es un `INSERT`.
+- Datos del estudio (nombre, dirección, WhatsApp, Instagram, email, horarios)
+  fuera del código: la landing los lee de `public_studio_settings` con respaldo.
+- Catálogo de **disciplinas** editable (color, descripción, renombrado en cascada
+  a clases, planes y profesoras) — reemplaza las 6 constantes duplicadas.
+- Catálogo de **medios de pago** editable.
+- El cron diario lee los parámetros en vez de sus constantes.
+- Arreglo: un pago anulado ya no suma al total adeudado ni dispara alertas.
+
+Falta del Bloque 0: permisos configurables, auditoría de quién hizo qué, baja
+lógica de usuarios, momento exacto del cobro en huso argentino y reorganización
+de Configuración.
 
 ## Estado general
 

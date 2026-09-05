@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
+import { disciplineStyle } from '@/lib/disciplines'
 import { markAttendance, updateReservationStatus } from '@/lib/api'
 import type { Reservation, ReservationStatus } from '@/lib/types'
 
@@ -28,18 +29,9 @@ const STATUS_CONFIG: Record<
   ausente: { label: 'Ausente', bg: 'bg-red-100', text: 'text-red-700', icon: XCircle },
 }
 
-const DISCIPLINE_COLORS: Record<string, string> = {
-  'Pilates Mat': '#C4735A',
-  'Pilates Reformer': '#7D9B76',
-  'Pilates Clínico': '#9B6E8E',
-  Yoga: '#D4A854',
-  Stretching: '#5E8FA8',
-  Funcional: '#B8956A',
-}
-
 export function ReservasPage() {
   const { refresh, canWrite } = useData()
-  const { reservations: RESERVATIONS, students: STUDENTS } = useStudio()
+  const { reservations: RESERVATIONS, students: STUDENTS, disciplines } = useStudio()
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('todas')
   const [filterDate, setFilterDate] = useState<string>('')
@@ -197,7 +189,7 @@ export function ReservasPage() {
                     const cfg = STATUS_CONFIG[r.status]
                     const StatusIcon = cfg.icon
                     const student = STUDENTS.find((s) => s.id === r.studentId)
-                    const disciplineColor = DISCIPLINE_COLORS[r.discipline] ?? '#C4735A'
+                    const disciplineColor = disciplineStyle(disciplines, r.discipline).dot
 
                     return (
                       <tr key={r.id} className="hover:bg-muted/30 transition-colors">

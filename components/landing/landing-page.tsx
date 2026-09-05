@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   ArrowRight,
@@ -19,9 +19,14 @@ import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 
 // ---------------------------------------------------------------
-// Datos del estudio — editar acá para personalizar la landing
+// Datos del estudio
+//
+// Desde la migración 0011 salen de la tabla studio_settings (vista pública
+// `public_studio_settings`) y se editan desde Configuración. Estos valores
+// quedan como respaldo por si la migración todavía no corrió o una clave
+// está vacía.
 // ---------------------------------------------------------------
-const STUDIO = {
+const STUDIO_FALLBACK = {
   name: 'PilatesStudio',
   city: 'San Miguel de Tucumán',
   address: 'Av. Aconquija 1200, Yerba Buena, Tucumán',
@@ -33,10 +38,12 @@ const STUDIO = {
   openHours: 'Lun a Vie 7:00–21:00 · Sáb 9:00–13:00',
 }
 
-const wa = (text: string) =>
-  `https://wa.me/${STUDIO.whatsapp}?text=${encodeURIComponent(text)}`
+type Studio = typeof STUDIO_FALLBACK
 
-const DISCIPLINE_STYLE: Record<string, { dot: string; bg: string; text: string; blurb: string }> = {
+interface DisciplineStyle { dot: string; bg: string; text: string; blurb: string }
+
+/** Respaldo hasta que carguen las disciplinas del catálogo (migración 0011). */
+const DISCIPLINE_FALLBACK: Record<string, DisciplineStyle> = {
   'Pilates Mat': {
     dot: '#C4735A', bg: '#FDEEE8', text: '#8B3A25',
     blurb: 'Fuerza y control desde el centro del cuerpo, en colchoneta. La base de todo.',
@@ -64,6 +71,34 @@ const DISCIPLINE_STYLE: Record<string, { dot: string; bg: string; text: string; 
 }
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+
+// ---------------------------------------------------------------
+// Contexto de la landing: datos del estudio y disciplinas, cargados en vivo
+// desde las vistas públicas. Con respaldo, así la página nunca queda vacía.
+// ---------------------------------------------------------------
+interface LandingData {
+  studio: Studio
+  disciplines: Record<string, DisciplineStyle>
+  /** Orden en el que se muestran (el del catálogo) */
+  disciplineNames: string[]
+}
+
+const LandingCtx = createContext<LandingData>({
+  studio: STUDIO_FALLBACK,
+  disciplines: DISCIPLINE_FALLBACK,
+  disciplineNames: Object.keys(DISCIPLINE_FALLBACK),
+})
+
+function useLanding(): LandingData {
+  return useContext(LandingCtx)
+}
+
+/** Link de WhatsApp con el mensaje ya escrito. */
+function useWa(): (text: string) => string {
+  const { studio } = useLanding()
+  return (text: string) =>
+    `https://wa.me/${studio.whatsapp}?text=${encodeURIComponent(text)}`
+}
 
 function Instagram({ className }: { className?: string }) {
   return (
@@ -238,6 +273,7 @@ function TiltCard({ children, className }: { children: React.ReactNode; classNam
 // Secciones
 // ---------------------------------------------------------------
 function Nav() {
+  const { studio } = useLanding()
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   useEffect(() => {
@@ -269,7 +305,7 @@ function Nav() {
           <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
             <span className="text-primary-foreground font-serif font-bold text-base">P</span>
           </div>
-          <span className="font-serif font-semibold text-foreground text-lg">{STUDIO.name}</span>
+          <span className="font-serif font-semibold text-foreground text-lg">{studio.name}</span>
         </a>
 
         <nav className="hidden md:flex items-center gap-7">
@@ -331,6 +367,8 @@ function Nav() {
 }
 
 function Hero() {
+  const { studio } = useLanding()
+  const wa = useWa()
   const words = ['Fuerza,', 'control', 'y', 'calma.']
   return (
     <section className="relative min-h-screen flex items-center overflow-hidden">
@@ -349,7 +387,7 @@ function Hero() {
       <div className="relative max-w-6xl mx-auto px-5 w-full pt-28 pb-24">
         <div className="max-w-xl">
           <p className="fade-up text-[11px] md:text-xs font-bold tracking-[0.3em] text-primary uppercase mb-5" style={{ animationDelay: '200ms' }}>
-            Estudio de Pilates · {STUDIO.city}
+            Estudio de Pilates · {studio.city}
           </p>
 
           <h1 className="font-serif text-5xl md:text-7xl leading-[1.04] text-foreground mb-6">
@@ -421,7 +459,8 @@ function Hero() {
 }
 
 function Marquee() {
-  const items = Object.keys(DISCIPLINE_STYLE)
+  const { disciplineNames } = useLanding()
+  const items = disciplineNames
   const row = [...items, ...items, ...items]
   return (
     <div className="relative -rotate-2 -mx-4 my-2 z-10">
@@ -519,6 +558,7 @@ function Estudio({ schedule }: { schedule: PublicClass[] }) {
 }
 
 function Disciplinas() {
+  const { disciplines, disciplineNames } = useLanding()
   return (
     <section id="disciplinas" className="py-24 bg-foreground/[0.025]">
       <div className="max-w-6xl mx-auto px-5">
@@ -539,7 +579,9 @@ function Disciplinas() {
         </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {Object.entries(DISCIPLINE_STYLE).map(([name, s], i) => (
+          {disciplineNames.map((name, i) => {
+            const s = disciplines[name] ?? DISCIPLINE_FALLBACK['Pilates Mat']
+            return (
             <Reveal key={name} delay={i * 90}>
               <div
                 className="group relative rounded-3xl border border-border bg-card p-7 overflow-hidden transition-all duration-500 hover:-translate-y-1.5 hover:shadow-xl cursor-default h-full"
@@ -568,7 +610,8 @@ function Disciplinas() {
                 </div>
               </div>
             </Reveal>
-          ))}
+            )
+          })}
         </div>
       </div>
     </section>
@@ -576,6 +619,7 @@ function Disciplinas() {
 }
 
 function Planes({ plans }: { plans: PublicPlan[] }) {
+  const wa = useWa()
   const trial = plans.find((p) => p.is_trial)
   const paid = plans.filter((p) => !p.is_trial).sort((a, b) => a.price - b.price)
 
@@ -713,6 +757,7 @@ function Planes({ plans }: { plans: PublicPlan[] }) {
 }
 
 function Horarios({ schedule }: { schedule: PublicClass[] }) {
+  const { disciplines } = useLanding()
   const todayIdx = Math.min((new Date().getDay() + 6) % 7, 5)
   const [day, setDay] = useState(todayIdx)
   if (schedule.length === 0) return null
@@ -759,7 +804,7 @@ function Horarios({ schedule }: { schedule: PublicClass[] }) {
             </p>
           ) : (
             ofDay.map((c, i) => {
-              const s = DISCIPLINE_STYLE[c.discipline]
+              const s = disciplines[c.discipline] ?? DISCIPLINE_FALLBACK['Pilates Mat']
               return (
                 <div
                   key={c.id}
@@ -830,6 +875,8 @@ function Quote() {
 }
 
 function Contacto() {
+  const { studio } = useLanding()
+  const wa = useWa()
   return (
     <section id="contacto" className="py-24 md:py-32">
       <div className="max-w-6xl mx-auto px-5 grid md:grid-cols-2 gap-8 items-stretch">
@@ -846,9 +893,9 @@ function Contacto() {
                   <MapPin className="w-4.5 h-4.5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-foreground">{STUDIO.address}</p>
+                  <p className="text-sm font-semibold text-foreground">{studio.address}</p>
                   <a
-                    href={STUDIO.mapsUrl}
+                    href={studio.mapsUrl}
                     target="_blank"
                     rel="noreferrer"
                     className="text-xs text-primary font-medium hover:underline"
@@ -861,24 +908,24 @@ function Contacto() {
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                   <Clock className="w-4.5 h-4.5 text-primary" />
                 </div>
-                <p className="text-sm text-foreground/75 pt-2">{STUDIO.openHours}</p>
+                <p className="text-sm text-foreground/75 pt-2">{studio.openHours}</p>
               </li>
               <li className="flex items-start gap-3.5">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                   <Mail className="w-4.5 h-4.5 text-primary" />
                 </div>
                 <a
-                  href={`mailto:${STUDIO.email}`}
+                  href={`mailto:${studio.email}`}
                   className="text-sm text-foreground/75 pt-2 hover:text-primary transition-colors"
                 >
-                  {STUDIO.email}
+                  {studio.email}
                 </a>
               </li>
             </ul>
 
             <div className="flex gap-2.5 mt-9">
               <a
-                href={`https://instagram.com/${STUDIO.instagram}`}
+                href={`https://instagram.com/${studio.instagram}`}
                 target="_blank"
                 rel="noreferrer"
                 aria-label="Instagram"
@@ -887,7 +934,7 @@ function Contacto() {
                 <Instagram className="w-4.5 h-4.5" />
               </a>
               <a
-                href={`https://facebook.com/${STUDIO.facebook}`}
+                href={`https://facebook.com/${studio.facebook}`}
                 target="_blank"
                 rel="noreferrer"
                 aria-label="Facebook"
@@ -940,6 +987,8 @@ function Contacto() {
 }
 
 function Footer() {
+  const { studio } = useLanding()
+  const wa = useWa()
   return (
     <footer className="bg-foreground text-background/80">
       <div className="max-w-6xl mx-auto px-5 py-14">
@@ -949,10 +998,10 @@ function Footer() {
               <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
                 <span className="text-primary-foreground font-serif font-bold text-base">P</span>
               </div>
-              <span className="font-serif font-semibold text-background text-lg">{STUDIO.name}</span>
+              <span className="font-serif font-semibold text-background text-lg">{studio.name}</span>
             </div>
             <p className="text-xs text-background/50 max-w-xs leading-relaxed">
-              Estudio de Pilates y movimiento en {STUDIO.city}. {STUDIO.openHours}.
+              Estudio de Pilates y movimiento en {studio.city}. {studio.openHours}.
             </p>
           </div>
 
@@ -965,15 +1014,15 @@ function Footer() {
             </div>
             <div className="flex flex-col gap-2.5">
               <p className="text-xs font-bold uppercase tracking-wider text-background/40 mb-1">Seguinos</p>
-              <a href={`https://instagram.com/${STUDIO.instagram}`} target="_blank" rel="noreferrer" className="hover:text-background transition-colors">Instagram</a>
-              <a href={`https://facebook.com/${STUDIO.facebook}`} target="_blank" rel="noreferrer" className="hover:text-background transition-colors">Facebook</a>
+              <a href={`https://instagram.com/${studio.instagram}`} target="_blank" rel="noreferrer" className="hover:text-background transition-colors">Instagram</a>
+              <a href={`https://facebook.com/${studio.facebook}`} target="_blank" rel="noreferrer" className="hover:text-background transition-colors">Facebook</a>
               <a href={wa('¡Hola!')} target="_blank" rel="noreferrer" className="hover:text-background transition-colors">WhatsApp</a>
             </div>
           </nav>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 mt-12 pt-6 border-t border-background/10 text-xs text-background/40">
-          <p>© {new Date().getFullYear()} {STUDIO.name}. Todos los derechos reservados.</p>
+          <p>© {new Date().getFullYear()} {studio.name}. Todos los derechos reservados.</p>
           <Link href="/sistema" className="hover:text-background/70 transition-colors">
             Acceso al sistema
           </Link>
@@ -989,6 +1038,11 @@ function Footer() {
 export function LandingPage() {
   const [plans, setPlans] = useState<PublicPlan[]>([])
   const [schedule, setSchedule] = useState<PublicClass[]>([])
+  const [landing, setLanding] = useState<LandingData>({
+    studio: STUDIO_FALLBACK,
+    disciplines: DISCIPLINE_FALLBACK,
+    disciplineNames: Object.keys(DISCIPLINE_FALLBACK),
+  })
 
   useEffect(() => {
     supabase
@@ -999,9 +1053,51 @@ export function LandingPage() {
       .from('public_schedule')
       .select('*')
       .then(({ data }) => setSchedule((data as PublicClass[]) ?? []))
+
+    // Datos del estudio y disciplinas, editables desde Configuración
+    // (migración 0011). Si algo falta, queda el respaldo de arriba.
+    Promise.all([
+      supabase.from('public_studio_settings').select('key, value'),
+      supabase.from('public_disciplines').select('*'),
+    ]).then(([settingsRes, discRes]) => {
+      const rows = (settingsRes.data ?? []) as Array<{ key: string; value: string }>
+      const map = new Map(rows.map((r) => [r.key, r.value?.trim() ?? '']))
+      const pick = (key: string, fallback: string) => map.get(key) || fallback
+
+      const discRows = (discRes.data ?? []) as Array<{
+        name: string
+        color: string
+        bg_color: string
+        text_color: string
+        blurb: string
+      }>
+
+      setLanding((prev) => ({
+        studio: {
+          ...prev.studio,
+          name: pick('studio_name', STUDIO_FALLBACK.name),
+          address: pick('studio_address', STUDIO_FALLBACK.address),
+          mapsUrl: pick('studio_maps_url', STUDIO_FALLBACK.mapsUrl),
+          whatsapp: pick('studio_whatsapp', STUDIO_FALLBACK.whatsapp),
+          instagram: pick('studio_instagram', STUDIO_FALLBACK.instagram),
+          email: pick('studio_email', STUDIO_FALLBACK.email),
+          openHours: pick('studio_hours', STUDIO_FALLBACK.openHours),
+        },
+        disciplines: discRows.length
+          ? Object.fromEntries(
+              discRows.map((d) => [
+                d.name,
+                { dot: d.color, bg: d.bg_color, text: d.text_color, blurb: d.blurb ?? '' },
+              ])
+            )
+          : prev.disciplines,
+        disciplineNames: discRows.length ? discRows.map((d) => d.name) : prev.disciplineNames,
+      }))
+    })
   }, [])
 
   return (
+    <LandingCtx.Provider value={landing}>
     <main className="overflow-x-clip">
       <Nav />
       <Hero />
@@ -1014,5 +1110,6 @@ export function LandingPage() {
       <Contacto />
       <Footer />
     </main>
+    </LandingCtx.Provider>
   )
 }
