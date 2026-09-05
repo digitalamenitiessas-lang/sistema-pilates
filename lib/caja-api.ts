@@ -351,7 +351,7 @@ export async function fetchExpenses(f: ExpenseFilters): Promise<Expense[]> {
     detail: g.detail ?? '',
     amount: Number(g.amount),
     supplier: g.supplier ?? '',
-    docType: g.doc_type ?? '',
+    docType: g.doc_type ?? 'sin comprobante',
     docNumber: g.doc_number ?? '',
     method: g.method,
     accountId: g.account_id,
@@ -370,7 +370,7 @@ export interface ExpenseInput {
   detail: string
   amount: number
   supplier: string
-  docType: string
+  docType: Expense['docType']
   docNumber: string
   method: string | null
   accountId: string | null
@@ -387,7 +387,7 @@ function expenseRow(input: ExpenseInput) {
     detail: input.detail.trim(),
     amount: input.amount,
     supplier: input.supplier.trim(),
-    doc_type: input.docType || null,
+    doc_type: input.docType || 'sin comprobante',
     doc_number: input.docNumber.trim(),
     method: input.method,
     account_id: input.accountId,

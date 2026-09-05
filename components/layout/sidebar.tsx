@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   Wallet,
+  Receipt,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData } from '@/lib/data-context'
@@ -33,6 +34,7 @@ export type PageKey =
   | 'reservas'
   | 'pagos'
   | 'caja'
+  | 'gastos'
   | 'configuracion'
 
 interface NavItem {
@@ -49,6 +51,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'reservas', label: 'Reservas', icon: ClipboardList },
   { key: 'pagos', label: 'Pagos', icon: CreditCard },
   { key: 'caja', label: 'Caja', icon: Wallet },
+  { key: 'gastos', label: 'Gastos', icon: Receipt },
 ]
 
 interface SidebarProps {
@@ -78,6 +81,7 @@ export function Sidebar({
   const navItems = NAV_ITEMS.filter((item) => {
     if (item.key === 'pagos') return canWrite
     if (item.key === 'caja') return can('caja.ver') || canWrite
+    if (item.key === 'gastos') return can('gastos.ver') || canWrite
     return true
   })
 

@@ -389,7 +389,13 @@ export interface CashSession {
 }
 
 export type ExpenseStatus = 'pendiente' | 'pagado' | 'anulado'
-export type DocType = 'factura' | 'recibo' | 'ticket' | 'nota_credito' | 'otro' | ''
+export type DocType =
+  | 'factura'
+  | 'recibo'
+  | 'ticket'
+  | 'nota de credito'
+  | 'orden de pago'
+  | 'sin comprobante'
 
 export interface ExpenseCategory {
   id: string
