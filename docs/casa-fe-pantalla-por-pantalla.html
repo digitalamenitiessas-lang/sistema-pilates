@@ -1,0 +1,721 @@
+<title>Casa Fé pantalla por pantalla</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+  :root {
+    /* Paleta del propio sistema: la terracota y la crema son la marca del estudio */
+    --tinta: #3D2C23;
+    --tinta-suave: #6B5646;
+    --tenue: #8A7A6D;
+    --crema: #F7F1EA;
+    --papel: #FFFDFB;
+    --linea: #E3D6C8;
+    --linea-fina: #EFE5D9;
+    --terracota: #A9552F;
+    --terracota-suave: #FDEEE8;
+    --salvia: #5E7A57;
+    --salvia-suave: #E8F2EB;
+    --dorado: #9A6F1E;
+    --dorado-suave: #FBF2DE;
+
+    --ancho: 62rem;
+  }
+
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      --tinta: #F2E9E0;
+      --tinta-suave: #C8B6A6;
+      --tenue: #9A8878;
+      --crema: #1F1815;
+      --papel: #2A211D;
+      --linea: #43352E;
+      --linea-fina: #372B26;
+      --terracota: #E39068;
+      --terracota-suave: #3A241B;
+      --salvia: #A6C39C;
+      --salvia-suave: #24301F;
+      --dorado: #E0BC70;
+      --dorado-suave: #322715;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --tinta: #F2E9E0;
+    --tinta-suave: #C8B6A6;
+    --tenue: #9A8878;
+    --crema: #1F1815;
+    --papel: #2A211D;
+    --linea: #43352E;
+    --linea-fina: #372B26;
+    --terracota: #E39068;
+    --terracota-suave: #3A241B;
+    --salvia: #A6C39C;
+    --salvia-suave: #24301F;
+    --dorado: #E0BC70;
+    --dorado-suave: #322715;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--crema);
+    color: var(--tinta);
+    font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0 1.25rem 5rem;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .envoltorio { max-width: var(--ancho); margin: 0 auto; }
+
+  /* ── Encabezado ─────────────────────────────────────────── */
+  header.tapa {
+    padding: 3.5rem 0 2rem;
+    border-bottom: 1px solid var(--linea);
+  }
+  .marca {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--terracota);
+    margin: 0 0 1rem;
+  }
+  h1 {
+    font-family: 'Newsreader', Georgia, serif;
+    font-size: clamp(2.1rem, 5vw, 3.1rem);
+    font-weight: 400;
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+    margin: 0 0 0.75rem;
+    text-wrap: balance;
+  }
+  .bajada {
+    font-size: 1.05rem;
+    color: var(--tinta-suave);
+    max-width: 42rem;
+    margin: 0;
+  }
+
+  /* ── Cifras del estado ──────────────────────────────────── */
+  .cifras {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 0;
+    margin: 2.5rem 0 0;
+    border-top: 1px solid var(--linea-fina);
+  }
+  .cifra {
+    padding: 1.25rem 1.25rem 1.25rem 0;
+    border-right: 1px solid var(--linea-fina);
+  }
+  .cifra:last-child { border-right: none; }
+  .cifra .n {
+    font-family: 'Newsreader', Georgia, serif;
+    font-size: 2.1rem;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    display: block;
+  }
+  .cifra .q {
+    font-size: 0.8rem;
+    color: var(--tenue);
+    display: block;
+    margin-top: 0.35rem;
+  }
+  .n.hecho { color: var(--salvia); }
+  .n.parcial { color: var(--dorado); }
+  .n.falta { color: var(--tenue); }
+
+  /* ── Secciones ──────────────────────────────────────────── */
+  section { margin-top: 3.5rem; }
+  h2 {
+    font-family: 'Newsreader', Georgia, serif;
+    font-size: 1.7rem;
+    font-weight: 400;
+    margin: 0 0 0.4rem;
+    letter-spacing: -0.01em;
+  }
+  .intro {
+    color: var(--tinta-suave);
+    margin: 0 0 1.75rem;
+    max-width: 44rem;
+  }
+
+  /* ── Matriz ─────────────────────────────────────────────── */
+  .marco-tabla {
+    overflow-x: auto;
+    border: 1px solid var(--linea);
+    border-radius: 4px;
+    background: var(--papel);
+  }
+  table { border-collapse: collapse; width: 100%; min-width: 34rem; }
+  th, td {
+    text-align: left;
+    padding: 0.7rem 0.85rem;
+    border-bottom: 1px solid var(--linea-fina);
+  }
+  thead th {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--tenue);
+    font-weight: 600;
+    background: var(--crema);
+    border-bottom: 1px solid var(--linea);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  th.rol, td.rol { text-align: center; width: 7rem; }
+  td.pantalla { font-weight: 500; }
+  td.pantalla span {
+    display: block;
+    font-weight: 400;
+    font-size: 0.8rem;
+    color: var(--tenue);
+  }
+
+  .marca-si, .marca-parcial, .marca-no {
+    display: inline-block;
+    font-size: 0.72rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .marca-si { background: var(--salvia-suave); color: var(--salvia); font-weight: 500; }
+  .marca-parcial { background: var(--dorado-suave); color: var(--dorado); font-weight: 500; }
+  .marca-no { color: var(--tenue); }
+
+  /* ── Fichas de pantalla ─────────────────────────────────── */
+  .pantallas { display: flex; flex-direction: column; gap: 1.5rem; }
+  .ficha {
+    background: var(--papel);
+    border: 1px solid var(--linea);
+    border-radius: 4px;
+    padding: 1.4rem 1.5rem;
+  }
+  .ficha h3 {
+    font-family: 'Newsreader', Georgia, serif;
+    font-size: 1.25rem;
+    font-weight: 500;
+    margin: 0 0 0.15rem;
+  }
+  .quien {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 0.7rem;
+    color: var(--terracota);
+    letter-spacing: 0.04em;
+    margin: 0 0 1rem;
+  }
+  .ficha ul { margin: 0; padding-left: 1.1rem; }
+  .ficha li { margin-bottom: 0.3rem; }
+  .ficha li::marker { color: var(--linea); }
+  .nota-rol {
+    margin: 1rem 0 0;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--linea-fina);
+    font-size: 0.87rem;
+    color: var(--tinta-suave);
+  }
+  .nota-rol strong { color: var(--tinta); font-weight: 600; }
+
+  /* ── Pendientes ─────────────────────────────────────────── */
+  .bloques { display: flex; flex-direction: column; gap: 0; }
+  .bloque {
+    display: grid;
+    grid-template-columns: 8.5rem 1fr;
+    gap: 1.5rem;
+    padding: 1.15rem 0;
+    border-bottom: 1px solid var(--linea-fina);
+    align-items: start;
+  }
+  .bloque:last-child { border-bottom: none; }
+  .bloque .etiqueta {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--tenue);
+    padding-top: 0.15rem;
+  }
+  .bloque p { margin: 0; }
+  .bloque .titulo { font-weight: 600; margin-bottom: 0.2rem; }
+  .bloque .detalle { color: var(--tinta-suave); font-size: 0.92rem; }
+
+  .aviso {
+    background: var(--terracota-suave);
+    border-left: 2px solid var(--terracota);
+    padding: 1rem 1.2rem;
+    margin-top: 1.75rem;
+    font-size: 0.92rem;
+  }
+  .aviso p { margin: 0; }
+  .aviso p + p { margin-top: 0.6rem; }
+
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--linea);
+    font-size: 0.82rem;
+    color: var(--tenue);
+  }
+
+  /* ── Impresión / PDF ────────────────────────────────────── */
+  @media print {
+    /* El PDF se imprime siempre en claro, sin importar el tema del equipo */
+    :root {
+      --tinta: #3D2C23; --tinta-suave: #6B5646; --tenue: #8A7A6D;
+      --crema: #FFFFFF; --papel: #FFFDFB; --linea: #E3D6C8;
+      --linea-fina: #EFE5D9; --terracota: #A9552F; --terracota-suave: #FDEEE8;
+      --salvia: #5E7A57; --salvia-suave: #E8F2EB;
+      --dorado: #9A6F1E; --dorado-suave: #FBF2DE;
+    }
+    @page { margin: 1.4cm 1.5cm; }
+    body { padding: 0; font-size: 10.5pt; background: #fff; }
+    .envoltorio { max-width: none; }
+    header.tapa { padding-top: 0; }
+    h1 { font-size: 26pt; }
+    h2 { font-size: 15pt; }
+    section { margin-top: 1.6rem; break-before: auto; }
+    /* Que una ficha o un bloque no queden partidos entre dos páginas */
+    .ficha, .bloque, .aviso, .cifra { break-inside: avoid; }
+    /* La tabla puede partirse entre páginas, pero repitiendo el
+       encabezado y sin cortar una fila por la mitad */
+    .marco-tabla { overflow: visible; }
+    table { min-width: 0; }
+    thead { display: table-header-group; }
+    tr { break-inside: avoid; }
+    h2, h3 { break-after: avoid; }
+    .marca-si, .marca-parcial, .marca-no {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .ficha, .aviso, thead th, .marca-si, .marca-parcial {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    footer { margin-top: 2rem; }
+  }
+
+  @media (max-width: 34rem) {
+    .bloque { grid-template-columns: 1fr; gap: 0.35rem; }
+    .cifra { padding-right: 0.75rem; }
+  }
+</style>
+
+<div class="envoltorio">
+
+  <header class="tapa">
+    <p class="marca">Casa Fé · Sistema de gestión</p>
+    <h1>Qué hace el sistema, pantalla por pantalla</h1>
+    <p class="bajada">
+      Qué puede hacer cada persona según su rol, en cada parte del sistema, y
+      qué queda por construir del documento de requerimientos.
+    </p>
+
+    <div class="cifras">
+      <div class="cifra">
+        <span class="n hecho">9</span>
+        <span class="q">pantallas funcionando</span>
+      </div>
+      <div class="cifra">
+        <span class="n hecho">4</span>
+        <span class="q">roles protegidos en la base</span>
+      </div>
+      <div class="cifra">
+        <span class="n parcial">71</span>
+        <span class="q">permisos configurables</span>
+      </div>
+      <div class="cifra">
+        <span class="n falta">9</span>
+        <span class="q">módulos por construir</span>
+      </div>
+    </div>
+  </header>
+
+  <section>
+    <h2>Quién entra a dónde</h2>
+    <p class="intro">
+      Los permisos no son solo visuales: los exige la base de datos. Aunque
+      alguien intente entrar por otro camino, obtiene lo que su rol permite y
+      nada más.
+    </p>
+
+    <div class="marco-tabla">
+      <table>
+        <thead>
+          <tr>
+            <th>Pantalla</th>
+            <th class="rol">Admin</th>
+            <th class="rol">Recepción</th>
+            <th class="rol">Profesora</th>
+            <th class="rol">Alumna</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="pantalla">Web pública <span>Planes, horarios, talleres</span></td>
+            <td class="rol"><span class="marca-si">Sí</span></td>
+            <td class="rol"><span class="marca-si">Sí</span></td>
+            <td class="rol"><span class="marca-si">Sí</span></td>
+            <td class="rol"><span class="marca-si">Sí</span></td>
+          </tr>
+          <tr>
+            <td class="pantalla">Inicio <span>Tablero del día</span></td>
+            <td class="rol"><span class="marca-si">Todo</span></td>
+            <td class="rol"><span class="marca-si">Todo</span></td>
+            <td class="rol"><span class="marca-parcial">Sin dinero</span></td>
+            <td class="rol"><span class="marca-no">—</span></td>
+          </tr>
+          <tr>
+            <td class="pantalla">Agenda <span>Grilla semanal de clases</span></td>
+            <td class="rol"><span class="marca-si">Todo</span></td>
+            <td class="rol"><span class="marca-si">Todo</span></td>
+            <td class="rol"><span class="marca-parcial">Consulta</span></td>
+            <td class="rol"><span class="marca-no">—</span></td>
+          </tr>
+          <tr>
+            <td class="pantalla">Alumnas <span>Listado y ficha</span></td>
+            <td class="rol"><span class="marca-si">Todo</span></td>
+            <td class="rol"><span class="marca-si">Todo</span></td>
+            <td class="rol"><span class="marca-parcial">Sin salud</span></td>
+            <td class="rol"><span class="marca-no">—</span></td>
+          </tr>
+          <tr>
+            <td class="pantalla">Planes <span>Planes y membresías</span></td>
+            <td class="rol"><span class="marca-si">Todo</span></td>
+            <td class="rol"><span class="marca-si">Todo</span></td>
+            <td class="rol"><span class="marca-parcial">Consulta</span></td>
+            <td class="rol"><span class="marca-no">—</span></td>
+          </tr>
+          <tr>
+            <td class="pantalla">Reservas <span>Asistencias y lista de espera</span></td>
+            <td class="rol"><span class="marca-si">Todo</span></td>
+            <td class="rol"><span class="marca-si">Todo</span></td>
+            <td class="rol"><span class="marca-parcial">Consulta</span></td>
+            <td class="rol"><span class="marca-no">—</span></td>
+          </tr>
+          <tr>
+            <td class="pantalla">Pagos <span>Cobros y comprobantes</span></td>
+            <td class="rol"><span class="marca-si">Todo</span></td>
+            <td class="rol"><span class="marca-si">Todo</span></td>
+            <td class="rol"><span class="marca-no">No entra</span></td>
+            <td class="rol"><span class="marca-no">—</span></td>
+          </tr>
+          <tr>
+            <td class="pantalla">Configuración <span>Reglas, catálogos, accesos</span></td>
+            <td class="rol"><span class="marca-si">Todo</span></td>
+            <td class="rol"><span class="marca-parcial">Sin accesos</span></td>
+            <td class="rol"><span class="marca-no">No entra</span></td>
+            <td class="rol"><span class="marca-no">—</span></td>
+          </tr>
+          <tr>
+            <td class="pantalla">Portal <span>La app de la alumna</span></td>
+            <td class="rol"><span class="marca-no">—</span></td>
+            <td class="rol"><span class="marca-no">—</span></td>
+            <td class="rol"><span class="marca-no">—</span></td>
+            <td class="rol"><span class="marca-si">Lo suyo</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="aviso">
+      <p>
+        <strong>Esto se puede cambiar sin programar.</strong> Los 71 permisos
+        del sistema se configuran desde Configuración → Permisos, con casilleros
+        por rol. Y si hace falta una excepción con una persona puntual —una
+        profesora que además cobra los sábados— también se puede.
+      </p>
+      <p>
+        Hoy están en modo prueba: la matriz se puede dejar armada como se
+        quiera y recién después se activa, de a un grupo por vez, para que si
+        algo queda mal se vea en el momento y no en medio de la jornada.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Qué se hace en cada pantalla</h2>
+    <p class="intro">
+      Lo que sigue es lo que funciona hoy, probado y en línea.
+    </p>
+
+    <div class="pantallas">
+
+      <article class="ficha">
+        <h3>Web pública</h3>
+        <p class="quien">Sin necesidad de entrar al sistema</p>
+        <ul>
+          <li>Planes con precio, cantidad de clases y vigencia, en vivo desde el sistema.</li>
+          <li>Grilla de horarios real: se cambia una clase y la web se actualiza sola.</li>
+          <li>Talleres y clases especiales que todavía no pasaron.</li>
+          <li>Disciplinas con su descripción, y botones de WhatsApp en toda la página.</li>
+          <li>Dirección, horarios de atención y redes, editables desde Configuración.</li>
+        </ul>
+      </article>
+
+      <article class="ficha">
+        <h3>Inicio</h3>
+        <p class="quien">Admin · Recepción · Profesora</p>
+        <ul>
+          <li>Alumnas activas, clases del día con su ocupación, ingresos del mes y pagos pendientes.</li>
+          <li>Alertas de membresías vencidas y deudas, con aviso por WhatsApp en un click y el mensaje ya escrito.</li>
+          <li>Tomar asistencia de una clase del día, directo desde el listado.</li>
+          <li>Campana de avisos en vivo: pago acreditado, alumna nueva, membresía renovada o por vencer.</li>
+        </ul>
+        <p class="nota-rol">
+          <strong>La profesora</strong> ve las alumnas y las clases del día, pero
+          donde va el dinero dice “Sin acceso” en lugar de un cero que engañaría.
+        </p>
+      </article>
+
+      <article class="ficha">
+        <h3>Agenda</h3>
+        <p class="quien">Admin · Recepción · Profesora</p>
+        <ul>
+          <li>Grilla semanal por día, con cupos en vivo y filtro por disciplina.</li>
+          <li>Crear clases regulares, y también <strong>talleres y eventos con fecha propia</strong>: nombre, descripción, nivel o público, precio, requisitos y cupo.</li>
+          <li>Marcar una clase como “la reserva recepción”, para que no se autorreserve desde el portal.</li>
+          <li>Reservar una alumna al toque, o anotarla en lista de espera si está completa.</li>
+          <li><strong>Suspender un día puntual</strong> (un feriado) con su motivo, sin tocar el resto de las semanas.</li>
+          <li><strong>Cambiar la profesora de un día</strong>, cuando alguien cubre a otra.</li>
+          <li>Tomar asistencia desde el detalle de la clase.</li>
+        </ul>
+        <p class="nota-rol">
+          <strong>La profesora</strong> consulta la grilla. Tomar asistencia y
+          anotar alumnas son permisos aparte, que se le pueden dar sin darle
+          nada más.
+        </p>
+      </article>
+
+      <article class="ficha">
+        <h3>Tomar asistencia</h3>
+        <p class="quien">Admin · Recepción · (Profesora, si se le habilita)</p>
+        <ul>
+          <li>Pensada para el celular: se usa parada en la sala, con una mano.</li>
+          <li>Lista de quienes reservaron, con botones grandes de presente y ausente.</li>
+          <li>Contador de presentes, ausentes y sin marcar.</li>
+          <li>Corregir una marca es un toque, y si se marcó presente por error la clase vuelve a la membresía.</li>
+          <li>Marcar presente descuenta la clase del plan de la alumna.</li>
+        </ul>
+      </article>
+
+      <article class="ficha">
+        <h3>Alumnas</h3>
+        <p class="quien">Admin · Recepción · Profesora</p>
+        <ul>
+          <li>Listado con búsqueda y filtros por estado de la membresía.</li>
+          <li>Ficha con datos de contacto, notas médicas, observaciones y contacto de emergencia.</li>
+          <li>Membresía con clases usadas y disponibles, e interruptor de renovación automática.</li>
+          <li>Historial de reservas, asistencias y pagos.</li>
+          <li>Asignar un plan, y crear el acceso al portal desde la misma ficha.</li>
+        </ul>
+        <p class="nota-rol">
+          <strong>La profesora</strong> ve la ficha operativa pero no los datos
+          médicos ni el contacto de emergencia: viven en otra tabla que su rol
+          no alcanza.
+        </p>
+      </article>
+
+      <article class="ficha">
+        <h3>Planes</h3>
+        <p class="quien">Admin · Recepción · Profesora</p>
+        <ul>
+          <li>Crear y editar planes: precio, cantidad de clases, vigencia en días, disciplinas habilitadas y color.</li>
+          <li>Marcar un plan como clase de prueba, que nunca se renueva sola.</li>
+          <li>Asignar una membresía a una alumna, que genera su cuota.</li>
+          <li>Listado de membresías activas con su estado.</li>
+        </ul>
+      </article>
+
+      <article class="ficha">
+        <h3>Reservas</h3>
+        <p class="quien">Admin · Recepción · Profesora</p>
+        <ul>
+          <li>Todas las reservas con filtro por estado y por fecha.</li>
+          <li>Confirmar a alguien desde la lista de espera.</li>
+          <li>Marcar asistió o ausente, y cancelar.</li>
+        </ul>
+      </article>
+
+      <article class="ficha">
+        <h3>Pagos</h3>
+        <p class="quien">Admin · Recepción</p>
+        <ul>
+          <li>Cobrar en efectivo, transferencia, tarjeta o Mercado Pago, con comprobante numerado automático.</li>
+          <li>Generar el link de pago de Mercado Pago por cada deuda; cuando la alumna paga, el sistema lo acredita solo.</li>
+          <li>Recordatorio de deuda por WhatsApp con el mensaje escrito y el link de pago incluido.</li>
+          <li>Total cobrado, pendiente y vencido, con distribución por medio de pago.</li>
+        </ul>
+        <p class="nota-rol">
+          <strong>La profesora</strong> no entra: la pantalla no aparece y la
+          base tampoco le da los pagos.
+        </p>
+      </article>
+
+      <article class="ficha">
+        <h3>Configuración</h3>
+        <p class="quien">Admin · Recepción (parcial)</p>
+        <ul>
+          <li><strong>Datos del estudio</strong>: nombre, dirección, mapa, WhatsApp, Instagram, email y horarios. Es lo que muestra la web.</li>
+          <li><strong>Reglas del negocio</strong>: 21 parámetros — plazo de cancelación, cuándo se descuenta la clase, días de aviso de vencimiento, ventana de pago del 1 al 9, anticipación de cada recordatorio.</li>
+          <li><strong>Catálogos</strong>: disciplinas con su color y descripción, y medios de pago.</li>
+          <li><strong>Equipo y espacios</strong>: profesoras con sus disciplinas, y salas.</li>
+          <li><strong>Accesos</strong>: usuarios del sistema con su rol, y la matriz de permisos.</li>
+          <li><strong>Mercado Pago</strong>: credenciales del estudio con prueba de conexión.</li>
+        </ul>
+        <p class="nota-rol">
+          <strong>Recepción</strong> configura el estudio y los catálogos, pero
+          no administra usuarios ni permisos, y nunca ve las credenciales de
+          cobro. <strong>La profesora</strong> no entra.
+        </p>
+      </article>
+
+      <article class="ficha">
+        <h3>Portal de la alumna</h3>
+        <p class="quien">Alumna, en su celular</p>
+        <ul>
+          <li>Se registra sola con su email y DNI: si coinciden con su ficha, entra al instante. Nadie ajeno al estudio puede crearse una cuenta.</li>
+          <li>Su membresía con las clases que le quedan.</li>
+          <li>Reserva y cancela, con cupos en vivo y lista de espera.</li>
+          <li>Ve las clases suspendidas con su motivo, y los talleres que solo reserva recepción.</li>
+          <li>Sus deudas con botón de pagar online, y su historial.</li>
+          <li>Recupera o cambia su contraseña sin llamar al estudio.</li>
+          <li>Se instala como app en el teléfono, con ícono propio.</li>
+        </ul>
+        <p class="nota-rol">
+          Cada alumna ve <strong>solo sus propios datos</strong>. Eso no es un
+          permiso que alguien pueda apagar por error: está fijo en la base.
+        </p>
+      </article>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>Lo que falta</h2>
+    <p class="intro">
+      Del documento de requerimientos quedan nueve módulos por construir. Este
+      es el orden propuesto, corregido por dependencias técnicas: hay cosas que
+      si no van primero obligan a rehacer lo que venga después.
+    </p>
+
+    <div class="bloques">
+      <div class="bloque">
+        <p class="etiqueta">En curso</p>
+        <div>
+          <p class="titulo">Agenda y asistencias</p>
+          <p class="detalle">
+            Falta: cancelación dentro y fuera de plazo, clase recuperada, y que
+            la profesora anote a quien llega sin reserva. Depende de dos
+            definiciones del estudio: si la ausencia consume la clase y cuántos
+            recuperos se permiten.
+          </p>
+        </div>
+      </div>
+
+      <div class="bloque">
+        <p class="etiqueta">Sigue</p>
+        <div>
+          <p class="titulo">Días y horarios fijos</p>
+          <p class="detalle">
+            Que la alumna elija sus días fijos del mes, la prioridad por pago
+            del 1 al 9, la liberación automática de lugares el día 10, y el
+            aviso automático cuando se libera un lugar de la lista de espera.
+          </p>
+        </div>
+      </div>
+
+      <div class="bloque">
+        <p class="etiqueta">Sigue</p>
+        <div>
+          <p class="titulo">Membresías y ficha integral</p>
+          <p class="detalle">
+            Tres precios por plan según medio de pago, congelar una membresía,
+            datos físicos y de salud en campos separados, bitácora de
+            observaciones, baja de alumna con motivo, lista de recuperación y
+            cumpleaños del mes.
+          </p>
+        </div>
+      </div>
+
+      <div class="bloque">
+        <p class="etiqueta">Sigue</p>
+        <div>
+          <p class="titulo">Caja diaria y gastos</p>
+          <p class="detalle">
+            Cuentas y cajas con saldo, apertura y cierre con arqueo, gastos con
+            categoría, proveedor y comprobante adjunto, y el tablero financiero
+            completo con egresos y resultado neto.
+          </p>
+        </div>
+      </div>
+
+      <div class="bloque">
+        <p class="etiqueta">Sigue</p>
+        <div>
+          <p class="titulo">Reportes</p>
+          <p class="detalle">
+            Módulo propio con filtros por rango de fechas y descarga a Excel y
+            PDF. Va después de caja y gastos, porque la mitad de los reportes
+            depende de esos datos.
+          </p>
+        </div>
+      </div>
+
+      <div class="bloque">
+        <p class="etiqueta">Segunda etapa</p>
+        <div>
+          <p class="titulo">Cupones, beneficios y gift cards</p>
+          <p class="detalle">
+            Cupones de descuento con control de usos, beneficios de marcas
+            aliadas, regalar clases o extender una membresía, y gift cards.
+          </p>
+        </div>
+      </div>
+
+      <div class="bloque">
+        <p class="etiqueta">Segunda etapa</p>
+        <div>
+          <p class="titulo">Personal y remuneraciones</p>
+          <p class="detalle">
+            Ficha laboral, registro de horas trabajadas, reemplazos, condiciones
+            salariales con historial y liquidación por período.
+          </p>
+        </div>
+      </div>
+
+      <div class="bloque">
+        <p class="etiqueta">Segunda etapa</p>
+        <div>
+          <p class="titulo">Inventario y venta de productos</p>
+          <p class="detalle">
+            Productos con variantes, stock en tiempo real, venta en mostrador,
+            ingreso de mercadería y alertas de bajo stock.
+          </p>
+        </div>
+      </div>
+
+      <div class="bloque">
+        <p class="etiqueta">Segunda etapa</p>
+        <div>
+          <p class="titulo">Web autoadministrable y email marketing</p>
+          <p class="detalle">
+            Editor de textos, fotos y promociones de la web, con vista previa
+            antes de publicar. Y campañas de email con segmentación y métricas.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Sistema de gestión Casa Fé · Estado al 5 de septiembre de 2026 ·
+    Refleja funcionalidades desarrolladas, probadas y en línea a la fecha.
+  </footer>
+
+</div>
