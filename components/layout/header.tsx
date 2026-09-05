@@ -14,6 +14,7 @@ const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
   pagos: { title: 'Pagos', subtitle: 'Control de cobros e ingresos' },
   caja: { title: 'Caja', subtitle: 'Cuentas, movimientos y cierres' },
   gastos: { title: 'Gastos', subtitle: 'Egresos del estudio' },
+  reportes: { title: 'Reportes', subtitle: 'Números del estudio, descargables' },
   configuracion: { title: 'Configuración', subtitle: 'Ajustes del sistema' },
 }
 
