@@ -55,9 +55,54 @@ los valores que tenía escritos en el código.
 - El cron diario lee los parámetros en vez de sus constantes.
 - Arreglo: un pago anulado ya no suma al total adeudado ni dispara alertas.
 
-Falta del Bloque 0: permisos configurables, auditoría de quién hizo qué, baja
-lógica de usuarios, momento exacto del cobro en huso argentino y reorganización
-de Configuración.
+### 🔄 Bloque 0 — Motor de permisos (migración 0012, en frío)
+
+Requisito de la sección 11: permisos configurables por rol y por persona.
+Precedido por un relevamiento de **116 puntos de control de acceso** (42 en
+políticas de la base, 40 en la interfaz, 19 en endpoints, 15 en datos
+sensibles) y tres diseños comparados.
+
+La idea que lo hace seguro es el **modo sombra**: cada clave guarda en
+`legacy_roles` lo que el sistema responde HOY, y mientras está en sombra
+`can()` contesta con eso. Así reescribir una política de `app_role()` a
+`can()` es un cambio sin efecto, verificable con `perm_diff()`. El encendido
+después va grupo por grupo y se revierte con un UPDATE.
+
+- Migración `0012_permisos.sql`: 5 tablas del motor, catálogo de **71 claves**
+  con sus roles actuales, matriz derivada de `legacy_roles` (así arranca
+  siendo por construcción lo que el sistema hace hoy), funciones
+  `mis_permisos()` / `can()` / `perm_diff()`, `teachers.user_id` +
+  `my_teacher_ids()` para el alcance "solo mis clases", bitácora de cambios,
+  guardia anti auto-elevación e invariante de que nunca quede sin admin.
+  Es atómica y **en frío**: nada la consume todavía.
+- Deuda previa arreglada antes del motor (hoy inocua porque leer y escribir
+  usan la misma condición, y el motor la activaría el primer día): el
+  fallback muerto de las notas médicas contra una columna que 0008 eliminó,
+  el guardado que las pisaba con vacío, y el borrado de suscripciones push
+  que no filtraba por usuario.
+
+Migración `0013_permisos_policies.sql` aplicada y verificada: las políticas
+de la base ya preguntan al motor. Trae su propio bloque de vuelta atrás.
+
+Migración `0014_fix_can.sql` — **arreglo**: `can()` traía un caché por
+transacción que la rompía. Como la función declara `search_path` vacío,
+Postgres restaura las variables al salir, y una variable personalizada no
+vuelve a "no existe" sino a cadena vacía: desde la segunda llamada el
+caché se leía vacío y `can()` respondía que no a todo. Síntoma: el staff
+dejó de ver alumnas, membresías, reservas y pagos. El caché era una
+optimización, no parte de la corrección — con la llamada envuelta en
+`(select ...)` Postgres la resuelve igual una vez por consulta.
+
+Verificado con sesión real de admin después del arreglo: los KPIs del
+tablero vuelven a sus valores previos, y pasan marcar asistencia, cancelar
+una reserva, dar de baja un plan, leer datos de salud, guardar un
+parámetro y anular un pago (todo revertido después de probar).
+
+Falta: probar el portal de la alumna (cancelar una reserva es lo que
+ejercita la rama de aislamiento de la política restrictiva), tolerancia a
+fallo del bundle en `lib/api.ts`, unificar los chequeos del servidor, la
+pantalla de la matriz, y el encendido gradual. Después: baja lógica de usuarios, momento
+exacto del cobro en huso argentino y reorganización de Configuración.
 
 ## Estado general
 

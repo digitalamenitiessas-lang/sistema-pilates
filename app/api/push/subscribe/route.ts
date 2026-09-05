@@ -37,7 +37,17 @@ export async function DELETE(request: Request) {
   const { endpoint } = await request.json().catch(() => ({}))
   if (!endpoint) return NextResponse.json({ error: 'Falta endpoint' }, { status: 400 })
 
-  const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint)
+  const { data: userData } = await supabase.auth.getUser()
+  if (!userData?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+  // Acotado al dueño: borrar solo por endpoint dependía de que la política
+  // de la base filtrara por usuario. Si algún día esta ruta pasa por el
+  // service role, sin este filtro cualquiera desuscribiría a cualquiera.
+  const { error } = await supabase
+    .from('push_subscriptions')
+    .delete()
+    .eq('endpoint', endpoint)
+    .eq('user_id', userData.user.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({ ok: true })
