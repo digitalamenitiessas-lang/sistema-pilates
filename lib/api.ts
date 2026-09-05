@@ -257,8 +257,8 @@ export async function fetchStudioData(): Promise<StudioData> {
     role: 'alumno',
     membership: latestMembership.get(s.id),
     observations: s.observations ?? undefined,
-    medicalNotes: s.medical_notes ?? privateMap.get(s.id)?.medicalNotes,
-    emergencyContact: s.emergency_contact ?? privateMap.get(s.id)?.emergencyContact,
+    medicalNotes: privateMap.get(s.id)?.medicalNotes,
+    emergencyContact: privateMap.get(s.id)?.emergencyContact,
     userId: s.user_id ?? null,
   }))
 
@@ -443,15 +443,16 @@ export interface NewStudentInput {
 
 /**
  * Lo médico vive en student_private (0008, el profesor no lo lee).
- * Si la migración todavía no corrió, cae a la columna vieja de students.
+ *
+ * El error sube: antes caía a students.medical_notes, una columna que la
+ * migración 0008 eliminó, así que el fallback fallaba en silencio y la
+ * nota se perdía sin avisar.
  */
 async function saveMedicalNotes(studentId: string, medicalNotes: string): Promise<void> {
   const { error } = await supabase
     .from('student_private')
     .upsert({ student_id: studentId, medical_notes: medicalNotes, updated_at: new Date().toISOString() })
-  if (error) {
-    await supabase.from('students').update({ medical_notes: medicalNotes || null }).eq('id', studentId)
-  }
+  if (error) throw error
 }
 
 export async function createStudent(input: NewStudentInput, plans: Plan[]): Promise<void> {
@@ -489,7 +490,10 @@ export async function updateStudent(id: string, input: Omit<NewStudentInput, 'pl
     })
     .eq('id', id)
   if (error) throw error
-  await saveMedicalNotes(id, input.medicalNotes ?? '')
+  // Solo se toca si el formulario la trajo. Con permisos por rol, quien
+  // edite una ficha sin poder ver lo médico manda undefined y la nota
+  // queda intacta en vez de guardarse vacía.
+  if (input.medicalNotes !== undefined) await saveMedicalNotes(id, input.medicalNotes)
 }
 
 /** Prende o apaga la renovación automática de una membresía. */
