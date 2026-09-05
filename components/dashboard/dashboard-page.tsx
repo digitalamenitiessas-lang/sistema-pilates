@@ -55,13 +55,36 @@ function StatCard({
   value,
   sub,
   accent,
+  sinAcceso,
 }: {
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>
   label: string
   value: string
   sub: string
   accent: string
+  /** El rol no tiene permiso: mejor decirlo que mostrar un cero que miente */
+  sinAcceso?: boolean
 }) {
+  if (sinAcceso) {
+    return (
+      <div className="bg-card rounded-2xl border border-border border-dashed p-5 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground font-medium">{label}</span>
+          <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center">
+            <Icon className="w-5 h-5 text-muted-foreground" />
+          </div>
+        </div>
+        <div>
+          <p className="text-base font-semibold text-muted-foreground leading-none">
+            Sin acceso
+          </p>
+          <p className="text-xs text-muted-foreground mt-1.5">
+            Tu rol no ve esta información
+          </p>
+        </div>
+      </div>
+    )
+  }
   return (
     <div className="bg-card rounded-2xl border border-border p-5 flex flex-col gap-3">
       <div className="flex items-center justify-between">
@@ -83,7 +106,8 @@ function StatCard({
 
 export function DashboardPage({ onNavigate }: DashboardPageProps) {
   const { canWrite } = useData()
-  const { students, payments, alerts, monthlyRevenue, classes } = useStudio()
+  const { students, payments, alerts, monthlyRevenue, classes, denied } = useStudio()
+  const sinFinanzas = denied.includes('payments')
 
   const TODAY_CLASSES = classes
     .filter((c) => c.dayOfWeek === todayDayIndex())
@@ -120,22 +144,24 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
           sub={`${todayTotal} reservas confirmadas`}
           accent="#7D9B76"
         />
-        {canWrite && (
+        {(canWrite || sinFinanzas) && (
           <StatCard
             icon={TrendingUp}
-            label={`Ingresos ${currentMonth?.month ?? ''}`}
+            label={sinFinanzas ? 'Ingresos del mes' : `Ingresos ${currentMonth?.month ?? ''}`}
             value={`$${(currentMonthRevenue / 1000).toFixed(0)}k`}
             sub={`${Number(revenueDiff) >= 0 ? '+' : ''}${revenueDiff}% vs ${prevMonth?.month ?? 'mes anterior'}`}
             accent="#D4A854"
+            sinAcceso={sinFinanzas}
           />
         )}
-        {canWrite && (
+        {(canWrite || sinFinanzas) && (
           <StatCard
             icon={AlertTriangle}
             label="Pagos pendientes"
             value={String(pendingPayments.length)}
             sub={`$${pendingPayments.reduce((a, p) => a + p.amount, 0).toLocaleString('es-AR')} total`}
             accent="#EF4444"
+            sinAcceso={sinFinanzas}
           />
         )}
       </div>

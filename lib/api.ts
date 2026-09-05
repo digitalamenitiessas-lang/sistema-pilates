@@ -127,6 +127,13 @@ export interface StudioData {
    * Vacío mientras la migración no corrió.
    */
   permisos: string[]
+  /**
+   * Colecciones que este rol NO puede ver. Las políticas de la base
+   * devuelven cero filas cuando no hay permiso —no un error—, así que sin
+   * esto "no tenés acceso" y "todavía no hay nada" se ven igual: un $0 que
+   * miente. Las pantallas lo usan para decir cuál de las dos es.
+   */
+  denied: string[]
   /** Parámetros del negocio, listos para leer con settingNum/settingBool */
   settings: Settings
   /** Los mismos parámetros con su etiqueta y ayuda, para armar la pantalla */
@@ -148,10 +155,21 @@ export async function fetchStudioData(): Promise<StudioData> {
       supabase.from('monthly_revenue').select('*'),
     ])
 
-  const firstError =
-    teachersRes.error || plansRes.error || studentsRes.error || membershipsRes.error ||
-    classesRes.error || reservationsRes.error || paymentsRes.error || revenueRes.error
-  if (firstError) throw firstError
+  // Antes acá había un throw con el primer error, y eso convertía el
+  // problema de UNA tabla en la pantalla de error total. Ahora cada
+  // colección aporta lo que pudo traer y el resto sigue andando.
+  const fallaron = [
+    ['teachers', teachersRes], ['plans', plansRes], ['students', studentsRes],
+    ['memberships', membershipsRes], ['classes', classesRes],
+    ['reservations', reservationsRes], ['payments', paymentsRes],
+    ['monthlyRevenue', revenueRes],
+  ].filter(([, r]) => (r as { error: unknown }).error).map(([k]) => k as string)
+
+  // Si falló TODO, no es un problema de permisos: es la sesión o la
+  // conexión, y ahí sí conviene el cartel de error.
+  if (fallaron.length === 8) {
+    throw (teachersRes.error ?? new Error('No se pudieron cargar los datos'))
+  }
 
   // Datos sensibles de la ficha (tabla aparte desde 0008; RLS: staff y la
   // propia alumna). Para el profesor viene vacío; si la migración no corrió
@@ -213,6 +231,27 @@ export async function fetchStudioData(): Promise<StudioData> {
     // sin catálogos: valores por defecto
   }
   const warningDays = settingNum(settings, 'expiry_warning_days', EXPIRY_WARNING_DAYS)
+
+  // Qué clave gobierna cada colección (migración 0013). Se deriva del
+  // permiso y no del resultado vacío, porque una tabla sin filas y una
+  // tabla vedada llegan igual.
+  const CLAVE_POR_COLECCION: Record<string, string> = {
+    students: 'alumnos.ver',
+    memberships: 'membresias.ver',
+    reservations: 'reservas.ver',
+    payments: 'finanzas.ver',
+    monthlyRevenue: 'finanzas.ver',
+  }
+  const denied = permisos.length
+    ? [
+        ...new Set([
+          ...Object.entries(CLAVE_POR_COLECCION)
+            .filter(([, clave]) => !permisos.includes(clave))
+            .map(([coleccion]) => coleccion),
+          ...fallaron,
+        ]),
+      ]
+    : fallaron
 
   const teachers: Teacher[] = (teachersRes.data ?? []).map((t) => ({
     id: t.id,
@@ -377,7 +416,7 @@ export async function fetchStudioData(): Promise<StudioData> {
 
   return {
     teachers, plans, students, memberships, classes, reservations, payments,
-    monthlyRevenue, alerts, rooms, disciplines, paymentMethods, permisos, settings, settingsMeta,
+    monthlyRevenue, alerts, rooms, disciplines, paymentMethods, permisos, denied, settings, settingsMeta,
     mpConfigured,
   }
 }
@@ -988,7 +1027,9 @@ export async function deactivateClassSession(id: string): Promise<void> {
 export async function fetchProfiles(): Promise<Profile[]> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, full_name, role, email')
+    // select('*') y no una lista de columnas: así no se rompe si la
+    // migración 0015 (columna active) todavía no corrió.
+    .select('*')
     .order('created_at')
   if (error) throw error
   return (data ?? []).map((p) => ({
@@ -996,6 +1037,8 @@ export async function fetchProfiles(): Promise<Profile[]> {
     fullName: p.full_name,
     email: p.email ?? '',
     role: p.role as Role,
+    // Si la migración 0015 no corrió todavía, todos figuran activos
+    active: p.active ?? true,
   }))
 }
 
@@ -1055,6 +1098,20 @@ export async function fetchWeekOccupancy(weekStart: string): Promise<Map<string,
   return map
 }
 
+export async function reactivateSystemUser(userId: string): Promise<void> {
+  const { data } = await supabase.auth.getSession()
+  const res = await fetch('/api/admin/users', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${data.session?.access_token ?? ''}`,
+    },
+    body: JSON.stringify({ userId }),
+  })
+  if (!res.ok) throw new Error((await res.json()).error ?? 'No se pudo reactivar')
+}
+
+/** Da de baja el acceso: el perfil se conserva y el login queda bloqueado. */
 export async function deleteSystemUser(userId: string): Promise<void> {
   await adminApi({ userId }, 'DELETE')
 }

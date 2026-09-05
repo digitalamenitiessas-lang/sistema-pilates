@@ -121,9 +121,55 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'No podés eliminar tu propio usuario' }, { status: 400 })
   }
 
-  const { error } = await auth.admin.auth.admin.deleteUser(userId)
+  // Baja lógica, no borrado (migración 0015): el documento pide conservar
+  // las clases, asistencias y movimientos de quien ya no está. Son dos
+  // cosas juntas — marcar el perfil inactivo y bloquear el ingreso — y por
+  // eso pasan por acá y no por un update suelto desde el navegador.
+  const { error: perfilError } = await auth.admin
+    .from('profiles')
+    .update({ active: false })
+    .eq('id', userId)
+  if (perfilError) {
+    return NextResponse.json({ error: perfilError.message }, { status: 400 })
+  }
+
+  // Baneo largo en Auth: la cuenta existe, pero no puede iniciar sesión.
+  const { error } = await auth.admin.auth.admin.updateUserById(userId, {
+    ban_duration: '876000h',
+  })
+  if (error) {
+    // Si el baneo falla, se revierte el perfil para no dejar a alguien
+    // "inactivo" en la pantalla pero pudiendo entrar igual.
+    await auth.admin.from('profiles').update({ active: true }).eq('id', userId)
+    return NextResponse.json({ error: error.message }, { status: 400 })
+  }
+
+  return NextResponse.json({ ok: true })
+}
+
+/** Reactivar un acceso dado de baja. */
+export async function PATCH(request: Request) {
+  const auth = await authorize(request, 'usuarios.eliminar')
+  if (!auth.ok) return auth.response
+
+  const { userId } = await request.json().catch(() => ({}))
+  if (!userId) {
+    return NextResponse.json({ error: 'Falta userId' }, { status: 400 })
+  }
+
+  const { error } = await auth.admin.auth.admin.updateUserById(userId, {
+    ban_duration: 'none',
+  })
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 })
+  }
+
+  const { error: perfilError } = await auth.admin
+    .from('profiles')
+    .update({ active: true })
+    .eq('id', userId)
+  if (perfilError) {
+    return NextResponse.json({ error: perfilError.message }, { status: 400 })
   }
 
   return NextResponse.json({ ok: true })

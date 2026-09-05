@@ -161,6 +161,8 @@ export interface Profile {
   fullName: string
   email: string
   role: Role
+  /** false = acceso dado de baja; el perfil se conserva (migración 0015) */
+  active: boolean
 }
 
 export interface Room {

@@ -95,6 +95,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
               fullName: p.full_name || session.user.email || '',
               email: session.user.email ?? '',
               role: p.role as Role,
+              active: p.active ?? true,
             })
           }
           setProfileReady(true)
