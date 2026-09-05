@@ -99,9 +99,11 @@ function deriveMembershipStatus(
 }
 
 function derivePaymentStatus(status: string, dueDate: string): Payment['status'] {
-  // 'anulado' no es deuda: se muestra como pagado para que no sume al total
-  // adeudado ni dispare alertas (el listado de Pagos lo distingue aparte).
-  if (status === 'pagado' || status === 'anulado') return 'pagado'
+  // 'anulado' es un estado propio: no es deuda, pero tampoco es plata
+  // cobrada. Mostrarlo como pagado lo sumaba al total cobrado, que es
+  // justo el número que la caja tiene que hacer coincidir con lo contado.
+  if (status === 'anulado') return 'anulado'
+  if (status === 'pagado') return 'pagado'
   if (dueDate < localISO()) return 'vencido'
   return 'pendiente'
 }
@@ -162,16 +164,19 @@ export async function fetchStudioData(): Promise<StudioData> {
   // Antes acá había un throw con el primer error, y eso convertía el
   // problema de UNA tabla en la pantalla de error total. Ahora cada
   // colección aporta lo que pudo traer y el resto sigue andando.
-  const fallaron = [
+  const colecciones: Array<[string, { error: unknown }]> = [
     ['teachers', teachersRes], ['plans', plansRes], ['students', studentsRes],
     ['memberships', membershipsRes], ['classes', classesRes],
     ['reservations', reservationsRes], ['payments', paymentsRes],
     ['monthlyRevenue', revenueRes],
-  ].filter(([, r]) => (r as { error: unknown }).error).map(([k]) => k as string)
+  ]
+  const fallaron = colecciones.filter(([, r]) => r.error).map(([k]) => k)
 
   // Si falló TODO, no es un problema de permisos: es la sesión o la
-  // conexión, y ahí sí conviene el cartel de error.
-  if (fallaron.length === 8) {
+  // conexión, y ahí sí conviene el cartel de error. Se compara contra el
+  // total real y no contra un número escrito a mano, que se desactualiza
+  // en cuanto alguien suma una colección.
+  if (fallaron.length === colecciones.length) {
     throw (teachersRes.error ?? new Error('No se pudieron cargar los datos'))
   }
 

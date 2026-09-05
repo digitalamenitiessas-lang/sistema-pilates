@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Bell, BellRing, BellOff, CreditCard, UserPlus, CalendarClock, AlertTriangle, Loader2, Smartphone } from 'lucide-react'
+import { Bell, BellRing, BellOff, CreditCard, UserPlus, CalendarClock, AlertTriangle, Loader2, Smartphone, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useData } from '@/lib/data-context'
@@ -22,6 +22,7 @@ const TYPE_ICON: Record<NotificationType, React.ComponentType<{ className?: stri
   membresia_por_vencer: CalendarClock,
   membresia_vencida: AlertTriangle,
   deuda_vencida: AlertTriangle,
+  membresia_renovada: RefreshCw,
 }
 
 const TYPE_COLOR: Record<NotificationType, string> = {
@@ -30,6 +31,7 @@ const TYPE_COLOR: Record<NotificationType, string> = {
   membresia_por_vencer: 'bg-amber-100 text-amber-700',
   membresia_vencida: 'bg-red-100 text-red-700',
   deuda_vencida: 'bg-red-100 text-red-700',
+  membresia_renovada: 'bg-[#E8F2EB] text-[#2E6040]',
 }
 
 /** A qué pantalla lleva cada tipo de notificación al tocarla. */
@@ -39,6 +41,7 @@ const TYPE_PAGE: Record<NotificationType, PageKey> = {
   membresia_por_vencer: 'alumnos',
   membresia_vencida: 'alumnos',
   deuda_vencida: 'pagos',
+  membresia_renovada: 'alumnos',
 }
 
 function relativeTime(iso: string): string {

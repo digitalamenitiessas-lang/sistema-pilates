@@ -81,6 +81,13 @@ function PaymentStatusBadge({ status }: { status: Payment['status'] }) {
       </span>
     )
   }
+  if (status === 'anulado') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-muted text-muted-foreground line-through">
+        Anulado
+      </span>
+    )
+  }
   return (
     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-red-100 text-red-700">
       <X className="w-3 h-3" /> Vencido

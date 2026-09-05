@@ -69,7 +69,7 @@ export interface StudioSetting {
 
 export type MembershipStatus = 'activa' | 'vencida' | 'por vencer' | 'suspendida'
 
-export type PaymentStatus = 'pagado' | 'pendiente' | 'vencido'
+export type PaymentStatus = 'pagado' | 'pendiente' | 'vencido' | 'anulado'
 
 export type ReservationStatus = 'confirmada' | 'cancelada' | 'lista de espera' | 'asistió' | 'ausente'
 
@@ -221,6 +221,7 @@ export type NotificationType =
   | 'membresia_por_vencer'
   | 'membresia_vencida'
   | 'deuda_vencida'
+  | 'membresia_renovada'
 
 /** Notificación persistida (tabla notifications, migración 0007). */
 export interface AppNotification {
