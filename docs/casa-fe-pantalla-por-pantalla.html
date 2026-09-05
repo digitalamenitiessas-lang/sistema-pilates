@@ -318,7 +318,7 @@
 
     <div class="cifras">
       <div class="cifra">
-        <span class="n hecho">9</span>
+        <span class="n hecho">11</span>
         <span class="q">pantallas funcionando</span>
       </div>
       <div class="cifra">
@@ -326,11 +326,11 @@
         <span class="q">roles protegidos en la base</span>
       </div>
       <div class="cifra">
-        <span class="n parcial">71</span>
+        <span class="n parcial">75</span>
         <span class="q">permisos configurables</span>
       </div>
       <div class="cifra">
-        <span class="n falta">9</span>
+        <span class="n falta">8</span>
         <span class="q">módulos por construir</span>
       </div>
     </div>
@@ -406,6 +406,20 @@
             <td class="rol"><span class="marca-no">—</span></td>
           </tr>
           <tr>
+            <td class="pantalla">Caja <span>Cuentas, arqueo y movimientos</span></td>
+            <td class="rol"><span class="marca-si">Todo</span></td>
+            <td class="rol"><span class="marca-si">Todo</span></td>
+            <td class="rol"><span class="marca-no">No entra</span></td>
+            <td class="rol"><span class="marca-no">—</span></td>
+          </tr>
+          <tr>
+            <td class="pantalla">Gastos <span>Egresos del estudio</span></td>
+            <td class="rol"><span class="marca-si">Todo</span></td>
+            <td class="rol"><span class="marca-parcial">Sin anular</span></td>
+            <td class="rol"><span class="marca-no">No entra</span></td>
+            <td class="rol"><span class="marca-no">—</span></td>
+          </tr>
+          <tr>
             <td class="pantalla">Configuración <span>Reglas, catálogos, accesos</span></td>
             <td class="rol"><span class="marca-si">Todo</span></td>
             <td class="rol"><span class="marca-parcial">Sin accesos</span></td>
@@ -425,7 +439,7 @@
 
     <div class="aviso">
       <p>
-        <strong>Esto se puede cambiar sin programar.</strong> Los 71 permisos
+        <strong>Esto se puede cambiar sin programar.</strong> Los 75 permisos
         del sistema se configuran desde Configuración → Permisos, con casilleros
         por rol. Y si hace falta una excepción con una persona puntual —una
         profesora que además cobra los sábados— también se puede.
@@ -463,6 +477,7 @@
         <p class="quien">Admin · Recepción · Profesora</p>
         <ul>
           <li>Alumnas activas, clases del día con su ocupación, ingresos del mes y pagos pendientes.</li>
+          <li><strong>La plata del mes</strong>: cuánto entró, cuánto salió, el resultado —diciendo de qué está hecho— y en cuánto quedó el cajón para arquear, con el saldo de cada cuenta debajo.</li>
           <li>Alertas de membresías vencidas y deudas, con aviso por WhatsApp en un click y el mensaje ya escrito.</li>
           <li>Tomar asistencia de una clase del día, directo desde el listado.</li>
           <li>Campana de avisos en vivo: pago acreditado, alumna nueva, membresía renovada o por vencer.</li>
@@ -549,7 +564,8 @@
           <li>Cobrar en efectivo, transferencia, tarjeta o Mercado Pago, con comprobante numerado automático.</li>
           <li>Generar el link de pago de Mercado Pago por cada deuda; cuando la alumna paga, el sistema lo acredita solo.</li>
           <li>Recordatorio de deuda por WhatsApp con el mensaje escrito y el link de pago incluido.</li>
-          <li>Total cobrado, pendiente y vencido, con distribución por medio de pago.</li>
+          <li>Total cobrado, pendiente y vencido, y cuánto entró por cada medio de pago <strong>en plata</strong>, no en cantidad de cobros.</li>
+          <li><strong>Anular un cobro</strong> con su motivo: el comprobante emitido queda, el cobro deja de contar y baja el saldo de su cuenta. Si ese día ya se arqueó, el cierre firmado no cambia.</li>
         </ul>
         <p class="nota-rol">
           <strong>La profesora</strong> no entra: la pantalla no aparece y la
@@ -558,12 +574,41 @@
       </article>
 
       <article class="ficha">
+        <h3>Caja</h3>
+        <p class="quien">Admin · Recepción</p>
+        <ul>
+          <li><strong>Caja de hoy</strong>: cuánto entró, cuánto salió y cuánto debería haber en el cajón, todo calculado solo.</li>
+          <li><strong>Cerrar la caja</strong> pide un solo dato: cuánto contaste. La diferencia aparece mientras escribís y ahí se explica qué pasó.</li>
+          <li><strong>Cuentas</strong>: dónde está cada peso. El cajón, el banco, Mercado Pago y las tarjetas por acreditar, cada uno con su saldo.</li>
+          <li><strong>Movimientos</strong>: transferencias entre cuentas (retirar de Mercado Pago al banco), retiros, aportes y devoluciones.</li>
+          <li><strong>Cierres</strong>: el historial de arqueos con su diferencia y el motivo, que es lo que hoy es el cuaderno.</li>
+        </ul>
+        <p class="nota-rol">
+          La plata de <strong>Mercado Pago no entra al arqueo</strong> del cajón:
+          está en su propia cuenta hasta el día que se retira al banco. Sin esa
+          separación, la caja no cerraría nunca.
+        </p>
+      </article>
+
+      <article class="ficha">
+        <h3>Gastos</h3>
+        <p class="quien">Admin · Recepción</p>
+        <ul>
+          <li>Fecha, categoría, detalle, monto, proveedor, tipo y número de comprobante, medio de pago, cuenta de la que salió y etiquetas.</li>
+          <li><strong>Pagado o por pagar</strong> es una decisión al cargarlo: un gasto pendiente no mueve un peso hasta que se paga.</li>
+          <li>Los siete filtros: período, categoría, proveedor, medio, cuenta, etiqueta y estado, con el total de lo filtrado siempre a la vista.</li>
+          <li>Al elegir el medio, el sistema sugiere solo la cuenta de la que suele salir.</li>
+          <li>Anular pide el motivo y deja el gasto tachado: no se borra nada.</li>
+        </ul>
+      </article>
+
+      <article class="ficha">
         <h3>Configuración</h3>
         <p class="quien">Admin · Recepción (parcial)</p>
         <ul>
           <li><strong>Datos del estudio</strong>: nombre, dirección, mapa, WhatsApp, Instagram, email y horarios. Es lo que muestra la web.</li>
-          <li><strong>Reglas del negocio</strong>: 21 parámetros — plazo de cancelación, cuándo se descuenta la clase, días de aviso de vencimiento, ventana de pago del 1 al 9, anticipación de cada recordatorio.</li>
-          <li><strong>Catálogos</strong>: disciplinas con su color y descripción, y medios de pago.</li>
+          <li><strong>Reglas del negocio</strong>: 30 parámetros — plazo de cancelación, cuándo se descuenta la clase, días de aviso, ventana de pago del 1 al 9, cómo se cierra la caja, cuánta diferencia de arqueo se tolera, con qué estado se carga un gasto.</li>
+          <li><strong>Catálogos</strong>: disciplinas con su color y descripción, medios de pago y categorías de gasto.</li>
           <li><strong>Equipo y espacios</strong>: profesoras con sus disciplinas, y salas.</li>
           <li><strong>Accesos</strong>: usuarios del sistema con su rol, y la matriz de permisos.</li>
           <li><strong>Mercado Pago</strong>: credenciales del estudio con prueba de conexión.</li>
@@ -597,9 +642,67 @@
   </section>
 
   <section>
+    <h2>Lo último que se sumó</h2>
+    <p class="intro">
+      Septiembre de 2026. Lo que antes era un cuaderno.
+    </p>
+
+    <div class="bloques">
+      <div class="bloque">
+        <p class="etiqueta">Caja</p>
+        <div>
+          <p class="titulo">La plata tiene lugar</p>
+          <p class="detalle">
+            El sistema ya no sabe solo cuánto entró: sabe dónde está. Cuánto hay
+            en el cajón, cuánto en el banco, cuánto todavía debe la tarjeta.
+            Cerrar la caja pide un solo dato, cuánto contaste, y el resto ya está
+            calculado.
+          </p>
+        </div>
+      </div>
+
+      <div class="bloque">
+        <p class="etiqueta">Gastos</p>
+        <div>
+          <p class="titulo">Los egresos, con sus filtros</p>
+          <p class="detalle">
+            Categoría, proveedor, comprobante y de qué cuenta salió. Con el total
+            de lo filtrado siempre a la vista, que es lo que convierte un listado
+            en una herramienta para decidir.
+          </p>
+        </div>
+      </div>
+
+      <div class="bloque">
+        <p class="etiqueta">Agenda</p>
+        <div>
+          <p class="titulo">Talleres, suspensiones y asistencia</p>
+          <p class="detalle">
+            Clases especiales con fecha propia, suspender un día puntual sin
+            tocar el resto de las semanas, cambiar la profesora de una fecha, y
+            tomar asistencia desde el celular.
+          </p>
+        </div>
+      </div>
+
+      <div class="bloque">
+        <p class="etiqueta">Permisos</p>
+        <div>
+          <p class="titulo">75 permisos con casilleros</p>
+          <p class="detalle">
+            Quién puede hacer qué, configurable por rol y por persona, sin
+            depender de programación. Y 30 reglas del negocio que el estudio
+            ajusta desde el sistema.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
     <h2>Lo que falta</h2>
     <p class="intro">
-      Del documento de requerimientos quedan nueve módulos por construir. Este
+      Del documento de requerimientos quedan ocho módulos por construir. Este
       es el orden propuesto, corregido por dependencias técnicas: hay cosas que
       si no van primero obligan a rehacer lo que venga después.
     </p>
@@ -646,23 +749,11 @@
       <div class="bloque">
         <p class="etiqueta">Sigue</p>
         <div>
-          <p class="titulo">Caja diaria y gastos</p>
-          <p class="detalle">
-            Cuentas y cajas con saldo, apertura y cierre con arqueo, gastos con
-            categoría, proveedor y comprobante adjunto, y el tablero financiero
-            completo con egresos y resultado neto.
-          </p>
-        </div>
-      </div>
-
-      <div class="bloque">
-        <p class="etiqueta">Sigue</p>
-        <div>
-          <p class="titulo">Reportes</p>
+          <p class="titulo">Reportes descargables</p>
           <p class="detalle">
             Módulo propio con filtros por rango de fechas y descarga a Excel y
-            PDF. Va después de caja y gastos, porque la mitad de los reportes
-            depende de esos datos.
+            PDF: ventas, cobros, deudas, egresos y resultado, asistencias y
+            ocupación. Ya se puede construir, porque caja y gastos existen.
           </p>
         </div>
       </div>
