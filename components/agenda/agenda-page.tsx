@@ -16,10 +16,12 @@ import {
   Sparkles,
   UserCheck,
   CalendarOff,
+  ClipboardCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { disciplineStyle } from '@/lib/disciplines'
+import { TomarAsistencia } from '@/components/asistencia/tomar-asistencia'
 import {
   addDays,
   mondayOf,
@@ -428,12 +430,15 @@ function ClassDetailModal({
   onClose: () => void
   onEdit: (cls: ClassSession) => void
 }) {
-  const { refresh, canWrite } = useData()
+  const { refresh, canWrite, can } = useData()
   const { students, disciplines, teachers } = useStudio()
   const colors = disciplineStyle(disciplines, cls.discipline)
   const isFull = cls.enrolled >= cls.capacity
   const [dayBusy, setDayBusy] = useState(false)
   const [dayError, setDayError] = useState<string | null>(null)
+  const [tomandoAsistencia, setTomandoAsistencia] = useState(false)
+  // La profesora puede tomar asistencia sin poder editar nada más.
+  const puedeMarcarAsistencia = can('reservas.asistencia') || canWrite
 
   // Excepciones de esa fecha: suspender el día o cambiar la profesora
   // (migración 0018). Solo tocan ESE día, no la clase entera.
@@ -468,6 +473,7 @@ function ClassDetailModal({
     }
     runDay(() => setClassDateTeacher(cls.id, cls.date, teacherId, 'Reemplazo'))
   }
+
   const pct = Math.round((cls.enrolled / cls.capacity) * 100)
 
   const [studentId, setStudentId] = useState('')
@@ -504,6 +510,18 @@ function ClassDetailModal({
       setError(err instanceof Error ? err.message : 'No se pudo eliminar la clase')
       setSaving(false)
     }
+  }
+
+  if (tomandoAsistencia) {
+    return (
+      <TomarAsistencia
+        classId={cls.id}
+        date={cls.date}
+        title={cls.title}
+        time={cls.time}
+        onClose={() => setTomandoAsistencia(false)}
+      />
+    )
   }
 
   return (
@@ -700,6 +718,16 @@ function ClassDetailModal({
 
               {dayError && <p className="text-xs text-destructive">{dayError}</p>}
             </div>
+          )}
+
+          {puedeMarcarAsistencia && !cls.suspended && cls.enrolled > 0 && (
+            <button
+              onClick={() => setTomandoAsistencia(true)}
+              className="w-full py-3 rounded-xl border-2 border-primary text-primary text-sm font-bold flex items-center justify-center gap-2 hover:bg-primary/5 transition-colors"
+            >
+              <ClipboardCheck className="w-4 h-4" />
+              Tomar asistencia
+            </button>
           )}
 
           {!canWrite ? null : cls.suspended ? (

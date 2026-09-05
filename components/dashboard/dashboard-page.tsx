@@ -1,5 +1,7 @@
 'use client'
 
+import { useState } from 'react'
+
 import {
   Users,
   CalendarCheck,
@@ -11,10 +13,12 @@ import {
   Flame,
   CreditCard,
   MessageCircle,
+  ClipboardCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
-import { todayDayIndex } from '@/lib/api'
+import { TomarAsistencia } from '@/components/asistencia/tomar-asistencia'
+import { localISO, todayDayIndex } from '@/lib/api'
 import { paymentReminderLink } from '../pagos/pagos-page'
 import type { PageKey } from '../layout/sidebar'
 
@@ -105,9 +109,13 @@ function StatCard({
 }
 
 export function DashboardPage({ onNavigate }: DashboardPageProps) {
-  const { canWrite } = useData()
+  const { canWrite, can } = useData()
   const { students, payments, alerts, monthlyRevenue, classes, denied } = useStudio()
   const sinFinanzas = denied.includes('payments')
+  // Tomar asistencia desde "Clases de hoy": es el atajo que usa la
+  // profesora cuando entra al sistema con la clase por empezar.
+  const [asistenciaDe, setAsistenciaDe] = useState<(typeof classes)[number] | null>(null)
+  const puedeMarcarAsistencia = can('reservas.asistencia') || canWrite
 
   const TODAY_CLASSES = classes
     .filter((c) => c.dayOfWeek === todayDayIndex())
@@ -217,6 +225,15 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
                     <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-destructive/10 text-destructive">
                       Llena
                     </span>
+                  )}
+                  {puedeMarcarAsistencia && cls.enrolled > 0 && (
+                    <button
+                      onClick={() => setAsistenciaDe(cls)}
+                      className="shrink-0 px-3 py-1.5 rounded-lg border border-primary/40 text-primary text-[11px] font-bold hover:bg-primary/5 transition-colors flex items-center gap-1.5"
+                    >
+                      <ClipboardCheck className="w-3.5 h-3.5" />
+                      Asistencia
+                    </button>
                   )}
                 </div>
               )
@@ -441,6 +458,15 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
           </div>
         </div>
       </div>
+      {asistenciaDe && (
+        <TomarAsistencia
+          classId={asistenciaDe.id}
+          date={localISO()}
+          title={asistenciaDe.title}
+          time={asistenciaDe.time}
+          onClose={() => setAsistenciaDe(null)}
+        />
+      )}
     </div>
   )
 }

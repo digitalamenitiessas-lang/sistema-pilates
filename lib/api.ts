@@ -741,6 +741,33 @@ export async function updateReservationStatus(
 }
 
 /** Marca asistencia y descuenta una clase de la membresía vigente del alumno. */
+/**
+ * Deshace un "presente": devuelve la clase a la membresía que la consumió.
+ * Sin esto, marcar por error y corregir le come una clase a la alumna.
+ */
+export async function undoAttendance(reservation: Reservation): Promise<void> {
+  await updateReservationStatus(reservation.id, 'confirmada')
+
+  const { data: memberships, error } = await supabase
+    .from('memberships')
+    .select('id, classes_used')
+    .eq('student_id', reservation.studentId)
+    .eq('status', 'activa')
+    .gte('end_date', localISO())
+    .order('end_date', { ascending: false })
+    .limit(1)
+  if (error) throw error
+
+  const m = memberships?.[0]
+  if (m && m.classes_used > 0) {
+    const { error: updError } = await supabase
+      .from('memberships')
+      .update({ classes_used: m.classes_used - 1 })
+      .eq('id', m.id)
+    if (updError) throw updError
+  }
+}
+
 export async function markAttendance(reservation: Reservation): Promise<void> {
   await updateReservationStatus(reservation.id, 'asistió')
 
