@@ -17,6 +17,17 @@ interface DataContextValue {
    * — esto solo evita mostrar acciones que la base va a rechazar.
    */
   canWrite: boolean
+  /**
+   * ¿El usuario tiene esta clave de permiso? (migración 0012)
+   *
+   * Mientras la clave está en modo sombra, la base responde con lo que el
+   * rol puede hacer hoy, así que esto devuelve exactamente lo mismo que
+   * canWrite devolvía. Si la migración todavía no corrió, no hay claves y
+   * las pantallas caen a canWrite.
+   */
+  can: (clave: string) => boolean
+  /** true si la base devolvió permisos (migración 0012 aplicada) */
+  permisosReady: boolean
   sessionLoading: boolean
   data: StudioData | null
   dataLoading: boolean
@@ -99,13 +110,20 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const canWrite = profile?.role === 'admin' || profile?.role === 'recepcion'
 
+  const permisos = data?.permisos
+  const permisosReady = !!permisos && permisos.length > 0
+  const can = useCallback(
+    (clave: string) => (permisos ? permisos.includes(clave) : false),
+    [permisos]
+  )
+
   const signOut = useCallback(async () => {
     await supabase.auth.signOut()
   }, [])
 
   return (
     <DataContext.Provider
-      value={{ session, profile, profileReady, canWrite, sessionLoading, data, dataLoading, dataError, refresh, signOut }}
+      value={{ session, profile, profileReady, canWrite, can, permisosReady, sessionLoading, data, dataLoading, dataError, refresh, signOut }}
     >
       {children}
     </DataContext.Provider>

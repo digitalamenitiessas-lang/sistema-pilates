@@ -118,6 +118,12 @@ export interface StudioData {
   /** Catálogo editable desde Configuración (migración 0011) */
   disciplines: DisciplineItem[]
   paymentMethods: PaymentMethod[]
+  /**
+   * Claves de permiso del usuario logueado (migración 0012). Las resuelve
+   * la base con mis_permisos(): rol → matriz → excepción por persona.
+   * Vacío mientras la migración no corrió.
+   */
+  permisos: string[]
   /** Parámetros del negocio, listos para leer con settingNum/settingBool */
   settings: Settings
   /** Los mismos parámetros con su etiqueta y ayuda, para armar la pantalla */
@@ -163,12 +169,15 @@ export async function fetchStudioData(): Promise<StudioData> {
   let paymentMethods: PaymentMethod[] = []
   let settings: Settings = {}
   let settingsMeta: StudioSetting[] = []
+  let permisos: string[] = []
   try {
-    const [discRes, methodRes, settingsRes] = await Promise.all([
+    const [discRes, methodRes, settingsRes, permisosRes] = await Promise.all([
       supabase.from('disciplines').select('*').eq('active', true).order('sort_order').order('name'),
       supabase.from('payment_methods').select('*').order('sort_order'),
       supabase.from('studio_settings').select('*').order('group_key').order('sort_order'),
+      supabase.rpc('mis_permisos'),
     ])
+    permisos = (permisosRes.data as string[] | null) ?? []
     disciplines = (discRes.data ?? []).map((d) => ({
       id: d.id,
       name: d.name,
@@ -365,7 +374,7 @@ export async function fetchStudioData(): Promise<StudioData> {
 
   return {
     teachers, plans, students, memberships, classes, reservations, payments,
-    monthlyRevenue, alerts, rooms, disciplines, paymentMethods, settings, settingsMeta,
+    monthlyRevenue, alerts, rooms, disciplines, paymentMethods, permisos, settings, settingsMeta,
     mpConfigured,
   }
 }
