@@ -857,13 +857,26 @@ function UsersSection() {
   )
 }
 
-const SETTING_GROUPS: Array<{ key: SettingGroup; title: string; help: string }> = [
-  { key: 'estudio', title: 'Datos del estudio', help: 'Lo que se muestra en la web pública y en los emails' },
-  { key: 'reservas', title: 'Reservas y clases', help: 'Reglas de cancelación y lista de espera' },
-  { key: 'membresias', title: 'Membresías', help: 'Avisos de vencimiento, congelamientos y recuperación' },
-  { key: 'cobros', title: 'Cobros y prioridad del horario', help: 'Vencimiento de cuotas y ventana de pago mensual' },
-  { key: 'avisos', title: 'Avisos automáticos', help: 'Con cuánta anticipación sale cada recordatorio' },
-]
+/**
+ * Cómo se llama cada grupo en pantalla. Es solo la traducción: los grupos
+ * que existen salen del catálogo, así que un módulo nuevo agrega el suyo
+ * con un INSERT y aparece igual, con el nombre de la clave si todavía no
+ * está acá.
+ */
+const NOMBRE_GRUPO: Record<string, { title: string; help: string }> = {
+  estudio: { title: 'Datos del estudio', help: 'Lo que se muestra en la web pública y en los emails' },
+  reservas: { title: 'Reservas y clases', help: 'Reglas de cancelación y lista de espera' },
+  membresias: { title: 'Membresías', help: 'Avisos de vencimiento, congelamientos y recuperación' },
+  cobros: { title: 'Cobros y prioridad del horario', help: 'Vencimiento de cuotas y ventana de pago mensual' },
+  avisos: { title: 'Avisos automáticos', help: 'Con cuánta anticipación sale cada recordatorio' },
+  caja: { title: 'Caja y arqueo', help: 'Cómo se cierra la caja y qué diferencia se tolera' },
+  gastos: { title: 'Gastos', help: 'Cómo se cargan los egresos del estudio' },
+  general: { title: 'General', help: '' },
+}
+
+function tituloGrupo(key: string) {
+  return NOMBRE_GRUPO[key] ?? { title: key.charAt(0).toUpperCase() + key.slice(1), help: '' }
+}
 
 /**
  * Los parámetros del negocio. La pantalla se arma sola con lo que trae la
@@ -871,17 +884,21 @@ const SETTING_GROUPS: Array<{ key: SettingGroup; title: string; help: string }> 
  * fila), así que sumar un parámetro nuevo no requiere tocar este archivo.
  */
 function SettingsSection({ group }: { group: SettingGroup }) {
-  const { refresh, canWrite } = useData()
+  const { refresh, canWrite, profile } = useData()
   const { settingsMeta } = useStudio()
   const meta = settingsMeta.filter((s) => s.group === group)
-  const info = SETTING_GROUPS.find((g) => g.key === group)
+  const info = tituloGrupo(group)
 
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
 
+  const esAdmin = profile?.role === 'admin'
   const valueOf = (s: StudioSetting) => draft[s.key] ?? s.value
+  // Los de control aflojan el arqueo, así que no viven en manos de quien
+  // cierra la caja. La base lo exige igual con una política restrictiva.
+  const editable = (s: StudioSetting) => canWrite && (!s.soloAdmin || esAdmin)
   const dirty = Object.keys(draft).some((k) => draft[k] !== meta.find((s) => s.key === k)?.value)
 
   const set = (key: string, value: string) => {
@@ -920,8 +937,8 @@ function SettingsSection({ group }: { group: SettingGroup }) {
           )}
         </div>
         <div>
-          <h2 className="text-sm font-bold text-foreground">{info?.title ?? group}</h2>
-          <p className="text-xs text-muted-foreground">{info?.help}</p>
+          <h2 className="text-sm font-bold text-foreground">{info.title}</h2>
+          <p className="text-xs text-muted-foreground">{info.help}</p>
         </div>
       </div>
 
@@ -935,12 +952,12 @@ function SettingsSection({ group }: { group: SettingGroup }) {
             {s.kind === 'boolean' ? (
               <button
                 type="button"
-                disabled={!canWrite}
+                disabled={!editable(s)}
                 onClick={() => set(s.key, valueOf(s) === 'true' ? 'false' : 'true')}
                 className={cn(
                   'relative w-11 h-6 rounded-full transition-colors',
                   valueOf(s) === 'true' ? 'bg-primary' : 'bg-muted',
-                  !canWrite && 'opacity-50 cursor-not-allowed'
+                  !editable(s) && 'opacity-50 cursor-not-allowed'
                 )}
                 aria-label={s.label}
               >
@@ -954,7 +971,7 @@ function SettingsSection({ group }: { group: SettingGroup }) {
             ) : s.kind === 'choice' ? (
               <select
                 value={valueOf(s)}
-                disabled={!canWrite}
+                disabled={!editable(s)}
                 onChange={(e) => set(s.key, e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary/50 disabled:opacity-50"
               >
@@ -970,7 +987,7 @@ function SettingsSection({ group }: { group: SettingGroup }) {
             ) : s.kind === 'textarea' ? (
               <textarea
                 value={valueOf(s)}
-                disabled={!canWrite}
+                disabled={!editable(s)}
                 rows={2}
                 onChange={(e) => set(s.key, e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary/50 disabled:opacity-50"
@@ -979,13 +996,19 @@ function SettingsSection({ group }: { group: SettingGroup }) {
               <input
                 type={s.kind === 'number' ? 'number' : s.kind === 'time' ? 'time' : 'text'}
                 value={valueOf(s)}
-                disabled={!canWrite}
+                disabled={!editable(s)}
                 onChange={(e) => set(s.key, e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary/50 disabled:opacity-50"
               />
             )}
 
             {s.help && <p className="text-[11px] text-muted-foreground mt-1">{s.help}</p>}
+            {s.soloAdmin && !esAdmin && (
+              <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+                <Lock className="w-3 h-3" />
+                Solo lo cambia el admin: afloja el control del arqueo.
+              </p>
+            )}
           </div>
         ))}
 
@@ -1603,6 +1626,25 @@ function PermisosSection() {
 }
 
 export function ConfiguracionPage() {
+  const { settingsMeta } = useStudio()
+
+  // Los grupos salen del catálogo, no de una lista escrita acá: cuando un
+  // módulo nuevo agrega sus parámetros con un INSERT, su sección aparece
+  // sola. 'estudio' va aparte porque tiene su propio encabezado.
+  const gruposDeReglas = [...new Set(settingsMeta.map((s) => s.group))]
+    .filter((g) => g !== 'estudio')
+    // El orden lo da NOMBRE_GRUPO, que va de lo más cotidiano a lo más
+    // administrativo. Un grupo que todavía no esté ahí va al final, no en
+    // el medio por orden alfabético.
+    .sort((a, b) => {
+      const claves = Object.keys(NOMBRE_GRUPO)
+      const pos = (g: string) => {
+        const i = claves.indexOf(g)
+        return i === -1 ? claves.length : i
+      }
+      return pos(a) - pos(b) || a.localeCompare(b)
+    })
+
   return (
     <div className="p-4 md:p-6 max-w-2xl space-y-8">
       <div>
@@ -1619,10 +1661,9 @@ export function ConfiguracionPage() {
           Reglas del negocio
         </div>
         <div className="space-y-5">
-          <SettingsSection group="reservas" />
-          <SettingsSection group="membresias" />
-          <SettingsSection group="cobros" />
-          <SettingsSection group="avisos" />
+          {gruposDeReglas.map((g) => (
+            <SettingsSection key={g} group={g} />
+          ))}
         </div>
       </div>
 

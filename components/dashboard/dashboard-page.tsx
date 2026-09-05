@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import {
   Users,
@@ -14,11 +14,13 @@ import {
   CreditCard,
   MessageCircle,
   ClipboardCheck,
+  Wallet,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { TomarAsistencia } from '@/components/asistencia/tomar-asistencia'
-import { localISO, todayDayIndex } from '@/lib/api'
+import { fetchResumenPlata, type ResumenPlata } from '@/lib/caja-api'
+import { localISO, settingBool, settingText, todayDayIndex } from '@/lib/api'
 import { paymentReminderLink } from '../pagos/pagos-page'
 import type { PageKey } from '../layout/sidebar'
 
@@ -110,12 +112,28 @@ function StatCard({
 
 export function DashboardPage({ onNavigate }: DashboardPageProps) {
   const { canWrite, can } = useData()
-  const { students, payments, alerts, monthlyRevenue, classes, denied } = useStudio()
+  const { students, payments, alerts, monthlyRevenue, classes, denied, settings } = useStudio()
   const sinFinanzas = denied.includes('payments')
   // Tomar asistencia desde "Clases de hoy": es el atajo que usa la
   // profesora cuando entra al sistema con la clase por empezar.
   const [asistenciaDe, setAsistenciaDe] = useState<(typeof classes)[number] | null>(null)
   const puedeMarcarAsistencia = can('reservas.asistencia') || canWrite
+
+  // El bloque de plata: se consulta aparte porque sale de las vistas de
+  // caja, no del paquete que trae el resto del tablero.
+  const veCaja = can('caja.ver') || can('gastos.ver')
+  const [plata, setPlata] = useState<ResumenPlata | null>(null)
+  const baseNeto = settingText(settings, 'tablero_resultado_base', 'cobrado') as
+    | 'cobrado'
+    | 'devengado'
+  const mostrarSaldos = settingBool(settings, 'caja_cuentas_en_tablero', true)
+
+  useEffect(() => {
+    if (!veCaja) return
+    fetchResumenPlata(baseNeto)
+      .then(setPlata)
+      .catch(() => setPlata(null))
+  }, [veCaja, baseNeto])
 
   const TODAY_CLASSES = classes
     .filter((c) => c.dayOfWeek === todayDayIndex())
@@ -173,6 +191,95 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
           />
         )}
       </div>
+
+      {/* Bloque de plata: egresos, resultado y dónde está el dinero */}
+      {veCaja && plata && (
+        <div className="bg-card rounded-2xl border border-border overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+            <div className="flex items-center gap-2">
+              <Wallet className="w-4 h-4 text-primary" />
+              <h2 className="font-semibold text-foreground text-sm">La plata del mes</h2>
+            </div>
+            <button
+              onClick={() => onNavigate('caja')}
+              className="text-xs text-primary font-medium hover:underline flex items-center gap-1"
+            >
+              Ver caja <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {!plata.completo && (
+            <p className="px-5 pt-3 text-[11px] text-amber-800">
+              Tu rol no ve una parte de estos números, así que el resultado está incompleto.
+            </p>
+          )}
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-border">
+            <div className="px-5 py-4">
+              <p className="text-xs text-muted-foreground">Entró este mes</p>
+              <p className="text-xl font-bold text-[#2E6040] tabular-nums mt-1">
+                ${Math.round(plata.ingresosMes).toLocaleString('es-AR')}
+              </p>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-xs text-muted-foreground">Salió este mes</p>
+              <p className="text-xl font-bold text-destructive tabular-nums mt-1">
+                ${Math.round(plata.egresosMes).toLocaleString('es-AR')}
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                {plata.egresosHoy > 0
+                  ? `$${Math.round(plata.egresosHoy).toLocaleString('es-AR')} hoy`
+                  : 'sin gastos hoy'}
+              </p>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-xs text-muted-foreground">Resultado</p>
+              <p
+                className={cn(
+                  'text-xl font-bold tabular-nums mt-1',
+                  plata.neto >= 0 ? 'text-foreground' : 'text-destructive'
+                )}
+              >
+                ${Math.round(plata.neto).toLocaleString('es-AR')}
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                {baseNeto === 'cobrado' ? 'cobrado menos pagado' : 'incluye lo que falta pagar'}
+              </p>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-xs text-muted-foreground">En el cajón</p>
+              <p className="text-xl font-bold text-foreground tabular-nums mt-1">
+                $
+                {Math.round(
+                  plata.saldos.find((c) => c.arquea)?.saldo ?? 0
+                ).toLocaleString('es-AR')}
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">para arquear</p>
+            </div>
+          </div>
+
+          {/* Dónde está el resto: cada cuenta con su saldo */}
+          {mostrarSaldos && (
+            <div className="px-5 py-3.5 border-t border-border flex flex-wrap gap-x-6 gap-y-2">
+              {plata.saldos
+                .filter((c) => !c.arquea && (c.saldo !== 0 || !c.isSystem))
+                .map((c) => (
+                  <div key={c.accountId} className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{c.name}</span>
+                    <span
+                      className={cn(
+                        'text-xs font-semibold tabular-nums',
+                        c.isSystem && c.saldo !== 0 ? 'text-amber-700' : 'text-foreground'
+                      )}
+                    >
+                      ${Math.round(c.saldo).toLocaleString('es-AR')}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Today's classes */}

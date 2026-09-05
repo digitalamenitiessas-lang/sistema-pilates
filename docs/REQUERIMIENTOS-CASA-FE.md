@@ -318,11 +318,41 @@ es lo que permite que el estudio ajuste sus reglas sin pedirnos un desarrollo.
   bitácora de observaciones, bloque de deuda con cobro desde la ficha.
 - Baja de alumna con motivo, “por recuperar” y cumpleaños del mes.
 
-### Bloque 4 — Plata (prioridades 4 y 5, ≈ 4 semanas)
-- Cuentas y cajas con saldo; cada cobro imputado a una cuenta.
-- Caja diaria con apertura, cierre, arqueo y diferencias.
-- Gastos con categoría, proveedor, comprobante adjunto y filtros.
-- Tablero financiero completo: ventas, cobrado, pendiente, egresos, resultado neto.
+### Bloque 4 — Plata (prioridades 4 y 5)  🔄 en curso
+
+**Hecho (05/09/2026, migración `0020`):**
+
+- [x] **Cuentas y saldos**: cajas, cuentas bancarias, billeteras y pasarelas.
+      Cada medio de pago apunta a una, y Mercado Pago vive en la suya: esa
+      plata NO entra al arqueo del cajón.
+- [x] **El libro se deriva, no se copia.** Los cobros se leen de donde ya
+      estaban; no hay dos verdades para la misma plata, ni un disparador que
+      pueda tumbar un cobro real.
+- [x] **Caja diaria** con apertura, cierre y arqueo. El cierre pide un solo
+      dato: cuánto contaste. La diferencia se calcula mientras se escribe.
+- [x] **Movimientos** que los cobros no saben expresar: transferencias entre
+      cuentas, retiros, aportes, devoluciones y saldo de apertura.
+- [x] **Gastos** con los catorce campos de la sección 9, los siete filtros y
+      el total del filtro siempre a la vista. Un gasto pendiente no mueve un
+      peso hasta que se paga.
+- [x] Nueve parámetros configurables que resuelven doce decisiones de
+      negocio sin tener que preguntarlas.
+
+**Falta para cerrar el bloque:**
+
+- [x] **Los parámetros nuevos en Configuración** (05/09): las secciones ya no
+      están escritas a mano — salen del catálogo, así que el próximo módulo
+      agrega la suya con un `INSERT` y aparece sola. Los tres parámetros que
+      aflojan el control del arqueo solo los cambia el admin, y la pantalla
+      explica por qué.
+- [x] **Bloque de plata en el tablero** (05/09): entró y salió en el mes, el
+      gasto de hoy, el resultado y dónde está la plata cuenta por cuenta. Si
+      al rol le falta ver cobros o gastos, lo dice en vez de mostrar un
+      resultado que no incluye lo que no puede ver.
+- [ ] Botón de anular cobro en Pagos.
+- [ ] Adjuntar la foto del comprobante (primer uso de Storage, en migración
+      aparte).
+- [ ] Avisos de caja en el proceso diario: caja sin cerrar, diferencia.
 
 ### Bloque 5 — Reportes (prioridad 8, ≈ 2 semanas para lo construible)
 Módulo propio con filtros por rango de fechas y exportación a Excel y PDF. Se hace

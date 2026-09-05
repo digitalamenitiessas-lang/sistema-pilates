@@ -47,7 +47,11 @@ export interface PaymentMethod {
 }
 
 export type SettingKind = 'text' | 'number' | 'boolean' | 'time' | 'choice' | 'textarea'
-export type SettingGroup = 'estudio' | 'reservas' | 'membresias' | 'cobros' | 'avisos' | 'general'
+/**
+ * El grupo es texto libre, no una lista fija: un módulo nuevo agrega su
+ * grupo con un INSERT y la pantalla lo muestra sin tocar código.
+ */
+export type SettingGroup = string
 
 /**
  * Parámetro configurable del negocio (tabla studio_settings, migración 0011).
@@ -65,11 +69,13 @@ export interface StudioSetting {
   group: SettingGroup
   sortOrder: number
   isPublic: boolean
+  /** Solo el admin lo cambia; recepción lo ve en modo lectura */
+  soloAdmin: boolean
 }
 
 export type MembershipStatus = 'activa' | 'vencida' | 'por vencer' | 'suspendida'
 
-export type PaymentStatus = 'pagado' | 'pendiente' | 'vencido'
+export type PaymentStatus = 'pagado' | 'pendiente' | 'vencido' | 'anulado'
 
 export type ReservationStatus = 'confirmada' | 'cancelada' | 'lista de espera' | 'asistió' | 'ausente'
 
@@ -221,6 +227,7 @@ export type NotificationType =
   | 'membresia_por_vencer'
   | 'membresia_vencida'
   | 'deuda_vencida'
+  | 'membresia_renovada'
 
 /** Notificación persistida (tabla notifications, migración 0007). */
 export interface AppNotification {
@@ -282,4 +289,145 @@ export interface PermissionMatrix {
   /** "rol|clave" de cada permiso concedido */
   granted: Set<string>
   overrides: UserPermission[]
+}
+
+// ---------------------------------------------------------------
+// Caja, cuentas y gastos (migración 0020)
+//
+// Nada de esto entra en StudioData: son colecciones que crecen todos los
+// días y se consultan por rango desde su propia pantalla.
+// ---------------------------------------------------------------
+
+/** Dónde está la plata. 'transitoria' es la cuenta "A imputar". */
+export type AccountKind = 'caja' | 'banco' | 'billetera' | 'pasarela' | 'transitoria'
+
+export interface Account {
+  id: string
+  name: string
+  kind: AccountKind
+  /** true = se cuenta con la mano al cierre */
+  arquea: boolean
+  isSystem: boolean
+  active: boolean
+  sortOrder: number
+  bankName: string
+  cbu: string
+  alias: string
+  holder: string
+  notes: string
+}
+
+/** Cuenta con su saldo, de la vista account_balances. */
+export interface AccountBalance {
+  accountId: string
+  name: string
+  kind: AccountKind
+  arquea: boolean
+  isSystem: boolean
+  saldo: number
+  ultimoMovimiento: string | null
+  movimientos: number
+  /**
+   * El saldo se calcula con lo que este rol puede ver. Si le falta alguna
+   * de las dos, la pantalla lo avisa en vez de mostrar un número corto
+   * como si fuera el saldo real.
+   */
+  veCobros: boolean
+  veGastos: boolean
+}
+
+/** Una línea del libro: un cobro, un gasto o un movimiento manual. */
+export interface LedgerEntry {
+  origen: 'cobro' | 'gasto' | 'movimiento'
+  refId: string
+  accountId: string
+  at: string
+  dia: string
+  sentido: 'ingreso' | 'egreso'
+  monto: number
+  concepto: string
+  medio: string | null
+  contraparte: string | null
+  comprobante: string | null
+}
+
+/** Lo que payments no sabe expresar. */
+export type MovementKind =
+  | 'transferencia'
+  | 'retiro'
+  | 'aporte'
+  | 'devolucion'
+  | 'apertura'
+  | 'ajuste'
+
+export interface AccountMovement {
+  id: string
+  at: string
+  dia: string
+  kind: MovementKind
+  fromAccountId: string | null
+  toAccountId: string | null
+  amount: number
+  concept: string
+  status: 'vigente' | 'anulado'
+  notes: string
+}
+
+/** El arqueo: lo esperado y lo contado, congelados. */
+export interface CashSession {
+  id: string
+  accountId: string
+  fecha: string
+  desde: string
+  hasta: string | null
+  openedAt: string
+  openedBy: string | null
+  closedAt: string | null
+  closedBy: string | null
+  saldoInicial: number
+  ingresos: number
+  egresos: number
+  saldoEsperado: number
+  saldoReal: number | null
+  diferencia: number | null
+  totalesPorMedio: Record<string, number>
+  notas: string
+}
+
+export type ExpenseStatus = 'pendiente' | 'pagado' | 'anulado'
+export type DocType =
+  | 'factura'
+  | 'recibo'
+  | 'ticket'
+  | 'nota de credito'
+  | 'orden de pago'
+  | 'sin comprobante'
+
+export interface ExpenseCategory {
+  id: string
+  name: string
+  parentId: string | null
+  nature: 'fijo' | 'variable'
+  active: boolean
+  sortOrder: number
+}
+
+export interface Expense {
+  id: string
+  fecha: string
+  categoryId: string | null
+  categoryName: string
+  detail: string
+  amount: number
+  supplier: string
+  docType: DocType
+  docNumber: string
+  method: string | null
+  accountId: string | null
+  paidAt: string | null
+  paidDate: string | null
+  status: ExpenseStatus
+  tags: string[]
+  notes: string
+  voidReason: string
 }

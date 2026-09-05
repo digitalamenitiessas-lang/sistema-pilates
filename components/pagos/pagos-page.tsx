@@ -81,6 +81,13 @@ function PaymentStatusBadge({ status }: { status: Payment['status'] }) {
       </span>
     )
   }
+  if (status === 'anulado') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-muted text-muted-foreground line-through">
+        Anulado
+      </span>
+    )
+  }
   return (
     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-red-100 text-red-700">
       <X className="w-3 h-3" /> Vencido
@@ -521,17 +528,24 @@ export function PagosPage() {
   const currentMonthRevenue = currentMonth?.amount ?? 0
   const maxRevenue = Math.max(1, ...monthlyRevenue.map((m) => m.amount))
 
-  // Distribución real por método (sobre pagos cobrados)
+  // Distribución por método, en PLATA y no en cantidad de pagos: veinte
+  // cobros chicos en efectivo y dos transferencias grandes son cosas muy
+  // distintas, y contando pagos parecían lo mismo.
   const paidWithMethod = PAYMENTS.filter((p) => p.status === 'pagado' && p.method)
+  const totalWithMethod = paidWithMethod.reduce((a, p) => a + p.amount, 0)
   const methodDistribution = (Object.keys(METHOD_LABEL) as AnyMethod[])
-    .map((m) => ({
-      label: METHOD_LABEL[m],
-      color: METHOD_COLORS[m],
-      pct: paidWithMethod.length
-        ? Math.round((paidWithMethod.filter((p) => p.method === m).length / paidWithMethod.length) * 100)
-        : 0,
-    }))
-    .sort((a, b) => b.pct - a.pct)
+    .map((m) => {
+      const monto = paidWithMethod
+        .filter((p) => p.method === m)
+        .reduce((a, p) => a + p.amount, 0)
+      return {
+        label: METHOD_LABEL[m],
+        color: METHOD_COLORS[m],
+        monto,
+        pct: totalWithMethod ? Math.round((monto / totalWithMethod) * 100) : 0,
+      }
+    })
+    .sort((a, b) => b.monto - a.monto)
 
   return (
     <div className="flex flex-col h-full">
@@ -817,16 +831,21 @@ export function PagosPage() {
             </div>
 
             <div className="mt-5 pt-4 border-t border-border">
-              <p className="text-xs text-muted-foreground mb-2">Distribución por método</p>
+              <p className="text-xs text-muted-foreground mb-2">Cobrado por método</p>
               <div className="space-y-2">
-                {methodDistribution.map(({ label, pct, color }) => (
+                {methodDistribution.map(({ label, pct, color, monto }) => (
                   <div key={label} className="flex items-center gap-2">
                     <div
                       className="w-2.5 h-2.5 rounded-full shrink-0"
                       style={{ backgroundColor: color }}
                     />
                     <span className="text-xs text-muted-foreground flex-1">{label}</span>
-                    <span className="text-xs font-semibold text-foreground">{pct}%</span>
+                    <span className="text-xs font-semibold text-foreground tabular-nums">
+                      ${monto.toLocaleString('es-AR')}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground tabular-nums w-9 text-right">
+                      {pct}%
+                    </span>
                     <div className="w-20 h-1.5 rounded-full bg-muted overflow-hidden">
                       <div
                         className="h-full rounded-full"

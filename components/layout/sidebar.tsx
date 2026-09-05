@@ -12,6 +12,8 @@ import {
   ChevronLeft,
   Menu,
   X,
+  Wallet,
+  Receipt,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData } from '@/lib/data-context'
@@ -31,6 +33,8 @@ export type PageKey =
   | 'planes'
   | 'reservas'
   | 'pagos'
+  | 'caja'
+  | 'gastos'
   | 'configuracion'
 
 interface NavItem {
@@ -46,6 +50,8 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'planes', label: 'Planes', icon: BookOpen },
   { key: 'reservas', label: 'Reservas', icon: ClipboardList },
   { key: 'pagos', label: 'Pagos', icon: CreditCard },
+  { key: 'caja', label: 'Caja', icon: Wallet },
+  { key: 'gastos', label: 'Gastos', icon: Receipt },
 ]
 
 interface SidebarProps {
@@ -66,11 +72,18 @@ export function Sidebar({
   mobileOpen,
   onMobileClose,
 }: SidebarProps) {
-  const { profile, canWrite, signOut } = useData()
+  const { profile, canWrite, can, signOut } = useData()
   // El drawer mobile siempre se muestra expandido; el colapso es cosa de desktop
   const showLabels = !collapsed || mobileOpen
   // El profesor no ve datos económicos ni configuración (rol solo consulta)
-  const navItems = NAV_ITEMS.filter((item) => item.key !== 'pagos' || canWrite)
+  // Cada módulo con su propio permiso; los que no lo tienen, con el
+  // genérico de escritura de siempre.
+  const navItems = NAV_ITEMS.filter((item) => {
+    if (item.key === 'pagos') return canWrite
+    if (item.key === 'caja') return can('caja.ver') || canWrite
+    if (item.key === 'gastos') return can('gastos.ver') || canWrite
+    return true
+  })
 
   return (
     <>
