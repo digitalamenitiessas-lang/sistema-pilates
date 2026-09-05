@@ -340,8 +340,11 @@ es lo que permite que el estudio ajuste sus reglas sin pedirnos un desarrollo.
 
 **Falta para cerrar el bloque:**
 
-- [ ] Los parámetros nuevos en la pantalla de Configuración (las secciones
-      están escritas a mano en el JSX; conviene derivarlas del catálogo).
+- [x] **Los parámetros nuevos en Configuración** (05/09): las secciones ya no
+      están escritas a mano — salen del catálogo, así que el próximo módulo
+      agrega la suya con un `INSERT` y aparece sola. Los tres parámetros que
+      aflojan el control del arqueo solo los cambia el admin, y la pantalla
+      explica por qué.
 - [ ] Bloque de plata en el tablero: egresos del día y del mes, resultado
       neto y saldos por cuenta.
 - [ ] Botón de anular cobro en Pagos.

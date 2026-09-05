@@ -47,7 +47,11 @@ export interface PaymentMethod {
 }
 
 export type SettingKind = 'text' | 'number' | 'boolean' | 'time' | 'choice' | 'textarea'
-export type SettingGroup = 'estudio' | 'reservas' | 'membresias' | 'cobros' | 'avisos' | 'general'
+/**
+ * El grupo es texto libre, no una lista fija: un módulo nuevo agrega su
+ * grupo con un INSERT y la pantalla lo muestra sin tocar código.
+ */
+export type SettingGroup = string
 
 /**
  * Parámetro configurable del negocio (tabla studio_settings, migración 0011).
@@ -65,6 +69,8 @@ export interface StudioSetting {
   group: SettingGroup
   sortOrder: number
   isPublic: boolean
+  /** Solo el admin lo cambia; recepción lo ve en modo lectura */
+  soloAdmin: boolean
 }
 
 export type MembershipStatus = 'activa' | 'vencida' | 'por vencer' | 'suspendida'

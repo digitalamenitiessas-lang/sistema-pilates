@@ -256,6 +256,7 @@ export async function fetchStudioData(): Promise<StudioData> {
       group: r.group_key,
       sortOrder: r.sort_order,
       isPublic: r.is_public,
+      soloAdmin: r.solo_admin ?? false,
     }))
     settings = Object.fromEntries(settingsMeta.map((r) => [r.key, r.value]))
   } catch {
