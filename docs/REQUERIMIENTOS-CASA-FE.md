@@ -345,8 +345,10 @@ es lo que permite que el estudio ajuste sus reglas sin pedirnos un desarrollo.
       agrega la suya con un `INSERT` y aparece sola. Los tres parámetros que
       aflojan el control del arqueo solo los cambia el admin, y la pantalla
       explica por qué.
-- [ ] Bloque de plata en el tablero: egresos del día y del mes, resultado
-      neto y saldos por cuenta.
+- [x] **Bloque de plata en el tablero** (05/09): entró y salió en el mes, el
+      gasto de hoy, el resultado y dónde está la plata cuenta por cuenta. Si
+      al rol le falta ver cobros o gastos, lo dice en vez de mostrar un
+      resultado que no incluye lo que no puede ver.
 - [ ] Botón de anular cobro en Pagos.
 - [ ] Adjuntar la foto del comprobante (primer uso de Storage, en migración
       aparte).

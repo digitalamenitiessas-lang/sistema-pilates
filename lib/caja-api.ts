@@ -486,3 +486,50 @@ export async function fetchCajaControl(): Promise<CajaProblema[]> {
     monto: Number(p.monto ?? 0),
   }))
 }
+
+// ---------------------------------------------------------------
+// El bloque de plata del tablero
+// ---------------------------------------------------------------
+export interface ResumenPlata {
+  egresosHoy: number
+  egresosMes: number
+  ingresosMes: number
+  /** Ingresos menos egresos, según cómo lo defina el estudio */
+  neto: number
+  saldos: AccountBalance[]
+  /** false si al rol le falta ver cobros o gastos: el neto quedaría corto */
+  completo: boolean
+}
+
+/**
+ * Un solo viaje para todo el bloque. Si al rol le falta una de las dos
+ * mitades, `completo` viene en false y la pantalla lo dice en vez de
+ * mostrar un neto que no incluye lo que no puede ver.
+ */
+export async function fetchResumenPlata(base: 'cobrado' | 'devengado'): Promise<ResumenPlata> {
+  const hoy = new Date().toLocaleDateString('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+  })
+  const mes = hoy.slice(0, 7)
+
+  const [resMes, gastosHoy, saldos] = await Promise.all([
+    supabase.from('resultado_mensual').select('*').eq('mes', mes).maybeSingle(),
+    supabase.from('expenses').select('amount').eq('status', 'pagado').eq('paid_date', hoy),
+    fetchBalances(),
+  ])
+
+  const fila = resMes.data
+  const egresosMes = Number(
+    (base === 'devengado' ? fila?.egresos_devengados : fila?.egresos_pagados) ?? 0
+  )
+  const ingresosMes = Number(fila?.ingresos ?? 0)
+
+  return {
+    egresosHoy: (gastosHoy.data ?? []).reduce((a, g) => a + Number(g.amount), 0),
+    egresosMes,
+    ingresosMes,
+    neto: ingresosMes - egresosMes,
+    saldos,
+    completo: (fila?.ve_ingresos ?? true) && (fila?.ve_egresos ?? true),
+  }
+}
