@@ -47,6 +47,8 @@ type WeekClass = ClassSession & {
   suspended?: boolean
   /** Ese día la da otra profesora */
   substitute?: boolean
+  /** La profesora de siempre, para saber a quién se vuelve */
+  titularName?: string
   occurrenceReason?: string
 }
 
@@ -668,7 +670,9 @@ function ClassDetailModal({
                     onChange={(e) => reemplazar(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs text-foreground outline-none focus:border-primary"
                   >
-                    <option value="">La da {cls.teacherName} (como siempre)</option>
+                    <option value="">
+                      La da {cls.titularName ?? cls.teacherName} (como siempre)
+                    </option>
                     {teachers.map((t) => (
                       <option key={t.id} value={t.id}>
                         Ese día la da {t.name}
@@ -764,6 +768,7 @@ export function AgendaPage() {
   const { classes, reservations, disciplines, occurrences } = useStudio()
   const [selectedDisciplines, setSelectedDisciplines] = useState<Discipline[]>([])
   const [selectedClass, setSelectedClass] = useState<WeekClass | null>(null)
+
   const [weekOffset, setWeekOffset] = useState(0)
   const [showForm, setShowForm] = useState(false)
   const [editingClass, setEditingClass] = useState<ClassSession | undefined>(undefined)
@@ -795,6 +800,7 @@ export function AgendaPage() {
           time: occ?.startTime ?? c.time,
           capacity: occ?.capacity ?? c.capacity,
           teacherName: occ?.teacherId ? occ.teacherName : c.teacherName,
+          titularName: c.teacherName,
           suspended: occ?.status === 'suspendida',
           substitute: !!occ?.teacherId,
           occurrenceReason: occ?.reason ?? '',
@@ -803,6 +809,14 @@ export function AgendaPage() {
         }
       })
   }, [classes, reservations, occurrences, weekStart])
+
+  // El detalle se re-lee de la semana en cada render: si se suspende el día
+  // o se cambia la profesora, el modal abierto muestra el cambio al toque
+  // en vez de quedarse con la copia del momento en que se abrió.
+  const detalle = selectedClass
+    ? weekClasses.find((c) => c.id === selectedClass.id && c.date === selectedClass.date) ??
+      selectedClass
+    : null
 
   const toggleDiscipline = (d: Discipline) => {
     setSelectedDisciplines((prev) =>
@@ -1030,9 +1044,9 @@ export function AgendaPage() {
       </div>
 
       {/* Class detail modal */}
-      {selectedClass && (
+      {detalle && (
         <ClassDetailModal
-          cls={selectedClass}
+          cls={detalle}
           onClose={() => setSelectedClass(null)}
           onEdit={(cls) => {
             setSelectedClass(null)
