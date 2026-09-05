@@ -13,6 +13,7 @@ import {
   Plus,
   Pencil,
   Trash2,
+  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
@@ -63,6 +64,7 @@ function ClassCard({ cls, onClick }: { cls: WeekClass; onClick: () => void }) {
     >
       <div className="flex items-start justify-between gap-1 mb-1">
         <p className="text-xs font-semibold leading-tight line-clamp-2" style={{ color: colors.text }}>
+          {cls.kind === 'especial' && <Sparkles className="w-3 h-3 inline-block mr-1 -mt-0.5" />}
           {cls.title}
         </p>
         {isFull && (
@@ -109,6 +111,13 @@ function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => v
   const [duration, setDuration] = useState(String(cls?.durationMinutes ?? 55))
   const [capacity, setCapacity] = useState(String(cls?.capacity ?? 10))
   const [room, setRoom] = useState(cls?.room ?? (rooms[0]?.name ?? ''))
+  const [kind, setKind] = useState<'regular' | 'especial'>(cls?.kind ?? 'regular')
+  const [date, setDate] = useState(cls?.date ?? '')
+  const [description, setDescription] = useState(cls?.description ?? '')
+  const [level, setLevel] = useState(cls?.level ?? '')
+  const [price, setPrice] = useState(cls?.price != null ? String(cls.price) : '')
+  const [requirements, setRequirements] = useState(cls?.requirements ?? '')
+  const [bookable, setBookable] = useState(cls?.bookable ?? true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -123,18 +132,36 @@ function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => v
       setError('Seleccioná profesor/a')
       return
     }
+    if (kind === 'especial' && !date) {
+      setError('Una clase especial necesita su fecha')
+      return
+    }
     setSaving(true)
     setError(null)
+    // En una especial el día de la semana se deriva de la fecha, así la
+    // grilla la ubica igual que a cualquier otra.
+    const diaDeLaFecha = (iso: string) => {
+      const [y, m, d] = iso.split('-').map(Number)
+      return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7
+    }
+
     const input: ClassInput = {
       title,
       discipline,
       teacherId,
-      dayOfWeek,
+      dayOfWeek: kind === 'especial' ? diaDeLaFecha(date) : dayOfWeek,
       startTime,
       durationMinutes: Number(duration) || 55,
       capacity: Number(capacity) || 10,
       room,
       color: disciplineStyle(disciplines, discipline).dot,
+      kind,
+      date: kind === 'especial' ? date : null,
+      description,
+      level,
+      price: price.trim() === '' ? null : Number(price),
+      requirements,
+      bookable,
     }
     try {
       if (isEdit) await updateClassSession(cls.id, input)
@@ -170,6 +197,33 @@ function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => v
 
         <div className="px-6 py-5 space-y-4 overflow-y-auto">
           <div>
+            <label className={labelClass}>Tipo de clase</label>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { k: 'regular', t: 'Regular', s: 'Se repite todas las semanas' },
+                { k: 'especial', t: 'Especial', s: 'Taller o evento, con su fecha' },
+              ] as const).map((o) => (
+                <button
+                  key={o.k}
+                  type="button"
+                  onClick={() => setKind(o.k)}
+                  className={cn(
+                    'rounded-xl border px-3 py-2 text-left transition-colors',
+                    kind === o.k
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/40'
+                  )}
+                >
+                  <span className="block text-sm font-semibold text-foreground">{o.t}</span>
+                  <span className="block text-[11px] text-muted-foreground leading-tight mt-0.5">
+                    {o.s}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
             <label className={labelClass}>Nombre de la clase *</label>
             <input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="Ej: Reformer Intermedio" className={inputClass} />
           </div>
@@ -193,12 +247,27 @@ function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => v
               </select>
             </div>
             <div>
-              <label className={labelClass}>Día</label>
-              <select value={dayOfWeek} onChange={(e) => setDayOfWeek(Number(e.target.value))} className={inputClass}>
-                {DAYS.map((d, i) => (
-                  <option key={d} value={i}>{d}</option>
-                ))}
-              </select>
+              {kind === 'especial' ? (
+                <>
+                  <label className={labelClass}>Fecha *</label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    required
+                    className={inputClass}
+                  />
+                </>
+              ) : (
+                <>
+                  <label className={labelClass}>Día</label>
+                  <select value={dayOfWeek} onChange={(e) => setDayOfWeek(Number(e.target.value))} className={inputClass}>
+                    {DAYS.map((d, i) => (
+                      <option key={d} value={i}>{d}</option>
+                    ))}
+                  </select>
+                </>
+              )}
             </div>
             <div>
               <label className={labelClass}>Hora de inicio</label>
@@ -227,6 +296,82 @@ function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => v
               <input value={room} onChange={(e) => setRoom(e.target.value)} placeholder="Ej: Sala 1" className={inputClass} />
             )}
           </div>
+
+          <div>
+            <label className={labelClass}>Descripción</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              placeholder="De qué se trata. Se muestra en la web y en el portal."
+              className={inputClass}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>Nivel o público</label>
+              <input
+                value={level}
+                onChange={(e) => setLevel(e.target.value)}
+                placeholder="Ej: Embarazadas"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Precio</label>
+              <input
+                type="number"
+                min="0"
+                step="100"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="Incluida en el plan"
+                className={inputClass}
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Vacío = la cubre la membresía
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <label className={labelClass}>Requisitos</label>
+            <input
+              value={requirements}
+              onChange={(e) => setRequirements(e.target.value)}
+              placeholder="Ej: traer toalla y media antideslizante"
+              className={inputClass}
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setBookable(!bookable)}
+            className="flex items-start gap-3 w-full text-left"
+          >
+            <span
+              className={cn(
+                'w-10 h-6 rounded-full transition-colors relative shrink-0 mt-0.5',
+                bookable ? 'bg-primary' : 'bg-muted'
+              )}
+            >
+              <span
+                className={cn(
+                  'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform',
+                  bookable ? 'translate-x-[18px]' : 'translate-x-0.5'
+                )}
+              />
+            </span>
+            <span>
+              <span className="block text-sm font-medium text-foreground">
+                La alumna puede reservarla sola
+              </span>
+              <span className="block text-[11px] text-muted-foreground leading-tight">
+                Apagado: se muestra en la agenda, pero el lugar lo asigna recepción
+              </span>
+            </span>
+          </button>
 
           {error && <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
         </div>
@@ -325,8 +470,37 @@ function ClassDetailModal({
             >
               {cls.discipline}
             </span>
+            {cls.kind === 'especial' && (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full mb-2 ml-1.5 inline-flex items-center gap-1 bg-foreground/10 text-foreground">
+                <Sparkles className="w-3 h-3" />
+                Especial
+              </span>
+            )}
             <h3 className="text-base font-bold text-foreground">{cls.title}</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">{shortDate(cls.date)}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {shortDate(cls.date)}
+              {cls.level && ` · ${cls.level}`}
+            </p>
+            {cls.description && (
+              <p className="text-xs text-foreground/70 mt-1.5 max-w-xs">{cls.description}</p>
+            )}
+            {(cls.price != null || cls.requirements || !cls.bookable) && (
+              <div className="mt-1.5 space-y-0.5">
+                {cls.price != null && (
+                  <p className="text-xs font-semibold text-foreground">
+                    ${cls.price.toLocaleString('es-AR')} — se cobra aparte
+                  </p>
+                )}
+                {cls.requirements && (
+                  <p className="text-[11px] text-muted-foreground">Requisitos: {cls.requirements}</p>
+                )}
+                {!cls.bookable && (
+                  <p className="text-[11px] text-muted-foreground">
+                    La alumna no la reserva sola: el lugar lo asigna recepción
+                  </p>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-1">
             {canWrite && (
@@ -487,16 +661,21 @@ export function AgendaPage() {
 
   // Cupos por clase para la semana visible
   const weekClasses: WeekClass[] = useMemo(() => {
-    return classes.map((c) => {
-      const date = addDays(weekStart, c.dayOfWeek)
-      const ofDay = reservations.filter((r) => r.classId === c.id && r.date === date)
-      return {
-        ...c,
-        date,
-        enrolled: ofDay.filter((r) => r.status === 'confirmada' || r.status === 'asistió').length,
-        waitlist: ofDay.filter((r) => r.status === 'lista de espera').length,
-      }
-    })
+    const weekLast = addDays(weekStart, 6)
+    return classes
+      // Una especial solo aparece en la semana de su fecha; las regulares,
+      // todas las semanas (migración 0017).
+      .filter((c) => c.kind !== 'especial' || (c.date >= weekStart && c.date <= weekLast))
+      .map((c) => {
+        const date = c.kind === 'especial' && c.date ? c.date : addDays(weekStart, c.dayOfWeek)
+        const ofDay = reservations.filter((r) => r.classId === c.id && r.date === date)
+        return {
+          ...c,
+          date,
+          enrolled: ofDay.filter((r) => r.status === 'confirmada' || r.status === 'asistió').length,
+          waitlist: ofDay.filter((r) => r.status === 'lista de espera').length,
+        }
+      })
   }, [classes, reservations, weekStart])
 
   const toggleDiscipline = (d: Discipline) => {

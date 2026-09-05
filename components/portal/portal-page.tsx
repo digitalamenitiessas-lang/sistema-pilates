@@ -559,7 +559,11 @@ export function PortalPage() {
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         {c.mine.status === 'lista de espera' ? 'En espera' : 'Reservada'}
                       </span>
-                    ) : isPast || !canBook ? null : busyId === c.id ? (
+                    ) : isPast || !canBook ? null : !c.bookable ? (
+                      <span className="text-[10px] font-semibold text-muted-foreground text-right leading-tight block max-w-[92px]">
+                        Reservás en recepción
+                      </span>
+                    ) : busyId === c.id ? (
                       <Loader2 className="w-4 h-4 animate-spin text-primary" />
                     ) : isFull ? (
                       <button

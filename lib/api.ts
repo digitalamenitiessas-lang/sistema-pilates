@@ -11,6 +11,7 @@ import type {
   AppNotification,
   MonthlyRevenue,
   Discipline,
+  ClassKind,
   Profile,
   Role,
   Room,
@@ -340,7 +341,9 @@ export async function fetchStudioData(): Promise<StudioData> {
   const weekStart = mondayOf()
   const weekEnd = addDays(weekStart, 6)
   const classes: ClassSession[] = (classesRes.data ?? []).map((c) => {
-    const classDate = addDays(weekStart, c.day_of_week)
+    // Las especiales tienen su propia fecha; las regulares caen en el día
+    // de la semana que les toca (migración 0017).
+    const classDate = c.date ?? addDays(weekStart, c.day_of_week)
     const ofWeek = reservations.filter(
       (r) => r.classId === c.id && r.date >= weekStart && r.date <= weekEnd
     )
@@ -358,6 +361,13 @@ export async function fetchStudioData(): Promise<StudioData> {
       waitlist: ofWeek.filter((r) => r.status === 'lista de espera').length,
       room: c.room,
       color: c.color ?? '#C4735A',
+      kind: (c.kind ?? 'regular') as ClassSession['kind'],
+      date: c.date ?? '',
+      description: c.description ?? '',
+      level: c.level ?? '',
+      price: c.price === null || c.price === undefined ? null : Number(c.price),
+      requirements: c.requirements ?? '',
+      bookable: c.bookable ?? true,
       // fecha concreta de esta clase en la semana actual (para reservar)
       weekDate: classDate,
     } as ClassSession & { weekDate: string }
@@ -991,6 +1001,28 @@ export interface ClassInput {
   capacity: number
   room: string
   color: string
+  kind?: ClassKind
+  /** Fecha del evento; solo para las especiales (migración 0017) */
+  date?: string | null
+  description?: string
+  level?: string
+  price?: number | null
+  requirements?: string
+  bookable?: boolean
+}
+
+/** Las columnas de 0017 se mandan solo si vienen, así el alta sigue
+ *  funcionando aunque la migración todavía no haya corrido. */
+function classExtras(input: ClassInput): Record<string, unknown> {
+  const extras: Record<string, unknown> = {}
+  if (input.kind !== undefined) extras.kind = input.kind
+  if (input.date !== undefined) extras.date = input.date || null
+  if (input.description !== undefined) extras.description = input.description
+  if (input.level !== undefined) extras.level = input.level
+  if (input.price !== undefined) extras.price = input.price
+  if (input.requirements !== undefined) extras.requirements = input.requirements
+  if (input.bookable !== undefined) extras.bookable = input.bookable
+  return extras
 }
 
 function classRow(input: ClassInput) {
@@ -1004,6 +1036,7 @@ function classRow(input: ClassInput) {
     capacity: input.capacity,
     room: input.room,
     color: input.color,
+    ...classExtras(input),
   }
 }
 
