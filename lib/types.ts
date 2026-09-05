@@ -200,3 +200,53 @@ export interface AppNotification {
   createdAt: string
   read: boolean
 }
+
+// ---------------------------------------------------------------
+// Motor de permisos (migración 0012)
+// ---------------------------------------------------------------
+
+/**
+ * Cómo se comporta una clave:
+ * - 'permiso'     configurable desde la pantalla
+ * - 'fija'        la tiene todo usuario logueado (el portal depende de ella)
+ * - 'estructural' existe, pero tildarla sería una escalada de privilegios
+ * - 'servicio'    identidad de máquina (cron, webhook), no se asigna
+ * - 'futuro'      el módulo todavía no existe
+ */
+export type PermissionKind = 'permiso' | 'fija' | 'estructural' | 'servicio' | 'futuro'
+
+/**
+ * 'sombra' = la clave todavía responde con lo que el rol podía hacer antes
+ * del motor, así que tildarla o destildarla no cambia nada todavía.
+ * 'activo' = manda la matriz.
+ */
+export type PermissionMode = 'sombra' | 'activo'
+
+export interface PermissionKey {
+  clave: string
+  etiqueta: string
+  ayuda: string
+  grupo: string
+  orden: number
+  tipo: PermissionKind
+  /** Los roles que la tienen hoy, antes del motor */
+  legacyRoles: Role[]
+  modo: PermissionMode
+}
+
+/** Excepción para una persona puntual (tabla user_permissions). */
+export interface UserPermission {
+  userId: string
+  clave: string
+  allow: boolean
+  motivo: string
+  expiresAt: string | null
+}
+
+/** El catálogo con su matriz, listo para pintar la pantalla. */
+export interface PermissionMatrix {
+  keys: PermissionKey[]
+  /** "rol|clave" de cada permiso concedido */
+  granted: Set<string>
+  overrides: UserPermission[]
+}
