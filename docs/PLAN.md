@@ -81,9 +81,27 @@ después va grupo por grupo y se revierte con un UPDATE.
   el guardado que las pisaba con vacío, y el borrado de suscripciones push
   que no filtraba por usuario.
 
-Falta: reescribir las políticas a `can()` (0013), tolerancia a fallo del
-bundle en `lib/api.ts`, unificar los chequeos del servidor, la pantalla de
-la matriz, y el encendido gradual. Después: baja lógica de usuarios, momento
+Migración `0013_permisos_policies.sql` aplicada y verificada: las políticas
+de la base ya preguntan al motor. Trae su propio bloque de vuelta atrás.
+
+Migración `0014_fix_can.sql` — **arreglo**: `can()` traía un caché por
+transacción que la rompía. Como la función declara `search_path` vacío,
+Postgres restaura las variables al salir, y una variable personalizada no
+vuelve a "no existe" sino a cadena vacía: desde la segunda llamada el
+caché se leía vacío y `can()` respondía que no a todo. Síntoma: el staff
+dejó de ver alumnas, membresías, reservas y pagos. El caché era una
+optimización, no parte de la corrección — con la llamada envuelta en
+`(select ...)` Postgres la resuelve igual una vez por consulta.
+
+Verificado con sesión real de admin después del arreglo: los KPIs del
+tablero vuelven a sus valores previos, y pasan marcar asistencia, cancelar
+una reserva, dar de baja un plan, leer datos de salud, guardar un
+parámetro y anular un pago (todo revertido después de probar).
+
+Falta: probar el portal de la alumna (cancelar una reserva es lo que
+ejercita la rama de aislamiento de la política restrictiva), tolerancia a
+fallo del bundle en `lib/api.ts`, unificar los chequeos del servidor, la
+pantalla de la matriz, y el encendido gradual. Después: baja lógica de usuarios, momento
 exacto del cobro en huso argentino y reorganización de Configuración.
 
 ## Estado general
