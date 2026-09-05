@@ -75,8 +75,21 @@ interface StudentRef {
 }
 
 export async function GET(request: Request) {
+  // Sin CRON_SECRET en producción el endpoint queda CERRADO, no abierto:
+  // dispara renovaciones, genera cuotas y manda emails a las alumnas, así
+  // que nadie de afuera tiene que poder invocarlo. Vercel manda el header
+  // solo si la variable está cargada — si el cron dejó de correr, es esto.
+  // En desarrollo local se puede llamar a mano sin secreto para probarlo.
   const secret = process.env.CRON_SECRET
-  if (secret && request.headers.get('authorization') !== `Bearer ${secret}`) {
+  const isProd = process.env.NODE_ENV === 'production'
+  if (!secret) {
+    if (isProd) {
+      return NextResponse.json(
+        { error: 'Falta CRON_SECRET: cargala en las variables de entorno' },
+        { status: 503 }
+      )
+    }
+  } else if (request.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
 
