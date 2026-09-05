@@ -15,6 +15,7 @@ import type {
   Profile,
   Role,
   Room,
+  ClassOccurrence,
   DisciplineItem,
   PaymentMethod,
   StudioSetting,
@@ -119,6 +120,8 @@ export interface StudioData {
   monthlyRevenue: MonthlyRevenue[]
   alerts: Alert[]
   rooms: Room[]
+  /** Excepciones por fecha: suspensiones y reemplazos (migración 0018) */
+  occurrences: ClassOccurrence[]
   /** Catálogo editable desde Configuración (migración 0011) */
   disciplines: DisciplineItem[]
   paymentMethods: PaymentMethod[]
@@ -192,6 +195,7 @@ export async function fetchStudioData(): Promise<StudioData> {
   let settings: Settings = {}
   let settingsMeta: StudioSetting[] = []
   let permisos: string[] = []
+  let occurrences: ClassOccurrence[] = []
   try {
     const [discRes, methodRes, settingsRes, permisosRes] = await Promise.all([
       supabase.from('disciplines').select('*').eq('active', true).order('sort_order').order('name'),
@@ -200,6 +204,27 @@ export async function fetchStudioData(): Promise<StudioData> {
       supabase.rpc('mis_permisos'),
     ])
     permisos = (permisosRes.data as string[] | null) ?? []
+
+    // Solo las de un rango corto alrededor de hoy: son excepciones, no
+    // hace falta traerse el historial entero.
+    const desde = addDays(localISO(), -30)
+    const hasta = addDays(localISO(), 60)
+    const occRes = await supabase
+      .from('class_occurrences')
+      .select('*, teachers(name)')
+      .gte('date', desde)
+      .lte('date', hasta)
+    occurrences = (occRes.data ?? []).map((o) => ({
+      id: o.id,
+      classId: o.class_id,
+      date: o.date,
+      status: o.status,
+      teacherId: o.teacher_id,
+      teacherName: (o.teachers as { name: string } | null)?.name ?? '',
+      startTime: o.start_time ? String(o.start_time).slice(0, 5) : null,
+      capacity: o.capacity,
+      reason: o.reason ?? '',
+    }))
     disciplines = (discRes.data ?? []).map((d) => ({
       id: d.id,
       name: d.name,
@@ -426,7 +451,7 @@ export async function fetchStudioData(): Promise<StudioData> {
 
   return {
     teachers, plans, students, memberships, classes, reservations, payments,
-    monthlyRevenue, alerts, rooms, disciplines, paymentMethods, permisos, denied, settings, settingsMeta,
+    monthlyRevenue, alerts, rooms, occurrences, disciplines, paymentMethods, permisos, denied, settings, settingsMeta,
     mpConfigured,
   }
 }
@@ -1336,5 +1361,51 @@ export async function clearUserPermission(userId: string, clave: string): Promis
     .delete()
     .eq('user_id', userId)
     .eq('clave', clave)
+  if (error) throw error
+}
+
+// ---------------------------------------------------------------
+// Excepciones por fecha (migración 0018)
+//
+// La fila existe solo cuando ese día se aparta de la norma. Volver a lo
+// normal es borrarla.
+// ---------------------------------------------------------------
+export async function suspendClassDate(
+  classId: string,
+  date: string,
+  reason: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('class_occurrences')
+    .upsert(
+      { class_id: classId, date, status: 'suspendida', reason: reason.trim() },
+      { onConflict: 'class_id,date' }
+    )
+  if (error) throw error
+}
+
+/** Reemplazo de profesora por un día. teacherId vacío quita el reemplazo. */
+export async function setClassDateTeacher(
+  classId: string,
+  date: string,
+  teacherId: string | null,
+  reason: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('class_occurrences')
+    .upsert(
+      { class_id: classId, date, status: 'normal', teacher_id: teacherId, reason: reason.trim() },
+      { onConflict: 'class_id,date' }
+    )
+  if (error) throw error
+}
+
+/** Saca la excepción: ese día vuelve a ser una clase común. */
+export async function clearClassDate(classId: string, date: string): Promise<void> {
+  const { error } = await supabase
+    .from('class_occurrences')
+    .delete()
+    .eq('class_id', classId)
+    .eq('date', date)
   if (error) throw error
 }

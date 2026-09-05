@@ -6,6 +6,23 @@ export type Role = 'admin' | 'recepcion' | 'profesor' | 'alumno'
  */
 export type Discipline = string
 
+/**
+ * Una clase en una fecha concreta, cuando ese día se aparta de la norma
+ * (migración 0018). Si no hay instancia, la clase corre como siempre.
+ */
+export interface ClassOccurrence {
+  id: string
+  classId: string
+  date: string
+  status: 'normal' | 'suspendida'
+  /** Quién la da ese día; vacío = la de siempre */
+  teacherId: string | null
+  teacherName: string
+  startTime: string | null
+  capacity: number | null
+  reason: string
+}
+
 /** Disciplina del catálogo (tabla disciplines, migración 0011). */
 export interface DisciplineItem {
   id: string
