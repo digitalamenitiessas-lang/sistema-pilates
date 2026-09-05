@@ -112,6 +112,9 @@ export interface Student {
   userId?: string | null
 }
 
+/** 'regular' se repite cada semana; 'especial' es un evento con su fecha. */
+export type ClassKind = 'regular' | 'especial'
+
 export interface ClassSession {
   id: string
   title: string
@@ -126,6 +129,17 @@ export interface ClassSession {
   waitlist: number
   room: string
   color: string
+  kind: ClassKind
+  /** Fecha del evento; vacío en las regulares (migración 0017) */
+  date: string
+  description: string
+  /** Nivel o público: "Inicial", "Embarazadas", "Mayores de 60" */
+  level: string
+  /** null = incluida en la membresía; con valor = se cobra aparte */
+  price: number | null
+  requirements: string
+  /** false = se muestra pero la alumna no la reserva sola */
+  bookable: boolean
 }
 
 export interface Reservation {
@@ -161,6 +175,8 @@ export interface Profile {
   fullName: string
   email: string
   role: Role
+  /** false = acceso dado de baja; el perfil se conserva (migración 0015) */
+  active: boolean
 }
 
 export interface Room {

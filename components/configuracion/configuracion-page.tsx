@@ -25,6 +25,8 @@ import {
   ShieldCheck,
   Info,
   Lock,
+  UserMinus,
+  RotateCcw,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
@@ -41,6 +43,7 @@ import {
   fetchProfiles,
   createSystemUser,
   deleteSystemUser,
+  reactivateSystemUser,
   updateUserRole,
   createDiscipline,
   updateDiscipline,
@@ -737,13 +740,30 @@ function UsersSection() {
   }
 
   const handleDelete = async (u: Profile) => {
-    if (!window.confirm(`¿Eliminar el usuario ${u.email}? Pierde el acceso al sistema.`)) return
+    if (
+      !window.confirm(
+        `¿Dar de baja el acceso de ${u.email}? No va a poder entrar más, pero se conserva todo lo que hizo: clases, asistencias y movimientos.`
+      )
+    )
+      return
     setBusyId(u.id)
     try {
       await deleteSystemUser(u.id)
       load()
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'No se pudo eliminar')
+      window.alert(err instanceof Error ? err.message : 'No se pudo dar de baja')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const handleReactivate = async (u: Profile) => {
+    setBusyId(u.id)
+    try {
+      await reactivateSystemUser(u.id)
+      load()
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'No se pudo reactivar')
     } finally {
       setBusyId(null)
     }
@@ -777,9 +797,14 @@ function UsersSection() {
           return (
             <div key={u.id} className="flex items-center gap-3 px-5 py-3.5 flex-wrap">
               <div className="flex-1 min-w-40">
-                <p className="text-sm font-semibold text-foreground truncate">
+                <p className={cn('text-sm font-semibold truncate', u.active ? 'text-foreground' : 'text-muted-foreground')}>
                   {u.fullName || u.email}
                   {isSelf && <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">Vos</span>}
+                  {!u.active && (
+                    <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                      Dado de baja
+                    </span>
+                  )}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">{u.email}</p>
               </div>
@@ -789,9 +814,9 @@ function UsersSection() {
                 <>
                   <select
                     value={u.role}
-                    disabled={busyId === u.id}
+                    disabled={busyId === u.id || !u.active}
                     onChange={(e) => handleRole(u, e.target.value as Role)}
-                    className="px-2.5 py-1.5 rounded-lg border border-border bg-background text-xs text-foreground outline-none focus:border-primary"
+                    className="px-2.5 py-1.5 rounded-lg border border-border bg-background text-xs text-foreground outline-none focus:border-primary disabled:opacity-50"
                   >
                     {Object.entries(ROLE_LABELS).map(([value, label]) => (
                       <option key={value} value={value}>
@@ -799,14 +824,27 @@ function UsersSection() {
                       </option>
                     ))}
                   </select>
-                  <button
-                    disabled={busyId === u.id}
-                    onClick={() => handleDelete(u)}
-                    className="w-8 h-8 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
-                    aria-label={`Eliminar ${u.email}`}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  {u.active ? (
+                    <button
+                      disabled={busyId === u.id}
+                      onClick={() => handleDelete(u)}
+                      className="w-8 h-8 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
+                      aria-label={`Dar de baja ${u.email}`}
+                      title="Dar de baja el acceso"
+                    >
+                      <UserMinus className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <button
+                      disabled={busyId === u.id}
+                      onClick={() => handleReactivate(u)}
+                      className="w-8 h-8 rounded-lg hover:bg-[#E8F2EB] flex items-center justify-center text-muted-foreground hover:text-[#2E6040] transition-colors disabled:opacity-50"
+                      aria-label={`Reactivar ${u.email}`}
+                      title="Reactivar el acceso"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </>
               )}
             </div>

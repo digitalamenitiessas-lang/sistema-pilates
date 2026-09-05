@@ -232,38 +232,39 @@ Propuesta de orden. Respeta las prioridades de la clienta, pero corregida por
 dependencias técnicas: hay cosas que si no van primero, obligan a rehacer lo que
 venga después.
 
-### Bloque 0 — La mesa de control  🔄 en curso
-Nada de esto se "ve" en pantallas nuevas, pero todo lo demás se apoya acá, y es
-lo que permite que el estudio ajuste sus reglas sin pedirnos un desarrollo.
+### Bloque 0 — Los cimientos  🔄 casi cerrado
+Nada de esto se "ve" como una función nueva, pero todo lo demás se apoya acá, y
+es lo que permite que el estudio ajuste sus reglas sin pedirnos un desarrollo.
 
-**Primer tramo — hecho (05/09/2026, migración `0011_configurable.sql`):**
+**Hecho y verificado contra la base real (05/09/2026):**
 
-- [x] **Parámetros del negocio configurables**: tabla `studio_settings` con 21
-      parámetros (plazos, anticipaciones, ventana de pago del 1 al 9, cuándo se
-      consume la clase) y su pantalla en Configuración. La pantalla se arma sola
-      con lo que trae la tabla: sumar un parámetro nuevo es un `INSERT`, no un
-      deploy.
-- [x] **Datos del estudio fuera del código**: nombre, dirección, mapa, WhatsApp,
-      Instagram, email y horarios salen de la base. La landing los lee de la vista
-      pública `public_studio_settings`, con respaldo a los valores actuales.
-- [x] **Catálogo de disciplinas** editable, con color y descripción, y renombrado
-      en cascada a clases, planes y profesoras. Reemplazó las seis constantes
-      duplicadas del código (agenda, planes, configuración, reservas, portal y
-      landing). Requisito explícito de la sección 1 del documento.
-- [x] **Catálogo de medios de pago** editable, base de los tres precios por plan
-      (Bloque 3) y de la caja diaria (Bloque 4).
-- [x] **El proceso diario lee los parámetros** en vez de sus constantes.
-- [x] **Arreglo**: un pago anulado ya no se cuenta como deuda en el tablero ni
-      dispara alertas.
+| | Migración |
+|---|---|
+| ✅ **21 parámetros del negocio configurables** — plazos, anticipaciones, ventana de pago del 1 al 9, cuándo se consume la clase. La pantalla se arma sola con lo que trae la tabla: sumar un parámetro es un `INSERT`, no un deploy | `0011` |
+| ✅ **Datos del estudio fuera del código** — nombre, dirección, mapa, WhatsApp, Instagram, email, horarios. La web los lee de una vista pública, con respaldo | `0011` |
+| ✅ **Catálogo de disciplinas** editable con color y descripción, con renombrado en cascada. Reemplazó seis constantes duplicadas en el código | `0011` |
+| ✅ **Catálogo de medios de pago** editable | `0011` |
+| ✅ **Motor de permisos** por rol y por persona: 71 claves, matriz configurable, excepciones por persona con vencimiento, bitácora, guardias anti auto-elevación e invariante de que nunca quede sin admin | `0012` |
+| ✅ **Las políticas de la base preguntan al motor** — 13 políticas reescritas, los `for all` abiertos en crear/editar/borrar, y el corte real de "anular movimientos" | `0013` |
+| ✅ **Pantalla de la matriz** de permisos en Configuración | — |
+| ✅ **El cron lee los parámetros** en vez de sus constantes | — |
 
-**Segundo tramo — pendiente:**
+**Arreglos que salieron del camino:**
 
-- [ ] **Permisos configurables** por rol y por persona, reemplazando los roles
-      fijos. Resuelve solo la pregunta de qué puede hacer la profesora.
-- [ ] **Auditoría "quién hizo qué"** en reservas, asistencias, cobros y anulaciones.
-- [ ] **Baja lógica de usuarios** en vez del borrado físico actual.
-- [ ] **Momento exacto del cobro** y día único en huso argentino, antes de la caja.
-- [ ] **Configuración reorganizada** para que soporte los 20 catálogos que vienen.
+- El cron diario quedaba abierto si faltaba su variable de entorno (`if (secret && ...)`). Ahora es fail-closed.
+- Las notas médicas se podían **perder en silencio**: la función que las guarda caía a una columna que la migración 0008 había eliminado y se tragaba el error, y además se guardaban vacías cada vez que alguien editaba la ficha sin traer ese campo.
+- Un pago anulado se contaba como deuda en el tablero.
+- El borrado de suscripciones push no filtraba por usuario.
+- `can()` traía un caché que la rompía (migración `0014`): la función declara `search_path` vacío, y al salir Postgres restaura las variables — pero una variable personalizada no vuelve a "no existe" sino a cadena vacía. Desde la segunda llamada el caché se leía vacío y respondía que no a todo.
+
+**Falta para cerrar el bloque — solo lo que depende del estudio:**
+
+- [ ] Probar el portal de la alumna: **cancelar una reserva** es lo que ejercita la rama de aislamiento de la política restrictiva nueva.
+- [x] **Unificar los chequeos del servidor** (05/09): los endpoints preguntan al motor con la misma clave que la pantalla, vía `lib/permisos-server.ts`. Antes verificaban el rol a mano, así que un permiso destildado desaparecía del navegador pero el endpoint lo seguía aceptando. De paso se cerró una filtración: `/api/mp/test` devuelve el alias y el email de la cuenta de Mercado Pago del estudio, y con el chequeo viejo recepción los veía sin tener acceso a las credenciales — ahora exige su propia clave.
+- [ ] Encendido gradual de los permisos, grupo por grupo, empezando por Catálogos.
+- [x] **Distinguir "sin acceso" de "vacío"** (05/09): las políticas devuelven cero filas cuando no hay permiso, no un error, así que un rol sin acceso al dinero veía un $0 que miente. El tablero ahora dice "Sin acceso". Además, el error de una tabla ya no tira la pantalla entera.
+- [x] **Baja lógica de accesos** (05/09, migración `0015`): se marca el perfil inactivo y se bloquea el ingreso, con reversión si una de las dos falla, y se puede reactivar. Antes se borraba la cuenta y el perfil se iba en cascada, contra lo que pide el documento.
+- [x] **Un solo "día" para el dinero** (05/09, migración `0016`): el cobro guarda el instante exacto y el día se deriva del huso del estudio. Antes se calculaba de cuatro maneras distintas según quién escribiera; para un arqueo de caja eso significa cobros en el cierre equivocado.
 
 ### Bloque 1 — Agenda y asistencias (prioridad 1 de la clienta, ≈ 3 semanas)
 - Clases especiales y talleres con fecha puntual; instancia de clase por fecha

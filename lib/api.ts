@@ -11,6 +11,7 @@ import type {
   AppNotification,
   MonthlyRevenue,
   Discipline,
+  ClassKind,
   Profile,
   Role,
   Room,
@@ -127,6 +128,13 @@ export interface StudioData {
    * Vacío mientras la migración no corrió.
    */
   permisos: string[]
+  /**
+   * Colecciones que este rol NO puede ver. Las políticas de la base
+   * devuelven cero filas cuando no hay permiso —no un error—, así que sin
+   * esto "no tenés acceso" y "todavía no hay nada" se ven igual: un $0 que
+   * miente. Las pantallas lo usan para decir cuál de las dos es.
+   */
+  denied: string[]
   /** Parámetros del negocio, listos para leer con settingNum/settingBool */
   settings: Settings
   /** Los mismos parámetros con su etiqueta y ayuda, para armar la pantalla */
@@ -148,10 +156,21 @@ export async function fetchStudioData(): Promise<StudioData> {
       supabase.from('monthly_revenue').select('*'),
     ])
 
-  const firstError =
-    teachersRes.error || plansRes.error || studentsRes.error || membershipsRes.error ||
-    classesRes.error || reservationsRes.error || paymentsRes.error || revenueRes.error
-  if (firstError) throw firstError
+  // Antes acá había un throw con el primer error, y eso convertía el
+  // problema de UNA tabla en la pantalla de error total. Ahora cada
+  // colección aporta lo que pudo traer y el resto sigue andando.
+  const fallaron = [
+    ['teachers', teachersRes], ['plans', plansRes], ['students', studentsRes],
+    ['memberships', membershipsRes], ['classes', classesRes],
+    ['reservations', reservationsRes], ['payments', paymentsRes],
+    ['monthlyRevenue', revenueRes],
+  ].filter(([, r]) => (r as { error: unknown }).error).map(([k]) => k as string)
+
+  // Si falló TODO, no es un problema de permisos: es la sesión o la
+  // conexión, y ahí sí conviene el cartel de error.
+  if (fallaron.length === 8) {
+    throw (teachersRes.error ?? new Error('No se pudieron cargar los datos'))
+  }
 
   // Datos sensibles de la ficha (tabla aparte desde 0008; RLS: staff y la
   // propia alumna). Para el profesor viene vacío; si la migración no corrió
@@ -213,6 +232,27 @@ export async function fetchStudioData(): Promise<StudioData> {
     // sin catálogos: valores por defecto
   }
   const warningDays = settingNum(settings, 'expiry_warning_days', EXPIRY_WARNING_DAYS)
+
+  // Qué clave gobierna cada colección (migración 0013). Se deriva del
+  // permiso y no del resultado vacío, porque una tabla sin filas y una
+  // tabla vedada llegan igual.
+  const CLAVE_POR_COLECCION: Record<string, string> = {
+    students: 'alumnos.ver',
+    memberships: 'membresias.ver',
+    reservations: 'reservas.ver',
+    payments: 'finanzas.ver',
+    monthlyRevenue: 'finanzas.ver',
+  }
+  const denied = permisos.length
+    ? [
+        ...new Set([
+          ...Object.entries(CLAVE_POR_COLECCION)
+            .filter(([, clave]) => !permisos.includes(clave))
+            .map(([coleccion]) => coleccion),
+          ...fallaron,
+        ]),
+      ]
+    : fallaron
 
   const teachers: Teacher[] = (teachersRes.data ?? []).map((t) => ({
     id: t.id,
@@ -301,7 +341,9 @@ export async function fetchStudioData(): Promise<StudioData> {
   const weekStart = mondayOf()
   const weekEnd = addDays(weekStart, 6)
   const classes: ClassSession[] = (classesRes.data ?? []).map((c) => {
-    const classDate = addDays(weekStart, c.day_of_week)
+    // Las especiales tienen su propia fecha; las regulares caen en el día
+    // de la semana que les toca (migración 0017).
+    const classDate = c.date ?? addDays(weekStart, c.day_of_week)
     const ofWeek = reservations.filter(
       (r) => r.classId === c.id && r.date >= weekStart && r.date <= weekEnd
     )
@@ -319,6 +361,13 @@ export async function fetchStudioData(): Promise<StudioData> {
       waitlist: ofWeek.filter((r) => r.status === 'lista de espera').length,
       room: c.room,
       color: c.color ?? '#C4735A',
+      kind: (c.kind ?? 'regular') as ClassSession['kind'],
+      date: c.date ?? '',
+      description: c.description ?? '',
+      level: c.level ?? '',
+      price: c.price === null || c.price === undefined ? null : Number(c.price),
+      requirements: c.requirements ?? '',
+      bookable: c.bookable ?? true,
       // fecha concreta de esta clase en la semana actual (para reservar)
       weekDate: classDate,
     } as ClassSession & { weekDate: string }
@@ -377,7 +426,7 @@ export async function fetchStudioData(): Promise<StudioData> {
 
   return {
     teachers, plans, students, memberships, classes, reservations, payments,
-    monthlyRevenue, alerts, rooms, disciplines, paymentMethods, permisos, settings, settingsMeta,
+    monthlyRevenue, alerts, rooms, disciplines, paymentMethods, permisos, denied, settings, settingsMeta,
     mpConfigured,
   }
 }
@@ -569,7 +618,9 @@ export async function registerPayment(input: NewPaymentInput): Promise<number> {
       concept: input.concept,
       amount: input.amount,
       due_date: localISO(),
-      paid_date: localISO(),
+      // El día lo deriva la base del instante, en el huso del estudio
+      // (migración 0016). Una sola definición de "día" para todos.
+      paid_at: new Date().toISOString(),
       status: 'pagado',
       method: input.method,
     })
@@ -586,7 +637,7 @@ export async function collectPayment(
 ): Promise<number> {
   const { data, error } = await supabase
     .from('payments')
-    .update({ status: 'pagado', method, paid_date: localISO() })
+    .update({ status: 'pagado', method, paid_at: new Date().toISOString() })
     .eq('id', paymentId)
     .select()
     .single()
@@ -950,6 +1001,28 @@ export interface ClassInput {
   capacity: number
   room: string
   color: string
+  kind?: ClassKind
+  /** Fecha del evento; solo para las especiales (migración 0017) */
+  date?: string | null
+  description?: string
+  level?: string
+  price?: number | null
+  requirements?: string
+  bookable?: boolean
+}
+
+/** Las columnas de 0017 se mandan solo si vienen, así el alta sigue
+ *  funcionando aunque la migración todavía no haya corrido. */
+function classExtras(input: ClassInput): Record<string, unknown> {
+  const extras: Record<string, unknown> = {}
+  if (input.kind !== undefined) extras.kind = input.kind
+  if (input.date !== undefined) extras.date = input.date || null
+  if (input.description !== undefined) extras.description = input.description
+  if (input.level !== undefined) extras.level = input.level
+  if (input.price !== undefined) extras.price = input.price
+  if (input.requirements !== undefined) extras.requirements = input.requirements
+  if (input.bookable !== undefined) extras.bookable = input.bookable
+  return extras
 }
 
 function classRow(input: ClassInput) {
@@ -963,6 +1036,7 @@ function classRow(input: ClassInput) {
     capacity: input.capacity,
     room: input.room,
     color: input.color,
+    ...classExtras(input),
   }
 }
 
@@ -988,7 +1062,9 @@ export async function deactivateClassSession(id: string): Promise<void> {
 export async function fetchProfiles(): Promise<Profile[]> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, full_name, role, email')
+    // select('*') y no una lista de columnas: así no se rompe si la
+    // migración 0015 (columna active) todavía no corrió.
+    .select('*')
     .order('created_at')
   if (error) throw error
   return (data ?? []).map((p) => ({
@@ -996,6 +1072,8 @@ export async function fetchProfiles(): Promise<Profile[]> {
     fullName: p.full_name,
     email: p.email ?? '',
     role: p.role as Role,
+    // Si la migración 0015 no corrió todavía, todos figuran activos
+    active: p.active ?? true,
   }))
 }
 
@@ -1055,6 +1133,20 @@ export async function fetchWeekOccupancy(weekStart: string): Promise<Map<string,
   return map
 }
 
+export async function reactivateSystemUser(userId: string): Promise<void> {
+  const { data } = await supabase.auth.getSession()
+  const res = await fetch('/api/admin/users', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${data.session?.access_token ?? ''}`,
+    },
+    body: JSON.stringify({ userId }),
+  })
+  if (!res.ok) throw new Error((await res.json()).error ?? 'No se pudo reactivar')
+}
+
+/** Da de baja el acceso: el perfil se conserva y el login queda bloqueado. */
 export async function deleteSystemUser(userId: string): Promise<void> {
   await adminApi({ userId }, 'DELETE')
 }

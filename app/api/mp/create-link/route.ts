@@ -1,17 +1,13 @@
 import { NextResponse } from 'next/server'
-import { getMpAccessToken, mpFetch, requireStaff, supabaseAdmin, supabaseForRequest } from '@/lib/mp-server'
+import { getMpAccessToken, mpFetch, supabaseAdmin } from '@/lib/mp-server'
+import { esDenegado, exigir } from '@/lib/permisos-server'
 
 // Genera un link de pago (Checkout Pro) para un pago pendiente.
 // external_reference = uuid del pago interno, para poder acreditarlo después.
 export async function POST(request: Request) {
-  const supabase = supabaseForRequest(request)
-  if (!supabase) {
-    return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-  }
-  const denied = await requireStaff(supabase)
-  if (denied) {
-    return NextResponse.json({ error: denied }, { status: 403 })
-  }
+  const caller = await exigir(request, 'pagos.link_mp')
+  if (esDenegado(caller)) return caller.error
+  const supabase = caller.supabase
 
   const { paymentId } = await request.json().catch(() => ({}))
   if (!paymentId) {
