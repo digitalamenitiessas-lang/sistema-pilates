@@ -1442,17 +1442,28 @@ export async function suspendClassDate(
   if (error) throw error
 }
 
-/** Reemplazo de profesora por un día. teacherId vacío quita el reemplazo. */
+/**
+ * Reemplazo de profesora por un día. teacherId nulo quita el reemplazo.
+ *
+ * Manda SOLO su propia columna. Antes mandaba también status 'normal' y
+ * reason, y como el upsert pisa cada columna que viaja en el cuerpo, poner
+ * un reemplazo sobre una fecha suspendida la desuspendía en silencio —la
+ * clase volvía a aceptar reservas sin que nadie se enterara— y le escribía
+ * 'Reemplazo' encima del motivo que la alumna lee en el portal.
+ *
+ * Al crear la fila, status toma el default 'normal' de la tabla (0018); al
+ * actualizarla, queda el que ya tenía. Para volver a dictar una fecha
+ * suspendida está clearClassDate, que es explícito.
+ */
 export async function setClassDateTeacher(
   classId: string,
   date: string,
-  teacherId: string | null,
-  reason: string
+  teacherId: string | null
 ): Promise<void> {
   const { error } = await supabase
     .from('class_occurrences')
     .upsert(
-      { class_id: classId, date, status: 'normal', teacher_id: teacherId, reason: reason.trim() },
+      { class_id: classId, date, teacher_id: teacherId },
       { onConflict: 'class_id,date' }
     )
   if (error) throw error
