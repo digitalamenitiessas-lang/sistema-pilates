@@ -67,9 +67,19 @@ export function TomarAsistencia({
       // devuelve: marcar por error no le puede costar una clase a la
       // alumna. Si la ausencia también consume, lo define el estudio desde
       // Configuración y esa regla se muda a la base.
-      if (estado === 'asistió' && r.status !== 'asistió') await markAttendance(r)
-      else if (r.status === 'asistió' && estado !== 'asistió') await undoAttendance(r)
-      else await updateReservationStatus(r.id, estado)
+      if (estado === 'asistió' && r.status !== 'asistió') {
+        await markAttendance(r)
+      } else if (r.status === 'asistió') {
+        // Salir de "presente" devuelve la clase, pero el estado que queda es
+        // el que se pidió. Antes se delegaba entero en undoAttendance, que
+        // fuerza 'confirmada': tocar "ausente" sobre una presente devolvía
+        // la clase y dejaba a la alumna otra vez en "faltan marcar", así que
+        // la profesora la marcaba de nuevo y no entendía por qué no quedaba.
+        await undoAttendance(r)
+        if (estado !== 'confirmada') await updateReservationStatus(r.id, estado)
+      } else {
+        await updateReservationStatus(r.id, estado)
+      }
       await refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo marcar')

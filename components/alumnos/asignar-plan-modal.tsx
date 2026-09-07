@@ -15,7 +15,15 @@ interface AsignarPlanModalProps {
 export function AsignarPlanModal({ student, onClose }: AsignarPlanModalProps) {
   const { data, refresh } = useData()
   const plans = data?.plans ?? []
-  const [planId, setPlanId] = useState(student.membership?.planId ?? '')
+  const settings = data?.settings ?? {}
+  // Solo se preselecciona el plan actual si sigue estando entre los activos.
+  // Si se dio de baja —que es lo que va a pasar con los planes de demo— el
+  // botón quedaba habilitado apuntando a un id que la base rechaza, y el
+  // error recién aparecía al guardar.
+  const [planId, setPlanId] = useState(() => {
+    const actual = student.membership?.planId
+    return actual && plans.some((p) => p.id === actual) ? actual : ''
+  })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -24,7 +32,7 @@ export function AsignarPlanModal({ student, onClose }: AsignarPlanModalProps) {
     setSaving(true)
     setError(null)
     try {
-      await assignMembership(student.id, planId, plans)
+      await assignMembership(student.id, planId, plans, settings)
       await refresh()
       onClose()
     } catch (err) {
@@ -92,12 +100,21 @@ export function AsignarPlanModal({ student, onClose }: AsignarPlanModalProps) {
             </button>
           ))}
 
+          {plans.length === 0 && (
+            <p className="text-sm text-muted-foreground bg-muted rounded-xl px-3 py-3 text-center">
+              No hay planes activos para asignar. Creá uno en Planes, o reactivá
+              alguno de los que están dados de baja.
+            </p>
+          )}
+
           {error && (
             <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
           )}
-          <p className="text-[11px] text-muted-foreground pt-1">
-            La membresía arranca hoy. Si el plan tiene precio, la deuda queda generada en Pagos para cobrarla.
-          </p>
+          {plans.length > 0 && (
+            <p className="text-[11px] text-muted-foreground pt-1">
+              La membresía arranca hoy. Si el plan tiene precio, la deuda queda generada en Pagos para cobrarla.
+            </p>
+          )}
         </div>
 
         <div className="flex gap-3 px-6 py-4 border-t border-border shrink-0">

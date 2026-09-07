@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData } from '@/lib/data-context'
-import { localISO } from '@/lib/api'
+import { hoyISO } from '@/lib/api'
 import {
   abrirCaja,
   cerrarCaja,
@@ -229,7 +229,7 @@ function MovimientoModal({
   const [hacia, setHacia] = useState('')
   const [monto, setMonto] = useState('')
   const [concepto, setConcepto] = useState('')
-  const [dia, setDia] = useState(localISO())
+  const [dia, setDia] = useState(hoyISO())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -382,7 +382,7 @@ export function CajaPage() {
 
   // La caja arqueable: es la que se cuenta con la mano.
   const cajaPrincipal = useMemo(() => saldos.find((s) => s.arquea) ?? null, [saldos])
-  const hoy = localISO()
+  const hoy = hoyISO()
 
   const cargar = useCallback(async () => {
     setError(null)

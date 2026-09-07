@@ -211,24 +211,91 @@ liberación de lugares y anticipación de cada recordatorio.
 Lo mismo vale para la estética: tipografía, textos y fotos se cargan cuando la
 clienta los tenga, sin frenar la lógica.
 
-## 7. Preguntas para la clienta
+## 7. Lo que la clienta contestó (06/09/2026)
 
-Las cinco preguntas de forma quedaron respondidas del lado nuestro (§6) salvo las
-que dependen del estudio. El mensaje enviado a la clienta el 05/09/2026 pide:
+Contestó las 20 preguntas y mandó **"Casa Fé — Membresías y Condiciones"**, seis
+páginas de política del estudio. El texto está en
+[`casa-fe-membresias-y-condiciones.txt`](casa-fe-membresias-y-condiciones.txt) y
+el cruce completo contra el código, con evidencia archivo:línea, en
+[`casa-fe-impacto-de-las-respuestas.md`](casa-fe-impacto-de-las-respuestas.md).
 
-1. **Alcance**: confirmar que arrancamos por agenda, membresías, cobros y ficha, y
-   que inventario, sueldos y marketing van a segunda etapa.
-2. **Horarios fijos**: qué pasa en un mes con cinco lunes — ¿esa quinta clase entra
-   en el plan o queda afuera?
-3. **Cuándo se descuenta la clase**: al reservar o al venir, y si la ausencia sin
-   aviso la consume.
-4. **Vigencia contra horario fijo**: si la membresía vence el 20 y ya pagó del 1 al
-   9 para el mes siguiente, qué pasa con sus horarios fijos del 21 al 31.
-5. **Profesoras**: si tienen que poder tomar asistencia desde el celular, anotar a
-   una alumna que llega sin reserva y ver lesiones o limitaciones.
+### Lo que quedó decidido
 
-El resto (plazos, anticipaciones, precios, disciplinas, textos, fotos, tipografía)
-lo carga ella misma cuando lo tenga: son parámetros, no desarrollo.
+| Tema | Decisión | Dónde vive |
+|---|---|---|
+| Cuándo se descuenta la clase | **Al reservar** | `class_consumption = 'reserva'` |
+| Faltar sin avisar | **Pierde la clase** | `absence_consumes_class = true` |
+| Plazo de cancelación | **3 horas** | `cancel_hours = 3` |
+| Recuperos | **2 por mes, dentro del mes**, sujetos a disponibilidad | `recoveries_per_month = 2` (nueva) |
+| El mes | **4 semanas.** El quinto lunes no suma clase | `weeks_per_month = 4` (nueva) |
+| Precios | Transferencia base, **efectivo −5%, tarjeta +25%** (hasta 3 cuotas) | `payment_methods.ajuste_pct` (nueva) |
+| Lista de espera | **Se avisa a todas**, la primera que confirma se lo lleva | — |
+| Sin reserva | Si hay lugar, **toma la clase** | `override_by` / `override_reason` (ya están, 0022) |
+| Asistencia | La tildan **profesora y encargada**, una por una | Ya está |
+| Lesiones | **La profesora las ve** | Partir `student_private` en dos niveles |
+| Horario fijo | **Se pierde al vencer sin pagar**; renovar después no garantiza recuperarlo | `slot_release_day = 10` |
+| Caja | **Cierra por día**, controla efectivo, transferencia y tarjetas | Ya está (0020) |
+| Disciplinas | **Tres**: Reformer, Embarazadas, 3ra Edad | Catálogo (0011) |
+| Planes | **Seis FE**, por frecuencia semanal | `plans.weekly_frequency` (nueva) |
+| Cómo se llaman | **"Clientes"** en pantalla, `students` en la base | Género por definir |
+
+**El precio no son tres números, son dos porcentajes.** Verificado sobre las seis
+filas del documento: efectivo es exactamente base × 0,95 y tarjeta base × 1,25,
+sin una sola excepción. Se modela como precio base más un porcentaje por medio de
+pago — el día que cambie el descuento se toca un número, no doce.
+
+### Lo que contradice algo ya construido
+
+- **La lista de espera de la 0022 modela el producto equivocado.** El estado
+  `'ofrecida'`, la columna `offer_expires_at` y el parámetro
+  `waitlist_offer_minutes` suponen una oferta secuencial con reloj. Con "avisar a
+  todas" eso sobra. Y el comentario de `0022:71-74` **está mal**: afirma que la
+  alumna podría confirmar desde el portal, y no puede — su única política
+  permisiva de update es `"alumno cancela"` (`0005:78`), con
+  `with check (status = 'cancelada')`. La restrictiva de `0013:264` solo resta
+  permiso, nunca lo otorga. Sin una política nueva, "la primera que confirma
+  gana" no se puede ejecutar.
+- **Suspender una fecha pasa de correcto a cobro indebido.** Hoy la pantalla dice
+  "decidí si les devolvés la clase" porque nadie descuenta al reservar. Cuando el
+  consumo sea al reservar, suspender sin devolver le cobra la clase a la alumna
+  por algo que decidió el estudio — y el documento (§12) dice explícitamente que
+  no la pierde.
+- **Los seis planes y las seis disciplinas sembradas son de demo** y no se parecen
+  a los de ella. Desactivarlos toca la renovación automática y el respaldo de la
+  landing.
+
+### Lo que sigue abierto
+
+**Bloquea de verdad:** la **vigencia de la membresía** (§4 del documento, marcada
+"PENDIENTE DE CONFIRMACIÓN"). De ella cuelgan las clases que vencen (§5), la
+ventana de recupero (§7), la reposición cuando cancela el estudio (§12) y la
+pregunta 11. Hoy corre desde la asignación por N días, y eso choca con el ciclo
+de cobro del 1 al 9: son dos relojes distintos.
+
+**No bloquea, se puede parametrizar:** congelamiento (§9), feriados (§13), el
+redondeo de precios, la ventana del 21 al 31 (P11) y qué significa "facturado"
+(P18). Promociones (§15) queda fuera del alcance.
+
+**Las preguntas 14 y 15 no se entendieron, y la culpa es nuestra.** La 15 hablaba
+de alumnas "por recuperar", y en este proyecto *recuperar* significa dos cosas:
+recuperar una clase perdida y recuperar una alumna que dejó de venir. La colisión
+está escrita en la base: `recovery_after_days` tiene por etiqueta
+`'Pasa a "por recuperar" (días)'` (`0011:106`). **"Recuperar" queda reservado para
+la clase perdida en toda la interfaz**, y ese parámetro se renombra.
+
+### Las siete preguntas que faltan
+
+Congelar la membresía · las clientas que dejaron de venir · desde cuándo y hasta
+cuándo vale una membresía · la tarjeta por Mercado Pago (el recargo y el tope de
+cuotas) · el género de "clienta" · si un plan combina disciplinas · el redondeo de
+precios. Redactadas en castellano llano en
+[`casa-fe-impacto-de-las-respuestas.md`](casa-fe-impacto-de-las-respuestas.md), §6.
+
+### El alcance que definió Matías
+
+Terminar lo que hay, y de lo nuevo **solo Personal y remuneraciones**. Afuera:
+promociones, cupones, beneficios, gift cards, productos e inventario. **Reportes
+ya está hecho** (migración `0021`).
 
 ## 8. Cómo arrancamos
 
@@ -388,19 +455,86 @@ $1.793.000 — los tres totales cuadran entre sí y con el tablero.
 **Falta, cuando existan los módulos que los alimentan:** reportes de personal y
 remuneraciones, y de inventario y ventas de mostrador.
 
-### Después, según lo que decida la clienta
-- **Comercial** (cupones, beneficios, gift cards, promociones): ≈ 4 semanas.
-- **Personal y remuneraciones** (prioridad 6): ≈ 4 semanas.
-- **Inventario y mostrador** (prioridad 7): ≈ 5 semanas.
-- **Landing administrable y email marketing**: el documento mismo los admite como
-  segunda etapa; ≈ 5 semanas.
+### El orden corregido con las respuestas (06/09/2026)
 
-### Lo primero, esta semana
-1. Pasarle a la clienta las **7 preguntas bloqueantes** de §7 y la conversación de
-   alcance: si las 10 prioridades entran en la primera versión o cortamos.
-2. Con esas respuestas, cerrar las **8 decisiones estructurales** de §6.
-3. Arrancar el **Bloque 0**, que no depende de ninguna respuesta y destraba todo lo
-   demás.
+Reemplaza al plan por bloques de arriba, que se armó cuando faltaban las
+respuestas. Lo de más abajo se apoya en lo de más arriba: cambiarlo de orden
+obliga a rehacer. El detalle con evidencia archivo:línea está en
+[`casa-fe-impacto-de-las-respuestas.md`](casa-fe-impacto-de-las-respuestas.md), §5.
+
+**Paso 0 — Los arreglos previos.** Se lleva las migraciones `0023`
+(el tipo de aviso `renovacion_omitida`) y `0024` (marcar los parámetros que
+todavía no rigen), así que el resto corre dos números más abajo de lo que
+decía el plan original. Bugs vivos y trampas que se despiertan con lo
+de abajo. Ninguno depende de la clienta.
+
+- El `continue` mudo del cron sobre un plan inactivo
+  (`app/api/cron/diario/route.ts:148`) tiene que dejar rastro. **Bloqueante para
+  sembrar los planes FE**: desactivar los viejos apagaría la renovación de todas
+  en silencio.
+- `tomar-asistencia.tsx:71` — pasar de presente a ausente deja `'confirmada'`.
+- **El fallback de la campana** (`notifications-bell.tsx:19-44`): tres mapas de
+  seis claves escritos a mano. Un tipo desconocido deja el icono en `undefined` y
+  React tira la campana entera. Se arregla **antes** del primer aviso de lista de
+  espera. Ya hay tres tipos de caja permitidos por el CHECK y no emitidos por
+  esto.
+- `lib/api.ts:627` usa 5 días fijos en vez de `payment_grace_days`.
+- `localISO()` (`lib/api.ts:30`) usa el reloj del navegador; la vigencia tiene que
+  derivar el día del huso del estudio, como la plata desde la `0016`.
+- Marcar en pantalla como pendientes los parámetros que **nadie lee todavía**
+  (`class_consumption`, `absence_consumes_class`, `cancel_hours`,
+  `waitlist_offer_minutes`), con el criterio de los permisos en sombra. Son once
+  en total los declarados sin código.
+
+**Paso 1 — Catálogo: disciplinas, planes y el renombre** (`0025`). Las tres
+disciplinas con renombrado en cascada hecho en SQL, los seis planes FE con
+`weekly_frequency`, y el vocabulario. El renombre a "Clientes" va en su propio
+commit, después de la respuesta de género.
+
+**Paso 2 — El consumo de la clase, en la base** (`0026`). El corazón del cambio:
+redefine qué significa una reserva. Trigger que descuenta al insertar y sella
+`membership_id`; clasificación de la cancelación contra `cancel_hours`;
+devolución al suspender una fecha con `cancel_kind = 'suspendida por el estudio'`;
+tope de recuperos; la excepción autorizada. Corte limpio, **sin backfill**: el
+camino de asistencia descuenta solo si `membership_id is null`.
+
+**Paso 3 — Los precios** (`0027`). `payment_methods.ajuste_pct`, el recálculo en
+el modal de cobro, y la invalidación del link de Mercado Pago cuando cambia el
+monto.
+
+**Paso 4 — Lista de espera y avisos** (`0028`). Borrar lo que sobra de la 0022,
+**la política permisiva nueva** para que la alumna confirme, el registro de a
+quién se le avisó, y encender el canal hacia la alumna: `pushToUser`
+(`lib/push-server.ts:65`) está escrita y **sin un solo llamador**, y el email por
+Resend ya anda en producción. El cron diario no alcanza: una cancelación a 3
+horas del plazo hay que avisarla en minutos.
+
+**Paso 5 — Feriados y suspensión masiva.** Hoy un lunes feriado con 8 clases son
+8 clics.
+
+**Paso 6 — Vigencia y horarios fijos.** Acá entra la respuesta que falta.
+
+**Paso 7 — Congelamiento y ausencias prolongadas.** Solo si la respuesta es sí.
+Se construyen juntos o ninguno: §8 y §9 del documento son dos respuestas a la
+misma situación.
+
+**Paso 8 — Cambio de plan desde la app.** Necesita el prorrateo, y separar
+"cambiar plan" de "renovar", que hoy son el mismo botón
+(`ficha-alumno.tsx:552-566`).
+
+**Paso 9 — Cerrar lo pendiente de bloques anteriores.** Foto del comprobante de
+gasto, avisos de caja, cambio de horario por fecha, y el encendido gradual de
+permisos.
+
+**Paso 10 — Personal y remuneraciones.** Lo único nuevo del alcance. Hoy
+`teachers` no tiene una sola columna laboral. Dos criterios de la casa aplican de
+entrada: los sueldos van en `teacher_private` —RLS filtra filas, no columnas— y
+la liquidación se **deriva** de las horas y las condiciones vigentes, no se copia
+a una tabla que se desincroniza. Va último porque no bloquea nada, y el reporte
+que lo acompaña ya tiene su molde en la `0021`.
+
+**Fuera del alcance:** promociones, cupones, beneficios, gift cards, productos e
+inventario.
 
 ## 9. Lo que este análisis no cubre
 

@@ -71,6 +71,13 @@ export interface StudioSetting {
   isPublic: boolean
   /** Solo el admin lo cambia; recepción lo ve en modo lectura */
   soloAdmin: boolean
+  /**
+   * false = la fila existe y todavía no hay código que la lea (0024). La
+   * pantalla lo avisa, con el mismo criterio que los permisos en sombra:
+   * se puede dejar armado, pero no rige. Por defecto true, para que el
+   * sistema siga andando igual si la migración no corrió.
+   */
+  rige: boolean
 }
 
 export type MembershipStatus = 'activa' | 'vencida' | 'por vencer' | 'suspendida'
@@ -94,6 +101,8 @@ export interface Plan {
   name: string
   price: number
   classCount: number
+  /** Veces por semana (0025). 0 = no aplica, como el pase de un día. */
+  weeklyFrequency: number
   durationDays: number
   disciplines: Discipline[]
   description: string
@@ -221,6 +230,13 @@ export interface Alert {
   date?: string
 }
 
+/**
+ * Los tipos de aviso a los que la campana les da icono, color y destino
+ * propios. La lista de verdad NO es esta: es el CHECK de `notifications`
+ * (0007, ampliado en la 0010 y otra vez en la 0020), y la base se migra a
+ * mano, sin desplegar el front. Por eso estar acá es una mejora sobre el
+ * genérico, no un requisito: un tipo que falte se dibuja igual.
+ */
 export type NotificationType =
   | 'pago_acreditado'
   | 'nuevo_alumno'
@@ -228,11 +244,24 @@ export type NotificationType =
   | 'membresia_vencida'
   | 'deuda_vencida'
   | 'membresia_renovada'
+  // Los tres de caja los admite el CHECK desde la 0020 y todavía no los
+  // emite nadie: quedan listos para el día que el cron los mande.
+  | 'caja_sin_cerrar'
+  | 'caja_diferencia'
+  | 'saldo_sin_imputar'
+  | 'renovacion_omitida'
 
 /** Notificación persistida (tabla notifications, migración 0007). */
 export interface AppNotification {
   id: string
-  type: NotificationType
+  /**
+   * Texto plano y no la unión de arriba, a propósito. Tiparlo como unión
+   * era prometer una exhaustividad que solo la base puede garantizar, y esa
+   * promesa terminaba en pantalla como un icono `undefined` que tira el
+   * árbol de React entero. Quien lo dibuja resuelve con `estiloDeAviso()`,
+   * que nunca devuelve nada vacío.
+   */
+  type: string
   title: string
   body: string
   studentId?: string | null

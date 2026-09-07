@@ -1,7 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Bell, BellRing, BellOff, CreditCard, UserPlus, CalendarClock, AlertTriangle, Loader2, Smartphone, RefreshCw } from 'lucide-react'
+import {
+  Bell, BellRing, BellOff, CreditCard, UserPlus, CalendarClock, AlertTriangle,
+  Loader2, Smartphone, RefreshCw, RefreshCwOff, Wallet, Scale, Coins,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useData } from '@/lib/data-context'
@@ -16,32 +19,62 @@ import {
 import type { AppNotification, NotificationType } from '@/lib/types'
 import type { PageKey } from './sidebar'
 
-const TYPE_ICON: Record<NotificationType, React.ComponentType<{ className?: string }>> = {
-  pago_acreditado: CreditCard,
-  nuevo_alumno: UserPlus,
-  membresia_por_vencer: CalendarClock,
-  membresia_vencida: AlertTriangle,
-  deuda_vencida: AlertTriangle,
-  membresia_renovada: RefreshCw,
+/** Cómo se dibuja un aviso: icono, color de la pastilla y a dónde lleva. */
+interface EstiloAviso {
+  Icon: React.ComponentType<{ className?: string }>
+  color: string
+  page: PageKey
 }
 
-const TYPE_COLOR: Record<NotificationType, string> = {
-  pago_acreditado: 'bg-[#E8F2EB] text-[#2E6040]',
-  nuevo_alumno: 'bg-primary/10 text-primary',
-  membresia_por_vencer: 'bg-amber-100 text-amber-700',
-  membresia_vencida: 'bg-red-100 text-red-700',
-  deuda_vencida: 'bg-red-100 text-red-700',
-  membresia_renovada: 'bg-[#E8F2EB] text-[#2E6040]',
+/**
+ * El genérico: lo que se muestra cuando el tipo no se reconoce. Existe
+ * porque antes esto eran tres mapas sueltos y un tipo ausente devolvía
+ * `undefined` en los tres. El icono `undefined` no rompía el aviso: tiraba
+ * el árbol de React, o sea la campana, el header y la pantalla entera, y
+ * como no hay error boundary había que recargar — y volvía a explotar al
+ * primer clic, porque la fila seguía ahí.
+ *
+ * La base admite tipos que esta versión del código puede no conocer: se
+ * migra a mano y el front se despliega aparte. No reconocer uno tiene que
+ * ser aburrido, no fatal.
+ */
+const GENERICO: EstiloAviso = {
+  Icon: Bell,
+  color: 'bg-muted text-muted-foreground',
+  page: 'dashboard',
 }
 
-/** A qué pantalla lleva cada tipo de notificación al tocarla. */
-const TYPE_PAGE: Record<NotificationType, PageKey> = {
-  pago_acreditado: 'pagos',
-  nuevo_alumno: 'alumnos',
-  membresia_por_vencer: 'alumnos',
-  membresia_vencida: 'alumnos',
-  deuda_vencida: 'pagos',
-  membresia_renovada: 'alumnos',
+/**
+ * Un estilo por tipo conocido. Sigue declarado contra `NotificationType`
+ * para que el compilador avise si se suma un tipo a la unión y se olvida el
+ * estilo — pero ahora olvidarlo cuesta un icono feo, no la campana.
+ */
+const ESTILOS: Record<NotificationType, EstiloAviso> = {
+  pago_acreditado:      { Icon: CreditCard,    color: 'bg-[#E8F2EB] text-[#2E6040]', page: 'pagos' },
+  nuevo_alumno:         { Icon: UserPlus,      color: 'bg-primary/10 text-primary',  page: 'alumnos' },
+  membresia_por_vencer: { Icon: CalendarClock, color: 'bg-amber-100 text-amber-700', page: 'alumnos' },
+  membresia_vencida:    { Icon: AlertTriangle, color: 'bg-red-100 text-red-700',     page: 'alumnos' },
+  deuda_vencida:        { Icon: AlertTriangle, color: 'bg-red-100 text-red-700',     page: 'pagos' },
+  membresia_renovada:   { Icon: RefreshCw,     color: 'bg-[#E8F2EB] text-[#2E6040]', page: 'alumnos' },
+  caja_sin_cerrar:      { Icon: Wallet,        color: 'bg-amber-100 text-amber-700', page: 'caja' },
+  caja_diferencia:      { Icon: Scale,         color: 'bg-red-100 text-red-700',     page: 'caja' },
+  saldo_sin_imputar:    { Icon: Coins,         color: 'bg-amber-100 text-amber-700', page: 'caja' },
+  // El par de RefreshCw: la renovación que no fue. Lleva a Planes y no a
+  // Alumnos porque lo que hay que arreglar es el plan apagado, no la ficha.
+  // Ámbar y no rojo: no se rompió nada, hay algo mal configurado.
+  renovacion_omitida:   { Icon: RefreshCwOff,  color: 'bg-amber-100 text-amber-700', page: 'planes' },
+}
+
+/**
+ * Resuelve el estilo de un aviso sin devolver nunca `undefined`: el tipo
+ * exacto, y si no está, el genérico — que si el aviso apunta a una alumna
+ * la lleva a su listado, que es más útil que Inicio.
+ */
+function estiloDeAviso(n: AppNotification): EstiloAviso {
+  // El índice es texto que viene de la base, no la unión: puede no estar.
+  const propio: EstiloAviso | undefined = ESTILOS[n.type as NotificationType]
+  if (propio) return propio
+  return n.studentId ? { ...GENERICO, page: 'alumnos' } : GENERICO
 }
 
 function relativeTime(iso: string): string {
@@ -191,13 +224,13 @@ export function NotificationsBell({ onNavigate }: { onNavigate?: (page: PageKey)
               </div>
             ) : (
               items.map((n) => {
-                const Icon = TYPE_ICON[n.type]
+                const { Icon, color, page } = estiloDeAviso(n)
                 return (
                   <button
                     key={n.id}
                     onClick={() => {
                       close()
-                      onNavigate?.(TYPE_PAGE[n.type])
+                      onNavigate?.(page)
                     }}
                     className={cn(
                       'w-full flex items-start gap-3 px-4 py-3 text-left border-b border-border last:border-b-0 hover:bg-muted/60 transition-colors',
@@ -207,7 +240,7 @@ export function NotificationsBell({ onNavigate }: { onNavigate?: (page: PageKey)
                     <span
                       className={cn(
                         'w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5',
-                        TYPE_COLOR[n.type]
+                        color
                       )}
                     >
                       <Icon className="w-4 h-4" />

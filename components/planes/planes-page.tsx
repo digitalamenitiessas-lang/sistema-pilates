@@ -152,7 +152,11 @@ function PlanFormModal({ plan, onClose }: { plan?: Plan; onClose: () => void }) 
   const [color, setColor] = useState(plan?.color ?? PLAN_COLORS[0])
   const [disciplines, setDisciplines] = useState<Discipline[]>(plan?.disciplines ?? [])
   const [description, setDescription] = useState(plan?.description ?? '')
+  const [weeklyFrequency, setWeeklyFrequency] = useState(
+    plan ? String(plan.weeklyFrequency ?? 0) : '0'
+  )
   const [isTrial, setIsTrial] = useState(plan?.isTrial ?? false)
+  const [popular, setPopular] = useState(plan?.popular ?? false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -172,11 +176,13 @@ function PlanFormModal({ plan, onClose }: { plan?: Plan; onClose: () => void }) 
       name,
       price: Number(price) || 0,
       classCount: Number(classCount) || 1,
+      weeklyFrequency: Number(weeklyFrequency) || 0,
       durationDays: Number(durationDays) || 30,
       disciplines,
       description,
       color,
       isTrial,
+      popular,
     }
     try {
       if (isEdit) {
@@ -233,6 +239,13 @@ function PlanFormModal({ plan, onClose }: { plan?: Plan; onClose: () => void }) 
             <div>
               <label className={labelClass}>Cantidad de clases</label>
               <input type="number" min="1" value={classCount} onChange={(e) => setClassCount(e.target.value)} required placeholder="8" className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Veces por semana</label>
+              <input type="number" min="0" max="7" value={weeklyFrequency} onChange={(e) => setWeeklyFrequency(e.target.value)} placeholder="2" className={inputClass} />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                0 si no aplica, como el pase de un día.
+              </p>
             </div>
             <div>
               <label className={labelClass}>Vigencia (días)</label>
@@ -302,6 +315,18 @@ function PlanFormModal({ plan, onClose }: { plan?: Plan; onClose: () => void }) 
             />
             <span className="text-sm text-foreground">
               Es clase de prueba <span className="text-muted-foreground">(opción inicial para nuevos alumnos)</span>
+            </span>
+          </label>
+
+          <label className="flex items-center gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={popular}
+              onChange={(e) => setPopular(e.target.checked)}
+              className="w-4 h-4 accent-[var(--primary)]"
+            />
+            <span className="text-sm text-foreground">
+              Destacarlo en la web <span className="text-muted-foreground">(aparece como &quot;El más elegido&quot;)</span>
             </span>
           </label>
 

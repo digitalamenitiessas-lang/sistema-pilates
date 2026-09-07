@@ -107,6 +107,14 @@ export async function GET(request: Request) {
   const rows: NotificationRow[] = []
   const emails: Array<{ to: string; subject: string; html: string; key: string }> = []
 
+  // Los avisos de renovación omitida van en su propia tanda porque su tipo
+  // lo habilita el CHECK de la 0023. Si esa migración todavía no corrió, la
+  // base rechaza la fila — y en un upsert único ese rechazo se llevaría
+  // puesta la tanda entera, o sea los avisos y los emails de las
+  // membresías que SÍ se renovaron. Y esos no vuelven: en la corrida
+  // siguiente la membresía vieja ya no es la más reciente y no se evalúa.
+  const omitidas: NotificationRow[] = []
+
   // Fin de membresía más reciente por alumna: solo esa genera renovación o
   // avisos (las anteriores ya fueron reemplazadas y no son noticia).
   const { data: allMems } = await admin.from('memberships').select('student_id, end_date')
@@ -118,7 +126,14 @@ export async function GET(request: Request) {
     maxEnd.get(m.student_id) === m.end_date
 
   // ── 1. Renovación automática ──────────────────────────────────────────
+  //
+  // Los tres motivos de salteo compartían un `continue` mudo y no son la
+  // misma cosa. La clase de prueba y la alumna dada de baja son decisiones
+  // tomadas: se cuentan y no molestan a nadie. El plan desactivado no es
+  // una decisión sobre esta alumna, es el efecto de un switch en Planes, y
+  // ese sí deja aviso.
   let renewed = 0
+  const salteadas = { planApagado: 0, planDePrueba: 0, alumnaInactiva: 0 }
   const mpToken = await getMpAccessToken(admin)
   const { data: toRenew, error: renewError } = await admin
     .from('memberships')
@@ -144,7 +159,36 @@ export async function GET(request: Request) {
       is_trial: boolean
     } | null
     if (!isLatest(m)) continue
-    if (!plan?.active || plan.is_trial || student?.active === false) continue
+
+    // Los deliberados van primero, y el orden importa: cuando se apaguen
+    // los planes de demo, una alumna ya dada de baja que lo tenía no tiene
+    // que generar un "no se renovó" que nadie va a ir a arreglar.
+    if (student?.active === false) {
+      salteadas.alumnaInactiva++
+      continue
+    }
+    if (plan?.is_trial) {
+      salteadas.planDePrueba++
+      continue
+    }
+    // Plan apagado, o fila de plan ausente, que entra por el mismo lado:
+    // el único salteo que nadie pidió.
+    if (!plan?.active) {
+      salteadas.planApagado++
+      omitidas.push({
+        type: 'renovacion_omitida',
+        title: 'No se renovó: plan desactivado',
+        body: `${student?.name ?? '—'}: el plan ${plan?.name ?? 'de la membresía'} está desactivado, así que la membresía venció el ${formatDate(m.end_date)} y no se renovó sola. Reactivá el plan o asignale otro.`,
+        student_id: m.student_id,
+        membership_id: m.id,
+        audience: 'staff',
+        dedupe_key: `renovom-${m.id}`,
+      })
+      // A la alumna no se le manda nada: es un problema de configuración
+      // del estudio, no una noticia suya, y el mail le llegaría antes de
+      // que haya alguien del otro lado que sepa qué contestarle.
+      continue
+    }
 
     const endDate = addDaysISO(today, plan.duration_days)
     const { data: newMembership, error: memError } = await admin
@@ -320,15 +364,23 @@ export async function GET(request: Request) {
   }
 
   // ── Insertar (idempotente) y avisar solo por lo NUEVO ─────────────────
-  let created: Array<{ dedupe_key: string; type: string }> = []
-  if (rows.length > 0) {
+  const insertarAvisos = async (tanda: NotificationRow[]) => {
+    if (tanda.length === 0) return { creados: [] as Array<{ dedupe_key: string; type: string }>, error: null as string | null }
     const { data, error } = await admin
       .from('notifications')
-      .upsert(rows, { onConflict: 'dedupe_key', ignoreDuplicates: true })
+      .upsert(tanda, { onConflict: 'dedupe_key', ignoreDuplicates: true })
       .select('dedupe_key, type')
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    created = data ?? []
+    return { creados: data ?? [], error: error?.message ?? null }
   }
+
+  const principal = await insertarAvisos(rows)
+  if (principal.error) return NextResponse.json({ error: principal.error }, { status: 500 })
+
+  // Aparte y sin cortar: si falta la 0023 la base rechaza el tipo, y eso no
+  // puede tumbar los avisos que ya entraron. Queda dicho en el resumen.
+  const extra = await insertarAvisos(omitidas)
+
+  const created = [...principal.creados, ...extra.creados]
 
   const newKeys = new Set(created.map((c) => c.dedupe_key))
 
@@ -357,6 +409,8 @@ export async function GET(request: Request) {
     date: today,
     renewed,
     renewalsSkipped: renewError ? 'migración 0010 pendiente' : undefined,
+    salteadas,
+    avisoOmitidasRechazado: extra.error ?? undefined,
     evaluated: rows.length,
     created: created.length,
     emailsSent,

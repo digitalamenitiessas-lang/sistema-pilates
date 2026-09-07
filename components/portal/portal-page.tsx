@@ -23,7 +23,7 @@ import { disciplineStyle } from '@/lib/disciplines'
 import {
   addDays,
   mondayOf,
-  localISO,
+  hoyISO,
   createReservation,
   updateReservationStatus,
   fetchWeekOccupancy,
@@ -255,7 +255,7 @@ export function PortalPage() {
   const [showChangePassword, setShowChangePassword] = useState(false)
 
   const weekStart = addDays(mondayOf(), weekOffset * 7)
-  const today = localISO()
+  const today = hoyISO()
 
   useEffect(() => {
     fetchWeekOccupancy(weekStart).then(setOccupancy)

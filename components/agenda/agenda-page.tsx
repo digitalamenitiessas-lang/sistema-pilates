@@ -27,7 +27,7 @@ import {
   mondayOf,
   createReservation,
   clearClassDate,
-  localISO,
+  hoyISO,
   createClassSession,
   setClassDateTeacher,
   suspendClassDate,
@@ -127,7 +127,11 @@ function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => v
   const isEdit = !!cls
 
   const [title, setTitle] = useState(cls?.title ?? '')
-  const [discipline, setDiscipline] = useState<Discipline>(cls?.discipline ?? 'Pilates Mat')
+  // La primera del catálogo, no un nombre escrito acá: 'Pilates Mat' es
+  // una de las disciplinas de demo y el estudio la va a renombrar.
+  const [discipline, setDiscipline] = useState<Discipline>(
+    cls?.discipline ?? disciplines[0]?.name ?? ''
+  )
   const [teacherId, setTeacherId] = useState(cls?.teacherId ?? '')
   const [dayOfWeek, setDayOfWeek] = useState(cls?.dayOfWeek ?? 0)
   const [startTime, setStartTime] = useState(cls?.time ?? '09:00')
@@ -255,6 +259,9 @@ function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => v
             <div>
               <label className={labelClass}>Disciplina</label>
               <select value={discipline} onChange={(e) => setDiscipline(e.target.value as Discipline)} className={inputClass}>
+                {/* Sin catálogo no hay nada que elegir, y el select tiene que
+                    poder mostrar eso en vez de un valor que no existe. */}
+                {disciplines.length === 0 && <option value="">Sin disciplinas cargadas</option>}
                 {disciplines.map((d) => (
                   <option key={d.id} value={d.name}>{d.name}</option>
                 ))}
@@ -808,7 +815,7 @@ export function AgendaPage() {
 
   const weekStart = addDays(mondayOf(), weekOffset * 7)
   const weekEnd = addDays(weekStart, 5)
-  const today = localISO()
+  const today = hoyISO()
 
   // Cupos por clase para la semana visible
   const weekClasses: WeekClass[] = useMemo(() => {

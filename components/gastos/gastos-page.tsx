@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
-import { addDays, localISO, settingText } from '@/lib/api'
+import { addDays, hoyISO, settingText } from '@/lib/api'
 import {
   createExpense,
   fetchAccounts,
@@ -82,7 +82,7 @@ function GastoModal({
   const estadoDefault = settingText(settings, 'gastos_estado_default', 'pagado') as Expense['status']
   const exigeComprobante = settingText(settings, 'gastos_comprobante_obligatorio', 'false') === 'true'
 
-  const [fecha, setFecha] = useState(gasto?.fecha ?? localISO())
+  const [fecha, setFecha] = useState(gasto?.fecha ?? hoyISO())
   const [categoryId, setCategoryId] = useState(gasto?.categoryId ?? '')
   const [detail, setDetail] = useState(gasto?.detail ?? '')
   const [amount, setAmount] = useState(gasto ? String(gasto.amount) : '')
@@ -92,7 +92,7 @@ function GastoModal({
   const [status, setStatus] = useState<Expense['status']>(gasto?.status ?? estadoDefault)
   const [method, setMethod] = useState(gasto?.method ?? '')
   const [accountId, setAccountId] = useState(gasto?.accountId ?? '')
-  const [paidDate, setPaidDate] = useState(gasto?.paidDate ?? localISO())
+  const [paidDate, setPaidDate] = useState(gasto?.paidDate ?? hoyISO())
   const [tags, setTags] = useState((gasto?.tags ?? []).join(', '))
   const [notes, setNotes] = useState(gasto?.notes ?? '')
   const [saving, setSaving] = useState(false)
@@ -340,8 +340,8 @@ export function GastosPage() {
   const { can, canWrite } = useData()
   const { paymentMethods } = useStudio()
 
-  const [desde, setDesde] = useState(addDays(localISO(), -30))
-  const [hasta, setHasta] = useState(localISO())
+  const [desde, setDesde] = useState(addDays(hoyISO(), -30))
+  const [hasta, setHasta] = useState(hoyISO())
   const [categoryId, setCategoryId] = useState('')
   const [supplier, setSupplier] = useState('')
   const [method, setMethod] = useState('')
@@ -429,7 +429,7 @@ export function GastosPage() {
     if (!cuenta) return
     setBusyId(g.id)
     try {
-      await payExpense(g.id, g.accountId ?? cuenta.id, g.method ?? 'efectivo', localISO())
+      await payExpense(g.id, g.accountId ?? cuenta.id, g.method ?? 'efectivo', hoyISO())
       await cargar()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo registrar el pago')
