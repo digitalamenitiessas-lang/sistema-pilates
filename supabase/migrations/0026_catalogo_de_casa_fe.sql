@@ -13,15 +13,13 @@
 -- clientas desde la pantalla, y no se puede dar de alta a nadie sin un
 -- plan al que asignarla.
 --
--- NADA SE BORRA. Los planes y disciplinas de demo quedan inactivos, que
--- es como este sistema da de baja: las membresías viejas siguen
--- apuntando a su plan y el historial no se rompe.
+-- NADA SE BORRA NI SE APAGA. Esta migración solo SUMA: el catálogo de
+-- prueba se queda conviviendo con el de Casa Fé, porque hasta que el
+-- estudio cargue sus profesoras, sus salas y su grilla, las clases de
+-- demo son lo único que hay para probar el flujo de punta a punta.
 --
--- ⚠ EFECTO ESPERADO Y BUSCADO: al desactivar los planes de demo, las
---   membresías de prueba que los usaban dejan de renovarse solas, y el
---   proceso diario va a emitir "No se renovó: plan desactivado" por cada
---   una. Eso NO es un error: es la 0023 haciendo exactamente su trabajo,
---   y es la prueba de que ese aviso hacía falta.
+-- Al final del archivo está el bloque para apagar la demo, que se corre
+-- aparte el día que existan los datos reales.
 --
 -- Ejecutar completo en el SQL Editor del dashboard de Supabase.
 -- ============================================================
@@ -59,11 +57,12 @@ update public.disciplines set
   active = true
 where name = 'Pilates Reformer';
 
--- Las cinco de demo salen de circulación. No se borran: hay clases y
--- planes de prueba que las nombran, y borrarlas dejaría esas filas
--- apuntando a un nombre que ya no está en ningún catálogo.
-update public.disciplines set active = false
-where name in ('Pilates Mat', 'Pilates Clínico', 'Yoga', 'Stretching', 'Funcional');
+-- Las cinco de demo se quedan ACTIVAS por ahora, a propósito: hasta que
+-- el estudio cargue su grilla real, las clases de prueba son lo único que
+-- hay para probar el flujo de punta a punta, y una clase cuya disciplina
+-- está apagada se dibuja sin color y sin descripción.
+-- Se apagan con el bloque del final, el día que se carguen los datos
+-- reales.
 
 -- ------------------------------------------------------------
 -- 2. Las seis membresías
@@ -124,13 +123,11 @@ on conflict do nothing;
 -- permiten venderlo con anticipación sin que venza antes de que la
 -- persona venga. Es un número editable desde Planes.
 
--- Los seis de demo salen de circulación. Sus membresías siguen vivas y
--- apuntando a ellos: dar de baja un plan no toca a quien ya lo tiene.
-update public.plans set active = false, popular = false
-where name in (
-  'Básico Mat', 'Reformer Premium', 'Full Flex',
-  'Clínico Terapéutico', 'Yoga & Movimiento', 'Clase de Prueba'
-);
+-- Los seis de demo también se quedan activos por ahora. Apagarlos haría
+-- que las once membresías de prueba dejaran de renovarse, y el proceso
+-- diario emitiría un aviso de "No se renovó: plan desactivado" por cada
+-- una: el mecanismo funcionando, pero ruido justo cuando hay que probar
+-- otra cosa. Se apagan con el bloque del final.
 
 -- ------------------------------------------------------------
 -- 3. El estudio deja de llamarse PilatesStudio
@@ -182,11 +179,12 @@ commit;
 -- ============================================================
 -- CÓMO VERIFICAR
 --
---   select name, active, sort_order from public.disciplines order by active desc, sort_order;
---     → tres activas: Reformer, Embarazadas, 3ra Edad. Cinco inactivas.
+--   select name, active, sort_order from public.disciplines order by sort_order;
+--     → las tres de Casa Fé primero (Reformer, Embarazadas, 3ra Edad) y
+--       las de demo abajo, todas activas todavía
 --
---   select name, price, class_count, weekly_frequency, popular, is_trial, active
---   from public.plans where active order by weekly_frequency;
+--   select name, price, class_count, weekly_frequency, popular, is_trial
+--   from public.plans where name like 'FE %' order by weekly_frequency;
 --     → los seis FE, FE FLOW con popular = true, FE FIRST con is_trial = true
 --
 --   -- El precio de efectivo y el de tarjeta tienen que dar la tabla del
@@ -198,11 +196,40 @@ commit;
 --   from public.plans where active and price > 0 order by price;
 --     → 45.000 / 42.750 / 56.250 para FE START, y así con los seis
 --
--- Y en la web pública: tres disciplinas con su descripción y seis planes
--- con los precios de transferencia, con FE FLOW destacado.
+-- Y en la pantalla: al dar de alta una clienta aparecen los seis planes
+-- FE junto a los de prueba, con FE FLOW destacado. La web muestra las
+-- ocho disciplinas por ahora — las tres reales y las cinco de demo—,
+-- hasta que se corra el bloque de APAGAR LA DEMO del final.
 --
--- El proceso diario va a avisar "No se renovó: plan desactivado" por las
--- membresías de prueba. Es lo esperado.
+-- Nada del proceso diario cambia con esta migración.
+-- ============================================================
+
+-- ============================================================
+-- APAGAR LA DEMO — correr ESTE BLOQUE APARTE, el día que el estudio
+-- tenga cargadas sus profesoras, sus salas y su grilla real.
+--
+-- Hasta entonces las disciplinas y los planes de prueba conviven con los
+-- de Casa Fé a propósito: son lo único que hay para probar el flujo
+-- completo antes de que existan los datos verdaderos.
+--
+-- Después de esto la web pública muestra solo las tres disciplinas y los
+-- seis planes FE, y el proceso diario va a avisar "No se renovó: plan
+-- desactivado" por cada membresía de prueba que quede viva. Eso es
+-- esperado: es la 0023 haciendo su trabajo.
+--
+--   begin;
+--
+--   update public.disciplines set active = false
+--   where name in ('Pilates Mat', 'Pilates Clínico', 'Yoga', 'Stretching', 'Funcional');
+--
+--   update public.plans set active = false, popular = false
+--   where name in ('Básico Mat', 'Reformer Premium', 'Full Flex',
+--                  'Clínico Terapéutico', 'Yoga & Movimiento', 'Clase de Prueba');
+--
+--   commit;
+--
+-- Y para borrar del todo los datos de prueba —clientas, clases, pagos—
+-- está la migración 0027, que lleva su propia guardia y pide backup.
 -- ============================================================
 
 -- ============================================================
