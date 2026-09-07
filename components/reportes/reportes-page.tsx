@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Download, Loader2, FileSpreadsheet, Printer, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData } from '@/lib/data-context'
-import { addDays, localISO } from '@/lib/api'
+import { addDays, hoyISO } from '@/lib/api'
 import { descargarCsv, nombreArchivo, type Columna } from '@/lib/export'
 import {
   reporteAltas,
@@ -204,8 +204,8 @@ const REPORTES: Array<Reporte<any>> = [
 export function ReportesPage() {
   const { can, canWrite } = useData()
   const [activo, setActivo] = useState('cobros')
-  const [desde, setDesde] = useState(addDays(localISO(), -30))
-  const [hasta, setHasta] = useState(localISO())
+  const [desde, setDesde] = useState(addDays(hoyISO(), -30))
+  const [hasta, setHasta] = useState(hoyISO())
   const [filas, setFilas] = useState<Record<string, unknown>[]>([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)

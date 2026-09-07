@@ -25,10 +25,35 @@ import type {
 } from './types'
 
 // ---------------------------------------------------------------
-// Helpers de fechas (en hora local, no UTC, por el huso de AR)
+// Helpers de fechas
+//
+// Hay dos cosas distintas y conviene no mezclarlas: FORMATEAR una fecha
+// que ya se tiene, y averiguar QUÉ DÍA ES HOY. La primera no depende del
+// huso; la segunda sí, y es la del estudio.
 // ---------------------------------------------------------------
+
+const HUSO_DEL_ESTUDIO = 'America/Argentina/Buenos_Aires'
+
+/**
+ * Formatea una fecha con sus componentes locales. Es un formateador PURO
+ * y no convierte de huso, a propósito: `addDays` arma un Date con
+ * componentes locales y se lo pasa a esta función, así que si acá adentro
+ * se convirtiera a la hora del estudio, sumar un día correría la fecha
+ * para siempre en todo navegador al este de Buenos Aires.
+ */
 export function localISO(d: Date = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * Qué día es hoy para el estudio, no para quien mira la pantalla. La
+ * migración 0016 ya fijó este criterio para la plata —el día se deriva del
+ * huso del estudio y no de quién escribe— y vale igual acá: una alumna
+ * mirando el portal desde España a las dos de la mañana tiene que ver el
+ * mismo "hoy" que recepción, o le aparecen las clases del día siguiente.
+ */
+export function hoyISO(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: HUSO_DEL_ESTUDIO })
 }
 
 export function addDays(iso: string, days: number): string {
@@ -37,15 +62,17 @@ export function addDays(iso: string, days: number): string {
   return localISO(date)
 }
 
-/** Lunes de la semana que contiene la fecha dada (dayOfWeek 0 = lunes). */
-export function mondayOf(d: Date = new Date()): string {
-  const diff = (d.getDay() + 6) % 7
-  return localISO(new Date(d.getFullYear(), d.getMonth(), d.getDate() - diff))
+/** Lunes de la semana que contiene esa fecha (dayOfWeek 0 = lunes). */
+export function mondayOf(iso: string = hoyISO()): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const diff = (new Date(y, m - 1, d).getDay() + 6) % 7
+  return addDays(iso, -diff)
 }
 
-/** Índice de día 0=lunes .. 6=domingo para hoy. */
+/** Índice de día 0=lunes .. 6=domingo para hoy en el estudio. */
 export function todayDayIndex(): number {
-  return (new Date().getDay() + 6) % 7
+  const [y, m, d] = hoyISO().split('-').map(Number)
+  return (new Date(y, m - 1, d).getDay() + 6) % 7
 }
 
 const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
@@ -92,7 +119,7 @@ function deriveMembershipStatus(
   warningDays: number = EXPIRY_WARNING_DAYS
 ): Membership['status'] {
   if (status === 'suspendida') return 'suspendida'
-  const today = localISO()
+  const today = hoyISO()
   if (endDate < today) return 'vencida'
   if (endDate <= addDays(today, warningDays)) return 'por vencer'
   return 'activa'
@@ -104,7 +131,7 @@ function derivePaymentStatus(status: string, dueDate: string): Payment['status']
   // justo el número que la caja tiene que hacer coincidir con lo contado.
   if (status === 'anulado') return 'anulado'
   if (status === 'pagado') return 'pagado'
-  if (dueDate < localISO()) return 'vencido'
+  if (dueDate < hoyISO()) return 'vencido'
   return 'pendiente'
 }
 
@@ -212,8 +239,8 @@ export async function fetchStudioData(): Promise<StudioData> {
 
     // Solo las de un rango corto alrededor de hoy: son excepciones, no
     // hace falta traerse el historial entero.
-    const desde = addDays(localISO(), -30)
-    const hasta = addDays(localISO(), 60)
+    const desde = addDays(hoyISO(), -30)
+    const hasta = addDays(hoyISO(), 60)
     const occRes = await supabase
       .from('class_occurrences')
       .select('*, teachers(name)')
@@ -470,7 +497,7 @@ function buildAlerts(
 ): Alert[] {
   const alerts: Alert[] = []
   const name = (id: string) => students.find((s) => s.id === id)?.name
-  const today = localISO()
+  const today = hoyISO()
 
   for (const m of memberships) {
     // solo la membresía más reciente de cada alumno genera alerta
@@ -620,7 +647,7 @@ export async function assignMembership(
   const plan = plans.find((p) => p.id === planId)
   if (!plan) throw new Error('Plan inexistente')
 
-  const start = localISO()
+  const start = hoyISO()
   const { data: membership, error } = await supabase
     .from('memberships')
     .insert({
@@ -669,7 +696,7 @@ export async function registerPayment(input: NewPaymentInput): Promise<number> {
       membership_id: input.membershipId || null,
       concept: input.concept,
       amount: input.amount,
-      due_date: localISO(),
+      due_date: hoyISO(),
       // El día lo deriva la base del instante, en el huso del estudio
       // (migración 0016). Una sola definición de "día" para todos.
       paid_at: new Date().toISOString(),
@@ -805,7 +832,7 @@ export async function undoAttendance(reservation: Reservation): Promise<void> {
     .select('id, classes_used')
     .eq('student_id', reservation.studentId)
     .eq('status', 'activa')
-    .gte('end_date', localISO())
+    .gte('end_date', hoyISO())
     .order('end_date', { ascending: false })
     .limit(1)
   if (error) throw error
@@ -828,7 +855,7 @@ export async function markAttendance(reservation: Reservation): Promise<void> {
     .select('id, classes_used, classes_total')
     .eq('student_id', reservation.studentId)
     .eq('status', 'activa')
-    .gte('end_date', localISO())
+    .gte('end_date', hoyISO())
     .order('end_date', { ascending: false })
     .limit(1)
   if (error) throw error

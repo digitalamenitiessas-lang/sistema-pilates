@@ -27,7 +27,7 @@ import {
   mondayOf,
   createReservation,
   clearClassDate,
-  localISO,
+  hoyISO,
   createClassSession,
   setClassDateTeacher,
   suspendClassDate,
@@ -808,7 +808,7 @@ export function AgendaPage() {
 
   const weekStart = addDays(mondayOf(), weekOffset * 7)
   const weekEnd = addDays(weekStart, 5)
-  const today = localISO()
+  const today = hoyISO()
 
   // Cupos por clase para la semana visible
   const weekClasses: WeekClass[] = useMemo(() => {

@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { TomarAsistencia } from '@/components/asistencia/tomar-asistencia'
 import { fetchResumenPlata, type ResumenPlata } from '@/lib/caja-api'
-import { localISO, settingBool, settingText, todayDayIndex } from '@/lib/api'
+import { hoyISO, settingBool, settingText, todayDayIndex } from '@/lib/api'
 import { paymentReminderLink } from '../pagos/pagos-page'
 import type { PageKey } from '../layout/sidebar'
 
@@ -568,7 +568,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
       {asistenciaDe && (
         <TomarAsistencia
           classId={asistenciaDe.id}
-          date={localISO()}
+          date={hoyISO()}
           title={asistenciaDe.title}
           time={asistenciaDe.time}
           onClose={() => setAsistenciaDe(null)}
