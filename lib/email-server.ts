@@ -6,7 +6,19 @@
 // En sandbox (sin dominio) Resend solo entrega al email del dueño de la
 // cuenta — suficiente para probar.
 
-const BRAND = 'PilatesStudio'
+// El remitente y la firma de cada mail que recibe la clienta salen del
+// sistema, no del código. Se resuelve una vez por instancia y se guarda:
+// el proceso diario manda varios mails seguidos y no tiene sentido
+// preguntarle a la base el nombre del estudio en cada uno.
+import { nombreDelEstudio, NOMBRE_POR_DEFECTO } from './estudio'
+
+let marcaCache: string | null = null
+
+async function marca(): Promise<string> {
+  if (marcaCache) return marcaCache
+  marcaCache = await nombreDelEstudio()
+  return marcaCache
+}
 
 export function emailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY)
@@ -15,7 +27,7 @@ export function emailConfigured(): boolean {
 export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
   const key = process.env.RESEND_API_KEY
   if (!key || !to) return false
-  const from = process.env.EMAIL_FROM || `${BRAND} <onboarding@resend.dev>`
+  const from = process.env.EMAIL_FROM || `${await marca()} <onboarding@resend.dev>`
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -28,21 +40,26 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
   }
 }
 
-/** Plantilla mínima con la estética del estudio. */
-export function emailLayout(title: string, bodyHtml: string): string {
+/**
+ * Plantilla mínima con la estética del estudio. Async porque el nombre lo
+ * pone el estudio desde Configuración: la inicial del recuadro y la firma
+ * del pie salen de ahí.
+ */
+export async function emailLayout(title: string, bodyHtml: string): Promise<string> {
+  const nombre = await marca()
   return `<!doctype html>
 <html lang="es"><body style="margin:0;background:#f5ece3;font-family:-apple-system,Segoe UI,Roboto,sans-serif;">
   <div style="max-width:480px;margin:0 auto;padding:32px 16px;">
     <div style="text-align:center;margin-bottom:16px;">
-      <span style="display:inline-block;width:40px;height:40px;line-height:40px;border-radius:12px;background:#A9552F;color:#fff;font-weight:700;font-size:18px;">P</span>
-      <p style="margin:8px 0 0;font-weight:700;color:#3d2c23;">${BRAND}</p>
+      <span style="display:inline-block;width:40px;height:40px;line-height:40px;border-radius:12px;background:#A9552F;color:#fff;font-weight:700;font-size:18px;">${nombre.trim().charAt(0).toUpperCase()}</span>
+      <p style="margin:8px 0 0;font-weight:700;color:#3d2c23;">${nombre}</p>
     </div>
     <div style="background:#fff;border-radius:16px;padding:24px;color:#3d2c23;">
       <h1 style="font-size:18px;margin:0 0 12px;">${title}</h1>
       ${bodyHtml}
     </div>
     <p style="text-align:center;font-size:11px;color:#8a7a6d;margin-top:16px;">
-      Este es un aviso automático de ${BRAND}.
+      Este es un aviso automático de ${nombre}.
     </p>
   </div>
 </body></html>`

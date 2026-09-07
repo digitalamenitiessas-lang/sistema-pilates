@@ -28,6 +28,7 @@ import {
   updateReservationStatus,
   fetchWeekOccupancy,
   type Occupancy,
+  settingText,
 } from '@/lib/api'
 import type { Discipline, Reservation, Student } from '@/lib/types'
 
@@ -242,7 +243,7 @@ function UpcomingList({
 
 export function PortalPage() {
   const { profile, refresh, signOut } = useData()
-  const { students, classes, reservations, payments, disciplines, occurrences } = useStudio()
+  const { students, classes, reservations, payments, disciplines, occurrences, settings } = useStudio()
 
   // Con RLS, el alumno solo recibe su propia ficha
   const me = students.find((s) => s.userId === profile?.id) ?? students[0] ?? null
@@ -278,11 +279,16 @@ export function PortalPage() {
     [reservations, me, today]
   )
 
-  const myPayments = useMemo(
-    () => payments.filter((p) => p.studentId === me?.id).slice(0, 8),
+  const misPagos = useMemo(
+    () => payments.filter((p) => p.studentId === me?.id),
     [payments, me]
   )
-  const myDebts = myPayments.filter((p) => p.status === 'pendiente' || p.status === 'vencido')
+  // La deuda se calcula sobre TODOS sus pagos y el corte es solo para
+  // mostrar. Al revés —cortar en ocho y después filtrar— la clienta con
+  // nueve pagos dejaba de ver que debía, y cuanto más antigua la deuda,
+  // antes desaparecía: justo la que hay que cobrar.
+  const myDebts = misPagos.filter((p) => p.status === 'pendiente' || p.status === 'vencido')
+  const myPayments = misPagos.slice(0, 8)
 
   const dayClasses = useMemo(() => {
     const date = addDays(weekStart, day)
@@ -370,11 +376,11 @@ export function PortalPage() {
       <header className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shrink-0">
-            <span className="text-primary-foreground font-serif font-bold text-base">P</span>
+            <span className="text-primary-foreground font-serif font-bold text-base">{settingText(settings, 'studio_name', 'Casa Fé').trim().charAt(0)}</span>
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-foreground truncate">¡Hola, {me.name.split(' ')[0]}!</p>
-            <p className="text-[10px] text-muted-foreground">PilatesStudio</p>
+            <p className="text-[10px] text-muted-foreground">{settingText(settings, 'studio_name', 'Casa Fé')}</p>
           </div>
           <button
             onClick={() => setShowChangePassword(true)}

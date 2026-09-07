@@ -4,6 +4,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { pushToStaff } from './push-server'
 import { sendEmail, emailLayout } from './email-server'
+import { descriptorDeTarjeta, nombreDelEstudio } from '@/lib/estudio'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
@@ -88,7 +89,7 @@ export async function createMpCheckoutLink(
     body: JSON.stringify({
       items: [{ title: payment.title, quantity: 1, unit_price: Number(payment.amount), currency_id: 'ARS' }],
       external_reference: payment.id,
-      statement_descriptor: 'PILATESSTUDIO',
+      statement_descriptor: descriptorDeTarjeta(await nombreDelEstudio()),
     }),
   })
   if (!ok) return null
@@ -172,7 +173,7 @@ async function notifyPaymentCredited(supabase: SupabaseClient, payment: PaidPaym
     await sendEmail(
       student.email,
       'Recibimos tu pago 💚',
-      emailLayout(
+      await emailLayout(
         `¡Gracias, ${name.split(' ')[0]}!`,
         `<p>Registramos tu pago de <strong>${amount}</strong>${payment.concept ? ` por <strong>${payment.concept}</strong>` : ''}.</p>
          ${payment.receipt_number ? `<p>Comprobante N° <strong>${String(payment.receipt_number).padStart(8, '0')}</strong>.</p>` : ''}

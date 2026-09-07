@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Lock, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useNombreDelEstudio } from '@/lib/estudio-client'
 
 // Página a la que llega el enlace de "Olvidé mi contraseña". El cliente de
 // Supabase detecta el token de la URL y abre una sesión de recuperación;
@@ -16,6 +17,7 @@ const inputClass =
 const labelClass = 'text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block'
 
 export default function RecuperarPage() {
+  const estudio = useNombreDelEstudio()
   const [status, setStatus] = useState<'checking' | 'ready' | 'done' | 'invalid'>('checking')
   const [password, setPassword] = useState('')
   const [password2, setPassword2] = useState('')
@@ -71,9 +73,9 @@ export default function RecuperarPage() {
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
           <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center mb-4">
-            <span className="text-primary-foreground font-serif font-bold text-2xl">P</span>
+            <span className="text-primary-foreground font-serif font-bold text-2xl">{estudio.trim().charAt(0)}</span>
           </div>
-          <h1 className="font-serif text-2xl font-semibold text-foreground">PilatesStudio</h1>
+          <h1 className="font-serif text-2xl font-semibold text-foreground">{estudio}</h1>
           <p className="text-sm text-muted-foreground mt-1">Nueva contraseña</p>
         </div>
 

@@ -17,7 +17,8 @@ import {
   BarChart3,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useData } from '@/lib/data-context'
+import { settingText } from '@/lib/api'
+import { useData, useStudio } from '@/lib/data-context'
 import { initials } from '@/lib/api'
 
 const ROLE_LABELS: Record<string, string> = {
@@ -75,6 +76,8 @@ export function Sidebar({
   mobileOpen,
   onMobileClose,
 }: SidebarProps) {
+  const { settings } = useStudio()
+  const estudio = settingText(settings, 'studio_name', 'Casa Fé')
   const { profile, canWrite, can, signOut } = useData()
   // El drawer mobile siempre se muestra expandido; el colapso es cosa de desktop
   const showLabels = !collapsed || mobileOpen
@@ -115,17 +118,17 @@ export function Sidebar({
         {showLabels && (
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-              <span className="text-primary-foreground font-serif font-bold text-sm">P</span>
+              <span className="text-primary-foreground font-serif font-bold text-sm">{estudio.trim().charAt(0)}</span>
             </div>
             <div className="min-w-0">
-              <p className="font-serif font-semibold text-foreground text-sm leading-tight truncate">PilatesStudio</p>
+              <p className="font-serif font-semibold text-foreground text-sm leading-tight truncate">{estudio}</p>
               <p className="text-[10px] text-muted-foreground truncate">Sistema de Gestión</p>
             </div>
           </div>
         )}
         {!showLabels && (
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center mx-auto">
-            <span className="text-primary-foreground font-serif font-bold text-sm">P</span>
+            <span className="text-primary-foreground font-serif font-bold text-sm">{estudio.trim().charAt(0)}</span>
           </div>
         )}
         <button

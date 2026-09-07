@@ -260,7 +260,7 @@ export async function GET(request: Request) {
         to: student.email,
         key: `renov-${m.id}`,
         subject: `Renovamos tu membresía ${plan.name}`,
-        html: emailLayout(
+        html: await emailLayout(
           `¡Hola ${student.name.split(' ')[0]}!`,
           `<p>Tu membresía <strong>${plan.name}</strong> se renovó automáticamente hasta el <strong>${formatDate(endDate)}</strong>.</p>
            ${Number(plan.price) > 0 ? `<p>La cuota es de <strong>${formatAmount(plan.price)}</strong> y vence el <strong>${formatDate(dueDate)}</strong>.</p>` : ''}
@@ -297,7 +297,7 @@ export async function GET(request: Request) {
         to: student.email,
         key: `venc-${m.id}-${m.end_date}`,
         subject: `Tu membresía vence el ${formatDate(m.end_date)}`,
-        html: emailLayout(
+        html: await emailLayout(
           `¡Hola ${student.name.split(' ')[0]}!`,
           `<p>Te recordamos que tu membresía <strong>${plan}</strong> vence el <strong>${formatDate(m.end_date)}</strong>.</p>
            <p>Podés renovarla en el estudio o consultar tus opciones desde el portal. ¡Te esperamos!</p>`
@@ -353,7 +353,7 @@ export async function GET(request: Request) {
         to: student.email,
         key: `deuda-${p.id}`,
         subject: 'Tenés un pago pendiente en el estudio',
-        html: emailLayout(
+        html: await emailLayout(
           `¡Hola ${student.name.split(' ')[0]}!`,
           `<p>Tenés pendiente el pago de <strong>${p.concept || 'tu cuota'}</strong> por <strong>${formatAmount(p.amount)}</strong>.</p>
            ${p.mp_link ? `<p><a href="${p.mp_link}" style="display:inline-block;background:#A9552F;color:#fff;text-decoration:none;padding:10px 20px;border-radius:10px;font-weight:600;">Pagar online</a></p>` : ''}
@@ -399,7 +399,7 @@ export async function GET(request: Request) {
       byType('deuda_vencida') && `${byType('deuda_vencida')} deuda(s) vencida(s)`,
     ].filter(Boolean)
     pushSent = await pushToStaff(admin, {
-      title: 'PilatesStudio — avisos del día',
+      title: `${settings.studio_name || 'Casa Fé'} — avisos del día`,
       body: `Membresías y pagos: ${parts.join(', ')}.`,
       url: '/sistema',
     })

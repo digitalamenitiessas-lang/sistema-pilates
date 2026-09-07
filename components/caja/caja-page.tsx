@@ -28,6 +28,7 @@ import {
   fetchLedger,
   fetchOpenSession,
   fetchSessions,
+  reabrirCaja,
   type CajaProblema,
 } from '@/lib/caja-api'
 import type { AccountBalance, CashSession, LedgerEntry, MovementKind } from '@/lib/types'
@@ -379,6 +380,33 @@ export function CajaPage() {
 
   const puedeOperar = can('caja.operar') || canWrite
   const puedeCerrar = can('caja.cerrar') || canWrite
+  // Su propia clave, no la de cerrar: reabrir deshace un cierre firmado y
+  // la 0020 lo separó a propósito.
+  const puedeReabrir = can('caja.reabrir') || canWrite
+  const [reabriendo, setReabriendo] = useState<string | null>(null)
+
+  // Reabrir un arqueo ya existía en la base y en la API desde la 0020, y
+  // nunca tuvo botón. El error más probable del día uno es un cero de más
+  // al tipear lo contado, y sin esto solo se arregla entrando al SQL
+  // Editor. Pide confirmación porque deshace un cierre firmado.
+  const reabrir = async (id: string, fecha: string) => {
+    const dia = new Date(fecha + 'T12:00:00').toLocaleDateString('es-AR', {
+      day: 'numeric', month: 'long',
+    })
+    if (!window.confirm(
+      `¿Reabrir el arqueo del ${dia}?\n\nEl cierre deja de estar firmado y la caja vuelve a quedar abierta. ` +
+      `Se usa cuando lo contado se cargó mal.`
+    )) return
+    setReabriendo(id)
+    try {
+      await reabrirCaja(id)
+      await cargar()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo reabrir')
+    } finally {
+      setReabriendo(null)
+    }
+  }
 
   // La caja arqueable: es la que se cuenta con la mano.
   const cajaPrincipal = useMemo(() => saldos.find((s) => s.arquea) ?? null, [saldos])
@@ -684,6 +712,16 @@ export function CajaPage() {
                       <p className="text-[11px] text-[#2E6040] font-semibold">cerró justo</p>
                     )}
                   </div>
+                  {puedeReabrir && (
+                    <button
+                      onClick={() => reabrir(a.id, a.fecha)}
+                      disabled={reabriendo === a.id}
+                      className="shrink-0 px-2.5 py-1.5 rounded-lg border border-border text-[11px] font-semibold text-muted-foreground hover:text-foreground hover:border-primary/40 disabled:opacity-50"
+                      title="Volver a abrir este turno para corregirlo"
+                    >
+                      {reabriendo === a.id ? '…' : 'Reabrir'}
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

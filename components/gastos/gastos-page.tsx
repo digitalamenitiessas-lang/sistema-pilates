@@ -424,19 +424,12 @@ export function GastosPage() {
     }
   }
 
-  const pagar = async (g: Expense) => {
-    const cuenta = cuentas[0]
-    if (!cuenta) return
-    setBusyId(g.id)
-    try {
-      await payExpense(g.id, g.accountId ?? cuenta.id, g.method ?? 'efectivo', hoyISO())
-      await cargar()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo registrar el pago')
-    } finally {
-      setBusyId(null)
-    }
-  }
+  // Marcar un gasto como pagado saca plata de una cuenta, así que hay que
+  // decir de cuál. Antes tomaba la primera de la lista —que es la caja del
+  // mostrador— y el medio efectivo: pagar el alquiler con un clic sacaba
+  // la plata del cajón y el arqueo del día no cerraba, sin que nada lo
+  // dijera. Ahora pregunta, con lo que ya sabe del gasto propuesto.
+  const [pagando, setPagando] = useState<Expense | null>(null)
 
   const limpiarFiltros = () => {
     setCategoryId('')
@@ -604,8 +597,8 @@ export function GastosPage() {
                     <div className="flex items-center gap-1 shrink-0">
                       {g.status === 'pendiente' && puedeEditar && (
                         <button
-                          onClick={() => pagar(g)}
-                          title="Marcar como pagado"
+                          onClick={() => setPagando(g)}
+                          title="Registrar el pago"
                           className="w-7 h-7 rounded-lg hover:bg-[#E8F2EB] flex items-center justify-center text-muted-foreground hover:text-[#2E6040]"
                         >
                           <Check className="w-3.5 h-3.5" />
@@ -654,6 +647,138 @@ export function GastosPage() {
           }}
         />
       )}
+
+      {pagando && (
+        <PagarGastoModal
+          gasto={pagando}
+          cuentas={cuentas}
+          paymentMethods={paymentMethods}
+          onClose={() => setPagando(null)}
+          onListo={() => {
+            setPagando(null)
+            cargar()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+
+/**
+ * Registrar el pago de un gasto que estaba pendiente. Pide las tres cosas
+ * que definen de dónde salió la plata, con la cuenta sugerida a partir del
+ * medio — igual que al cargar el gasto.
+ */
+function PagarGastoModal({
+  gasto,
+  cuentas,
+  paymentMethods,
+  onListo,
+  onClose,
+}: {
+  gasto: Expense
+  cuentas: Account[]
+  paymentMethods: { code: string; name: string; active: boolean }[]
+  onListo: () => void
+  onClose: () => void
+}) {
+  const [method, setMethod] = useState(gasto.method ?? '')
+  const [accountId, setAccountId] = useState(gasto.accountId ?? '')
+  const [dia, setDia] = useState(hoyISO())
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const elegirMedio = (code: string) => {
+    setMethod(code)
+    if (!accountId) {
+      const sugerida = cuentas.find((c) => c.kind === (code === 'efectivo' ? 'caja' : 'banco'))
+      if (sugerida) setAccountId(sugerida.id)
+    }
+  }
+
+  const confirmar = async () => {
+    if (!method) return setError('Elegí con qué se pagó')
+    if (!accountId) return setError('Elegí de qué cuenta salió')
+    setSaving(true)
+    setError(null)
+    try {
+      await payExpense(gasto.id, accountId, method, dia)
+      onListo()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo registrar el pago')
+      setSaving(false)
+    }
+  }
+
+  const campo =
+    'w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary'
+  const etiqueta = 'block text-xs font-semibold text-foreground mb-1.5'
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/20 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="bg-card rounded-2xl shadow-2xl w-full max-w-sm border border-border"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-6 py-4 border-b border-border">
+          <h2 className="text-base font-bold text-foreground">Registrar el pago</h2>
+          <p className="text-xs text-muted-foreground truncate">
+            {gasto.detail} · {plata(gasto.amount)}
+          </p>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          <div>
+            <label className={etiqueta}>¿Con qué se pagó?</label>
+            <select value={method} onChange={(e) => elegirMedio(e.target.value)} className={campo}>
+              <option value="">Elegir...</option>
+              {paymentMethods.filter((m) => m.active).map((m) => (
+                <option key={m.code} value={m.code}>{m.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className={etiqueta}>¿De qué cuenta salió?</label>
+            <select value={accountId} onChange={(e) => setAccountId(e.target.value)} className={campo}>
+              <option value="">Elegir...</option>
+              {cuentas.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className={etiqueta}>¿Qué día?</label>
+            <input type="date" value={dia} onChange={(e) => setDia(e.target.value)} className={campo} />
+          </div>
+
+          {error && (
+            <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
+          )}
+        </div>
+
+        <div className="flex gap-3 px-6 py-4 border-t border-border">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={confirmar}
+            disabled={saving}
+            className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2"
+          >
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            Registrar
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

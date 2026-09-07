@@ -1,9 +1,13 @@
 import type { MetadataRoute } from 'next'
+import { nombreDelEstudio } from '@/lib/estudio'
 
-export default function manifest(): MetadataRoute.Manifest {
+// Async a propósito: el nombre sale del sistema, no del código. Es el que
+// la clienta ve debajo del ícono cuando instala la app en el celular.
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  const nombre = await nombreDelEstudio()
   return {
-    name: 'PilatesStudio',
-    short_name: 'PilatesStudio',
+    name: nombre,
+    short_name: nombre,
     description: 'Reservá tus clases, mirá tu membresía y tus pagos.',
     start_url: '/sistema',
     display: 'standalone',
