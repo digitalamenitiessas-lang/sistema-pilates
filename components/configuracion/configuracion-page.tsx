@@ -41,6 +41,7 @@ import {
   renameRoom,
   deactivateRoom,
   fetchProfiles,
+  setTeacherUser,
   createSystemUser,
   deleteSystemUser,
   reactivateSystemUser,
@@ -419,6 +420,30 @@ function TeachersSection() {
   const { teachers } = useStudio()
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<Teacher | undefined>(undefined)
+  // Las cuentas con rol profesor, para poder vincularlas con su ficha.
+  const [cuentas, setCuentas] = useState<Profile[]>([])
+  const [vinculando, setVinculando] = useState<string | null>(null)
+  const [errorVinculo, setErrorVinculo] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!canWrite) return
+    fetchProfiles()
+      .then((ps) => setCuentas(ps.filter((p) => p.role === 'profesor' && p.active)))
+      .catch(() => setCuentas([]))
+  }, [canWrite])
+
+  const vincular = async (t: Teacher, userId: string) => {
+    setVinculando(t.id)
+    setErrorVinculo(null)
+    try {
+      await setTeacherUser(t.id, userId || null)
+      await refresh()
+    } catch (err) {
+      setErrorVinculo(err instanceof Error ? err.message : 'No se pudo vincular')
+    } finally {
+      setVinculando(null)
+    }
+  }
 
   const handleDelete = async (t: Teacher) => {
     if (!window.confirm(`¿Dar de baja a ${t.name}? Sus clases quedan en la agenda hasta que las edites.`)) return
@@ -435,7 +460,9 @@ function TeachersSection() {
           </div>
           <div>
             <h2 className="text-sm font-bold text-foreground">Profesores</h2>
-            <p className="text-xs text-muted-foreground">Equipo del estudio y sus disciplinas</p>
+            <p className="text-xs text-muted-foreground">
+              Equipo del estudio, sus disciplinas y con qué cuenta entra cada una
+            </p>
           </div>
         </div>
         {canWrite && (
@@ -464,6 +491,22 @@ function TeachersSection() {
               <p className="text-xs text-muted-foreground truncate">{t.disciplines.join(' · ')}</p>
             </div>
             {canWrite && (
+              <select
+                value={t.userId ?? ''}
+                disabled={vinculando === t.id}
+                onChange={(e) => vincular(t, e.target.value)}
+                className="px-2 py-1.5 rounded-lg border border-border bg-background text-xs text-foreground outline-none focus:border-primary max-w-[11rem] shrink-0"
+                aria-label={`Cuenta de ${t.name}`}
+              >
+                <option value="">Sin cuenta</option>
+                {cuentas.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.fullName || c.email}
+                  </option>
+                ))}
+              </select>
+            )}
+            {canWrite && (
               <>
                 <button
                   onClick={() => {
@@ -487,6 +530,19 @@ function TeachersSection() {
           </div>
         ))}
       </div>
+
+      {canWrite && (
+        <div className="px-5 py-3 border-t border-border space-y-1">
+          {errorVinculo && <p className="text-xs text-destructive">{errorVinculo}</p>}
+          <p className="text-[11px] text-muted-foreground">
+            La cuenta es con la que la profesora entra al sistema. Sin vincularla,
+            el sistema no sabe qué clases son suyas y no puede mostrarle solo las
+            de ella.
+            {cuentas.length === 0 &&
+              ' Todavía no hay ninguna cuenta con rol profesor: creala en Accesos.'}
+          </p>
+        </div>
+      )}
 
       {showForm && <TeacherFormModal teacher={editing} onClose={() => setShowForm(false)} />}
     </div>

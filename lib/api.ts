@@ -349,6 +349,8 @@ export async function fetchStudioData(): Promise<StudioData> {
     phone: t.phone,
     email: t.email,
     color: t.color,
+    // ?? null mientras la 0012 no haya corrido
+    userId: t.user_id ?? null,
   }))
 
   const plans: Plan[] = (plansRes.data ?? []).map((p) => ({
@@ -1250,6 +1252,24 @@ export async function updateClassSession(id: string, input: ClassInput): Promise
 export async function deactivateClassSession(id: string): Promise<void> {
   const { error } = await supabase.from('class_sessions').update({ active: false }).eq('id', id)
   if (error) throw error
+}
+
+/**
+ * Vincula una profesora con la cuenta que usa para entrar. Es lo que hace
+ * que my_teacher_ids() y my_class_ids() (0012) devuelvan algo, y por lo
+ * tanto lo que permite que "ver solo mis clases" signifique algo. Nulo
+ * desvincula.
+ */
+export async function setTeacherUser(teacherId: string, userId: string | null): Promise<void> {
+  const { error } = await supabase
+    .from('teachers')
+    .update({ user_id: userId })
+    .eq('id', teacherId)
+  if (error) {
+    // La columna es unique: una cuenta no puede ser dos profesoras.
+    if (error.code === '23505') throw new Error('Esa cuenta ya está vinculada a otra profesora')
+    throw error
+  }
 }
 
 // ---------------------------------------------------------------

@@ -99,6 +99,12 @@ export interface Teacher {
   phone: string
   email: string
   color: string
+  /**
+   * La cuenta con la que entra al sistema (0012). Sin esto,
+   * my_teacher_ids() no encuentra nada y "ver solo mis clases" no puede
+   * funcionar por más permiso que se le dé: la base no sabe quién es.
+   */
+  userId?: string | null
 }
 
 export interface Plan {
