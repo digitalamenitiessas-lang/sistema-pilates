@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Bell, BellRing, BellOff, CreditCard, UserPlus, CalendarClock, AlertTriangle,
-  Loader2, Smartphone, RefreshCw, Wallet, Scale, Coins,
+  Loader2, Smartphone, RefreshCw, RefreshCwOff, Wallet, Scale, Coins,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
@@ -59,6 +59,10 @@ const ESTILOS: Record<NotificationType, EstiloAviso> = {
   caja_sin_cerrar:      { Icon: Wallet,        color: 'bg-amber-100 text-amber-700', page: 'caja' },
   caja_diferencia:      { Icon: Scale,         color: 'bg-red-100 text-red-700',     page: 'caja' },
   saldo_sin_imputar:    { Icon: Coins,         color: 'bg-amber-100 text-amber-700', page: 'caja' },
+  // El par de RefreshCw: la renovación que no fue. Lleva a Planes y no a
+  // Alumnos porque lo que hay que arreglar es el plan apagado, no la ficha.
+  // Ámbar y no rojo: no se rompió nada, hay algo mal configurado.
+  renovacion_omitida:   { Icon: RefreshCwOff,  color: 'bg-amber-100 text-amber-700', page: 'planes' },
 }
 
 /**

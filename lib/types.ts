@@ -247,6 +247,7 @@ export type NotificationType =
   | 'caja_sin_cerrar'
   | 'caja_diferencia'
   | 'saldo_sin_imputar'
+  | 'renovacion_omitida'
 
 /** Notificación persistida (tabla notifications, migración 0007). */
 export interface AppNotification {
