@@ -945,8 +945,13 @@ function SettingsSection({ group }: { group: SettingGroup }) {
       <div className="px-5 py-4 space-y-4">
         {meta.map((s) => (
           <div key={s.key}>
-            <label className="block text-xs font-semibold text-foreground mb-1.5">
+            <label className="flex items-center gap-2 text-xs font-semibold text-foreground mb-1.5">
               {s.label}
+              {!s.rige && (
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                  Todavía no rige
+                </span>
+              )}
             </label>
 
             {s.kind === 'boolean' ? (
@@ -1003,6 +1008,12 @@ function SettingsSection({ group }: { group: SettingGroup }) {
             )}
 
             {s.help && <p className="text-[11px] text-muted-foreground mt-1">{s.help}</p>}
+            {!s.rige && (
+              <p className="text-[11px] text-amber-700 mt-1">
+                Se puede dejar cargado, pero el sistema todavía no lo tiene en
+                cuenta. Cuando empiece a regir, el cartel desaparece.
+              </p>
+            )}
             {s.soloAdmin && !esAdmin && (
               <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
                 <Lock className="w-3 h-3" />

@@ -71,6 +71,13 @@ export interface StudioSetting {
   isPublic: boolean
   /** Solo el admin lo cambia; recepción lo ve en modo lectura */
   soloAdmin: boolean
+  /**
+   * false = la fila existe y todavía no hay código que la lea (0024). La
+   * pantalla lo avisa, con el mismo criterio que los permisos en sombra:
+   * se puede dejar armado, pero no rige. Por defecto true, para que el
+   * sistema siga andando igual si la migración no corrió.
+   */
+  rige: boolean
 }
 
 export type MembershipStatus = 'activa' | 'vencida' | 'por vencer' | 'suspendida'

@@ -284,6 +284,9 @@ export async function fetchStudioData(): Promise<StudioData> {
       sortOrder: r.sort_order,
       isPublic: r.is_public,
       soloAdmin: r.solo_admin ?? false,
+      // ?? true: si la 0024 no corrió, la columna no viene y todo rige,
+      // que es exactamente lo que pasaba antes de que existiera la marca.
+      rige: r.rige ?? true,
     }))
     settings = Object.fromEntries(settingsMeta.map((r) => [r.key, r.value]))
   } catch {
