@@ -145,7 +145,7 @@ function ReceiptSuccess({ receiptNumber, onClose }: { receiptNumber: number; onC
 
 function RegistrarPagoModal({ onClose }: { onClose: () => void }) {
   const { refresh } = useData()
-  const { students, plans } = useStudio()
+  const { students, plans, paymentMethods, settings } = useStudio()
 
   const [studentId, setStudentId] = useState('')
   const [concept, setConcept] = useState('')
@@ -156,6 +156,18 @@ function RegistrarPagoModal({ onClose }: { onClose: () => void }) {
   const [receiptNumber, setReceiptNumber] = useState<number | null>(null)
 
   const selectedStudent = students.find((s) => s.id === studentId)
+
+  // El mismo ajuste que aplica Cobrar. Sin esto, el mismo acto comercial
+  // daba dos números distintos según por qué botón se entrara: cobrar una
+  // deuda en efectivo descontaba 5% y registrar el pago a mano no, y la
+  // diferencia solo aparecía al cerrar el mes.
+  const deLista = Number(amount) || 0
+  const ajuste = method
+    ? (paymentMethods.find((m) => m.code === method)?.ajustePct ?? 0)
+    : 0
+  const aCobrar = ajuste === 0
+    ? deLista
+    : precioConAjuste(deLista, ajuste, settingText(settings, 'price_rounding', 'cincuenta'))
 
   const applyPlanDefaults = (id: string) => {
     setStudentId(id)
@@ -176,7 +188,7 @@ function RegistrarPagoModal({ onClose }: { onClose: () => void }) {
         studentId,
         membershipId: selectedStudent?.membership?.id,
         concept: concept || 'Pago',
-        amount: Number(amount) || 0,
+        amount: aCobrar,
         method,
       })
       await refresh()
@@ -261,11 +273,26 @@ function RegistrarPagoModal({ onClose }: { onClose: () => void }) {
                   placeholder="32000"
                   className={inputClass}
                 />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  El precio de lista. Si el medio de pago tiene descuento o
+                  recargo, se aplica abajo.
+                </p>
               </div>
 
               <div>
                 <label className={labelClass}>Método de pago *</label>
                 <MethodPicker value={method} onChange={setMethod} />
+                {aCobrar !== deLista && (
+                  <p className="text-xs mt-2 bg-muted rounded-xl px-3 py-2 text-foreground">
+                    Se cobra{' '}
+                    <strong className="tabular-nums">${aCobrar.toLocaleString('es-AR')}</strong>{' '}
+                    <span className={aCobrar < deLista ? 'text-[#2E6040]' : 'text-amber-700'}>
+                      ({aCobrar < deLista ? 'descuento' : 'recargo'} del{' '}
+                      {Math.abs(ajuste).toLocaleString('es-AR')}% por{' '}
+                      {METHOD_LABEL[method as Method].toLowerCase()})
+                    </span>
+                  </p>
+                )}
               </div>
 
               {error && (
