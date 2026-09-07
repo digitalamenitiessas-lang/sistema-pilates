@@ -24,7 +24,7 @@ const ROLE_LABELS: Record<string, string> = {
   admin: 'Admin',
   recepcion: 'Recepción',
   profesor: 'Profesor/a',
-  alumno: 'Alumno/a',
+  alumno: 'Clienta',
 }
 
 export type PageKey =
@@ -48,7 +48,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
   { key: 'agenda', label: 'Agenda', icon: CalendarDays },
-  { key: 'alumnos', label: 'Alumnos', icon: Users },
+  { key: 'alumnos', label: 'Clientas', icon: Users },
   { key: 'planes', label: 'Planes', icon: BookOpen },
   { key: 'reservas', label: 'Reservas', icon: ClipboardList },
   { key: 'pagos', label: 'Pagos', icon: CreditCard },

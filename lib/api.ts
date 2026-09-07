@@ -99,6 +99,30 @@ const EXPIRY_WARNING_DAYS = 5
 // ---------------------------------------------------------------
 export type Settings = Record<string, string>
 
+/**
+ * El precio que se cobra según cómo paga la clienta.
+ *
+ * El ajuste vive en el medio de pago (0028) y no en el plan: es una
+ * propiedad de cómo se paga, no de qué se compra. El redondeo es un
+ * parámetro porque base × 0,95 da entero solo si la base es múltiplo de
+ * 20 — con los precios de hoy nunca se nota, con el primer aumento sí.
+ */
+export function precioConAjuste(
+  base: number,
+  ajustePct: number,
+  redondeo: string = 'cincuenta'
+): number {
+  const bruto = base * (1 + ajustePct / 100)
+  switch (redondeo) {
+    case 'cien':        return Math.round(bruto / 100) * 100
+    case 'cien_arriba': return Math.ceil(bruto / 100) * 100
+    case 'ninguno':     return Math.round(bruto * 100) / 100
+    // 'cincuenta' es el default y el que deja intacta la lista de precios
+    // publicada: sus doce valores son múltiplos de 50.
+    default:            return Math.round(bruto / 50) * 50
+  }
+}
+
 export function settingNum(settings: Settings, key: string, fallback: number): number {
   const n = Number(settings[key])
   return Number.isFinite(n) ? n : fallback
@@ -270,6 +294,8 @@ export async function fetchStudioData(): Promise<StudioData> {
       code: m.code,
       name: m.name,
       isManual: m.is_manual,
+      // ?? 0 mientras la 0028 no haya corrido: sin ajuste, el precio de lista.
+      ajustePct: Number(m.ajuste_pct ?? 0),
       active: m.active,
       sortOrder: m.sort_order,
     }))
@@ -323,6 +349,8 @@ export async function fetchStudioData(): Promise<StudioData> {
     phone: t.phone,
     email: t.email,
     color: t.color,
+    // ?? null mientras la 0012 no haya corrido
+    userId: t.user_id ?? null,
   }))
 
   const plans: Plan[] = (plansRes.data ?? []).map((p) => ({
@@ -740,13 +768,26 @@ export async function voidPayment(paymentId: string, motivo: string): Promise<vo
 }
 
 /** Cobra un pago pendiente existente; devuelve el número de comprobante. */
+/**
+ * Cobra el pago. `amount` viaja porque el monto puede haber cambiado al
+ * elegir el medio: lo que se guarda es lo que entró de verdad a la caja,
+ * no el precio de lista. Sin monto, se cobra lo que ya estaba.
+ */
 export async function collectPayment(
   paymentId: string,
-  method: 'efectivo' | 'transferencia' | 'tarjeta'
+  method: 'efectivo' | 'transferencia' | 'tarjeta',
+  amount?: number
 ): Promise<number> {
+  const cambios: Record<string, unknown> = {
+    status: 'pagado',
+    method,
+    paid_at: new Date().toISOString(),
+  }
+  if (amount !== undefined) cambios.amount = amount
+
   const { data, error } = await supabase
     .from('payments')
-    .update({ status: 'pagado', method, paid_at: new Date().toISOString() })
+    .update(cambios)
     .eq('id', paymentId)
     .select()
     .single()
@@ -839,56 +880,21 @@ export async function updateReservationStatus(
   if (error) throw error
 }
 
-/** Marca asistencia y descuenta una clase de la membresía vigente del alumno. */
 /**
- * Deshace un "presente": devuelve la clase a la membresía que la consumió.
- * Sin esto, marcar por error y corregir le come una clase a la alumna.
+ * El descuento de la clase ya no vive acá.
+ *
+ * Hasta la 0029 lo hacía el navegador: markAttendance sumaba uno a
+ * classes_used y undoAttendance restaba. Elegían la membresía con una
+ * consulta suelta —la más reciente que siguiera vigente— así que si la
+ * clienta renovaba en el medio, la clase se le devolvía a la membresía
+ * equivocada. Y como reservar no descontaba nada, se podía reservar de
+ * más sin que ningún lado avisara.
+ *
+ * Ahora lo hace la base: descuenta al reservar, valida el saldo antes de
+ * aceptar y recalcula el contador en vez de sumar y restar, que es lo que
+ * hace imposible el doble cobro. Marcar asistencia pasó a ser lo que
+ * dice: un cambio de estado, con updateReservationStatus.
  */
-export async function undoAttendance(reservation: Reservation): Promise<void> {
-  await updateReservationStatus(reservation.id, 'confirmada')
-
-  const { data: memberships, error } = await supabase
-    .from('memberships')
-    .select('id, classes_used')
-    .eq('student_id', reservation.studentId)
-    .eq('status', 'activa')
-    .gte('end_date', hoyISO())
-    .order('end_date', { ascending: false })
-    .limit(1)
-  if (error) throw error
-
-  const m = memberships?.[0]
-  if (m && m.classes_used > 0) {
-    const { error: updError } = await supabase
-      .from('memberships')
-      .update({ classes_used: m.classes_used - 1 })
-      .eq('id', m.id)
-    if (updError) throw updError
-  }
-}
-
-export async function markAttendance(reservation: Reservation): Promise<void> {
-  await updateReservationStatus(reservation.id, 'asistió')
-
-  const { data: memberships, error } = await supabase
-    .from('memberships')
-    .select('id, classes_used, classes_total')
-    .eq('student_id', reservation.studentId)
-    .eq('status', 'activa')
-    .gte('end_date', hoyISO())
-    .order('end_date', { ascending: false })
-    .limit(1)
-  if (error) throw error
-
-  const m = memberships?.[0]
-  if (m && m.classes_used < m.classes_total) {
-    const { error: updError } = await supabase
-      .from('memberships')
-      .update({ classes_used: m.classes_used + 1 })
-      .eq('id', m.id)
-    if (updError) throw updError
-  }
-}
 
 // ---------------------------------------------------------------
 // Mercado Pago (las llamadas a la API de MP pasan por /api/mp/*
@@ -1145,6 +1151,23 @@ export async function renamePaymentMethod(code: string, name: string): Promise<v
   if (error) throw error
 }
 
+/**
+ * El descuento o recargo del medio de pago (0028). Si la migración no
+ * corrió, la base no conoce la columna y se avisa en vez de fallar mudo.
+ */
+export async function setPaymentMethodAjuste(code: string, ajustePct: number): Promise<void> {
+  const { error } = await supabase
+    .from('payment_methods')
+    .update({ ajuste_pct: ajustePct })
+    .eq('code', code)
+  if (error) {
+    if (/ajuste_pct/.test(error.message)) {
+      throw new Error('Falta correr la migración 0028 para poder ajustar precios por medio de pago')
+    }
+    throw error
+  }
+}
+
 export async function setPaymentMethodActive(code: string, active: boolean): Promise<void> {
   const { error } = await supabase.from('payment_methods').update({ active }).eq('code', code)
   if (error) throw error
@@ -1229,6 +1252,24 @@ export async function updateClassSession(id: string, input: ClassInput): Promise
 export async function deactivateClassSession(id: string): Promise<void> {
   const { error } = await supabase.from('class_sessions').update({ active: false }).eq('id', id)
   if (error) throw error
+}
+
+/**
+ * Vincula una profesora con la cuenta que usa para entrar. Es lo que hace
+ * que my_teacher_ids() y my_class_ids() (0012) devuelvan algo, y por lo
+ * tanto lo que permite que "ver solo mis clases" signifique algo. Nulo
+ * desvincula.
+ */
+export async function setTeacherUser(teacherId: string, userId: string | null): Promise<void> {
+  const { error } = await supabase
+    .from('teachers')
+    .update({ user_id: userId })
+    .eq('id', teacherId)
+  if (error) {
+    // La columna es unique: una cuenta no puede ser dos profesoras.
+    if (error.code === '23505') throw new Error('Esa cuenta ya está vinculada a otra profesora')
+    throw error
+  }
 }
 
 // ---------------------------------------------------------------

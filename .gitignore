@@ -13,3 +13,5 @@ __v0_jsx-dev-runtime.ts
 node_modules
 .next/
 .DS_Store
+# Borradores que escriben los agentes de diseño: no son migraciones
+supabase/migrations/*BORRADOR*

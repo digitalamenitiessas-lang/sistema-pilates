@@ -42,6 +42,11 @@ export interface PaymentMethod {
   name: string
   /** false = lo acredita una integración (Mercado Pago), no se cobra a mano */
   isManual: boolean
+  /**
+   * Qué le hace este medio al precio de lista (0028): -5 es 5% de
+   * descuento, 25 es 25% de recargo. Cero mientras la migración no corrió.
+   */
+  ajustePct: number
   active: boolean
   sortOrder: number
 }
@@ -94,6 +99,12 @@ export interface Teacher {
   phone: string
   email: string
   color: string
+  /**
+   * La cuenta con la que entra al sistema (0012). Sin esto,
+   * my_teacher_ids() no encuentra nada y "ver solo mis clases" no puede
+   * funcionar por más permiso que se le dé: la base no sabe quién es.
+   */
+  userId?: string | null
 }
 
 export interface Plan {

@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
-import { registerPayment, collectPayment, createMpLink, syncMpPayments, voidPayment } from '@/lib/api'
+import { registerPayment, collectPayment, createMpLink, syncMpPayments, voidPayment, precioConAjuste, settingText } from '@/lib/api'
 import type { Payment } from '@/lib/types'
 
 type FilterStatus = 'todos' | 'pagado' | 'pendiente' | 'vencido'
@@ -218,14 +218,14 @@ function RegistrarPagoModal({ onClose }: { onClose: () => void }) {
 
             <div className="px-6 py-5 space-y-4 overflow-y-auto">
               <div>
-                <label className={labelClass}>Alumno *</label>
+                <label className={labelClass}>Clienta *</label>
                 <select
                   value={studentId}
                   onChange={(e) => applyPlanDefaults(e.target.value)}
                   required
                   className={inputClass}
                 >
-                  <option value="">Seleccionar alumno...</option>
+                  <option value="">Seleccionar clienta...</option>
                   {students.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
@@ -299,17 +299,30 @@ function RegistrarPagoModal({ onClose }: { onClose: () => void }) {
 
 function CobrarModal({ payment, onClose }: { payment: Payment; onClose: () => void }) {
   const { refresh } = useData()
+  const { paymentMethods, settings } = useStudio()
   const [method, setMethod] = useState<Method | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [receiptNumber, setReceiptNumber] = useState<number | null>(null)
+
+  // El precio de lista es el que quedó en la deuda; el medio de pago lo
+  // ajusta (efectivo −5%, tarjeta +25%). Mientras no se elige medio, se
+  // muestra el de lista.
+  const ajuste = method
+    ? (paymentMethods.find((m) => m.code === method)?.ajustePct ?? 0)
+    : 0
+  const redondeo = settingText(settings, 'price_rounding', 'cincuenta')
+  const aCobrar = ajuste === 0
+    ? payment.amount
+    : precioConAjuste(payment.amount, ajuste, redondeo)
+  const diferencia = aCobrar - payment.amount
 
   const handleSubmit = async () => {
     if (!method) return
     setSaving(true)
     setError(null)
     try {
-      const n = await collectPayment(payment.id, method)
+      const n = await collectPayment(payment.id, method, aCobrar)
       await refresh()
       setReceiptNumber(n)
     } catch (err) {
@@ -345,9 +358,19 @@ function CobrarModal({ payment, onClose }: { payment: Payment; onClose: () => vo
               <div className="bg-muted rounded-xl p-4">
                 <p className="text-sm font-semibold text-foreground">{payment.studentName}</p>
                 <p className="text-xs text-muted-foreground">{payment.planName}</p>
-                <p className="text-2xl font-bold text-foreground mt-2">
-                  ${payment.amount.toLocaleString('es-AR')}
+                <p className="text-2xl font-bold text-foreground mt-2 tabular-nums">
+                  ${aCobrar.toLocaleString('es-AR')}
                 </p>
+                {diferencia !== 0 && (
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Precio de lista ${payment.amount.toLocaleString('es-AR')} ·{' '}
+                    <span className={diferencia < 0 ? 'text-[#2E6040]' : 'text-amber-700'}>
+                      {diferencia < 0 ? 'descuento' : 'recargo'} del{' '}
+                      {Math.abs(ajuste).toLocaleString('es-AR')}% por pagar con{' '}
+                      {METHOD_LABEL[method as Method].toLowerCase()}
+                    </span>
+                  </p>
+                )}
               </div>
 
               <div>
@@ -477,7 +500,7 @@ function MpLinkModal({ payment, onClose }: { payment: Payment; onClose: () => vo
                 )}
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Cuando el alumno pague, el sistema lo acredita automáticamente y genera el
+                Cuando la clienta pague, el sistema lo acredita automáticamente y genera el
                 comprobante (se actualiza al abrir esta pantalla).
               </p>
             </>
@@ -700,7 +723,7 @@ export function PagosPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar alumno..."
+            placeholder="Buscar clienta..."
             className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground outline-none text-sm"
           />
         </div>
@@ -749,7 +772,7 @@ export function PagosPage() {
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Alumno
+                      Clienta
                     </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">
                       Concepto

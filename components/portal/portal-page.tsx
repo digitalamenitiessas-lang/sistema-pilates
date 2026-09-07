@@ -150,7 +150,7 @@ function MembershipCard({ student }: { student: Student }) {
   }
 
   const left = ms.classesTotal - ms.classesUsed
-  const pct = Math.round((ms.classesUsed / ms.classesTotal) * 100)
+  const pct = Math.min(100, Math.round((ms.classesUsed / ms.classesTotal) * 100))
   const statusCfg =
     ms.status === 'activa'
       ? { label: 'Activa', class: 'bg-[#E8F2EB] text-[#2E6040]' }
@@ -350,7 +350,7 @@ export function PortalPage() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center gap-3">
         <XCircle className="w-10 h-10 text-muted-foreground opacity-40" />
-        <p className="text-sm font-semibold text-foreground">Tu cuenta no está vinculada a una ficha de alumno</p>
+        <p className="text-sm font-semibold text-foreground">Tu cuenta no está vinculada a una ficha de clienta</p>
         <p className="text-xs text-muted-foreground max-w-xs">
           Pedile a recepción que te genere el acceso desde tu ficha. Si ya lo hicieron, probá salir y volver a entrar.
         </p>

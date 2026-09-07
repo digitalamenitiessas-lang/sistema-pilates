@@ -8,7 +8,7 @@ import type { PageKey } from './sidebar'
 const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
   dashboard: { title: 'Inicio', subtitle: 'Vista general del estudio' },
   agenda: { title: 'Agenda', subtitle: 'Clases y horarios semanales' },
-  alumnos: { title: 'Alumnos', subtitle: 'Fichas y membresías' },
+  alumnos: { title: 'Clientas', subtitle: 'Fichas y membresías' },
   planes: { title: 'Planes y Membresías', subtitle: 'Gestión de planes disponibles' },
   reservas: { title: 'Reservas', subtitle: 'Turnos, cancelaciones y lista de espera' },
   pagos: { title: 'Pagos', subtitle: 'Control de cobros e ingresos' },
@@ -57,7 +57,7 @@ export function Header({ currentPage, onNavigate, onOpenMobileMenu }: HeaderProp
         {/* Search */}
         <div className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg bg-muted border border-border text-sm text-muted-foreground w-52 cursor-pointer hover:border-primary/40 transition-colors">
           <Search className="w-4 h-4 shrink-0" />
-          <span>Buscar alumno...</span>
+          <span>Buscar clienta...</span>
           <kbd className="ml-auto text-[10px] px-1.5 py-0.5 rounded border border-border bg-card font-mono">⌘K</kbd>
         </div>
 

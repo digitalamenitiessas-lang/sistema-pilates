@@ -533,7 +533,7 @@ function Estudio({ schedule }: { schedule: PublicClass[] }) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/Pilates2.jpg"
-              alt="Alumnos en clase de Reformer"
+              alt="Clientas en clase de Reformer"
               className="w-full h-[420px] md:h-[520px] object-cover hover:scale-105 transition-transform duration-700"
             />
           </div>

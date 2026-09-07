@@ -15,7 +15,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { disciplineStyle } from '@/lib/disciplines'
-import { markAttendance, updateReservationStatus } from '@/lib/api'
+import { updateReservationStatus } from '@/lib/api'
 import type { Reservation, ReservationStatus } from '@/lib/types'
 
 const STATUS_CONFIG: Record<
@@ -78,7 +78,7 @@ export function ReservasPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar alumno o clase..."
+            placeholder="Buscar clienta o clase..."
             className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground outline-none text-sm"
           />
         </div>
@@ -155,7 +155,7 @@ export function ReservasPage() {
               <thead>
                 <tr className="border-b border-border bg-muted/30">
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Alumno
+                    Clienta
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     Clase
@@ -242,7 +242,7 @@ export function ReservasPage() {
                               <>
                                 <button
                                   disabled={busyId === r.id}
-                                  onClick={() => runAction(r, () => markAttendance(r))}
+                                  onClick={() => runAction(r, () => updateReservationStatus(r.id, 'asistió'))}
                                   className="w-7 h-7 rounded-lg hover:bg-[#E8F2EB] flex items-center justify-center text-muted-foreground hover:text-[#2E6040] transition-colors disabled:opacity-50"
                                   title="Marcar asistencia"
                                 >
