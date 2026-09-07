@@ -547,7 +547,13 @@ async function saveMedicalNotes(studentId: string, medicalNotes: string): Promis
   if (error) throw error
 }
 
-export async function createStudent(input: NewStudentInput, plans: Plan[]): Promise<void> {
+const PAYMENT_GRACE_DAYS = 5
+
+export async function createStudent(
+  input: NewStudentInput,
+  plans: Plan[],
+  settings: Settings = {}
+): Promise<void> {
   const { data: student, error } = await supabase
     .from('students')
     .insert({
@@ -565,7 +571,7 @@ export async function createStudent(input: NewStudentInput, plans: Plan[]): Prom
   if (input.medicalNotes) await saveMedicalNotes(student.id, input.medicalNotes)
 
   if (input.planId) {
-    await assignMembership(student.id, input.planId, plans)
+    await assignMembership(student.id, input.planId, plans, settings)
   }
 }
 
@@ -597,8 +603,20 @@ export async function setMembershipAutoRenew(membershipId: string, autoRenew: bo
   if (error) throw error
 }
 
-/** Crea la membresía y deja generada la deuda (pago pendiente). */
-export async function assignMembership(studentId: string, planId: string, plans: Plan[]): Promise<void> {
+/**
+ * Crea la membresía y deja generada la deuda (pago pendiente).
+ *
+ * `settings` va por parámetro y no se consulta acá adentro porque el
+ * paquete del estudio ya los trae cargados: pedirlos de nuevo sería un
+ * viaje a la base por cada alta. Con el objeto vacío cae al default, que es
+ * lo mismo que hacía antes de que el parámetro existiera.
+ */
+export async function assignMembership(
+  studentId: string,
+  planId: string,
+  plans: Plan[],
+  settings: Settings = {}
+): Promise<void> {
   const plan = plans.find((p) => p.id === planId)
   if (!plan) throw new Error('Plan inexistente')
 
@@ -624,7 +642,10 @@ export async function assignMembership(studentId: string, planId: string, plans:
       membership_id: membership.id,
       concept: plan.name,
       amount: plan.price,
-      due_date: addDays(start, 5),
+      // El plazo lo pone el estudio desde Configuración. Estaba escrito en
+      // el código mientras el parámetro ya existía y nadie lo leía: la
+      // clienta lo cambiaba y la cuota seguía venciendo a los cinco días.
+      due_date: addDays(start, settingNum(settings, 'payment_grace_days', PAYMENT_GRACE_DAYS)),
       status: 'pendiente',
     })
     if (payError) throw payError

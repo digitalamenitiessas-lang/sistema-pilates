@@ -14,6 +14,7 @@ interface AlumnoFormModalProps {
 export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
   const { data, refresh } = useData()
   const plans = data?.plans ?? []
+  const settings = data?.settings ?? {}
 
   const [name, setName] = useState(student?.name ?? '')
   const [email, setEmail] = useState(student?.email ?? '')
@@ -37,7 +38,7 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
       if (isEdit) {
         await updateStudent(student.id, input)
       } else {
-        await createStudent({ ...input, planId: planId || undefined }, plans)
+        await createStudent({ ...input, planId: planId || undefined }, plans, settings)
       }
       await refresh()
       onClose()
