@@ -99,6 +99,30 @@ const EXPIRY_WARNING_DAYS = 5
 // ---------------------------------------------------------------
 export type Settings = Record<string, string>
 
+/**
+ * El precio que se cobra según cómo paga la clienta.
+ *
+ * El ajuste vive en el medio de pago (0028) y no en el plan: es una
+ * propiedad de cómo se paga, no de qué se compra. El redondeo es un
+ * parámetro porque base × 0,95 da entero solo si la base es múltiplo de
+ * 20 — con los precios de hoy nunca se nota, con el primer aumento sí.
+ */
+export function precioConAjuste(
+  base: number,
+  ajustePct: number,
+  redondeo: string = 'cincuenta'
+): number {
+  const bruto = base * (1 + ajustePct / 100)
+  switch (redondeo) {
+    case 'cien':        return Math.round(bruto / 100) * 100
+    case 'cien_arriba': return Math.ceil(bruto / 100) * 100
+    case 'ninguno':     return Math.round(bruto * 100) / 100
+    // 'cincuenta' es el default y el que deja intacta la lista de precios
+    // publicada: sus doce valores son múltiplos de 50.
+    default:            return Math.round(bruto / 50) * 50
+  }
+}
+
 export function settingNum(settings: Settings, key: string, fallback: number): number {
   const n = Number(settings[key])
   return Number.isFinite(n) ? n : fallback
@@ -270,6 +294,8 @@ export async function fetchStudioData(): Promise<StudioData> {
       code: m.code,
       name: m.name,
       isManual: m.is_manual,
+      // ?? 0 mientras la 0028 no haya corrido: sin ajuste, el precio de lista.
+      ajustePct: Number(m.ajuste_pct ?? 0),
       active: m.active,
       sortOrder: m.sort_order,
     }))
@@ -740,13 +766,26 @@ export async function voidPayment(paymentId: string, motivo: string): Promise<vo
 }
 
 /** Cobra un pago pendiente existente; devuelve el número de comprobante. */
+/**
+ * Cobra el pago. `amount` viaja porque el monto puede haber cambiado al
+ * elegir el medio: lo que se guarda es lo que entró de verdad a la caja,
+ * no el precio de lista. Sin monto, se cobra lo que ya estaba.
+ */
 export async function collectPayment(
   paymentId: string,
-  method: 'efectivo' | 'transferencia' | 'tarjeta'
+  method: 'efectivo' | 'transferencia' | 'tarjeta',
+  amount?: number
 ): Promise<number> {
+  const cambios: Record<string, unknown> = {
+    status: 'pagado',
+    method,
+    paid_at: new Date().toISOString(),
+  }
+  if (amount !== undefined) cambios.amount = amount
+
   const { data, error } = await supabase
     .from('payments')
-    .update({ status: 'pagado', method, paid_at: new Date().toISOString() })
+    .update(cambios)
     .eq('id', paymentId)
     .select()
     .single()
@@ -1143,6 +1182,23 @@ export async function createPaymentMethod(code: string, name: string): Promise<v
 export async function renamePaymentMethod(code: string, name: string): Promise<void> {
   const { error } = await supabase.from('payment_methods').update({ name: name.trim() }).eq('code', code)
   if (error) throw error
+}
+
+/**
+ * El descuento o recargo del medio de pago (0028). Si la migración no
+ * corrió, la base no conoce la columna y se avisa en vez de fallar mudo.
+ */
+export async function setPaymentMethodAjuste(code: string, ajustePct: number): Promise<void> {
+  const { error } = await supabase
+    .from('payment_methods')
+    .update({ ajuste_pct: ajustePct })
+    .eq('code', code)
+  if (error) {
+    if (/ajuste_pct/.test(error.message)) {
+      throw new Error('Falta correr la migración 0028 para poder ajustar precios por medio de pago')
+    }
+    throw error
+  }
 }
 
 export async function setPaymentMethodActive(code: string, active: boolean): Promise<void> {

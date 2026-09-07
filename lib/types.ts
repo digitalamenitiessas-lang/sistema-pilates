@@ -42,6 +42,11 @@ export interface PaymentMethod {
   name: string
   /** false = lo acredita una integración (Mercado Pago), no se cobra a mano */
   isManual: boolean
+  /**
+   * Qué le hace este medio al precio de lista (0028): -5 es 5% de
+   * descuento, 25 es 25% de recargo. Cero mientras la migración no corrió.
+   */
+  ajustePct: number
   active: boolean
   sortOrder: number
 }

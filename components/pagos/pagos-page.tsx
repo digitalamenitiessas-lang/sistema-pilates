@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
-import { registerPayment, collectPayment, createMpLink, syncMpPayments, voidPayment } from '@/lib/api'
+import { registerPayment, collectPayment, createMpLink, syncMpPayments, voidPayment, precioConAjuste, settingText } from '@/lib/api'
 import type { Payment } from '@/lib/types'
 
 type FilterStatus = 'todos' | 'pagado' | 'pendiente' | 'vencido'
@@ -299,17 +299,30 @@ function RegistrarPagoModal({ onClose }: { onClose: () => void }) {
 
 function CobrarModal({ payment, onClose }: { payment: Payment; onClose: () => void }) {
   const { refresh } = useData()
+  const { paymentMethods, settings } = useStudio()
   const [method, setMethod] = useState<Method | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [receiptNumber, setReceiptNumber] = useState<number | null>(null)
+
+  // El precio de lista es el que quedó en la deuda; el medio de pago lo
+  // ajusta (efectivo −5%, tarjeta +25%). Mientras no se elige medio, se
+  // muestra el de lista.
+  const ajuste = method
+    ? (paymentMethods.find((m) => m.code === method)?.ajustePct ?? 0)
+    : 0
+  const redondeo = settingText(settings, 'price_rounding', 'cincuenta')
+  const aCobrar = ajuste === 0
+    ? payment.amount
+    : precioConAjuste(payment.amount, ajuste, redondeo)
+  const diferencia = aCobrar - payment.amount
 
   const handleSubmit = async () => {
     if (!method) return
     setSaving(true)
     setError(null)
     try {
-      const n = await collectPayment(payment.id, method)
+      const n = await collectPayment(payment.id, method, aCobrar)
       await refresh()
       setReceiptNumber(n)
     } catch (err) {
@@ -345,9 +358,19 @@ function CobrarModal({ payment, onClose }: { payment: Payment; onClose: () => vo
               <div className="bg-muted rounded-xl p-4">
                 <p className="text-sm font-semibold text-foreground">{payment.studentName}</p>
                 <p className="text-xs text-muted-foreground">{payment.planName}</p>
-                <p className="text-2xl font-bold text-foreground mt-2">
-                  ${payment.amount.toLocaleString('es-AR')}
+                <p className="text-2xl font-bold text-foreground mt-2 tabular-nums">
+                  ${aCobrar.toLocaleString('es-AR')}
                 </p>
+                {diferencia !== 0 && (
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Precio de lista ${payment.amount.toLocaleString('es-AR')} ·{' '}
+                    <span className={diferencia < 0 ? 'text-[#2E6040]' : 'text-amber-700'}>
+                      {diferencia < 0 ? 'descuento' : 'recargo'} del{' '}
+                      {Math.abs(ajuste).toLocaleString('es-AR')}% por pagar con{' '}
+                      {METHOD_LABEL[method as Method].toLowerCase()}
+                    </span>
+                  </p>
+                )}
               </div>
 
               <div>

@@ -51,6 +51,7 @@ import {
   createPaymentMethod,
   renamePaymentMethod,
   setPaymentMethodActive,
+  setPaymentMethodAjuste,
   saveSettings,
   fetchPermissionMatrix,
   setRolePermission,
@@ -1320,11 +1321,18 @@ function PaymentMethodsSection() {
         </div>
         <div>
           <h2 className="text-sm font-bold text-foreground">Medios de pago</h2>
-          <p className="text-xs text-muted-foreground">Con los que se puede cobrar en el mostrador</p>
+          <p className="text-xs text-muted-foreground">
+            Con los que se puede cobrar, y qué le hace cada uno al precio
+          </p>
         </div>
       </div>
 
       <div className="px-5 py-4 space-y-2">
+        <p className="text-[11px] text-muted-foreground pb-1">
+          El porcentaje ajusta el precio de lista al cobrar: <strong>−5</strong> es
+          cinco por ciento de descuento, <strong>25</strong> es veinticinco por
+          ciento de recargo, <strong>0</strong> deja el precio tal cual.
+        </p>
         {paymentMethods.length === 0 && (
           <p className="text-xs text-muted-foreground">
             Sin medios cargados. Corré la migración 0011.
@@ -1371,6 +1379,31 @@ function PaymentMethodsSection() {
                     automático
                   </span>
                 )}
+                {/* El ajuste se edita acá mismo: es un número y esto es su
+                    lugar natural. Vacío o cero = el precio de lista. */}
+                {canWrite ? (
+                  <span className="flex items-center gap-1 shrink-0">
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="-100"
+                      max="100"
+                      defaultValue={m.ajustePct}
+                      disabled={busy}
+                      onBlur={(e) => {
+                        const v = Number(e.target.value) || 0
+                        if (v !== m.ajustePct) run(() => setPaymentMethodAjuste(m.code, v))
+                      }}
+                      className="w-16 px-2 py-1 rounded-lg border border-border bg-background text-xs text-foreground text-right tabular-nums outline-none focus:border-primary"
+                      aria-label={`Ajuste de ${m.name}`}
+                    />
+                    <span className="text-xs text-muted-foreground">%</span>
+                  </span>
+                ) : m.ajustePct !== 0 ? (
+                  <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                    {m.ajustePct > 0 ? '+' : ''}{m.ajustePct}%
+                  </span>
+                ) : null}
                 {canWrite && (
                   <>
                     <button
