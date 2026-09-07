@@ -208,6 +208,17 @@ function mapSession(s: Record<string, unknown>): CashSession {
   }
 }
 
+/**
+ * Un error de PostgREST no es un Error de JavaScript: es un objeto plano.
+ * Las pantallas hacen `err instanceof Error ? err.message : 'genérico'`, así
+ * que tirarlo tal cual borra el mensaje que la base se tomó el trabajo de
+ * escribir — "esa cuenta ya tiene un turno abierto" se convertía en "no se
+ * pudo". Las funciones de caja rechazan con mensajes pensados para leerse.
+ */
+function comoError(error: { message?: string } | null, generico: string): Error {
+  return new Error(error?.message?.trim() || generico)
+}
+
 /** El turno abierto de una caja, si hay alguno. */
 export async function fetchOpenSession(accountId: string): Promise<CashSession | null> {
   const { data, error } = await supabase
@@ -237,7 +248,7 @@ export async function fetchSessions(accountId?: string | null, limite = 30): Pro
 
 export async function abrirCaja(accountId: string): Promise<CashSession> {
   const { data, error } = await supabase.rpc('abrir_caja', { p_account: accountId })
-  if (error) throw error
+  if (error) throw comoError(error, 'No se pudo abrir la caja')
   return mapSession(data)
 }
 
@@ -252,13 +263,13 @@ export async function cerrarCaja(
     p_saldo_real: saldoReal,
     p_notas: notas,
   })
-  if (error) throw error
+  if (error) throw comoError(error, 'No se pudo cerrar la caja')
   return mapSession(data)
 }
 
 export async function reabrirCaja(sessionId: string): Promise<void> {
   const { error } = await supabase.rpc('reabrir_caja', { p_session: sessionId })
-  if (error) throw error
+  if (error) throw comoError(error, 'No se pudo reabrir el arqueo')
 }
 
 // ---------------------------------------------------------------

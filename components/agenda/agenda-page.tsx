@@ -17,6 +17,7 @@ import {
   UserCheck,
   CalendarOff,
   ClipboardCheck,
+  Check,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
@@ -445,7 +446,7 @@ function ClassDetailModal({
   onEdit: (cls: ClassSession) => void
 }) {
   const { refresh, canWrite, can } = useData()
-  const { students, disciplines, teachers } = useStudio()
+  const { students, disciplines, teachers, reservations } = useStudio()
   const colors = disciplineStyle(disciplines, cls.discipline)
   const isFull = cls.enrolled >= cls.capacity
   const [dayBusy, setDayBusy] = useState(false)
@@ -488,12 +489,26 @@ function ClassDetailModal({
     runDay(() => setClassDateTeacher(cls.id, cls.date, teacherId))
   }
 
+  // Las que ya tienen reserva viva en esa clase y esa fecha.
+  const yaAnotadas = useMemo(
+    () =>
+      new Set(
+        reservations
+          .filter((r) => r.classId === cls.id && r.date === cls.date && r.status !== 'cancelada')
+          .map((r) => r.studentId)
+      ),
+    [reservations, cls.id, cls.date]
+  )
+
   const pct = Math.round((cls.enrolled / cls.capacity) * 100)
 
   const [studentId, setStudentId] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [done, setDone] = useState<string | null>(null)
+  // Quiénes se anotaron sin cerrar el panel. Antes esto era un cartel que
+  // reemplazaba el formulario, así que llenar una clase de seis eran seis
+  // aperturas del modal: la fricción número uno del mostrador.
+  const [anotadas, setAnotadas] = useState<{ nombre: string; espera: boolean }[]>([])
 
   const reserve = async (waitlist: boolean) => {
     if (!studentId) {
@@ -504,8 +519,10 @@ function ClassDetailModal({
     setError(null)
     try {
       await createReservation(studentId, cls.id, cls.date, waitlist ? 'lista de espera' : 'confirmada')
+      const nombre = students.find((s) => s.id === studentId)?.name ?? ''
       await refresh()
-      setDone(waitlist ? 'Anotado en lista de espera' : 'Reserva confirmada')
+      setAnotadas((prev) => [...prev, { nombre, espera: waitlist }])
+      setStudentId('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo crear la reserva')
     } finally {
@@ -748,23 +765,37 @@ function ClassDetailModal({
             <p className="text-sm text-center font-semibold text-muted-foreground bg-muted rounded-xl px-3 py-3">
               Clase suspendida ese día
             </p>
-          ) : done ? (
-            <p className="text-sm text-center font-semibold text-[#2E6040] bg-[#E8F2EB] rounded-xl px-3 py-3">
-              {done}
-            </p>
           ) : (
             <>
+              {anotadas.length > 0 && (
+                <div className="rounded-xl bg-[#E8F2EB] px-3 py-2.5 space-y-1">
+                  {anotadas.map((a, i) => (
+                    <p key={i} className="text-xs font-semibold text-[#2E6040] flex items-center gap-1.5">
+                      <Check className="w-3.5 h-3.5 shrink-0" />
+                      {a.nombre}
+                      {a.espera && <span className="font-normal">· en lista de espera</span>}
+                    </p>
+                  ))}
+                </div>
+              )}
+
               <select
                 value={studentId}
                 onChange={(e) => setStudentId(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary transition-colors"
               >
-                <option value="">Clienta a reservar...</option>
-                {students.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
+                <option value="">
+                  {anotadas.length > 0 ? 'Anotar a otra clienta...' : 'Clienta a reservar...'}
+                </option>
+                {/* Sin las que ya tienen lugar ese día: elegirlas de nuevo solo
+                    produce el error de reserva duplicada. */}
+                {students
+                  .filter((s) => !yaAnotadas.has(s.id))
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
               </select>
 
               {error && (

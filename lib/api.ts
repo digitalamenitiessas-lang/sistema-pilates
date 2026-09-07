@@ -866,10 +866,38 @@ export async function createReservation(
   const { error } = await supabase
     .from('reservations')
     .insert({ student_id: studentId, class_id: classId, date, status })
-  if (error) {
-    if (error.code === '23505') throw new Error('El alumno ya tiene una reserva para esa clase.')
-    throw error
+  if (!error) return
+  if (error.code !== '23505') throw error
+
+  // La restricción única de (clienta, clase, fecha) no mira el estado, así
+  // que una reserva cancelada bloquea anotarse de nuevo en esa misma
+  // clase. Pasa todo el tiempo: cancela, se le libera la tarde y quiere
+  // volver. Se reactiva la fila que ya está, que además conserva su
+  // historia (0031).
+  const { data: previa } = await supabase
+    .from('reservations')
+    .select('id, status')
+    .eq('student_id', studentId)
+    .eq('class_id', classId)
+    .eq('date', date)
+    .maybeSingle()
+
+  if (previa?.status === 'cancelada') {
+    const { error: reError } = await supabase.rpc('reactivar_reserva', {
+      p_reserva: previa.id,
+      p_estado: status,
+    })
+    // PGRST202 = falta correr la 0031. Se avisa qué pasa, no se calla.
+    if (reError?.code === 'PGRST202') {
+      throw new Error(
+        'Ya tiene una reserva cancelada en esa clase. Para reactivarla falta correr la migración 0031.'
+      )
+    }
+    if (reError) throw reError
+    return
   }
+
+  throw new Error('Esa clienta ya tiene una reserva para esa clase.')
 }
 
 export async function updateReservationStatus(
