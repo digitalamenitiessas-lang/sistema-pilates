@@ -262,6 +262,13 @@ function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => v
                 {/* Sin catálogo no hay nada que elegir, y el select tiene que
                     poder mostrar eso en vez de un valor que no existe. */}
                 {disciplines.length === 0 && <option value="">Sin disciplinas cargadas</option>}
+                {/* Una clase vieja puede tener una disciplina que el estudio
+                    dio de baja. Si no se ofrece, el select aparece en blanco y
+                    la clase parece no tener disciplina cuando sí la tiene. Se
+                    muestra marcada, para que se vea que hay que cambiarla. */}
+                {discipline && !disciplines.some((d) => d.name === discipline) && (
+                  <option value={discipline}>{discipline} — dada de baja</option>
+                )}
                 {disciplines.map((d) => (
                   <option key={d.id} value={d.name}>{d.name}</option>
                 ))}
