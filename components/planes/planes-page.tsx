@@ -445,7 +445,7 @@ export function PlanesPage() {
             )}
             {activeMemberships.map((m) => {
               const student = students.find((s) => s.id === m.studentId)
-              const pct = Math.round((m.classesUsed / m.classesTotal) * 100)
+              const pct = Math.min(100, Math.round((m.classesUsed / m.classesTotal) * 100))
               const plan = PLANS.find((p) => p.id === m.planId)
               return (
                 <div

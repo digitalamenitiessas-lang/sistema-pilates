@@ -150,7 +150,7 @@ function MembershipCard({ student }: { student: Student }) {
   }
 
   const left = ms.classesTotal - ms.classesUsed
-  const pct = Math.round((ms.classesUsed / ms.classesTotal) * 100)
+  const pct = Math.min(100, Math.round((ms.classesUsed / ms.classesTotal) * 100))
   const statusCfg =
     ms.status === 'activa'
       ? { label: 'Activa', class: 'bg-[#E8F2EB] text-[#2E6040]' }

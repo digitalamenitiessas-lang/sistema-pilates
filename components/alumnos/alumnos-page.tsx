@@ -61,7 +61,7 @@ function StudentCard({ student, onClick }: { student: Student; onClick: () => vo
             <div
               className="h-full rounded-full bg-primary transition-all"
               style={{
-                width: `${Math.round((ms.classesUsed / ms.classesTotal) * 100)}%`,
+                width: `${Math.min(100, Math.round((ms.classesUsed / ms.classesTotal) * 100))}%`,
               }}
             />
           </div>

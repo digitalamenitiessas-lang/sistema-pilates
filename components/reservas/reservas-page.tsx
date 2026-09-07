@@ -15,7 +15,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { disciplineStyle } from '@/lib/disciplines'
-import { markAttendance, updateReservationStatus } from '@/lib/api'
+import { updateReservationStatus } from '@/lib/api'
 import type { Reservation, ReservationStatus } from '@/lib/types'
 
 const STATUS_CONFIG: Record<
@@ -242,7 +242,7 @@ export function ReservasPage() {
                               <>
                                 <button
                                   disabled={busyId === r.id}
-                                  onClick={() => runAction(r, () => markAttendance(r))}
+                                  onClick={() => runAction(r, () => updateReservationStatus(r.id, 'asistió'))}
                                   className="w-7 h-7 rounded-lg hover:bg-[#E8F2EB] flex items-center justify-center text-muted-foreground hover:text-[#2E6040] transition-colors disabled:opacity-50"
                                   title="Marcar asistencia"
                                 >

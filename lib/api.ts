@@ -878,56 +878,21 @@ export async function updateReservationStatus(
   if (error) throw error
 }
 
-/** Marca asistencia y descuenta una clase de la membresía vigente del alumno. */
 /**
- * Deshace un "presente": devuelve la clase a la membresía que la consumió.
- * Sin esto, marcar por error y corregir le come una clase a la alumna.
+ * El descuento de la clase ya no vive acá.
+ *
+ * Hasta la 0029 lo hacía el navegador: markAttendance sumaba uno a
+ * classes_used y undoAttendance restaba. Elegían la membresía con una
+ * consulta suelta —la más reciente que siguiera vigente— así que si la
+ * clienta renovaba en el medio, la clase se le devolvía a la membresía
+ * equivocada. Y como reservar no descontaba nada, se podía reservar de
+ * más sin que ningún lado avisara.
+ *
+ * Ahora lo hace la base: descuenta al reservar, valida el saldo antes de
+ * aceptar y recalcula el contador en vez de sumar y restar, que es lo que
+ * hace imposible el doble cobro. Marcar asistencia pasó a ser lo que
+ * dice: un cambio de estado, con updateReservationStatus.
  */
-export async function undoAttendance(reservation: Reservation): Promise<void> {
-  await updateReservationStatus(reservation.id, 'confirmada')
-
-  const { data: memberships, error } = await supabase
-    .from('memberships')
-    .select('id, classes_used')
-    .eq('student_id', reservation.studentId)
-    .eq('status', 'activa')
-    .gte('end_date', hoyISO())
-    .order('end_date', { ascending: false })
-    .limit(1)
-  if (error) throw error
-
-  const m = memberships?.[0]
-  if (m && m.classes_used > 0) {
-    const { error: updError } = await supabase
-      .from('memberships')
-      .update({ classes_used: m.classes_used - 1 })
-      .eq('id', m.id)
-    if (updError) throw updError
-  }
-}
-
-export async function markAttendance(reservation: Reservation): Promise<void> {
-  await updateReservationStatus(reservation.id, 'asistió')
-
-  const { data: memberships, error } = await supabase
-    .from('memberships')
-    .select('id, classes_used, classes_total')
-    .eq('student_id', reservation.studentId)
-    .eq('status', 'activa')
-    .gte('end_date', hoyISO())
-    .order('end_date', { ascending: false })
-    .limit(1)
-  if (error) throw error
-
-  const m = memberships?.[0]
-  if (m && m.classes_used < m.classes_total) {
-    const { error: updError } = await supabase
-      .from('memberships')
-      .update({ classes_used: m.classes_used + 1 })
-      .eq('id', m.id)
-    if (updError) throw updError
-  }
-}
 
 // ---------------------------------------------------------------
 // Mercado Pago (las llamadas a la API de MP pasan por /api/mp/*

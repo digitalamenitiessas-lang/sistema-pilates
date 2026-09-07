@@ -491,7 +491,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                       <div className="h-2.5 rounded-full bg-muted overflow-hidden">
                         <div
                           className="h-full rounded-full bg-primary transition-all"
-                          style={{ width: `${(ms.classesUsed / ms.classesTotal) * 100}%` }}
+                          style={{ width: `${Math.min(100, (ms.classesUsed / ms.classesTotal) * 100)}%` }}
                         />
                       </div>
                     </div>
