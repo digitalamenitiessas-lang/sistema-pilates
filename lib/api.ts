@@ -479,16 +479,29 @@ export async function fetchStudioData(): Promise<StudioData> {
     mpLink: p.mp_link ?? null,
   }))
 
-  // La configuración solo es legible por admin/recepción; para otros
-  // roles (o antes de correr la migración 0002) queda en false.
+  // Si Mercado Pago está conectado, sin leer el token.
+  //
+  // La tabla la lee solo el admin (0008), y con razón: el token no tiene
+  // por qué viajar al navegador de recepción. Pero una consulta sin
+  // permiso devuelve CERO FILAS, no un error, así que preguntando por la
+  // tabla el sistema concluía "no está configurado" y le escondía a
+  // recepción botones que el servidor le habría aceptado. La función de la
+  // 0032 contesta el sí o el no sin mostrar el dato.
   let mpConfigured = false
   try {
-    const { data: mpSetting } = await supabase
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'mp_access_token')
-      .maybeSingle()
-    mpConfigured = !!mpSetting?.value
+    const { data, error } = await supabase.rpc('mp_configurado')
+    if (error) {
+      // PGRST202 = falta la 0032. Se cae al camino viejo, que anda para el
+      // admin y deja a recepción como estaba.
+      const { data: mpSetting } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'mp_access_token')
+        .maybeSingle()
+      mpConfigured = !!mpSetting?.value
+    } else {
+      mpConfigured = !!data
+    }
   } catch {
     mpConfigured = false
   }
