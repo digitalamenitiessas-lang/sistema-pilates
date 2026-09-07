@@ -221,6 +221,13 @@ export interface Alert {
   date?: string
 }
 
+/**
+ * Los tipos de aviso a los que la campana les da icono, color y destino
+ * propios. La lista de verdad NO es esta: es el CHECK de `notifications`
+ * (0007, ampliado en la 0010 y otra vez en la 0020), y la base se migra a
+ * mano, sin desplegar el front. Por eso estar acá es una mejora sobre el
+ * genérico, no un requisito: un tipo que falte se dibuja igual.
+ */
 export type NotificationType =
   | 'pago_acreditado'
   | 'nuevo_alumno'
@@ -228,11 +235,23 @@ export type NotificationType =
   | 'membresia_vencida'
   | 'deuda_vencida'
   | 'membresia_renovada'
+  // Los tres de caja los admite el CHECK desde la 0020 y todavía no los
+  // emite nadie: quedan listos para el día que el cron los mande.
+  | 'caja_sin_cerrar'
+  | 'caja_diferencia'
+  | 'saldo_sin_imputar'
 
 /** Notificación persistida (tabla notifications, migración 0007). */
 export interface AppNotification {
   id: string
-  type: NotificationType
+  /**
+   * Texto plano y no la unión de arriba, a propósito. Tiparlo como unión
+   * era prometer una exhaustividad que solo la base puede garantizar, y esa
+   * promesa terminaba en pantalla como un icono `undefined` que tira el
+   * árbol de React entero. Quien lo dibuja resuelve con `estiloDeAviso()`,
+   * que nunca devuelve nada vacío.
+   */
+  type: string
   title: string
   body: string
   studentId?: string | null
