@@ -330,6 +330,8 @@ export async function fetchStudioData(): Promise<StudioData> {
     name: p.name,
     price: Number(p.price),
     classCount: p.class_count,
+    // ?? 0 mientras la 0025 no haya corrido
+    weeklyFrequency: p.weekly_frequency ?? 0,
     durationDays: p.duration_days,
     disciplines: p.disciplines as Discipline[],
     description: p.description,
@@ -756,42 +758,57 @@ export interface PlanInput {
   name: string
   price: number
   classCount: number
+  /** Veces por semana. 0 = no aplica, como el pase de un día. */
+  weeklyFrequency: number
   durationDays: number
   disciplines: Discipline[]
   description: string
   color: string
   isTrial: boolean
+  /** El que la web destaca como "el más elegido" */
+  popular: boolean
 }
 
-export async function createPlan(input: PlanInput): Promise<void> {
-  const { error } = await supabase.from('plans').insert({
+function planRow(input: PlanInput) {
+  return {
     name: input.name,
     price: input.price,
     class_count: input.classCount,
+    weekly_frequency: input.weeklyFrequency,
     duration_days: input.durationDays,
     disciplines: input.disciplines,
     description: input.description,
     color: input.color,
     is_trial: input.isTrial,
-  })
-  if (error) throw error
+    popular: input.popular,
+  }
+}
+
+/**
+ * Escribe el plan tolerando que la 0025 no haya corrido: si la base
+ * todavía no conoce weekly_frequency, se reintenta sin esa columna. Sin
+ * esto, crear o editar un plan falla entero hasta que alguien corra la
+ * migración a mano — que es como se corren acá.
+ */
+async function escribirPlan(
+  escribir: (row: Record<string, unknown>) => PromiseLike<{ error: { message: string } | null }>,
+  row: Record<string, unknown>
+): Promise<void> {
+  const { error } = await escribir(row)
+  if (!error) return
+  if (!/weekly_frequency/.test(error.message)) throw error
+  const sinColumna = { ...row }
+  delete sinColumna.weekly_frequency
+  const reintento = await escribir(sinColumna)
+  if (reintento.error) throw reintento.error
+}
+
+export async function createPlan(input: PlanInput): Promise<void> {
+  await escribirPlan((row) => supabase.from('plans').insert(row), planRow(input))
 }
 
 export async function updatePlan(id: string, input: PlanInput): Promise<void> {
-  const { error } = await supabase
-    .from('plans')
-    .update({
-      name: input.name,
-      price: input.price,
-      class_count: input.classCount,
-      duration_days: input.durationDays,
-      disciplines: input.disciplines,
-      description: input.description,
-      color: input.color,
-      is_trial: input.isTrial,
-    })
-    .eq('id', id)
-  if (error) throw error
+  await escribirPlan((row) => supabase.from('plans').update(row).eq('id', id), planRow(input))
 }
 
 export async function deactivatePlan(id: string): Promise<void> {
@@ -1035,12 +1052,36 @@ export async function createDiscipline(input: DisciplineInput): Promise<void> {
  * Las tres tablas guardan el nombre como texto (igual que las salas), así que
  * la cascada la hace la app.
  */
+/**
+ * Renombrar una disciplina arrastra el nombre a class_sessions, plans y
+ * teachers, porque los catálogos guardan texto y no una clave foránea.
+ *
+ * Desde la 0025 eso lo hace una función en la base, en una transacción: o
+ * cambia todo o no cambia nada. El camino de abajo es el de antes, y
+ * queda solo para el rato en que la migración todavía no corrió — hace
+ * las mismas cuatro escrituras sueltas, con el mismo riesgo de dejar la
+ * disciplina renombrada y las clases apuntando al nombre viejo.
+ */
 export async function updateDiscipline(
   id: string,
   oldName: string,
   input: DisciplineInput
 ): Promise<void> {
   const row = disciplineRow(input)
+
+  const { error: rpcError } = await supabase.rpc('editar_disciplina', {
+    p_id: id,
+    p_nombre: row.name,
+    p_color: row.color,
+    p_bg_color: row.bg_color,
+    p_text_color: row.text_color,
+    p_blurb: row.blurb,
+  })
+  if (!rpcError) return
+  if (rpcError.code === '23505') throw new Error('Ya existe una disciplina con ese nombre')
+  // PGRST202 = la función no existe todavía. Cualquier otro error es real.
+  if (rpcError.code !== 'PGRST202') throw rpcError
+
   const { error } = await supabase.from('disciplines').update(row).eq('id', id)
   if (error) {
     if (error.code === '23505') throw new Error('Ya existe una disciplina con ese nombre')

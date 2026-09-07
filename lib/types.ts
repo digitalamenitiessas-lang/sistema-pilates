@@ -101,6 +101,8 @@ export interface Plan {
   name: string
   price: number
   classCount: number
+  /** Veces por semana (0025). 0 = no aplica, como el pase de un día. */
+  weeklyFrequency: number
   durationDays: number
   disciplines: Discipline[]
   description: string
