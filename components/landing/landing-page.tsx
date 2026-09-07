@@ -42,33 +42,19 @@ type Studio = typeof STUDIO_FALLBACK
 
 interface DisciplineStyle { dot: string; bg: string; text: string; blurb: string }
 
-/** Respaldo hasta que carguen las disciplinas del catálogo (migración 0011). */
-const DISCIPLINE_FALLBACK: Record<string, DisciplineStyle> = {
-  'Pilates Mat': {
-    dot: '#C4735A', bg: '#FDEEE8', text: '#8B3A25',
-    blurb: 'Fuerza y control desde el centro del cuerpo, en colchoneta. La base de todo.',
-  },
-  'Pilates Reformer': {
-    dot: '#7D9B76', bg: '#E8F2EB', text: '#2E6040',
-    blurb: 'Resistencia con resortes para trabajar profundo, con precisión y sin impacto.',
-  },
-  'Pilates Clínico': {
-    dot: '#9B6E8E', bg: '#F0EAF5', text: '#5A2F72',
-    blurb: 'Rehabilitación y trabajo postural guiado, indicado junto a tu médico o kinesiólogo.',
-  },
-  Yoga: {
-    dot: '#D4A854', bg: '#FDF5E6', text: '#7A5A1A',
-    blurb: 'Respiración, flexibilidad y calma. El contrapeso perfecto para tu semana.',
-  },
-  Stretching: {
-    dot: '#5E8FA8', bg: '#E6EFF5', text: '#1A4D6A',
-    blurb: 'Movilidad y elongación profunda para descomprimir el cuerpo.',
-  },
-  Funcional: {
-    dot: '#B8956A', bg: '#F5EDE0', text: '#6A4A1A',
-    blurb: 'Fuerza aplicada a movimientos reales. Energía pura en grupos chicos.',
-  },
+/**
+ * Estilo con el que se dibuja una disciplina cuyo color todavía no bajó
+ * del catálogo. Antes acá había seis disciplinas escritas a mano como
+ * respaldo, y eso era peor que no tener nada: si la consulta fallaba, la
+ * web le ofrecía a una persona que no conoce el estudio seis clases que
+ * el estudio no dicta. Mostrar menos es recuperable; prometer de más, no.
+ */
+const ESTILO_GENERICO: DisciplineStyle = {
+  dot: '#C4735A', bg: '#FDEEE8', text: '#8B3A25', blurb: '',
 }
+
+/** Vacío a propósito: las disciplinas salen del catálogo (migración 0011). */
+const DISCIPLINE_FALLBACK: Record<string, DisciplineStyle> = {}
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
@@ -559,6 +545,9 @@ function Estudio({ schedule }: { schedule: PublicClass[] }) {
 
 function Disciplinas() {
   const { disciplines, disciplineNames } = useLanding()
+  // Sin catálogo no se dibuja la sección: sacado el respaldo escrito a
+  // mano, quedaría el título prometiendo disciplinas y abajo nada.
+  if (disciplineNames.length === 0) return null
   return (
     <section id="disciplinas" className="py-24 bg-foreground/[0.025]">
       <div className="max-w-6xl mx-auto px-5">
@@ -568,7 +557,9 @@ function Disciplinas() {
         <div className="flex items-end justify-between gap-6 flex-wrap mb-12">
           <Reveal delay={100}>
             <h2 className="font-serif text-4xl md:text-5xl text-foreground leading-tight">
-              Seis maneras de <em className="text-primary">volver al cuerpo</em>
+              {/* Sin número: el catálogo lo edita el estudio, y un "Seis" escrito
+                  a mano se vuelve mentira la primera vez que agregue una. */}
+              Maneras de <em className="text-primary">volver al cuerpo</em>
             </h2>
           </Reveal>
           <Reveal delay={200}>
@@ -580,7 +571,7 @@ function Disciplinas() {
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {disciplineNames.map((name, i) => {
-            const s = disciplines[name] ?? DISCIPLINE_FALLBACK['Pilates Mat']
+            const s = disciplines[name] ?? ESTILO_GENERICO
             return (
             <Reveal key={name} delay={i * 90}>
               <div
@@ -804,7 +795,7 @@ function Horarios({ schedule }: { schedule: PublicClass[] }) {
             </p>
           ) : (
             ofDay.map((c, i) => {
-              const s = disciplines[c.discipline] ?? DISCIPLINE_FALLBACK['Pilates Mat']
+              const s = disciplines[c.discipline] ?? ESTILO_GENERICO
               return (
                 <div
                   key={c.id}
