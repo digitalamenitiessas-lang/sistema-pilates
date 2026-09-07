@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Lock, Mail, Loader2, ArrowLeft, IdCard, CheckCircle2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useNombreDelEstudio } from '@/lib/estudio-client'
 
 type Mode = 'login' | 'forgot' | 'register'
 
@@ -16,6 +17,7 @@ const buttonClass =
   'w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2'
 
 export function LoginPage() {
+  const estudio = useNombreDelEstudio()
   const [mode, setMode] = useState<Mode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -107,9 +109,9 @@ export function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
           <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center mb-4">
-            <span className="text-primary-foreground font-serif font-bold text-2xl">P</span>
+            <span className="text-primary-foreground font-serif font-bold text-2xl">{estudio.trim().charAt(0)}</span>
           </div>
-          <h1 className="font-serif text-2xl font-semibold text-foreground">PilatesStudio</h1>
+          <h1 className="font-serif text-2xl font-semibold text-foreground">{estudio}</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {mode === 'register' ? 'Creá tu acceso al portal' : mode === 'forgot' ? 'Recuperar contraseña' : 'Sistema de Gestión'}
           </p>
@@ -315,7 +317,7 @@ export function LoginPage() {
         )}
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          Staff y clientas del estudio
+          {`Staff y clientas de ${estudio}`}
         </p>
         <Link
           href="/"

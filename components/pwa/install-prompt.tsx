@@ -118,7 +118,7 @@ export function InstallPrompt() {
                 <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
                 <p className="text-sm text-foreground">
                   Tocá <strong>&quot;Agregar&quot;</strong> arriba a la derecha. Listo: vas a ver
-                  el ícono de PilatesStudio junto a tus apps.
+                  el ícono del estudio junto a tus apps.
                 </p>
               </li>
             </ol>
@@ -144,7 +144,7 @@ export function InstallPrompt() {
           <Smartphone className="w-5 h-5 text-primary-foreground" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-foreground">Llevá PilatesStudio en tu celu</p>
+          <p className="text-sm font-semibold text-foreground">Llevá el estudio en tu celu</p>
           <p className="text-xs text-muted-foreground mt-0.5 mb-3">
             Agregala a tu pantalla de inicio y usala como una app.
           </p>

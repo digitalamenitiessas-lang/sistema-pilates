@@ -27,7 +27,7 @@ import { supabase } from '@/lib/supabase'
 // está vacía.
 // ---------------------------------------------------------------
 const STUDIO_FALLBACK = {
-  name: 'PilatesStudio',
+  name: 'Casa Fé',
   city: 'San Miguel de Tucumán',
   address: 'Av. Aconquija 1200, Yerba Buena, Tucumán',
   mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Av.+Aconquija+1200+Yerba+Buena+Tucuman',

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getMpAccessToken, mpFetch, supabaseAdmin } from '@/lib/mp-server'
 import { esDenegado, exigir } from '@/lib/permisos-server'
+import { descriptorDeTarjeta, nombreDelEstudio } from '@/lib/estudio'
 
 // Genera un link de pago (Checkout Pro) para un pago pendiente.
 // external_reference = uuid del pago interno, para poder acreditarlo después.
@@ -52,7 +53,7 @@ export async function POST(request: Request) {
         },
       ],
       external_reference: payment.id,
-      statement_descriptor: 'PILATESSTUDIO',
+      statement_descriptor: descriptorDeTarjeta(await nombreDelEstudio()),
     }),
   })
 

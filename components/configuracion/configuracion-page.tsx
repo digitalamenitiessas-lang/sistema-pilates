@@ -206,7 +206,7 @@ function MercadoPagoSection() {
             </a>{' '}
             con la cuenta de Mercado Pago del estudio.
           </p>
-          <p>2. Creá una aplicación (nombre sugerido: PilatesStudio). En "Tipo de solución" elegí Pagos online → Checkout Pro.</p>
+          <p>2. Creá una aplicación con el nombre del estudio. En "Tipo de solución" elegí Pagos online → Checkout Pro.</p>
           <p>3. En la aplicación, andá a <strong>Credenciales de producción</strong> y copiá el <strong>Access Token</strong> y la <strong>Public Key</strong> acá abajo.</p>
           <p>4. Tocá <strong>Probar conexión</strong> y después <strong>Guardar</strong>. Listo — ya se pueden generar links de pago desde la pantalla Pagos.</p>
         </div>
