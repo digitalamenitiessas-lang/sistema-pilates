@@ -78,7 +78,7 @@ const ROLE_LABELS: Record<string, string> = {
   admin: 'Admin',
   recepcion: 'Recepción',
   profesor: 'Profesor/a',
-  alumno: 'Alumno/a',
+  alumno: 'Clienta',
 }
 
 const inputClass =
@@ -686,7 +686,7 @@ function UserFormModal({ onClose, onCreated }: { onClose: () => void; onCreated:
           <div>
             <label className={labelClass}>Rol</label>
             <select value={role} onChange={(e) => setRole(e.target.value as Role)} className={inputClass}>
-              <option value="recepcion">Recepción — gestiona alumnos, reservas y cobros</option>
+              <option value="recepcion">Recepción — gestiona clientas, reservas y cobros</option>
               <option value="profesor">Profesor/a — solo consulta</option>
               <option value="admin">Admin — acceso total y configuración</option>
             </select>
@@ -1432,7 +1432,7 @@ const ROLES_MATRIZ: Array<{ key: Role; label: string }> = [
   { key: 'admin', label: 'Admin' },
   { key: 'recepcion', label: 'Recepción' },
   { key: 'profesor', label: 'Profesora' },
-  { key: 'alumno', label: 'Alumna' },
+  { key: 'alumno', label: 'Clienta' },
 ]
 
 /** Por qué una clave no se puede tocar. */
@@ -1627,7 +1627,7 @@ function PermisosSection() {
             <br />
             Ojo con una cosa: sacarle <strong>Ver información financiera</strong> a
             un rol le esconde los pagos y la facturación, pero no el precio que
-            figura en la membresía de cada alumna. La base filtra por dato, no por
+            figura en la membresía de cada clienta. La base filtra por dato, no por
             campo suelto.
           </p>
         )}

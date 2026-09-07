@@ -62,7 +62,8 @@ hay que saber para no romperlo:
 - **`select * from public.perm_diff()` tiene que dar cero filas.** Cualquier
   fila ahí es un permiso que cambió sin que nadie lo pidiera.
 - El encendido va grupo por grupo: `update permission_keys set
-  enforce_mode = 'activo' where grupo = '...'`, y se revierte igual.
+  enforce_mode = 'activo' where grupo = '...'`, y se revierte igual. Ojo
+  que el grupo `Alumnos` pasó a llamarse `Clientas` en la migración 0026.
 - Interruptor de pánico: `update permission_config set value = 'emergencia'
   where key = 'modo'`.
 - `can()` va **siempre** envuelta en `(select ...)` dentro de una política.

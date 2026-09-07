@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'Sistema de Gestión — PilatesStudio',
-  description: 'Gestión de alumnos, clases, reservas, membresías y pagos.',
+  description: 'Gestión de clientas, clases, reservas, membresías y pagos.',
   robots: { index: false },
 }
 

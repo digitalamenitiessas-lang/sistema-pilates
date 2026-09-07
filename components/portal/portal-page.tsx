@@ -350,7 +350,7 @@ export function PortalPage() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center gap-3">
         <XCircle className="w-10 h-10 text-muted-foreground opacity-40" />
-        <p className="text-sm font-semibold text-foreground">Tu cuenta no está vinculada a una ficha de alumno</p>
+        <p className="text-sm font-semibold text-foreground">Tu cuenta no está vinculada a una ficha de clienta</p>
         <p className="text-xs text-muted-foreground max-w-xs">
           Pedile a recepción que te genere el acceso desde tu ficha. Si ya lo hicieron, probá salir y volver a entrar.
         </p>

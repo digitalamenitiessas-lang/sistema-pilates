@@ -169,7 +169,7 @@ export function LoginPage() {
             </button>
 
             <p className="text-center text-xs text-muted-foreground pt-1">
-              ¿Sos alumna del estudio y no tenés cuenta?{' '}
+              ¿Sos clienta del estudio y no tenés cuenta?{' '}
               <button
                 type="button"
                 onClick={() => switchMode('register')}
@@ -315,7 +315,7 @@ export function LoginPage() {
         )}
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          Staff y alumnos de PilatesStudio
+          Staff y clientas del estudio
         </p>
         <Link
           href="/"

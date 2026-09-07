@@ -211,7 +211,7 @@ const TIPOS_MOVIMIENTO: Array<{ k: MovementKind; label: string; ayuda: string }>
   { k: 'transferencia', label: 'Transferencia entre cuentas', ayuda: 'Retirar de Mercado Pago al banco, depositar la recaudación' },
   { k: 'retiro', label: 'Retiro', ayuda: 'Plata que sale y no es un gasto del estudio' },
   { k: 'aporte', label: 'Aporte', ayuda: 'Plata que entra y no es un cobro' },
-  { k: 'devolucion', label: 'Devolución', ayuda: 'Se le devolvió plata a una alumna' },
+  { k: 'devolucion', label: 'Devolución', ayuda: 'Se le devolvió plata a una clienta' },
   { k: 'apertura', label: 'Saldo inicial', ayuda: 'Con cuánto arrancó esta cuenta en el sistema' },
 ]
 

@@ -102,7 +102,7 @@ export function TomarAsistencia({
             <div className="min-w-0">
               <h2 className="text-base font-bold text-foreground truncate">{title}</h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {time} · {lista.length} {lista.length === 1 ? 'alumna' : 'alumnas'}
+                {time} · {lista.length} {lista.length === 1 ? 'clienta' : 'clientas'}
               </p>
             </div>
             <button

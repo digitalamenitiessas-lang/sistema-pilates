@@ -158,9 +158,9 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           icon={Users}
-          label="Alumnos activos"
+          label="Clientas activas"
           value={String(activeMembers)}
-          sub={`${students.length} alumnos totales`}
+          sub={`${students.length} clientas totales`}
           accent="#C4735A"
         />
         <StatCard

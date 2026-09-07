@@ -395,7 +395,7 @@ function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => v
             </span>
             <span>
               <span className="block text-sm font-medium text-foreground">
-                La alumna puede reservarla sola
+                La clienta puede reservarla sola
               </span>
               <span className="block text-[11px] text-muted-foreground leading-tight">
                 Apagado: se muestra en la agenda, pero el lugar lo asigna recepción
@@ -464,7 +464,7 @@ function ClassDetailModal({
 
   const suspender = () => {
     const motivo = window.prompt(
-      'Motivo de la suspensión (lo va a ver la alumna):',
+      'Motivo de la suspensión (lo va a ver la clienta):',
       cls.occurrenceReason || 'Feriado'
     )
     if (motivo === null) return
@@ -490,7 +490,7 @@ function ClassDetailModal({
 
   const reserve = async (waitlist: boolean) => {
     if (!studentId) {
-      setError('Seleccioná un alumno primero')
+      setError('Seleccioná una clienta primero')
       return
     }
     setSaving(true)
@@ -578,7 +578,7 @@ function ClassDetailModal({
                 )}
                 {!cls.bookable && (
                   <p className="text-[11px] text-muted-foreground">
-                    La alumna no la reserva sola: el lugar lo asigna recepción
+                    La clienta no la reserva sola: el lugar lo asigna recepción
                   </p>
                 )}
               </div>
@@ -752,7 +752,7 @@ function ClassDetailModal({
                 onChange={(e) => setStudentId(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary transition-colors"
               >
-                <option value="">Alumno a reservar...</option>
+                <option value="">Clienta a reservar...</option>
                 {students.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
