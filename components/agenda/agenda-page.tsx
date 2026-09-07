@@ -46,6 +46,8 @@ const MONTH_NAMES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'jul
 /** Clase con cupos calculados para una semana determinada. */
 type WeekClass = ClassSession & {
   date: string
+  /** Las que hay que mirar al pasar lista, incluidas las ausentes */
+  conLista: number
   /** Ese día no se dicta (migración 0018) */
   suspended?: boolean
   /** Ese día la da otra profesora */
@@ -751,7 +753,7 @@ function ClassDetailModal({
             </div>
           )}
 
-          {puedeMarcarAsistencia && !cls.suspended && cls.enrolled > 0 && (
+          {puedeMarcarAsistencia && !cls.suspended && cls.conLista > 0 && (
             <button
               onClick={() => setTomandoAsistencia(true)}
               className="w-full py-3 rounded-xl border-2 border-primary text-primary text-sm font-bold flex items-center justify-center gap-2 hover:bg-primary/5 transition-colors"
@@ -878,6 +880,14 @@ export function AgendaPage() {
           substitute: !!occ?.teacherId,
           occurrenceReason: occ?.reason ?? '',
           enrolled: ofDay.filter((r) => r.status === 'confirmada' || r.status === 'asistió').length,
+          // Las que hay que mirar al pasar lista, incluidas las que ya se
+          // marcaron ausente. Separado de `enrolled` —que es ocupación—
+          // porque si no, marcar ausente a todas dejaba el conteo en cero,
+          // el botón de asistencia desaparecía y no había forma de
+          // corregir un error de tipeo sin entrar al SQL Editor.
+          conLista: ofDay.filter(
+            (r) => r.status === 'confirmada' || r.status === 'asistió' || r.status === 'ausente'
+          ).length,
           waitlist: ofDay.filter((r) => r.status === 'lista de espera').length,
         }
       })

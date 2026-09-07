@@ -194,10 +194,13 @@ function MembershipCard({ student }: { student: Student }) {
 
 function UpcomingList({
   reservations,
+  suspendidas,
   onCancel,
   busyId,
 }: {
   reservations: Reservation[]
+  /** clase|fecha de los días que el estudio suspendió, con su motivo */
+  suspendidas: Map<string, string>
   onCancel: (r: Reservation) => void
   busyId: string | null
 }) {
@@ -211,32 +214,53 @@ function UpcomingList({
   }
   return (
     <div className="space-y-2">
-      {reservations.map((r) => (
+      {reservations.map((r) => {
+        // Suspender una fecha no cancela las reservas —esa decisión la toma
+        // el estudio—, así que la reserva seguía acá como si nada y la
+        // clienta viajaba a una clase que no se dictaba.
+        const motivo = suspendidas.get(`${r.classId}|${r.date}`)
+        return (
         <div key={r.id} className="bg-card rounded-2xl border border-border px-4 py-3 flex items-center gap-3">
           <div
             className="w-1 self-stretch rounded-full shrink-0"
-            style={{ backgroundColor: disciplineStyle(disciplines, r.discipline).dot }}
+            style={{ backgroundColor: motivo !== undefined ? '#C4B5AE' : disciplineStyle(disciplines, r.discipline).dot }}
           />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-foreground truncate">{r.className}</p>
+            <p className={cn('text-sm font-semibold truncate', motivo !== undefined ? 'text-muted-foreground line-through' : 'text-foreground')}>
+              {r.className}
+            </p>
             <p className="text-xs text-muted-foreground">
               {pretty(r.date)} · {r.time} · {r.teacherName}
             </p>
+            {motivo !== undefined && (
+              <p className="text-xs text-destructive font-medium mt-0.5">
+                El estudio suspendió esta clase{motivo ? `: ${motivo}` : ''}
+              </p>
+            )}
           </div>
-          {r.status === 'lista de espera' && (
+          {motivo !== undefined ? (
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-destructive/10 text-destructive shrink-0">
+              Suspendida
+            </span>
+          ) : r.status === 'lista de espera' ? (
             <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 shrink-0">
               En espera
             </span>
+          ) : null}
+          {/* Si el estudio la suspendió no hay nada que cancelar, y con el
+              consumo encendido esa clase no se le descuenta. */}
+          {motivo === undefined && (
+            <button
+              disabled={busyId === r.id}
+              onClick={() => onCancel(r)}
+              className="shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
+            >
+              {busyId === r.id ? '...' : 'Cancelar'}
+            </button>
           )}
-          <button
-            disabled={busyId === r.id}
-            onClick={() => onCancel(r)}
-            className="shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
-          >
-            {busyId === r.id ? '...' : 'Cancelar'}
-          </button>
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -265,6 +289,18 @@ export function PortalPage() {
   const ms = me?.membership
   const classesLeft = ms ? ms.classesTotal - ms.classesUsed : 0
   const canBook = !!ms && (ms.status === 'activa' || ms.status === 'por vencer') && classesLeft > 0
+
+  // Las fechas que el estudio suspendió, con su motivo, para las clases
+  // que le importan a esta clienta.
+  const suspendidas = useMemo(
+    () =>
+      new Map(
+        occurrences
+          .filter((o) => o.status === 'suspendida')
+          .map((o) => [`${o.classId}|${o.date}`, o.reason ?? ''])
+      ),
+    [occurrences]
+  )
 
   const myUpcoming = useMemo(
     () =>
@@ -468,7 +504,7 @@ export function PortalPage() {
             <CalendarDays className="w-4 h-4 text-primary" />
             Tus próximas clases
           </h2>
-          <UpcomingList reservations={myUpcoming} onCancel={cancel} busyId={busyId} />
+          <UpcomingList reservations={myUpcoming} suspendidas={suspendidas} onCancel={cancel} busyId={busyId} />
         </section>
 
         {/* Reservar */}
