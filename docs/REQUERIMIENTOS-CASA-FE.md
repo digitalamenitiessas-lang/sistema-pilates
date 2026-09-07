@@ -462,7 +462,10 @@ respuestas. Lo de más abajo se apoya en lo de más arriba: cambiarlo de orden
 obliga a rehacer. El detalle con evidencia archivo:línea está en
 [`casa-fe-impacto-de-las-respuestas.md`](casa-fe-impacto-de-las-respuestas.md), §5.
 
-**Paso 0 — Los arreglos previos.** Bugs vivos y trampas que se despiertan con lo
+**Paso 0 — Los arreglos previos.** Se lleva las migraciones `0023`
+(el tipo de aviso `renovacion_omitida`) y `0024` (marcar los parámetros que
+todavía no rigen), así que el resto corre dos números más abajo de lo que
+decía el plan original. Bugs vivos y trampas que se despiertan con lo
 de abajo. Ninguno depende de la clienta.
 
 - El `continue` mudo del cron sobre un plan inactivo
@@ -483,23 +486,23 @@ de abajo. Ninguno depende de la clienta.
   `waitlist_offer_minutes`), con el criterio de los permisos en sombra. Son once
   en total los declarados sin código.
 
-**Paso 1 — Catálogo: disciplinas, planes y el renombre** (`0023`). Las tres
+**Paso 1 — Catálogo: disciplinas, planes y el renombre** (`0025`). Las tres
 disciplinas con renombrado en cascada hecho en SQL, los seis planes FE con
 `weekly_frequency`, y el vocabulario. El renombre a "Clientes" va en su propio
 commit, después de la respuesta de género.
 
-**Paso 2 — El consumo de la clase, en la base** (`0024`). El corazón del cambio:
+**Paso 2 — El consumo de la clase, en la base** (`0026`). El corazón del cambio:
 redefine qué significa una reserva. Trigger que descuenta al insertar y sella
 `membership_id`; clasificación de la cancelación contra `cancel_hours`;
 devolución al suspender una fecha con `cancel_kind = 'suspendida por el estudio'`;
 tope de recuperos; la excepción autorizada. Corte limpio, **sin backfill**: el
 camino de asistencia descuenta solo si `membership_id is null`.
 
-**Paso 3 — Los precios** (`0025`). `payment_methods.ajuste_pct`, el recálculo en
+**Paso 3 — Los precios** (`0027`). `payment_methods.ajuste_pct`, el recálculo en
 el modal de cobro, y la invalidación del link de Mercado Pago cuando cambia el
 monto.
 
-**Paso 4 — Lista de espera y avisos** (`0026`). Borrar lo que sobra de la 0022,
+**Paso 4 — Lista de espera y avisos** (`0028`). Borrar lo que sobra de la 0022,
 **la política permisiva nueva** para que la alumna confirme, el registro de a
 quién se le avisó, y encender el canal hacia la alumna: `pushToUser`
 (`lib/push-server.ts:65`) está escrita y **sin un solo llamador**, y el email por
