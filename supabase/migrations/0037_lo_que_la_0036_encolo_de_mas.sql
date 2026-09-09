@@ -24,9 +24,19 @@
 -- DE UNA MENSUALIDAD. Un pase de un día arranca el día que se compra,
 -- siempre.
 --
--- Acá también se corrige un off-by-one que la 0036 dejó vivo justo en la
--- rama que no miraba, y se le agrega a la vista pública la columna que le
--- falta para no publicar una vigencia falsa.
+-- Acá también entran cuatro cosas más, y la última no es de este tema
+-- pero no puede esperar:
+--
+--   · Un off-by-one que la 0036 dejó vivo justo en la rama que no miraba.
+--   · El desempate de qué membresía paga la clase cuando hay dos, que es
+--     la consecuencia directa de dejar que el pase de prueba arranque hoy:
+--     sin eso, este arreglo mueve el problema en vez de sacarlo.
+--   · Un piso para la vigencia, porque un plan en cero creaba membresías
+--     vencidas el día antes de empezar y el insert pasaba.
+--   · La columna que le falta a la vista pública para no publicar una
+--     vigencia falsa.
+--   · Y `consumir_clase` de la 0029, que lee OLD en un INSERT: está
+--     aplicada y encendida, y si eso muerde falla TODA reserva nueva.
 --
 -- Ejecutar completo en el SQL Editor del dashboard de Supabase.
 -- ============================================================
@@ -123,12 +133,195 @@ begin
   end if;
 
   new.end_date := public.vigencia_hasta(new.start_date, new.plan_id);
+
+  -- Un plan con la vigencia en cero devuelve `start - 1`, o sea una
+  -- membresía vencida el día antes de empezar, y el insert PASA: no hay
+  -- CHECK que lo impida. Pasaba de verdad, porque hasta el arreglo de
+  -- este mismo lote el formulario de Planes escribía duration_days = 0 al
+  -- guardar un plan mensual. Se corta acá, que es donde se ve el
+  -- resultado, y no con un CHECK sobre plans: un plan mal cargado se
+  -- corrige, una membresía nacida vencida hay que descubrirla.
+  if new.end_date < new.start_date then
+    raise exception
+      'El plan no tiene vigencia: revisá los días o los meses en Planes antes de asignarlo';
+  end if;
+
   return new;
 end;
 $$;
 
 -- ------------------------------------------------------------
--- 3. LA WEB PÚBLICA NO PUEDE PUBLICAR UNA VIGENCIA QUE NO EXISTE
+-- 3. CUÁL MEMBRESÍA PAGA LA CLASE, CUANDO HAY DOS
+--
+-- Dejar que el pase de prueba arranque hoy abre a propósito lo que la
+-- 0036 había cerrado: dos membresías que cubren la misma fecha. Y ahí
+-- `membresia_para` elige "la que primero se pierde", que era lo correcto
+-- entre dos mensualidades y es lo PEOR entre una mensualidad y un pase:
+-- elige el pase aunque esté agotado, y `consumir_clase` rechaza la
+-- reserva con "Ya usó la clase de su plan" mientras la mensualidad tiene
+-- ocho clases sin tocar.
+--
+-- O sea: sin esto, arreglar el encolado del pase de prueba mueve el
+-- problema en vez de sacarlo.
+--
+-- El orden pasa a ser: primero la que TIENE saldo, y entre esas la que
+-- primero se pierde. Sigue siendo verdad lo que la 0029 quería —no
+-- desperdiciar la que vence antes— y deja de ser posible que una
+-- membresía agotada bloquee a una que no lo está.
+--
+-- `classes_used` es derivado y los triggers de la 0029 lo mantienen, así
+-- que se lee directo en vez de recalcular: `consumo_control()` es el que
+-- garantiza que no miente.
+-- ------------------------------------------------------------
+
+create or replace function public.membresia_para(p_student uuid, p_fecha date)
+returns uuid
+language sql stable security definer set search_path = ''
+as $$
+  select m.id
+  from public.memberships m
+  where m.student_id = p_student
+    and m.status = 'activa'
+    and p_fecha between m.start_date and m.end_date
+  order by (m.classes_used >= m.classes_total), m.end_date
+  limit 1
+$$;
+
+-- ------------------------------------------------------------
+-- 4. Y UNA QUE NO ES DE ESTE TEMA, PERO NO PUEDE ESPERAR
+--
+-- `consumir_clase` (0029) arma su bandera de "se está marcando
+-- asistencia" leyendo `old.status` dentro de una expresión con `and`:
+--
+--   v_marca := tg_op = 'UPDATE' and new.status in (...)
+--              and old.status is distinct from new.status;
+--
+-- En un INSERT, OLD no existe: no es una fila de nulos, es un registro
+-- sin asignar, y tocarle un campo levanta `record "old" is not assigned
+-- yet`. Lo único que lo salva es que el AND cortocircuite, y el manual
+-- dice explícitamente que el orden de evaluación de las subexpresiones no
+-- está definido.
+--
+-- Este proyecto ya había tomado la decisión contraria y la dejó escrita:
+-- `stamp_reservation` (0022) usa una bandera "con una bandera y no con un
+-- `or` en la condición: el OR de SQL no garantiza evaluación perezosa, y
+-- en un INSERT no existe OLD". En la 0029 se volvió a colar.
+--
+-- POR QUÉ AHORA. Esa línea nunca se ejecutó: consumir_clase arranca con
+-- `if not consumo_rige() then return new`, y el motor estuvo apagado
+-- hasta el 09/09. Se encendió el mismo día, y desde entonces no hubo
+-- ninguna reserva real porque no hay clientes cargados. La primera que
+-- se haga la ejercita — y si muerde, no falla una reserva: fallan TODAS,
+-- desde el portal y desde el mostrador.
+--
+-- La función va completa porque `create or replace` reemplaza el cuerpo
+-- entero; lo único que cambia son esas tres líneas. El trigger que la
+-- llama no se toca.
+-- ------------------------------------------------------------
+
+create or replace function public.consumir_clase()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_toma     boolean;   -- ¿esta escritura toma un lugar?
+  v_marca    boolean;   -- ¿se está marcando asistencia?
+  v_mem      uuid;
+  v_total    int;
+  v_usadas   int;
+  v_horas    numeric;
+  v_inicio   timestamptz;
+  v_susp     boolean;
+begin
+  if not public.consumo_rige() then return new; end if;
+
+  v_toma  := new.status in ('confirmada', 'asistió');
+
+  -- Con una bandera y no con un `and` en la expresión: el AND de SQL no
+  -- garantiza evaluación perezosa, y en un INSERT OLD no existe — leerlo
+  -- levanta 'record "old" is not assigned yet' y falla TODA reserva
+  -- nueva. La 0022 ya lo había dejado escrito (stamp_reservation usa
+  -- v_foto por este mismo motivo) y acá se había colado.
+  v_marca := false;
+  if tg_op = 'UPDATE' then
+    v_marca := new.status in ('asistió', 'ausente')
+               and old.status is distinct from new.status;
+  end if;
+
+  if tg_op = 'UPDATE' then
+    -- La identidad de la reserva NO se mueve en un update, y esto no es
+    -- cosmético: desde la 0029 date, class_id y start_time deciden si la
+    -- clase se pierde o vuelve. La política "alumno cancela" (0005:75-78)
+    -- deja a la alumna escribir sus propias filas y NO restringe
+    -- columnas, así que sin esto puede mandar start_time = '23:59' junto
+    -- con la cancelación y convertir un aviso tardío en uno en plazo.
+    -- Ningún camino legítimo del código escribe estas columnas en un
+    -- update: el único que existe es .update({ status }).
+    new.student_id := old.student_id;
+    new.class_id   := old.class_id;
+    new.date       := old.date;
+    new.membership_id := old.membership_id;
+    -- start_time solo lo refresca reservations_stamp al marcar asistencia,
+    -- que corre después de este trigger.
+    if not v_marca then new.start_time := old.start_time; end if;
+  end if;
+
+  -- ---- Clasificar la cancelación ----
+  if tg_op = 'UPDATE' and new.status = 'cancelada'
+     and old.status is distinct from 'cancelada' then
+
+    select exists (
+      select 1 from public.class_occurrences o
+      where o.class_id = new.class_id and o.date = new.date and o.status = 'suspendida'
+    ) into v_susp;
+
+    if v_susp then
+      -- La suspensión manda sobre el reloj: si el estudio no la dictó, no
+      -- importa a qué hora avisó la clienta.
+      new.cancel_kind := null;
+    else
+      select coalesce(nullif(s.value, '')::numeric, 3) into v_horas
+      from public.studio_settings s where s.key = 'cancel_hours';
+      v_horas := coalesce(v_horas, 3);
+
+      v_inicio := (new.date + coalesce(new.start_time, time '00:00'))
+                    at time zone 'America/Argentina/Buenos_Aires';
+
+      new.cancel_kind := case
+        when now() <= v_inicio - make_interval(mins => (v_horas * 60)::int)
+        then 'en plazo' else 'fuera de plazo' end;
+    end if;
+  end if;
+
+  -- ---- Validar y sellar al tomar un lugar ----
+  if v_toma and (tg_op = 'INSERT' or new.membership_id is null) then
+    v_mem := public.membresia_para(new.student_id, new.date);
+
+    if v_mem is null then
+      raise exception
+        'No tiene una membresía vigente para el % — asignale un plan antes de reservarle esa clase',
+        to_char(new.date, 'DD/MM/YYYY');
+    end if;
+
+    select m.classes_total, m.classes_used_base + public.consumo_contadas(m.id)
+    into v_total, v_usadas
+    from public.memberships m where m.id = v_mem;
+
+    if v_usadas >= v_total then
+      raise exception
+        'Ya usó las % clases de su plan. Para anotarla igual, renovale la membresía o cambiale el plan',
+        v_total;
+    end if;
+
+    new.membership_id := v_mem;
+  end if;
+
+  return new;
+end;
+$$;
+
+-- ------------------------------------------------------------
+-- 5. LA WEB PÚBLICA NO PUEDE PUBLICAR UNA VIGENCIA QUE NO EXISTE
 --
 -- La vista enumera columnas, así que `duration_months` no llegaba y la
 -- landing solo tenía `duration_days` para mostrar: publicaba "Vigencia 30
@@ -140,11 +333,29 @@ $$;
 -- Se suma la columna a la vista y la landing la usa. `select *` no sirve
 -- acá: la vista enumera a propósito, para no exponer una columna nueva de
 -- plans sin decidirlo.
+--
+-- LA COLUMNA VA AL FINAL, Y NO ES UNA CUESTIÓN DE ESTILO. `create or
+-- replace view` solo admite AGREGAR columnas después de las que ya
+-- estaban: poner `duration_months` en su lugar natural —al lado de
+-- `duration_days`— hace que Postgres lea la lista por posición y crea que
+-- se le está renombrando la sexta columna. Falla con
+-- `42P16: cannot change name of view column "disciplines" to
+-- "duration_months"` y, como todo esto va en una transacción, no se aplica
+-- nada del resto de la migración.
+--
+-- La alternativa era `drop view` + `create view`, y no se elige: la vista
+-- la lee la landing SIN LOGIN, y su acceso público depende de los
+-- privilegios por defecto del esquema. Recrear el objeto es apostar a que
+-- se los vuelva a dar; agregar al final no toca nada de eso.
+--
+-- El orden de las columnas de una vista no lo usa nadie acá: PostgREST
+-- devuelve un objeto y el código lee por nombre.
 -- ------------------------------------------------------------
 
 create or replace view public.public_plans as
-select id, name, price, class_count, duration_days, duration_months, disciplines,
-       description, color, popular, is_trial
+select id, name, price, class_count, duration_days, disciplines,
+       description, color, popular, is_trial,
+       duration_months
 from public.plans
 where active = true;
 
@@ -177,7 +388,26 @@ commit;
 --
 --   -- 6. La vista pública ya trae la columna
 --   select name, duration_days, duration_months from public.public_plans order by price;
---   → los cinco FE con duration_months = 1, FE FIRST con 7 días
+--   → los cinco FE con duration_months = 1, FE FIRST con 7 días y 0 meses
+--
+--   -- Y que la vista no haya perdido ninguna columna en el camino
+--   select column_name from information_schema.columns
+--   where table_name = 'public_plans' order by ordinal_position;
+--   → las diez de siempre y duration_months al final
+--
+--   -- 7. El desempate: con una prueba agotada y una mensualidad con
+--   --    saldo cubriendo el mismo día, el motor tiene que elegir la que
+--   --    tiene saldo. Con un cliente de prueba:
+--   --    asignale FE FIRST, marcale la clase como usada, asignale FE FLOW
+--   --    y pedile el motor para hoy.
+--   select p.name from public.plans p
+--   where p.id = (select m.plan_id from public.memberships m
+--                 where m.id = public.membresia_para('<id del cliente>', current_date));
+--   → FE FLOW   (antes devolvía FE FIRST y rechazaba la reserva)
+--
+--   -- 8. Un plan sin vigencia no puede asignarse
+--   --    (probalo creando un plan con 0 días y 0 meses desde Planes)
+--   → la base rechaza con "El plan no tiene vigencia"
 --
 --   select * from public.consumo_control();   → cero filas
 --   select * from public.perm_diff();         → cero filas
@@ -188,6 +418,15 @@ commit;
 --
 -- · EL CAMBIO DE PLAN, explicado arriba: sigue encolándose porque es el
 --   mismo botón que renovar y hace falta una decisión del estudio.
+--
+-- · EL CONTROL #4 DE LA 0036 YA NO DA CERO, Y ESTÁ BIEN. Esa migración
+--   dejó una consulta que buscaba membresías solapadas prometiendo "cero
+--   filas para todo lo creado a partir de acá". Desde acá el pase de
+--   prueba se solapa A PROPÓSITO con la mensualidad, así que esa consulta
+--   va a devolver esas parejas. El invariante correcto es más chico: no
+--   hay dos MENSUALIDADES que cubran la misma fecha. Para verificarlo hay
+--   que sumarle a esa consulta el `join plans` de las dos patas y filtrar
+--   `not p.is_trial`.
 --
 -- · LAS MEMBRESÍAS SUSPENDIDAS NO EMPUJAN. El trigger filtra
 --   `status = 'activa'`, así que si el estudio suspende una membresía y
@@ -240,7 +479,11 @@ commit;
 --   end;
 --   $fn$;
 --
---   create or replace view public.public_plans as
+--   -- Sacar una columna del final tampoco lo permite `create or replace`
+--   -- (solo agregar), así que la vuelta atrás de la vista necesita el
+--   -- drop, y con él hay que revisar que el acceso público siga estando.
+--   drop view public.public_plans;
+--   create view public.public_plans as
 --   select id, name, price, class_count, duration_days, disciplines,
 --          description, color, popular, is_trial
 --   from public.plans where active = true;

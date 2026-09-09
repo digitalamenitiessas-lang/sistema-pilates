@@ -115,6 +115,16 @@ $$;
 comment on function public.inicio_de_clase(uuid, date) is
   'Cuándo arranca esa clase ese día, con el cambio de horario de la instancia (0018) aplicado y en el huso del estudio (0016).';
 
+-- El revoke que toda función definer lleva en este proyecto (0012:268,
+-- 0020:137, 0025:117, 0031:78, 0032:48), y acá no es ceremonia: Supabase
+-- le da EXECUTE a anon sobre las funciones nuevas de public, y esta lee
+-- `class_occurrences`, cuya RLS reserva la lectura a quien tenga sesión
+-- (0018:54-57). Siendo definer se saltea esa política, así que sin el
+-- revoke cualquiera desde la landing podría pedir por RPC el horario
+-- corrido de una clase — un dato que hoy pide estar logueado.
+revoke all on function public.inicio_de_clase(uuid, date) from public, anon;
+grant execute on function public.inicio_de_clase(uuid, date) to authenticated;
+
 -- ------------------------------------------------------------
 -- 3. La regla
 --
@@ -125,30 +135,62 @@ comment on function public.inicio_de_clase(uuid, date) is
 --     lista de espera. Sin esto, cancelar y reactivar sería la puerta de
 --     atrás para exactamente lo mismo, y también descuenta.
 --
--- NO corre al marcar asistencia. Ahí old.status ya era 'confirmada' —o
--- 'ausente', si se está corrigiendo una marca— y nadie está tomando un
--- lugar nuevo. Importa: `reservas.asistencia` es la clave que el catálogo
--- señala para darle a UNA profesora, y una profesora con esa clave y sin
+-- NO corre al marcar asistencia por el camino normal: ahí old.status ya
+-- era 'confirmada' —o 'ausente', si se está corrigiendo una marca— y nadie
+-- toma un lugar nuevo, así que sale por el return de arriba. El único caso
+-- en que marcar presente sí pasa por acá es sobre una reserva CANCELADA, y
+-- eso no es marcar asistencia: es reactivarla y marcarla de una.
+--
+-- Importa igual: `reservas.asistencia` es la clave que el catálogo señala
+-- para darle a UNA profesora, y una profesora con esa clave y sin
 -- `reservas.crear` tiene que poder corregir un ausente después de la
--- clase. Que es, por definición, después de que la clase empezó.
+-- clase. Que es, por definición, después de que la clase empezó. Por eso
+-- el escape de más abajo acepta las tres claves de escritura y no una.
 -- ------------------------------------------------------------
 create or replace function public.reserva_en_hora()
 returns trigger
 language plpgsql security definer set search_path = ''
 as $$
 declare
-  v_reabre boolean;
+  -- Bandera y no una expresión con `and`: el AND de SQL no garantiza
+  -- evaluación perezosa, y en un INSERT OLD no existe —es un registro sin
+  -- asignar, no una fila de nulos— así que leerle un campo levanta
+  -- 'record "old" is not assigned yet' y falla toda reserva nueva. La 0022
+  -- ya lo dejó escrito para stamp_reservation; acá se respeta.
+  v_reabre boolean := false;
   v_kind   text;
   v_dow    int;
   v_fecha  date;
+  -- La identidad de la fila que va a QUEDAR. En un UPDATE no se lee de
+  -- new: quien reactiva manda esas columnas y `consumir_clase` las clava
+  -- después contra las de old, así que validar new sería validar lo que
+  -- llegó y no lo que se escribe.
+  v_clase  uuid;
+  v_dia    date;
   v_inicio timestamptz;
   v_corte  int;
   v_dias   text[] := array['lunes', 'martes', 'miércoles', 'jueves',
                            'viernes', 'sábado', 'domingo'];
 begin
-  v_reabre := tg_op = 'UPDATE'
-              and new.status in ('confirmada', 'asistió')
-              and old.status in ('cancelada', 'lista de espera', 'ofrecida');
+  if tg_op = 'UPDATE' then
+    -- Vuelve a tomar un lugar: 'lista de espera' entra porque anotarse en
+    -- la espera de una clase que ya pasó tampoco tiene sentido, y sin ella
+    -- cancelar y pasar a la espera era la puerta de atrás.
+    v_reabre := new.status in ('confirmada', 'asistió', 'lista de espera')
+                and old.status in ('cancelada', 'lista de espera', 'ofrecida');
+  end if;
+
+  -- En una rama y no en un `case`, por el mismo motivo que v_reabre: el
+  -- manual garantiza que CASE evalúa solo el brazo elegido, pero el
+  -- precedente de la casa (0022) es no depender del orden de evaluación
+  -- cuando OLD está en juego, y acá no cuesta nada respetarlo.
+  if tg_op = 'UPDATE' then
+    v_clase := old.class_id;
+    v_dia   := old.date;
+  else
+    v_clase := new.class_id;
+    v_dia   := new.date;
+  end if;
 
   if tg_op <> 'INSERT' and not v_reabre then
     return new;
@@ -156,18 +198,27 @@ begin
 
   select cs.kind, cs.day_of_week, cs.date
   into v_kind, v_dow, v_fecha
-  from public.class_sessions cs where cs.id = new.class_id;
+  from public.class_sessions cs where cs.id = v_clase;
 
   -- ---- La fecha tiene que ser un día en que esa clase se dicta ----
   --
   -- Solo en el INSERT: en una reactivación la fecha ya está escrita, y
   -- rechazarla ahí sería trabar la salida en vez de la entrada.
   --
-  -- Sin permiso que valga: esto no es una excepción autorizada, es un
-  -- dato que no cierra. Una reserva del martes contra la clase de los
-  -- lunes no aparece en ninguna lista de asistentes y no la ve nadie
-  -- hasta que la clienta reclama la clase que pagó.
-  if tg_op = 'INSERT' then
+  -- Y solo de hoy en adelante. La grilla cambia: el día que el estudio
+  -- mueva una clase de los lunes a los martes, `day_of_week` pasa a decir
+  -- martes y todas las fechas pasadas de esa clase dejan de cerrar. Sin
+  -- este corte, cargar una reserva vieja —o volver a cargar un día entero
+  -- después de un problema— se vuelve imposible, y el mensaje culparía a
+  -- la fecha en vez de al cambio de grilla.
+  --
+  -- Hacia adelante no hay permiso que valga, y eso sí es a propósito: no
+  -- es una excepción autorizada, es un dato que no cierra. Una reserva del
+  -- martes contra la clase de los lunes no aparece en ninguna lista de
+  -- asistentes y no la ve nadie hasta que la clienta reclama la clase que
+  -- pagó.
+  if tg_op = 'INSERT'
+     and new.date >= (now() at time zone 'America/Argentina/Buenos_Aires')::date then
     if v_kind = 'especial' then
       if v_fecha is distinct from new.date then
         raise exception
@@ -186,44 +237,64 @@ begin
 
   -- ---- Recepción sí puede anotar después ----
   --
-  -- El que llegó sin reserva y se la cargan cuando terminó. `can()` en
-  -- sombra responde el legado —admin y recepción— así que esto ya
-  -- funciona hoy y sigue funcionando cuando el grupo Reservas se ponga
-  -- en activo. La clienta nunca tiene esta clave, por ningún camino: su
-  -- puerta al insert es "alumno reserva" (0005:68-73).
-  if (select public.can('reservas.crear')) then
+  -- El que llegó sin reserva y se la cargan cuando terminó. Las tres
+  -- claves, no solo `reservas.crear`: el camino de UPDATE que este
+  -- trigger frena lo ejercen acciones gobernadas por `reservas.editar`
+  -- (confirmar desde la lista de espera) y `reservas.asistencia` (marcar
+  -- presente), así que con el grupo Reservas en activo una profesora con
+  -- asistencia y sin crear quedaría trabada.
+  --
+  -- `can()` en sombra responde el legado —admin y recepción— así que esto
+  -- ya funciona hoy y sigue funcionando al encender el grupo. Ningún rol
+  -- de clienta tiene estas claves, ni en sombra ni en la matriz sembrada;
+  -- su puerta al insert es "alumno reserva" (0005:68-73). Por persona sí
+  -- se le podrían dar desde la matriz de excepciones, y ahí el freno se
+  -- afloja: es la misma propiedad que tiene cualquier otro permiso.
+  if (select public.can('reservas.crear')
+           or public.can('reservas.editar')
+           or public.can('reservas.asistencia')) then
     return new;
   end if;
 
-  -- Sin sesión es el service role, que no pasa por RLS: el cron y el
-  -- webhook de Mercado Pago. Mismo criterio que usa `stamp_reservation`
-  -- para poner source = 'sistema'.
+  -- Sin sesión es el service role, que no pasa por RLS. Hoy eso es la
+  -- carga a mano desde el SQL Editor —lo que la vuelta atrás de abajo
+  -- asume para poder anotar un día entero de clases viejas—, no el cron
+  -- ni el webhook de Mercado Pago: ninguno de los dos escribe reservas.
   if auth.uid() is null then
     return new;
   end if;
 
   -- ---- Y la clase no puede haber empezado ----
-  v_inicio := public.inicio_de_clase(new.class_id, new.date);
+  v_inicio := public.inicio_de_clase(v_clase, v_dia);
   if v_inicio is null then
     return new;   -- clase sin horario: no hay contra qué comparar
   end if;
 
+  -- Sin el filtro por `rige`, a propósito: el portal lee este parámetro
+  -- con settingNum, que tampoco lo mira, y las dos mitades de la misma
+  -- regla tienen que leer el mismo número. Es lo que hace la 0029 con
+  -- cancel_hours.
   select coalesce(nullif(s.value, '')::numeric, 0)::int into v_corte
   from public.studio_settings s
-  where s.key = 'booking_cutoff_minutes' and s.rige;
-  v_corte := coalesce(v_corte, 0);
+  where s.key = 'booking_cutoff_minutes';
+
+  -- Con piso en cero: un margen negativo habilitaría reservar DESPUÉS de
+  -- que la clase empezó, que es exactamente lo que este trigger existe
+  -- para impedir. El parámetro puede endurecer la regla, no aflojarla, y
+  -- se acota donde vive el dato y no en la pantalla.
+  v_corte := greatest(coalesce(v_corte, 0), 0);
 
   if now() >= v_inicio - make_interval(mins => v_corte) then
     if v_corte > 0 then
       raise exception
         'La reserva de esa clase ya cerró: empieza a las % del % y se cierra % minutos antes. Para anotarte igual, pedilo en recepción',
         to_char(v_inicio at time zone 'America/Argentina/Buenos_Aires', 'HH24:MI'),
-        to_char(new.date, 'DD/MM/YYYY'), v_corte;
+        to_char(v_dia, 'DD/MM/YYYY'), v_corte;
     else
       raise exception
         'Esa clase ya empezó — era a las % del %. Para anotarte igual, pedilo en recepción',
         to_char(v_inicio at time zone 'America/Argentina/Buenos_Aires', 'HH24:MI'),
-        to_char(new.date, 'DD/MM/YYYY');
+        to_char(v_dia, 'DD/MM/YYYY');
     end if;
   end if;
 
@@ -266,6 +337,24 @@ commit;
 --
 -- Y el día de la semana, con cualquier sesión:
 --   · reservar la clase de los lunes para un martes → rechazada
+-- ============================================================
+
+-- ============================================================
+-- LO QUE ESTO NO ARREGLA
+--
+-- · `bookable = false` SIGUE SIN FRENO EN LA BASE. La 0017 creó esa
+--   columna para los talleres que pasan por recepción —"se muestra en la
+--   agenda pero la alumna no la puede reservar sola"— y hasta hoy eso lo
+--   sostiene únicamente el portal, que esconde el botón. Es el mismo tipo
+--   de agujero que este trigger vino a tapar: esconder un botón no es la
+--   protección. No entra acá para no mezclar dos reglas en una migración
+--   que ya trae dos, pero va en el mismo trigger cuando se haga, con la
+--   misma salida por permiso.
+--
+-- · EL CHEQUEO DEL DÍA DE LA SEMANA NO MIRA SI LA CLASE ESTÁ ACTIVA. Una
+--   reserva contra una clase dada de baja pasa igual: la baja es lógica y
+--   la fila sigue existiendo. Hoy no muerde porque el portal no ofrece
+--   clases inactivas, pero es la misma clase de hueco.
 -- ============================================================
 
 -- ============================================================

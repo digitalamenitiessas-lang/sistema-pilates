@@ -365,9 +365,12 @@ le sumó dos reglas que no eran gratis. Migraciones `0036` (corrida) y `0037`
       manda el navegador. Antes se calculaba en dos lugares con la misma fórmula
       duplicada, que es lo que la `0029` vino a terminar con el consumo de clases.
 - [x] **El pago anticipado se encola** detrás del período en curso en vez de
-      solaparse. Y eso resolvió de paso la pregunta que la `0029` y la `0030`
-      habían contestado distinto: sin solapamiento hay a lo sumo una membresía que
-      cubra una fecha.
+      solaparse. A lo sumo una **mensualidad** cubre una fecha; el pase de prueba
+      se solapa a propósito desde la `0037`, y ahí el desempate es la que tiene
+      saldo y después la que primero se pierde. Sin ese desempate, arreglar el
+      encolado del pase movía el problema en vez de sacarlo: el motor elegía el
+      pase agotado y rechazaba la reserva con "Ya usó la clase de su plan"
+      mientras la mensualidad tenía ocho clases sin tocar.
 - [x] **Estado `futura`** para la membresía pagada que todavía no empezó, y la
       ficha pasó a elegir "la que cubre hoy" en vez de "la más reciente" — si no,
       a quien paga adelantado se le mostraba la del mes que viene como si fuera la
@@ -424,6 +427,29 @@ motor encendido, anotarse a la noche en la clase de las 8:00 le descuenta la cla
       entró a las 7:50.
 
 Se escribió en una sesión aparte, numerada `0036`, y se renumeró al traerla.
+
+Cuatro lentes más la revisaron junto con la `0037` después de que esta última
+fallara al correrse, y encontraron siete cosas. Las que importan:
+- El trigger leía `old.status` en un `BEFORE INSERT OR UPDATE`, y en un INSERT
+  OLD no existe: es un registro sin asignar y leerle un campo levanta `record
+  "old" is not assigned yet`. Lo único que lo salvaba era que el AND
+  cortocircuitara, y el manual dice que ese orden no está definido. **La misma
+  falla estaba en `consumir_clase` de la `0029`, que ya está aplicada y
+  encendida** — si muerde no falla una reserva, fallan todas. Las dos se
+  reestructuraron con una bandera, que es lo que la `0022` ya había dejado
+  escrito para `stamp_reservation` con este mismo motivo.
+- `inicio_de_clase` es `security definer` y no llevaba el `revoke ... from
+  public, anon` que el resto del proyecto le pone a toda función definer. Lee
+  `class_occurrences`, cuya RLS pide sesión, así que desde la landing sin login
+  se podía pedir por RPC el horario corrido de una clase.
+- En el camino de UPDATE validaba `new.class_id` y `new.date` —los que manda
+  quien reactiva— en vez de los de la fila que va a quedar.
+- El chequeo del día de la semana no tenía salida y aplicaba también a fechas
+  pasadas: el día que el estudio mueva una clase de lunes a martes, cargar una
+  reserva vieja se volvía imposible. Ahora rige solo de hoy en adelante.
+- El escape por permiso miraba solo `reservas.crear`, pero el camino de UPDATE
+  lo ejercen acciones de `reservas.editar` y `reservas.asistencia`: con el grupo
+  en activo, una profesora con asistencia y sin crear quedaba trabada.
 
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
@@ -494,7 +520,9 @@ select
   (select count(*) from information_schema.columns where table_name='plans' and column_name='duration_months')        as col_duration_months_0036,
   (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='vigencia_hasta')  as fn_vigencia_hasta_0036,
   (select count(*) from pg_trigger where tgname='memberships_fechas' and not tgisinternal)                            as trg_membresia_fechas_0036,
-  (select count(*) from information_schema.columns where table_name='public_plans' and column_name='duration_months') as vista_publica_0037;
+  (select count(*) from information_schema.columns where table_name='public_plans' and column_name='duration_months') as vista_publica_0037,
+  (select count(*) from pg_trigger where tgname='reservations_agenda' and not tgisinternal)                            as trg_reserva_en_hora_0038,
+  (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='inicio_de_clase') as fn_inicio_de_clase_0038;
 ```
 
 ```sql
