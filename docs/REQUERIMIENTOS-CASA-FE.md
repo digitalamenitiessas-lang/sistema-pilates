@@ -318,7 +318,7 @@ minutos** y **8 lugares** en la **Sala Reformer**, que tiene 8 reformers.
 | Dirección, Instagram, email y horario | Cargados. El WhatsApp de la demo se **vació**: hasta hoy la web mandaba a un teléfono que no es del estudio |
 | Solo Reformer, una sola sala | Apagadas las cinco disciplinas de demo, las dos que todavía no se dictan y las tres salas de demo. Va **antes** de cargar la grilla: el formulario toma como default la primera disciplina y la primera sala activas |
 | Clases de 50 min y 8 lugares | `class_default_minutes` y `class_default_capacity`. Venían escritos en el código como 55 y 10 |
-| Reformer **no** se combina con embarazadas | Los seis planes FE pasaron a habilitar solo Reformer. **Es configuración, no una regla que rija**: hoy nada valida la disciplina al reservar |
+| Reformer **no** se combina con embarazadas | Los seis planes FE habilitan solo Reformer, y desde la `0040` **rige**: el trigger de reserva rechaza una clase cuya disciplina el plan no incluye. Hoy no muerde —hay una sola disciplina activa— y muerde el día que se cargue la grilla de embarazadas |
 | En pantalla se dice **"cliente"**, en masculino | Etiquetas y ayudas de permisos, ayudas de Configuración, dos funciones de aviso y el texto de las 19 pantallas. El grupo de permisos va por su **tercer** nombre: `Alumnos` → `Clientas` → `Clientes` |
 | **No existe** el período de pago del 1 al 9 | Borrados `priority_pay_from_day`, `priority_pay_to_day`, `slot_release_day` y `priority_reminder_days`. Nunca llegaron a regir: la `0024` ya los había marcado `rige = false` |
 

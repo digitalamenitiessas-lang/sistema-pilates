@@ -468,6 +468,36 @@ fallara al correrse, y encontraron siete cosas. Las que importan:
   lo ejercen acciones de `reservas.editar` y `reservas.asistencia`: con el grupo
   en activo, una profesora con asistencia y sin crear quedaba trabada.
 
+### ✅ El plan dice qué disciplina, y ahora rige (09/09) — `0040`, sin correr
+De la respuesta 6c casi todo ya funcionaba sin construir nada: día, hora, cupo y
+profesora son columnas de cada clase, y "grilla separada" se resuelve cargando
+las clases. Lo único que faltaba era **el impedimento**: la `0033` dejó los seis
+planes FE habilitando solo Reformer, pero nada lo validaba al reservar — ni el
+trigger de consumo, ni el de cupo, ni las políticas. El formulario rotulaba
+"Disciplinas habilitadas *", no dejaba guardar sin elegir una, y detrás no había
+nada.
+- [x] El chequeo va en `reserva_en_hora` (el trigger de la `0038`) y **no** en
+      `consumir_clase`, que era el lugar obvio porque ahí ya se resuelve la
+      membresía: esa función arranca con el interruptor de pánico de la `0029`, y
+      qué disciplina puede tomar un cliente no tiene nada que ver con si el
+      descuento de clases está funcionando.
+- [x] Sin membresía no dice nada: de eso se ocupa `consumir_clase`. Duplicar el
+      mensaje sería contestar dos veces la misma pregunta con palabras distintas.
+- [x] Sin salida por permiso, y queda escrito para poder revisarlo: el estudio lo
+      dijo en términos categóricos y las clases de embarazadas tienen cupo y
+      profesora propios, así que meter a alguien de Reformer no es una excepción
+      del mostrador. Si hiciera falta, la salida es darle el plan que
+      corresponde.
+
+**Hoy no cambia ni una reserva** —hay una sola disciplina activa y todos los
+planes la habilitan—, y muerde el día que se cargue la grilla de embarazadas,
+que es justo el día en que nadie va a estar mirando esto.
+
+**Lo que queda pendiente y está anotado en la migración:** la pantalla todavía
+ofrece lo que la base va a rechazar. El portal muestra todas las clases del día
+sin mirar el plan del cliente. Con una disciplina es invisible; con dos hay que
+filtrar. El orden correcto es este: primero el freno, después el filtro.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
@@ -507,7 +537,7 @@ fallara al correrse, y encontraron siete cosas. Las que importan:
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a `0038` ✅ (verificadas 09/09 con las consultas de abajo y contra la aplicación andando). **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Migraciones aplicadas | `0001` a `0038` ✅ · **`0039` y `0040` escritas, sin correr** (verificadas 09/09 con las consultas de abajo y contra la aplicación andando). **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
 | Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |
