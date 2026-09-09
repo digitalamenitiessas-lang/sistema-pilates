@@ -103,9 +103,13 @@ export function TomarAsistencia({
 
           {lista.length > 0 && (
             <div className="flex items-center gap-3 mt-3 text-xs">
-              <span className="font-semibold text-[#2E6040]">{presentes} presentes</span>
+              <span className="font-semibold text-[#2E6040]">
+                {presentes} {presentes === 1 ? 'presente' : 'presentes'}
+              </span>
               {ausentes > 0 && (
-                <span className="font-semibold text-destructive">{ausentes} ausentes</span>
+                <span className="font-semibold text-destructive">
+                  {ausentes} {ausentes === 1 ? 'ausente' : 'ausentes'}
+                </span>
               )}
               {faltanMarcar > 0 && (
                 <span className="text-muted-foreground">{faltanMarcar} sin marcar</span>

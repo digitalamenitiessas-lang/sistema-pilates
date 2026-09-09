@@ -205,6 +205,86 @@ esto solo evita ofrecer acciones que iban a fallar.
       configurar SMTP propio) → `/sistema/recuperar` para elegir la nueva.
 - [x] **Cambiar contraseña** desde el portal (ícono de llave en el header).
 
+### ✅ Configuración por secciones plegables (09/09)
+La pantalla juntaba quince bloques en un scroll de 15.000 px: para tocar un
+parámetro de caja había que pasar por todo lo demás. Ahora cada bloque es una
+sección que se despliega y se contrae (`components/ui/seccion-plegable.tsx`),
+con la lista cerrada en 1.600 px.
+- [x] Rótulos de grupo fijos (El estudio, Reglas del negocio, Catálogos,
+      Equipo y espacios, Accesos, Integraciones) y, debajo, las secciones
+      cerradas con su título, su ayuda y un chevron.
+- [x] Sin abrirla, cada sección adelanta lo que tiene: el conteo (3
+      disciplinas, 7 parámetros) y, cuando importa, una advertencia —
+      "Sin guardar" si quedó algo tipeado, "En sombra" en Permisos,
+      "Conectado / Sin conectar" en Mercado Pago. El conteo se esconde en
+      pantalla angosta; la advertencia nunca.
+- [x] Lo que se deja abierto se recuerda en el navegador (localStorage) y
+      "Desplegar / Contraer todo" para revisar de una. Contraer no descarta
+      lo tipeado: la sección se esconde, no se desmonta.
+- [x] El estado no vive en cada sección sino en el contexto, y los modales
+      salieron del cuerpo plegable — si no, "Agregar" con la sección cerrada
+      abría un modal invisible.
+
+### ✅ Volver a la pestaña ya no recarga el estudio (09/09)
+Síntoma: con el sistema abierto, ir a otra pestaña y volver dejaba la
+pantalla en "Cargando datos del estudio..." unos segundos.
+
+Causa: Supabase reemite `SIGNED_IN` con la **misma** sesión (idéntico
+`access_token`) cuando la pestaña vuelve al frente. `setSession` guardaba ese
+objeto nuevo, el efecto de carga dependía del objeto y volvía a pedir el
+bundle entero — catorce consultas — mientras `dataLoading` tapaba todo con el
+loader a pantalla completa. Medido con una sonda: mientras la pestaña está
+oculta esos eventos llegan **cada dos segundos**, o sea que también se
+recargaba el estudio en segundo plano todo el tiempo.
+- [x] `onAuthStateChange` conserva el objeto anterior cuando el usuario y el
+      token no cambiaron, y la carga se dispara por `session.user.id` y no por
+      el objeto: renovar el token ya no recarga nada.
+- [x] El loader tapa la pantalla solo cuando no hay datos. Un refresco con
+      datos en pantalla se hace por debajo.
+- [x] Al volver, si hace más de un minuto de la última carga, se refrescan
+      los datos en segundo plano (el estudio siguió operando). Con una
+      bandera para que varios `visibilitychange` seguidos no disparen dos o
+      tres bundles en paralelo.
+- [x] Un refresco que falla ya no borra la pantalla: avisa en una tira con
+      "Reintentar" y se sigue trabajando con la última versión cargada.
+
+### ✅ Reservas ordenada por día (09/09)
+Era una tabla plana de todo el histórico ordenada por fecha descendente: lo
+de hoy —lo único que se toca en el mostrador— aparecía mezclado con lo de
+hace dos meses.
+- [x] Cuatro bloques plegables (`SeccionPlegable`, el mismo componente de
+      Configuración): **Hoy** y **Mañana** abiertos, **Más adelante** —solo si
+      hay— e **Historial** cerrados. Hoy y mañana van por hora ascendente (el
+      orden en que pasan las clases); el historial, de lo más reciente a lo
+      más viejo.
+- [x] El encabezado de Hoy muestra **cuántas quedan sin marcar**, que es la
+      tarea pendiente del mostrador, y no un conteo total.
+- [x] En los bloques de un solo día la columna es la **hora**: la fecha se
+      repetía en cada fila sin decir nada.
+- [x] Buscar por nombre o filtrar por fecha/estado muestra **una lista sola**
+      en vez de los bloques: lo buscado suele estar en el historial, que
+      viene cerrado, y los bloques lo escondían.
+- [x] La columna de acciones quedó fija a la derecha. En una pantalla de 800
+      px la tabla pedía 558 y tenía 495, así que los botones de asistencia
+      —justo los de esta pantalla— quedaban fuera del scroll.
+- [x] **Hoy y mañana van agrupados por clase**, no en tabla: cada clase con
+      su hora, su profesora, cómo viene la asistencia y sus anotadas en orden
+      alfabético (las canceladas al final). Sin tabla no hay scroll
+      horizontal, así que las acciones se ven siempre.
+- [x] Cada clase de hoy tiene su botón **Tomar asistencia**, que abre el
+      mismo modal de `tomar-asistencia.tsx` que se usa desde Inicio y desde
+      la agenda. Mañana no lo tiene —la clase no pasó— y ahí el chip dice
+      "N anotadas" en vez de "N sin marcar", que es una tarea pendiente.
+- [x] De paso, el modal decía "1 presentes".
+- [x] Marcar asistencia/ausente ahora se rige por `reservas.asistencia` (en
+      sombra: sin efecto todavía, `perm_diff()` en cero). Cancelar y confirmar
+      desde lista de espera siguen siendo de quien escribe.
+
+Dónde se confirma la asistencia, para que quede escrito: en **Reservas** fila
+por fila (mostrador), y en el modal por clase de `tomar-asistencia.tsx`, que
+se abre desde **Inicio → Clases de Hoy** y desde el panel de la clase en
+**Agenda** (profesora en la sala, con el celular). Los tres escriben lo mismo.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
