@@ -267,6 +267,15 @@ hace dos meses.
 - [x] La columna de acciones quedó fija a la derecha. En una pantalla de 800
       px la tabla pedía 558 y tenía 495, así que los botones de asistencia
       —justo los de esta pantalla— quedaban fuera del scroll.
+- [x] **Hoy y mañana van agrupados por clase**, no en tabla: cada clase con
+      su hora, su profesora, cómo viene la asistencia y sus anotadas en orden
+      alfabético (las canceladas al final). Sin tabla no hay scroll
+      horizontal, así que las acciones se ven siempre.
+- [x] Cada clase de hoy tiene su botón **Tomar asistencia**, que abre el
+      mismo modal de `tomar-asistencia.tsx` que se usa desde Inicio y desde
+      la agenda. Mañana no lo tiene —la clase no pasó— y ahí el chip dice
+      "N anotadas" en vez de "N sin marcar", que es una tarea pendiente.
+- [x] De paso, el modal decía "1 presentes".
 - [x] Marcar asistencia/ausente ahora se rige por `reservas.asistencia` (en
       sombra: sin efecto todavía, `perm_diff()` en cero). Cancelar y confirmar
       desde lista de espera siguen siendo de quien escribe.
