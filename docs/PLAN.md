@@ -325,7 +325,33 @@ gruesa era $100. Esa regla cambia 8 de los 12 precios que él mismo publicó y
 deja falso su propio "Efectivo 5% OFF" (pasa a 4,44% en FE START).
 `price_rounding` queda en `cincuenta` hasta que confirme la tabla nueva.
 
-**Lo que falta para operar: la grilla.** Días y horas. Todo lo demás está.
+### ✅ La grilla cargada (09/09)
+Llegó la semana como el estudio la dicta y entró en la `0035`: **64 clases**
+—12 por día de lunes a viernes (Ivana de 8 a 13, turno tarde de 14 a 19) y 4 el
+sábado con Leandro—, todas Pilates Reformer, 50 minutos, 8 lugares, Sala
+Reformer.
+- [x] Va por migración y no por pantalla: son 64 formularios, y sobre todo
+      `class_sessions` **no tiene ningún índice único**, así que cargarla dos
+      veces duplicaría la grilla entera sin que nada avise. Con ids derivados
+      del día y la hora (`ca5afe01-…-<día><hora>…`) y `on conflict do nothing`,
+      correrla de nuevo no hace nada.
+- [x] La duración, el cupo y el color no se escriben en la migración: salen de
+      los parámetros y del catálogo, que es de donde los toma la pantalla. Así
+      recolorear la disciplina no deja 64 clases con el color viejo.
+- [x] Cuatro guardias que se plantan con el motivo en vez de fallar con un
+      error de clave foránea: las tres profesoras, la disciplina, la sala y los
+      dos parámetros.
+- [x] **La tabla de precios no necesitó nada.** Los doce valores dan exactos
+      contra lo cargado (45.000 × 0,95 = 42.750; × 1,25 = 56.250, y así los
+      seis planes). Confirma de paso que el redondeo al millar rompería su
+      propia lista.
+
+Verificado en la Agenda con la sesión real: "64 clases esta semana", el lunes
+con 12 y cupo 0/8, el sábado con 4 de Leandro de 9 a 12.
+
+**Lo que falta para operar: nada del sistema.** Dar de alta a los clientes
+reales y cobrar. Lo que sigue es desarrollo (vigencia mensual, renovación,
+turno fijo) y los datos que el estudio todavía no dio.
 
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
@@ -366,7 +392,7 @@ deja falso su propio "Efectivo 5% OFF" (pasa a 4,44% en FE START).
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a `0034` ✅ (verificadas 09/09 con las consultas de abajo). **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Migraciones aplicadas | `0001` a `0035` ✅ (verificadas 09/09 con las consultas de abajo). **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
 | Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |
