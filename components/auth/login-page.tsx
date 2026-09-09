@@ -171,7 +171,7 @@ export function LoginPage() {
             </button>
 
             <p className="text-center text-xs text-muted-foreground pt-1">
-              ¿Sos clienta del estudio y no tenés cuenta?{' '}
+              ¿Sos cliente del estudio y no tenés cuenta?{' '}
               <button
                 type="button"
                 onClick={() => switchMode('register')}
@@ -317,7 +317,7 @@ export function LoginPage() {
         )}
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          {`Staff y clientas de ${estudio}`}
+          {`Staff y clientes de ${estudio}`}
         </p>
         <Link
           href="/"

@@ -68,7 +68,7 @@ function AppShell() {
   // No mostrar ninguna interfaz hasta conocer el rol del usuario
   if (!profileReady && !dataError) return <FullScreenLoader message="Cargando tu perfil..." />
 
-  // Los alumnos ven su portal, no el sistema de gestión
+  // Los clientes ven su portal, no el sistema de gestión
   if (profile?.role === 'alumno' && data) {
     return (
       <>

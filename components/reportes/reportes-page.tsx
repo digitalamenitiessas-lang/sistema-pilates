@@ -30,7 +30,7 @@ const fecha = (iso: string) =>
 interface Reporte<T = Record<string, unknown>> {
   key: string
   nombre: string
-  grupo: 'Plata' | 'Clientas' | 'Clases'
+  grupo: 'Plata' | 'Clientes' | 'Clases'
   descripcion: string
   /** Qué permiso hace falta para que devuelva algo */
   necesita?: string
@@ -51,7 +51,7 @@ const REPORTES: Array<Reporte<any>> = [
     cargar: reporteCobros,
     columnas: [
       { titulo: 'Fecha', valor: (f) => f.fecha, render: (f) => fecha(f.fecha) },
-      { titulo: 'Clienta', valor: (f) => f.alumna },
+      { titulo: 'Cliente', valor: (f) => f.alumna },
       { titulo: 'Concepto', valor: (f) => f.concepto },
       { titulo: 'Medio', valor: (f) => f.medio },
       { titulo: 'Cuenta', valor: (f) => f.cuenta },
@@ -68,7 +68,7 @@ const REPORTES: Array<Reporte<any>> = [
     necesita: 'finanzas.ver',
     cargar: (r) => reporteDeudas(r.hasta),
     columnas: [
-      { titulo: 'Clienta', valor: (f) => f.alumna },
+      { titulo: 'Cliente', valor: (f) => f.alumna },
       { titulo: 'Concepto', valor: (f) => f.concepto },
       { titulo: 'Vencía', valor: (f) => f.vencimiento, render: (f) => fecha(f.vencimiento) },
       {
@@ -131,13 +131,13 @@ const REPORTES: Array<Reporte<any>> = [
   },
   {
     key: 'altas',
-    nombre: 'Clientas nuevas',
-    grupo: 'Clientas',
+    nombre: 'Clientes nuevos',
+    grupo: 'Clientes',
     descripcion: 'Quiénes se sumaron en el período, con su contacto',
     cargar: reporteAltas,
     columnas: [
       { titulo: 'Fecha', valor: (f) => f.fecha, render: (f) => fecha(f.fecha) },
-      { titulo: 'Clienta', valor: (f) => f.alumna },
+      { titulo: 'Cliente', valor: (f) => f.alumna },
       { titulo: 'Email', valor: (f) => f.email },
       { titulo: 'Teléfono', valor: (f) => f.telefono },
     ],
@@ -146,11 +146,11 @@ const REPORTES: Array<Reporte<any>> = [
   {
     key: 'membresias',
     nombre: 'Membresías que vencen',
-    grupo: 'Clientas',
+    grupo: 'Clientes',
     descripcion: 'Las que terminan en el período: para renovar y para recuperar',
     cargar: reporteMembresias,
     columnas: [
-      { titulo: 'Clienta', valor: (f) => f.alumna },
+      { titulo: 'Cliente', valor: (f) => f.alumna },
       { titulo: 'Plan', valor: (f) => f.plan },
       { titulo: 'Vence', valor: (f) => f.hasta, render: (f) => fecha(f.hasta) },
       {
@@ -173,7 +173,7 @@ const REPORTES: Array<Reporte<any>> = [
       { titulo: 'Fecha', valor: (f) => f.fecha, render: (f) => fecha(f.fecha) },
       { titulo: 'Clase', valor: (f) => f.clase },
       { titulo: 'Profesora', valor: (f) => f.profesora },
-      { titulo: 'Clienta', valor: (f) => f.alumna },
+      { titulo: 'Cliente', valor: (f) => f.alumna },
       { titulo: 'Estado', valor: (f) => f.estado },
     ],
     totalizar: (filas) => {
@@ -236,7 +236,7 @@ export function ReportesPage() {
     descargarCsv(nombreArchivo(reporte.nombre, desde, hasta), filas, reporte.columnas)
   }
 
-  const grupos = ['Plata', 'Clientas', 'Clases'] as const
+  const grupos = ['Plata', 'Clientes', 'Clases'] as const
 
   return (
     <div className="p-4 md:p-6 space-y-5">

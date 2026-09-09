@@ -1,6 +1,7 @@
 # Cómo se trabaja en este proyecto
 
-Sistema de gestión para el estudio de Pilates **Casa Fé**. Next.js 16 (App
+Sistema de gestión para el estudio de Pilates **Casa Fe** (sin tilde: lo
+confirmó el estudio el 09/09). Next.js 16 (App
 Router) + React 19 + Tailwind 4, Supabase (Postgres con RLS) y Mercado Pago.
 
 ## La hoja de ruta
@@ -63,7 +64,9 @@ hay que saber para no romperlo:
   fila ahí es un permiso que cambió sin que nadie lo pidiera.
 - El encendido va grupo por grupo: `update permission_keys set
   enforce_mode = 'activo' where grupo = '...'`, y se revierte igual. Ojo
-  que el grupo `Alumnos` pasó a llamarse `Clientas` en la migración 0026.
+  que ese grupo va por su tercer nombre: `Alumnos` (0012) → `Clientas`
+  (0026) → `Clientes` (0033). Filtrar por uno viejo no encuentra nada y no
+  enciende nada, sin dar error.
 - Interruptor de pánico: `update permission_config set value = 'emergencia'
   where key = 'modo'`.
 - `can()` va **siempre** envuelta en `(select ...)` dentro de una política.

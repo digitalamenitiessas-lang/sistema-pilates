@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createMpCheckoutLink, getMpAccessToken, supabaseAdmin } from '@/lib/mp-server'
 import { pushToStaff } from '@/lib/push-server'
 import { sendEmail, emailLayout } from '@/lib/email-server'
+import { NOMBRE_POR_DEFECTO } from '@/lib/estudio'
 
 // Cron diario (vercel.json lo dispara todas las mañanas):
 //   1. Renueva las membresías vencidas con auto_renew: mismo plan a precio
@@ -399,7 +400,7 @@ export async function GET(request: Request) {
       byType('deuda_vencida') && `${byType('deuda_vencida')} deuda(s) vencida(s)`,
     ].filter(Boolean)
     pushSent = await pushToStaff(admin, {
-      title: `${settings.studio_name || 'Casa Fé'} — avisos del día`,
+      title: `${settings.studio_name || NOMBRE_POR_DEFECTO} — avisos del día`,
       body: `Membresías y pagos: ${parts.join(', ')}.`,
       url: '/sistema',
     })

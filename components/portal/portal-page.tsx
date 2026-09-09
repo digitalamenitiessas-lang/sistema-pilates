@@ -216,8 +216,8 @@ function UpcomingList({
     <div className="space-y-2">
       {reservations.map((r) => {
         // Suspender una fecha no cancela las reservas —esa decisión la toma
-        // el estudio—, así que la reserva seguía acá como si nada y la
-        // clienta viajaba a una clase que no se dictaba.
+        // el estudio—, así que la reserva seguía acá como si nada y el
+        // cliente viajaba a una clase que no se dictaba.
         const motivo = suspendidas.get(`${r.classId}|${r.date}`)
         return (
         <div key={r.id} className="bg-card rounded-2xl border border-border px-4 py-3 flex items-center gap-3">
@@ -269,7 +269,7 @@ export function PortalPage() {
   const { profile, refresh, signOut } = useData()
   const { students, classes, reservations, payments, disciplines, occurrences, settings } = useStudio()
 
-  // Con RLS, el alumno solo recibe su propia ficha
+  // Con RLS, el cliente solo recibe su propia ficha
   const me = students.find((s) => s.userId === profile?.id) ?? students[0] ?? null
 
   const [weekOffset, setWeekOffset] = useState(0)
@@ -291,7 +291,7 @@ export function PortalPage() {
   const canBook = !!ms && (ms.status === 'activa' || ms.status === 'por vencer') && classesLeft > 0
 
   // Las fechas que el estudio suspendió, con su motivo, para las clases
-  // que le importan a esta clienta.
+  // que le importan a este cliente.
   const suspendidas = useMemo(
     () =>
       new Map(
@@ -320,7 +320,7 @@ export function PortalPage() {
     [payments, me]
   )
   // La deuda se calcula sobre TODOS sus pagos y el corte es solo para
-  // mostrar. Al revés —cortar en ocho y después filtrar— la clienta con
+  // mostrar. Al revés —cortar en ocho y después filtrar— el cliente con
   // nueve pagos dejaba de ver que debía, y cuanto más antigua la deuda,
   // antes desaparecía: justo la que hay que cobrar.
   const myDebts = misPagos.filter((p) => p.status === 'pendiente' || p.status === 'vencido')
@@ -392,7 +392,7 @@ export function PortalPage() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center gap-3">
         <XCircle className="w-10 h-10 text-muted-foreground opacity-40" />
-        <p className="text-sm font-semibold text-foreground">Tu cuenta no está vinculada a una ficha de clienta</p>
+        <p className="text-sm font-semibold text-foreground">Tu cuenta no está vinculada a una ficha de cliente</p>
         <p className="text-xs text-muted-foreground max-w-xs">
           Pedile a recepción que te genere el acceso desde tu ficha. Si ya lo hicieron, probá salir y volver a entrar.
         </p>
@@ -412,11 +412,11 @@ export function PortalPage() {
       <header className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shrink-0">
-            <span className="text-primary-foreground font-serif font-bold text-base">{settingText(settings, 'studio_name', 'Casa Fé').trim().charAt(0)}</span>
+            <span className="text-primary-foreground font-serif font-bold text-base">{settingText(settings, 'studio_name', 'Casa Fe').trim().charAt(0)}</span>
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-foreground truncate">¡Hola, {me.name.split(' ')[0]}!</p>
-            <p className="text-[10px] text-muted-foreground">{settingText(settings, 'studio_name', 'Casa Fé')}</p>
+            <p className="text-[10px] text-muted-foreground">{settingText(settings, 'studio_name', 'Casa Fe')}</p>
           </div>
           <button
             onClick={() => setShowChangePassword(true)}
@@ -520,7 +520,7 @@ export function PortalPage() {
                 {!ms
                   ? 'Necesitás una membresía activa para reservar.'
                   : classesLeft === 0
-                  ? 'Usaste todas las clases de tu plan este mes. Consultá en recepción para renovar.'
+                  ? 'Usaste todas las clases de tu plan. Consultá en recepción para renovar.'
                   : 'Tu membresía está vencida o suspendida. Consultá en recepción.'}
               </p>
             </div>

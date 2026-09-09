@@ -285,6 +285,48 @@ por fila (mostrador), y en el modal por clase de `tomar-asistencia.tsx`, que
 se abre desde **Inicio → Clases de Hoy** y desde el panel de la clase en
 **Agenda** (profesora en la sala, con el celular). Los tres escriben lo mismo.
 
+### ✅ Las respuestas del estudio, cargadas y verificadas (09/09)
+El estudio contestó el pedido de datos. Lo que era configuración entró en la
+`0033`; lo que era desarrollo quedó anotado en §8 de
+[`REQUERIMIENTOS-CASA-FE.md`](REQUERIMIENTOS-CASA-FE.md).
+- [x] **"Casa Fe" sin tilde** en la base y en los siete respaldos del código,
+      incluido `public/sw.js`, que se sirve estático y es la única marca que no
+      puede leer `studio_settings`.
+- [x] **Dirección, Instagram, email y horario** reales. Y el WhatsApp de la demo
+      **vaciado**: no era un campo pendiente, era un campo que mandaba a la
+      gente a un teléfono ajeno. Igual el link de Maps, que apuntaba a otra
+      dirección. Donde no hay dato, la pantalla esconde el elemento — y en
+      Planes, que es donde alguien ya decidió venir, repliega al mail.
+- [x] **Solo Pilates Reformer**, una sola sala, y los seis planes FE habilitando
+      solo esa disciplina. Va **antes** de cargar la grilla: el formulario toma
+      como default la primera disciplina y la primera sala activas, así que al
+      revés se cargan sesenta clases con la disciplina y la sala equivocadas, y
+      como `room` es texto libre sin clave foránea, nada se queja nunca.
+- [x] **50 minutos y 8 lugares** como parámetros (`class_default_minutes`,
+      `class_default_capacity`), no como literales del código.
+- [x] **"cliente", en masculino**, en las 32 pantallas, en los títulos de columna
+      del Excel, en las etiquetas y ayudas de permisos, en las ayudas de
+      Configuración y en dos funciones de aviso. El grupo de permisos va por su
+      **tercer** nombre: `Alumnos` → `Clientas` → `Clientes`.
+      Las referencias que la `0026` no se animó a tocar —`ficha-alumno.tsx:328`,
+      `alumnos.editar`, `'alumno'`— sobrevivieron intactas: se protegen como
+      tokens antes de tocar la prosa. `perm_diff()` sigue en cero.
+- [x] **Derogada la ventana de pago del 1 al 9**, que el estudio dio de baja por
+      escrito. Nunca llegó a regir: la `0024` ya la había marcado `rige = false`.
+- [x] **Datos de prueba borrados** (`0027`) y **las tres profesoras cargadas**
+      (`0034`), con los datos incompletos tal como vinieron y un nombre
+      provisorio para la del turno tarde.
+- [x] **Encendido el motor de consumo** de la `0029`, con las tablas vacías, que
+      es el momento en que el re-anclaje no tiene nada que perder.
+
+**El redondeo NO se tocó.** El estudio contestó "al próximo múltiplo de $1.000"
+a una pregunta que le decía que hoy los precios dan justos y cuya opción más
+gruesa era $100. Esa regla cambia 8 de los 12 precios que él mismo publicó y
+deja falso su propio "Efectivo 5% OFF" (pasa a 4,44% en FE START).
+`price_rounding` queda en `cincuenta` hasta que confirme la tabla nueva.
+
+**Lo que falta para operar: la grilla.** Días y horas. Todo lo demás está.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
@@ -324,7 +366,9 @@ se abre desde **Inicio → Clases de Hoy** y desde el panel de la clase en
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a `0009` ✅ (verificadas 26/08) |
+| Migraciones aplicadas | `0001` a `0034` ✅ (verificadas 09/09 con las consultas de abajo). **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
+| Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |
 | `SUPABASE_SERVICE_ROLE_KEY` | En `.env.local` ✅ · verificar en Vercel |
 | VAPID / push | Claves generadas en `.env.local` · cargar en Vercel |
@@ -333,3 +377,31 @@ se abre desde **Inicio → Clases de Hoy** y desde el panel de la clase en
 | Usuarios de prueba | `admin@pilatestudio.com` (cambiar clave) · `camila.portal@…` (demo) |
 | Roles | admin y recepción escriben; profesor consulta sin pagos ni datos médicos; alumno → portal (UI + RLS) ✅ |
 | Acceso enviado a la clienta | 24/08/2026, cuenta admin + demo del portal |
+
+### Qué migraciones corrieron
+
+Las migraciones se pegan a mano en el SQL Editor, así que el único registro es
+este documento. Cuando queda atrasado, cada migración nueva es una apuesta sobre
+si su `update` encuentra la fila. Estas dos consultas lo contestan sin tocar nada:
+
+```sql
+-- Qué existe en el esquema
+select
+  (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='consumo_rige')      as fn_consumo_rige_0029,
+  (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='reactivar_reserva') as fn_reactivar_0031,
+  (select count(*) from information_schema.columns where table_name='studio_settings' and column_name='rige')        as col_rige_0024,
+  (select count(*) from information_schema.columns where table_name='payment_methods' and column_name='ajuste_pct')  as col_ajuste_0028,
+  (select count(*) from information_schema.columns where table_name='plans' and column_name='weekly_frequency')      as col_weekly_0025,
+  (select count(*) from information_schema.columns where table_name='reservations' and column_name='membership_id')  as col_membership_id_0022;
+```
+
+```sql
+-- Qué dicen los datos
+select 'estudio' as bloque, key as dato, coalesce(nullif(value,''),'(vacío)') as valor from public.studio_settings where group_key = 'estudio'
+union all select 'params', key, value || case when rige then '  [rige]' else '  [NO rige]' end from public.studio_settings where group_key <> 'estudio'
+union all select 'disciplina', name, case when active then 'activa' else 'apagada' end from public.disciplines
+union all select 'plan', name, case when active then 'activo' else 'apagado' end || ' · ' || duration_days || 'd · ' || class_count || ' clases · ' || array_to_string(disciplines, ' + ') from public.plans
+union all select 'sala', name, case when active then 'activa' else 'apagada' end from public.rooms
+union all select 'permisos', 'grupo ' || grupo, count(*)::text || ' claves' from public.permission_keys group by grupo
+order by 1, 2;
+```

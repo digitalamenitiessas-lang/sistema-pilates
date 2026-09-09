@@ -108,7 +108,7 @@ function PortalAccessModal({ student, onClose }: { student: Student; onClose: ()
                   className={inputClass}
                 />
                 <p className="text-[11px] text-muted-foreground mt-1.5">
-                  Se la compartís a la clienta; con ella entra a su portal para reservar y ver sus pagos.
+                  Se la compartís al cliente; con ella entra a su portal para reservar y ver sus pagos.
                 </p>
               </div>
               {error && <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
@@ -191,7 +191,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
           className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Volver a clientas</span>
+          <span>Volver a clientes</span>
         </button>
       </div>
 
@@ -207,7 +207,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                 <div>
                   <h2 className="text-xl font-bold text-foreground">{student.name}</h2>
                   <p className="text-sm text-muted-foreground">
-                    Clienta desde {new Date(student.joinDate).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}
+                    Cliente desde {new Date(student.joinDate).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}
                   </p>
                 </div>
                 {canWrite && (
@@ -518,7 +518,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-foreground">Renovación automática</p>
                         <p className="text-xs text-muted-foreground">
-                          Al vencer, el sistema renueva el plan y genera la cuota del mes.
+                          Al vencer, el sistema renueva el plan y genera la cuota del período nuevo.
                         </p>
                       </div>
                       {canWrite ? (

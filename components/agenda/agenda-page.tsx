@@ -31,6 +31,7 @@ import {
   hoyISO,
   createClassSession,
   setClassDateTeacher,
+  settingNum,
   suspendClassDate,
   updateClassSession,
   deactivateClassSession,
@@ -126,20 +127,27 @@ function ClassCard({ cls, onClick }: { cls: WeekClass; onClick: () => void }) {
 
 function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => void }) {
   const { refresh } = useData()
-  const { teachers, rooms, disciplines } = useStudio()
+  const { teachers, rooms, disciplines, settings } = useStudio()
   const isEdit = !!cls
 
+  // La grilla del estudio es toda de clases iguales: si el formulario no
+  // arranca en el largo y el cupo que se dicta de verdad, cargar la semana
+  // es corregir los mismos dos campos una vez por clase.
+  const duracionPorDefecto = settingNum(settings, 'class_default_minutes', 50)
+  const cupoPorDefecto = settingNum(settings, 'class_default_capacity', 8)
+
   const [title, setTitle] = useState(cls?.title ?? '')
-  // La primera del catálogo, no un nombre escrito acá: 'Pilates Mat' es
-  // una de las disciplinas de demo y el estudio la va a renombrar.
+  // La primera del catálogo, no un nombre escrito acá. Y el catálogo trae
+  // solo las activas, así que desde la 0033 —que apagó las de demo— la
+  // primera es 'Pilates Reformer', la única que el estudio dicta.
   const [discipline, setDiscipline] = useState<Discipline>(
     cls?.discipline ?? disciplines[0]?.name ?? ''
   )
   const [teacherId, setTeacherId] = useState(cls?.teacherId ?? '')
   const [dayOfWeek, setDayOfWeek] = useState(cls?.dayOfWeek ?? 0)
   const [startTime, setStartTime] = useState(cls?.time ?? '09:00')
-  const [duration, setDuration] = useState(String(cls?.durationMinutes ?? 55))
-  const [capacity, setCapacity] = useState(String(cls?.capacity ?? 10))
+  const [duration, setDuration] = useState(String(cls?.durationMinutes ?? duracionPorDefecto))
+  const [capacity, setCapacity] = useState(String(cls?.capacity ?? cupoPorDefecto))
   const [room, setRoom] = useState(cls?.room ?? (rooms[0]?.name ?? ''))
   const [kind, setKind] = useState<'regular' | 'especial'>(cls?.kind ?? 'regular')
   const [date, setDate] = useState(cls?.date ?? '')
@@ -181,8 +189,8 @@ function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => v
       teacherId,
       dayOfWeek: kind === 'especial' ? diaDeLaFecha(date) : dayOfWeek,
       startTime,
-      durationMinutes: Number(duration) || 55,
-      capacity: Number(capacity) || 10,
+      durationMinutes: Number(duration) || duracionPorDefecto,
+      capacity: Number(capacity) || cupoPorDefecto,
       room,
       color: disciplineStyle(disciplines, discipline).dot,
       kind,
@@ -333,7 +341,7 @@ function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => v
                 ))}
               </select>
             ) : (
-              <input value={room} onChange={(e) => setRoom(e.target.value)} placeholder="Ej: Sala 1" className={inputClass} />
+              <input value={room} onChange={(e) => setRoom(e.target.value)} placeholder="Ej: Sala Reformer" className={inputClass} />
             )}
           </div>
 
@@ -405,7 +413,7 @@ function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => v
             </span>
             <span>
               <span className="block text-sm font-medium text-foreground">
-                La clienta puede reservarla sola
+                El cliente puede reservarla solo
               </span>
               <span className="block text-[11px] text-muted-foreground leading-tight">
                 Apagado: se muestra en la agenda, pero el lugar lo asigna recepción
@@ -474,7 +482,7 @@ function ClassDetailModal({
 
   const suspender = () => {
     const motivo = window.prompt(
-      'Motivo de la suspensión (lo va a ver la clienta):',
+      'Motivo de la suspensión (lo va a ver el cliente):',
       cls.occurrenceReason || 'Feriado'
     )
     if (motivo === null) return
@@ -514,7 +522,7 @@ function ClassDetailModal({
 
   const reserve = async (waitlist: boolean) => {
     if (!studentId) {
-      setError('Seleccioná una clienta primero')
+      setError('Seleccioná un cliente primero')
       return
     }
     setSaving(true)
@@ -604,7 +612,7 @@ function ClassDetailModal({
                 )}
                 {!cls.bookable && (
                   <p className="text-[11px] text-muted-foreground">
-                    La clienta no la reserva sola: el lugar lo asigna recepción
+                    El cliente no la reserva solo: el lugar lo asigna recepción
                   </p>
                 )}
               </div>
@@ -787,7 +795,7 @@ function ClassDetailModal({
                 className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary transition-colors"
               >
                 <option value="">
-                  {anotadas.length > 0 ? 'Anotar a otra clienta...' : 'Clienta a reservar...'}
+                  {anotadas.length > 0 ? 'Anotar a otro cliente...' : 'Cliente a reservar...'}
                 </option>
                 {/* Sin las que ya tienen lugar ese día: elegirlas de nuevo solo
                     produce el error de reserva duplicada. */}

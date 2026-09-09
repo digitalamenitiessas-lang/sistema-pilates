@@ -114,7 +114,7 @@ function PlanCard({ plan, onEdit, onDelete }: { plan: Plan; onEdit: () => void; 
           <div className="flex items-center gap-1.5">
             <Users className="w-3.5 h-3.5 text-muted-foreground" />
             <span className="text-xs text-muted-foreground">
-              <strong className="text-foreground">{activeCount}</strong> clienta
+              <strong className="text-foreground">{activeCount}</strong> cliente
               {activeCount !== 1 ? 's' : ''} activo{activeCount !== 1 ? 's' : ''}
             </span>
           </div>
@@ -314,7 +314,7 @@ function PlanFormModal({ plan, onClose }: { plan?: Plan; onClose: () => void }) 
               className="w-4 h-4 accent-[var(--primary)]"
             />
             <span className="text-sm text-foreground">
-              Es clase de prueba <span className="text-muted-foreground">(opción inicial para clientas nuevas)</span>
+              Es clase de prueba <span className="text-muted-foreground">(opción inicial para clientes nuevos)</span>
             </span>
           </label>
 

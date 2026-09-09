@@ -25,17 +25,20 @@ import { supabase } from '@/lib/supabase'
 // `public_studio_settings`) y se editan desde Configuración. Estos valores
 // quedan como respaldo por si la migración todavía no corrió o una clave
 // está vacía.
+//
+// El respaldo es el dato real del estudio, nunca uno de muestra: un
+// teléfono o una dirección inventados no son un campo pendiente, mandan a
+// la persona a otro lado. Los datos que el estudio todavía no dio quedan
+// vacíos a propósito y la pantalla esconde ese elemento.
 // ---------------------------------------------------------------
 const STUDIO_FALLBACK = {
-  name: 'Casa Fé',
-  city: 'San Miguel de Tucumán',
-  address: 'Av. Aconquija 1200, Yerba Buena, Tucumán',
-  mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Av.+Aconquija+1200+Yerba+Buena+Tucuman',
-  whatsapp: '5493813007791', // solo dígitos, con código de país
-  instagram: 'pilatestudio',
-  facebook: 'pilatestudio',
-  email: 'hola@pilatestudio.com',
-  openHours: 'Lun a Vie 7:00–21:00 · Sáb 9:00–13:00',
+  name: 'Casa Fe',
+  address: 'Mariano Moreno 107, Mercato Shopping Viejo, local 10, Yerba Buena, Tucumán',
+  mapsUrl: '',
+  whatsapp: '', // solo dígitos, con código de país
+  instagram: 'casafe.pilates',
+  email: 'casafe.pilates@gmail.com',
+  openHours: 'Lunes a viernes de 8 a 20, sábados de 9 a 13',
 }
 
 type Studio = typeof STUDIO_FALLBACK
@@ -58,6 +61,16 @@ const DISCIPLINE_FALLBACK: Record<string, DisciplineStyle> = {}
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
+/** La inicial del logo sale del nombre: escrita a mano queda la de otro estudio. */
+function inicial(nombre: string): string {
+  return nombre.trim().charAt(0).toUpperCase()
+}
+
+/** Los números de la web salen de la grilla, y un "1 disciplinas" delata que no. */
+function plural(n: number, uno: string, varios: string): string {
+  return n === 1 ? uno : varios
+}
+
 // ---------------------------------------------------------------
 // Contexto de la landing: datos del estudio y disciplinas, cargados en vivo
 // desde las vistas públicas. Con respaldo, así la página nunca queda vacía.
@@ -79,11 +92,34 @@ function useLanding(): LandingData {
   return useContext(LandingCtx)
 }
 
-/** Link de WhatsApp con el mensaje ya escrito. */
-function useWa(): (text: string) => string {
+/**
+ * Link de WhatsApp con el mensaje ya escrito, o `null` si el estudio
+ * todavía no cargó su número. Devolver null y no una cadena obliga a cada
+ * botón a decidir qué hace sin número, en vez de abrir wa.me/ vacío.
+ */
+function useWa(): (text: string) => string | null {
   const { studio } = useLanding()
   return (text: string) =>
-    `https://wa.me/${studio.whatsapp}?text=${encodeURIComponent(text)}`
+    studio.whatsapp
+      ? `https://wa.me/${studio.whatsapp}?text=${encodeURIComponent(text)}`
+      : null
+}
+
+/**
+ * Por dónde escribe quien quiere anotarse: WhatsApp si el estudio cargó su
+ * número, y si no, el mail con el asunto ya puesto. Devuelve null solo
+ * cuando no hay ninguno de los dos, y ahí el botón no se dibuja.
+ *
+ * Existe porque Planes es la única sección donde no ofrecer nada es peor
+ * que ofrecer el camino largo: es la pantalla donde alguien ya decidió que
+ * quiere venir.
+ */
+function useContacto(): (text: string) => string | null {
+  const { studio } = useLanding()
+  const wa = useWa()
+  return (text: string) =>
+    wa(text) ??
+    (studio.email ? `mailto:${studio.email}?subject=${encodeURIComponent(text)}` : null)
 }
 
 function Instagram({ className }: { className?: string }) {
@@ -92,14 +128,6 @@ function Instagram({ className }: { className?: string }) {
       <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
       <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
       <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
-    </svg>
-  )
-}
-
-function Facebook({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
     </svg>
   )
 }
@@ -289,7 +317,7 @@ function Nav() {
       <div className="max-w-6xl mx-auto px-5 flex items-center justify-between">
         <a href="#" className="flex items-center gap-2.5" onClick={() => setMenuOpen(false)}>
           <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-serif font-bold text-base">P</span>
+            <span className="text-primary-foreground font-serif font-bold text-base">{inicial(studio.name)}</span>
           </div>
           <span className="font-serif font-semibold text-foreground text-lg">{studio.name}</span>
         </a>
@@ -352,10 +380,17 @@ function Nav() {
   )
 }
 
-function Hero() {
-  const { studio } = useLanding()
+function Hero({ schedule }: { schedule: PublicClass[] }) {
   const wa = useWa()
+  const prueba = wa('¡Hola! Quiero reservar mi primera clase de prueba 🙌')
   const words = ['Fuerza,', 'control', 'y', 'calma.']
+
+  // Los chips salen de la grilla real. Sin grilla no se dibujan: eran dos
+  // números escritos a mano y le mentían el tamaño del estudio a quien entra.
+  const cupos = schedule.map((c) => c.capacity)
+  const minCupo = cupos.length ? Math.min(...cupos) : 0
+  const maxCupo = cupos.length ? Math.max(...cupos) : 0
+
   return (
     <section className="relative min-h-screen flex items-center overflow-hidden">
       {/* Imagen de fondo con zoom lento */}
@@ -373,7 +408,7 @@ function Hero() {
       <div className="relative max-w-6xl mx-auto px-5 w-full pt-28 pb-24">
         <div className="max-w-xl">
           <p className="fade-up text-[11px] md:text-xs font-bold tracking-[0.3em] text-primary uppercase mb-5" style={{ animationDelay: '200ms' }}>
-            Estudio de Pilates · {studio.city}
+            Estudio de Pilates
           </p>
 
           <h1 className="font-serif text-5xl md:text-7xl leading-[1.04] text-foreground mb-6">
@@ -401,19 +436,27 @@ function Hero() {
           </p>
 
           <div className="fade-up flex flex-wrap items-center gap-3" style={{ animationDelay: '1100ms' }}>
-            <a
-              href={wa('¡Hola! Quiero reservar mi primera clase de prueba 🙌')}
-              target="_blank"
-              rel="noreferrer"
-              className="group flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-primary text-primary-foreground text-sm font-bold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 transition-all"
-            >
-              <Sparkles className="w-4 h-4" />
-              Probá tu primera clase
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </a>
+            {prueba && (
+              <a
+                href={prueba}
+                target="_blank"
+                rel="noreferrer"
+                className="group flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-primary text-primary-foreground text-sm font-bold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 transition-all"
+              >
+                <Sparkles className="w-4 h-4" />
+                Probá tu primera clase
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </a>
+            )}
+            {/* Sin WhatsApp, "Ver planes" queda como única acción y toma el peso. */}
             <a
               href="#planes"
-              className="px-6 py-3.5 rounded-2xl border border-foreground/20 text-sm font-bold text-foreground hover:bg-foreground hover:text-background transition-colors"
+              className={cn(
+                'px-6 py-3.5 rounded-2xl text-sm font-bold transition-all',
+                prueba
+                  ? 'border border-foreground/20 text-foreground hover:bg-foreground hover:text-background'
+                  : 'bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5'
+              )}
             >
               Ver planes
             </a>
@@ -422,16 +465,24 @@ function Hero() {
       </div>
 
       {/* Chips flotantes */}
-      <div className="absolute right-10 top-1/3 hidden lg:flex flex-col gap-4">
-        <div className="float-y bg-background/80 backdrop-blur rounded-2xl px-5 py-4 shadow-lg border border-border">
-          <p className="text-2xl font-bold text-foreground">23</p>
-          <p className="text-xs text-muted-foreground">clases por semana</p>
+      {schedule.length > 0 && (
+        <div className="absolute right-10 top-1/3 hidden lg:flex flex-col gap-4">
+          <div className="float-y bg-background/80 backdrop-blur rounded-2xl px-5 py-4 shadow-lg border border-border">
+            <p className="text-2xl font-bold text-foreground">{schedule.length}</p>
+            <p className="text-xs text-muted-foreground">
+              {plural(schedule.length, 'clase por semana', 'clases por semana')}
+            </p>
+          </div>
+          <div className="float-y-slow bg-background/80 backdrop-blur rounded-2xl px-5 py-4 shadow-lg border border-border ml-10">
+            <p className="text-2xl font-bold text-foreground">
+              {minCupo === maxCupo ? maxCupo : `${minCupo}–${maxCupo}`}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {plural(maxCupo, 'persona por clase', 'personas por clase')}
+            </p>
+          </div>
         </div>
-        <div className="float-y-slow bg-background/80 backdrop-blur rounded-2xl px-5 py-4 shadow-lg border border-border ml-10">
-          <p className="text-2xl font-bold text-foreground">4–12</p>
-          <p className="text-xs text-muted-foreground">personas por clase</p>
-        </div>
-      </div>
+      )}
 
       <a
         href="#estudio"
@@ -447,7 +498,12 @@ function Hero() {
 function Marquee() {
   const { disciplineNames } = useLanding()
   const items = disciplineNames
-  const row = [...items, ...items, ...items]
+  // Sin catálogo quedaba una banda naranja vacía cruzando la página.
+  if (items.length === 0) return null
+  // La cinta se repite hasta llenar el ancho: con una sola disciplina, tres
+  // copias no alcanzan y el bucle se ve cortado a la mitad.
+  const copias = Math.max(3, Math.ceil(12 / items.length))
+  const row = Array.from({ length: copias }, () => items).flat()
   return (
     <div className="relative -rotate-2 -mx-4 my-2 z-10">
       <div className="bg-primary py-3.5 overflow-hidden shadow-md">
@@ -471,13 +527,26 @@ function Marquee() {
 }
 
 function Estudio({ schedule }: { schedule: PublicClass[] }) {
+  const { disciplineNames } = useLanding()
   const imgRef = useParallax(0.06)
-  const stats = {
-    classes: schedule.length || 23,
-    disciplines: schedule.length ? new Set(schedule.map((c) => c.discipline)).size : 6,
-    teachers: schedule.length ? new Set(schedule.map((c) => c.teacher_name)).size : 4,
-    rooms: schedule.length ? new Set(schedule.map((c) => c.room)).size : 3,
-  }
+
+  // Los números se cuentan sobre lo publicado: las clases, las profesoras y
+  // las salas salen de la grilla, y las disciplinas del catálogo, que es
+  // donde el estudio las edita — contarlas en la grilla anunciaba seis
+  // arriba mientras abajo se dibujaba una sola tarjeta. Antes había un
+  // respaldo escrito a mano (23 clases, 6 disciplinas, 4 profesoras, 3
+  // salas) que aparecía justo cuando la consulta no volvía: el momento en
+  // que nadie podía desmentirlo. En cero no se muestra: es que no hay dato.
+  const cuenta = (valor: (c: PublicClass) => string) =>
+    new Set(schedule.map(valor)).size
+  const profesoras = cuenta((c) => c.teacher_name)
+  const salas = cuenta((c) => c.room)
+  const stats = [
+    { n: schedule.length, label: plural(schedule.length, 'clase por semana', 'clases por semana') },
+    { n: disciplineNames.length, label: plural(disciplineNames.length, 'disciplina', 'disciplinas') },
+    { n: profesoras, label: plural(profesoras, 'instructor certificado', 'instructores certificados') },
+    { n: salas, label: plural(salas, 'sala equipada', 'salas equipadas') },
+  ].filter((s) => s.n > 0)
 
   return (
     <section id="estudio" className="relative py-24 md:py-32 overflow-hidden">
@@ -503,28 +572,25 @@ function Estudio({ schedule }: { schedule: PublicClass[] }) {
               No creemos en clases multitudinarias ni en rutinas copiadas. Cada
               persona entra con una historia distinta — una lesión, un objetivo,
               unas ganas — y el plan se arma alrededor de eso. Equipamiento
-              completo de Reformer, profesoras certificadas y grupos chicos donde
+              completo de Reformer, profesores certificados y grupos chicos donde
               tu nombre se conoce desde el primer día.
             </p>
           </Reveal>
 
-          <div className="grid grid-cols-2 gap-x-8 gap-y-6">
-            {[
-              { n: stats.classes, suffix: '', label: 'clases por semana' },
-              { n: stats.disciplines, suffix: '', label: 'disciplinas' },
-              { n: stats.teachers, suffix: '', label: 'instructores certificados' },
-              { n: stats.rooms, suffix: '', label: 'salas equipadas' },
-            ].map((s, i) => (
-              <Reveal key={s.label} delay={250 + i * 100}>
-                <div className="border-l-2 border-primary/40 pl-4">
-                  <p className="text-4xl font-bold text-foreground font-serif">
-                    <Counter target={s.n} suffix={s.suffix} />
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
-                </div>
-              </Reveal>
-            ))}
-          </div>
+          {stats.length > 0 && (
+            <div className="grid grid-cols-2 gap-x-8 gap-y-6">
+              {stats.map((s, i) => (
+                <Reveal key={s.label} delay={250 + i * 100}>
+                  <div className="border-l-2 border-primary/40 pl-4">
+                    <p className="text-4xl font-bold text-foreground font-serif">
+                      <Counter target={s.n} />
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+          )}
         </div>
 
         <Reveal delay={150} className="relative">
@@ -533,7 +599,7 @@ function Estudio({ schedule }: { schedule: PublicClass[] }) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/Pilates2.jpg"
-              alt="Clientas en clase de Reformer"
+              alt="Clientes en clase de Reformer"
               className="w-full h-[420px] md:h-[520px] object-cover hover:scale-105 transition-transform duration-700"
             />
           </div>
@@ -562,11 +628,14 @@ function Disciplinas() {
               Maneras de <em className="text-primary">volver al cuerpo</em>
             </h2>
           </Reveal>
-          <Reveal delay={200}>
-            <p className="text-sm text-foreground/60 max-w-xs">
-              Todas combinables entre sí según tu plan. Empezá por una, probalas todas.
-            </p>
-          </Reveal>
+          {/* La bajada solo tiene sentido si hay más de una disciplina para combinar. */}
+          {disciplineNames.length > 1 && (
+            <Reveal delay={200}>
+              <p className="text-sm text-foreground/60 max-w-xs">
+                Todas combinables entre sí según tu plan. Empezá por una, probalas todas.
+              </p>
+            </Reveal>
+          )}
         </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -610,9 +679,13 @@ function Disciplinas() {
 }
 
 function Planes({ plans }: { plans: PublicPlan[] }) {
-  const wa = useWa()
+  const contacto = useContacto()
+  const reservaPrueba = contacto('Quiero reservar mi clase de prueba')
   const trial = plans.find((p) => p.is_trial)
-  const paid = plans.filter((p) => !p.is_trial).sort((a, b) => a.price - b.price)
+  const paid = plans
+    .filter((p) => !p.is_trial)
+    .sort((a, b) => a.price - b.price)
+    .map((plan) => ({ plan, consulta: contacto(`Me interesa el plan ${plan.name}`) }))
 
   return (
     <section id="planes" className="py-24 md:py-32">
@@ -627,8 +700,8 @@ function Planes({ plans }: { plans: PublicPlan[] }) {
         </Reveal>
         <Reveal delay={180}>
           <p className="text-foreground/60 max-w-lg mb-12">
-            Elegí cuántas veces por semana querés venir y qué disciplinas querés
-            combinar. Sin matrícula, sin permanencia mínima.
+            Elegí cuántas veces por semana querés venir. Sin matrícula, sin
+            permanencia mínima.
           </p>
         </Reveal>
 
@@ -642,31 +715,34 @@ function Planes({ plans }: { plans: PublicPlan[] }) {
                   {trial.price === 0 ? 'Tu primera clase es gratis' : `Clase de prueba — $${trial.price.toLocaleString('es-AR')}`}
                 </p>
                 <p className="text-sm text-primary-foreground/80 max-w-md">
-                  {trial.description || 'Veni a conocer el estudio y probá la disciplina que quieras, sin compromiso.'}
+                  {trial.description || 'Vení a conocer el estudio y probá una clase, sin compromiso.'}
                 </p>
               </div>
-              <a
-                href={wa('¡Hola! Quiero reservar mi clase de prueba ✨')}
-                target="_blank"
-                rel="noreferrer"
-                className="relative group flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-primary-foreground text-primary text-sm font-bold hover:-translate-y-0.5 transition-transform"
-              >
-                Reservar mi lugar
-                <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-              </a>
+              {reservaPrueba && (
+                <a
+                  href={reservaPrueba}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="relative group flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-primary-foreground text-primary text-sm font-bold hover:-translate-y-0.5 transition-transform"
+                >
+                  Reservar mi lugar
+                  <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                </a>
+              )}
             </div>
           </Reveal>
         )}
 
         {paid.length === 0 ? (
           <Reveal>
+            {/* Sin canal escrito a mano: puede no haber WhatsApp cargado. */}
             <p className="text-sm text-muted-foreground">
-              Consultanos por WhatsApp para conocer los planes vigentes.
+              Consultanos para conocer los planes vigentes.
             </p>
           </Reveal>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
-            {paid.map((plan, i) => (
+            {paid.map(({ plan, consulta }, i) => (
               <Reveal key={plan.id} delay={i * 100} className="h-full">
                 <TiltCard className="h-full">
                   <div
@@ -722,19 +798,21 @@ function Planes({ plans }: { plans: PublicPlan[] }) {
                         ))}
                       </div>
 
-                      <a
-                        href={wa(`¡Hola! Me interesa el plan ${plan.name} 🧘`)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={cn(
-                          'mt-auto text-center py-3 rounded-2xl text-sm font-bold transition-all',
-                          plan.popular
-                            ? 'bg-primary text-primary-foreground hover:opacity-90'
-                            : 'border border-foreground/15 text-foreground hover:bg-foreground hover:text-background'
-                        )}
-                      >
-                        Consultar por este plan
-                      </a>
+                      {consulta && (
+                        <a
+                          href={consulta}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={cn(
+                            'mt-auto text-center py-3 rounded-2xl text-sm font-bold transition-all',
+                            plan.popular
+                              ? 'bg-primary text-primary-foreground hover:opacity-90'
+                              : 'border border-foreground/15 text-foreground hover:bg-foreground hover:text-background'
+                          )}
+                        >
+                          Consultar por este plan
+                        </a>
+                      )}
                     </div>
                   </div>
                 </TiltCard>
@@ -865,9 +943,15 @@ function Quote() {
   )
 }
 
-function Contacto() {
+function Contacto({ plans }: { plans: PublicPlan[] }) {
   const { studio } = useLanding()
   const wa = useWa()
+  const masInfo = wa('¡Hola! Quiero más info del estudio 🙂')
+  const empezar = wa('¡Hola! Quiero empezar esta semana 💪')
+  // La clase de prueba se regala solo si el estudio la puso en cero: el
+  // precio lo pone él y arriba, en Planes, se muestra el que cargó. Escrita
+  // sin condición, la página se contradecía a dos secciones de distancia.
+  const pruebaGratis = plans.some((p) => p.is_trial && p.price === 0)
   return (
     <section id="contacto" className="py-24 md:py-32">
       <div className="max-w-6xl mx-auto px-5 grid md:grid-cols-2 gap-8 items-stretch">
@@ -885,14 +969,17 @@ function Contacto() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-foreground">{studio.address}</p>
-                  <a
-                    href={studio.mapsUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs text-primary font-medium hover:underline"
-                  >
-                    Cómo llegar →
-                  </a>
+                  {/* Sin link de Maps cargado queda la dirección sola, que ya alcanza. */}
+                  {studio.mapsUrl && (
+                    <a
+                      href={studio.mapsUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-primary font-medium hover:underline"
+                    >
+                      Cómo llegar →
+                    </a>
+                  )}
                 </div>
               </li>
               <li className="flex items-start gap-3.5">
@@ -924,24 +1011,17 @@ function Contacto() {
               >
                 <Instagram className="w-4.5 h-4.5" />
               </a>
-              <a
-                href={`https://facebook.com/${studio.facebook}`}
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Facebook"
-                className="w-11 h-11 rounded-xl border border-border flex items-center justify-center text-foreground/60 hover:bg-primary hover:border-primary hover:text-primary-foreground transition-all hover:-translate-y-0.5"
-              >
-                <Facebook className="w-4.5 h-4.5" />
-              </a>
-              <a
-                href={wa('¡Hola! Quiero más info del estudio 🙂')}
-                target="_blank"
-                rel="noreferrer"
-                aria-label="WhatsApp"
-                className="w-11 h-11 rounded-xl border border-border flex items-center justify-center text-foreground/60 hover:bg-[#25D366] hover:border-[#25D366] hover:text-white transition-all hover:-translate-y-0.5"
-              >
-                <MessageCircle className="w-4.5 h-4.5" />
-              </a>
+              {masInfo && (
+                <a
+                  href={masInfo}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="WhatsApp"
+                  className="w-11 h-11 rounded-xl border border-border flex items-center justify-center text-foreground/60 hover:bg-[#25D366] hover:border-[#25D366] hover:text-white transition-all hover:-translate-y-0.5"
+                >
+                  <MessageCircle className="w-4.5 h-4.5" />
+                </a>
+              )}
             </div>
           </div>
         </Reveal>
@@ -955,19 +1035,21 @@ function Contacto() {
                 ¿Empezamos esta semana?
               </p>
               <p className="text-sm text-primary-foreground/80 max-w-sm leading-relaxed">
-                Escribinos por WhatsApp, contanos tu punto de partida y te
-                recomendamos por dónde arrancar. La primera clase corre por
-                nuestra cuenta.
+                Escribinos, contanos tu punto de partida y te recomendamos por
+                dónde arrancar.
+                {pruebaGratis ? ' La primera clase corre por nuestra cuenta.' : ''}
               </p>
             </div>
+            {/* Sin WhatsApp cargado, el mail es el canal: la tarjeta no puede
+                quedar sin acción, es el cierre de la página. */}
             <a
-              href={wa('¡Hola! Quiero empezar esta semana 💪')}
-              target="_blank"
-              rel="noreferrer"
+              href={empezar ?? `mailto:${studio.email}`}
+              target={empezar ? '_blank' : undefined}
+              rel={empezar ? 'noreferrer' : undefined}
               className="relative group mt-10 flex items-center justify-center gap-2 py-4 rounded-2xl bg-primary-foreground text-primary text-sm font-bold hover:-translate-y-0.5 transition-transform"
             >
-              <MessageCircle className="w-4 h-4" />
-              Escribinos por WhatsApp
+              {empezar ? <MessageCircle className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
+              {empezar ? 'Escribinos por WhatsApp' : 'Escribinos por mail'}
               <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
             </a>
           </div>
@@ -980,6 +1062,7 @@ function Contacto() {
 function Footer() {
   const { studio } = useLanding()
   const wa = useWa()
+  const saludo = wa('¡Hola!')
   return (
     <footer className="bg-foreground text-background/80">
       <div className="max-w-6xl mx-auto px-5 py-14">
@@ -987,12 +1070,12 @@ function Footer() {
           <div>
             <div className="flex items-center gap-2.5 mb-3">
               <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-                <span className="text-primary-foreground font-serif font-bold text-base">P</span>
+                <span className="text-primary-foreground font-serif font-bold text-base">{inicial(studio.name)}</span>
               </div>
               <span className="font-serif font-semibold text-background text-lg">{studio.name}</span>
             </div>
             <p className="text-xs text-background/50 max-w-xs leading-relaxed">
-              Estudio de Pilates y movimiento en {studio.city}. {studio.openHours}.
+              Estudio de Pilates y movimiento. {studio.address}. {studio.openHours}.
             </p>
           </div>
 
@@ -1006,8 +1089,9 @@ function Footer() {
             <div className="flex flex-col gap-2.5">
               <p className="text-xs font-bold uppercase tracking-wider text-background/40 mb-1">Seguinos</p>
               <a href={`https://instagram.com/${studio.instagram}`} target="_blank" rel="noreferrer" className="hover:text-background transition-colors">Instagram</a>
-              <a href={`https://facebook.com/${studio.facebook}`} target="_blank" rel="noreferrer" className="hover:text-background transition-colors">Facebook</a>
-              <a href={wa('¡Hola!')} target="_blank" rel="noreferrer" className="hover:text-background transition-colors">WhatsApp</a>
+              {saludo && (
+                <a href={saludo} target="_blank" rel="noreferrer" className="hover:text-background transition-colors">WhatsApp</a>
+              )}
             </div>
           </nav>
         </div>
@@ -1091,14 +1175,14 @@ export function LandingPage() {
     <LandingCtx.Provider value={landing}>
     <main className="overflow-x-clip">
       <Nav />
-      <Hero />
+      <Hero schedule={schedule} />
       <Marquee />
       <Estudio schedule={schedule} />
       <Disciplinas />
       <Planes plans={plans} />
       <Horarios schedule={schedule} />
       <Quote />
-      <Contacto />
+      <Contacto plans={plans} />
       <Footer />
     </main>
     </LandingCtx.Provider>

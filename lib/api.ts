@@ -100,7 +100,7 @@ const EXPIRY_WARNING_DAYS = 5
 export type Settings = Record<string, string>
 
 /**
- * El precio que se cobra según cómo paga la clienta.
+ * El precio que se cobra según cómo paga el cliente.
  *
  * El ajuste vive en el medio de pago (0028) y no en el plan: es una
  * propiedad de cómo se paga, no de qué se compra. El redondeo es un
@@ -423,7 +423,7 @@ export async function fetchStudioData(): Promise<StudioData> {
       date: r.date,
       time: cls?.start_time?.slice(0, 5) ?? '',
       status: r.status,
-      discipline: (cls?.discipline ?? 'Pilates Mat') as Discipline,
+      discipline: (cls?.discipline ?? 'Pilates Reformer') as Discipline,
       teacherName: cls?.teachers?.name ?? '—',
     }
   })
@@ -717,7 +717,7 @@ export async function assignMembership(
       amount: plan.price,
       // El plazo lo pone el estudio desde Configuración. Estaba escrito en
       // el código mientras el parámetro ya existía y nadie lo leía: la
-      // clienta lo cambiaba y la cuota seguía venciendo a los cinco días.
+      // estudio lo cambiaba y la cuota seguía venciendo a los cinco días.
       due_date: addDays(start, settingNum(settings, 'payment_grace_days', PAYMENT_GRACE_DAYS)),
       status: 'pendiente',
     })
@@ -882,7 +882,7 @@ export async function createReservation(
   if (!error) return
   if (error.code !== '23505') throw error
 
-  // La restricción única de (clienta, clase, fecha) no mira el estado, así
+  // La restricción única de (cliente, clase, fecha) no mira el estado, así
   // que una reserva cancelada bloquea anotarse de nuevo en esa misma
   // clase. Pasa todo el tiempo: cancela, se le libera la tarde y quiere
   // volver. Se reactiva la fila que ya está, que además conserva su
@@ -910,7 +910,7 @@ export async function createReservation(
     return
   }
 
-  throw new Error('Esa clienta ya tiene una reserva para esa clase.')
+  throw new Error('Ese cliente ya tiene una reserva para esa clase.')
 }
 
 export async function updateReservationStatus(
@@ -927,7 +927,7 @@ export async function updateReservationStatus(
  * Hasta la 0029 lo hacía el navegador: markAttendance sumaba uno a
  * classes_used y undoAttendance restaba. Elegían la membresía con una
  * consulta suelta —la más reciente que siguiera vigente— así que si la
- * clienta renovaba en el medio, la clase se le devolvía a la membresía
+ * cliente renovaba en el medio, la clase se le devolvía a la membresía
  * equivocada. Y como reservar no descontaba nada, se podía reservar de
  * más sin que ningún lado avisara.
  *

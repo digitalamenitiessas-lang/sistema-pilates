@@ -158,7 +158,7 @@ async function notifyPaymentCredited(supabase: SupabaseClient, payment: PaidPaym
     .eq('id', payment.student_id)
     .maybeSingle()
   const amount = `$${Number(payment.amount).toLocaleString('es-AR')}`
-  const name = student?.name ?? 'Un alumno'
+  const name = student?.name ?? 'Un cliente'
 
   const admin = supabaseAdmin()
   if (admin) {
