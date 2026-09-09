@@ -2,6 +2,12 @@
 
 > Documento vivo. Se actualiza con cada bloque de trabajo.
 > Última actualización: **05/09/2026** (cruce del documento de requerimientos de Casa Fé).
+> Guía de testeo por rol (para Matías, no para la clienta):
+> [`Casa-Fe-guia-de-testeo.pdf`](Casa-Fe-guia-de-testeo.pdf) — qué hacer en cada
+> rol y qué tiene que pasar, más los ocho casos donde la base rechaza a
+> propósito. Se acompaña con la migración `0039`, que carga diez clientes de
+> prueba y trae su propia vuelta atrás.
+
 > Documentos para la clienta (presentables, no este plan interno):
 > `docs/PilatesStudio-que-incluye-el-sistema.pdf` (qué abarca hoy + roles) ·
 > `docs/PilatesStudio-integraciones-y-etapas.pdf` (integraciones y etapas).
