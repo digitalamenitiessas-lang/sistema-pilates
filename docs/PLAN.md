@@ -248,6 +248,34 @@ recargaba el estudio en segundo plano todo el tiempo.
 - [x] Un refresco que falla ya no borra la pantalla: avisa en una tira con
       "Reintentar" y se sigue trabajando con la última versión cargada.
 
+### ✅ Reservas ordenada por día (09/09)
+Era una tabla plana de todo el histórico ordenada por fecha descendente: lo
+de hoy —lo único que se toca en el mostrador— aparecía mezclado con lo de
+hace dos meses.
+- [x] Cuatro bloques plegables (`SeccionPlegable`, el mismo componente de
+      Configuración): **Hoy** y **Mañana** abiertos, **Más adelante** —solo si
+      hay— e **Historial** cerrados. Hoy y mañana van por hora ascendente (el
+      orden en que pasan las clases); el historial, de lo más reciente a lo
+      más viejo.
+- [x] El encabezado de Hoy muestra **cuántas quedan sin marcar**, que es la
+      tarea pendiente del mostrador, y no un conteo total.
+- [x] En los bloques de un solo día la columna es la **hora**: la fecha se
+      repetía en cada fila sin decir nada.
+- [x] Buscar por nombre o filtrar por fecha/estado muestra **una lista sola**
+      en vez de los bloques: lo buscado suele estar en el historial, que
+      viene cerrado, y los bloques lo escondían.
+- [x] La columna de acciones quedó fija a la derecha. En una pantalla de 800
+      px la tabla pedía 558 y tenía 495, así que los botones de asistencia
+      —justo los de esta pantalla— quedaban fuera del scroll.
+- [x] Marcar asistencia/ausente ahora se rige por `reservas.asistencia` (en
+      sombra: sin efecto todavía, `perm_diff()` en cero). Cancelar y confirmar
+      desde lista de espera siguen siendo de quien escribe.
+
+Dónde se confirma la asistencia, para que quede escrito: en **Reservas** fila
+por fila (mostrador), y en el modal por clase de `tomar-asistencia.tsx`, que
+se abre desde **Inicio → Clases de Hoy** y desde el panel de la clase en
+**Agenda** (profesora en la sala, con el celular). Los tres escriben lo mismo.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
