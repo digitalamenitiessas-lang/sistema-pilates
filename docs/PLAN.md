@@ -205,6 +205,26 @@ esto solo evita ofrecer acciones que iban a fallar.
       configurar SMTP propio) → `/sistema/recuperar` para elegir la nueva.
 - [x] **Cambiar contraseña** desde el portal (ícono de llave en el header).
 
+### ✅ Configuración por secciones plegables (09/09)
+La pantalla juntaba quince bloques en un scroll de 15.000 px: para tocar un
+parámetro de caja había que pasar por todo lo demás. Ahora cada bloque es una
+sección que se despliega y se contrae (`components/ui/seccion-plegable.tsx`),
+con la lista cerrada en 1.600 px.
+- [x] Rótulos de grupo fijos (El estudio, Reglas del negocio, Catálogos,
+      Equipo y espacios, Accesos, Integraciones) y, debajo, las secciones
+      cerradas con su título, su ayuda y un chevron.
+- [x] Sin abrirla, cada sección adelanta lo que tiene: el conteo (3
+      disciplinas, 7 parámetros) y, cuando importa, una advertencia —
+      "Sin guardar" si quedó algo tipeado, "En sombra" en Permisos,
+      "Conectado / Sin conectar" en Mercado Pago. El conteo se esconde en
+      pantalla angosta; la advertencia nunca.
+- [x] Lo que se deja abierto se recuerda en el navegador (localStorage) y
+      "Desplegar / Contraer todo" para revisar de una. Contraer no descarta
+      lo tipeado: la sección se esconde, no se desmonta.
+- [x] El estado no vive en cada sección sino en el contexto, y los modales
+      salieron del cuerpo plegable — si no, "Agregar" con la sección cerrada
+      abría un modal invisible.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.

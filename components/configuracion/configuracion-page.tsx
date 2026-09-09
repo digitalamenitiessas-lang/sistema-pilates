@@ -27,9 +27,16 @@ import {
   Lock,
   UserMinus,
   RotateCcw,
+  ChevronsUpDown,
+  ChevronsDownUp,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
+import {
+  SeccionPlegable,
+  SeccionesPlegables,
+  useSeccionesPlegables,
+} from '@/components/ui/seccion-plegable'
 import {
   getMpSettings,
   saveMpSettings,
@@ -87,6 +94,19 @@ const inputClass =
   'w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors'
 const labelClass =
   'text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block'
+
+/**
+ * Lo que muestra una sección cerrada: cuántas cosas tiene adentro. Sirve
+ * para decidir si vale la pena abrirla sin abrirla. En pantalla angosta se
+ * esconde — es un dato lindo de tener, no información que haga falta.
+ */
+function Conteo({ n, singular, plural }: { n: number; singular: string; plural: string }) {
+  return (
+    <span className="hidden sm:inline text-xs text-muted-foreground tabular-nums">
+      {n} {n === 1 ? singular : plural}
+    </span>
+  )
+}
 
 function MercadoPagoSection() {
   const { profile, refresh } = useData()
@@ -158,20 +178,14 @@ function MercadoPagoSection() {
     'text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block'
 
   return (
-    <div className="bg-card rounded-2xl border border-border overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-[#009EE3]/10 flex items-center justify-center">
-            <CreditCard className="w-5 h-5 text-[#009EE3]" />
-          </div>
-          <div>
-            <h2 className="text-sm font-bold text-foreground">Mercado Pago</h2>
-            <p className="text-xs text-muted-foreground">
-              Links de pago para membresías, con acreditación automática
-            </p>
-          </div>
-        </div>
-        {account ? (
+    <SeccionPlegable
+      id="mercadopago"
+      icono={CreditCard}
+      colorIcono="bg-[#009EE3]/10 text-[#009EE3]"
+      titulo="Mercado Pago"
+      ayuda="Links de pago para membresías, con acreditación automática"
+      resumen={
+        account ? (
           <span className="flex items-center gap-1.5 text-xs font-semibold text-[#2E6040] bg-[#E8F2EB] px-2.5 py-1 rounded-full">
             <CheckCircle2 className="w-3.5 h-3.5" />
             Conectado
@@ -181,9 +195,9 @@ function MercadoPagoSection() {
             <XCircle className="w-3.5 h-3.5" />
             Sin conectar
           </span>
-        )}
-      </div>
-
+        )
+      }
+    >
       <div className="px-5 py-5 space-y-4">
         {account && (
           <div className="bg-[#E8F2EB] rounded-xl px-4 py-3 text-sm text-[#2E6040]">
@@ -289,7 +303,7 @@ function MercadoPagoSection() {
           </>
         )}
       </div>
-    </div>
+    </SeccionPlegable>
   )
 }
 
@@ -452,20 +466,15 @@ function TeachersSection() {
   }
 
   return (
-    <div className="bg-card rounded-2xl border border-border overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Users className="w-5 h-5 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-sm font-bold text-foreground">Profesores</h2>
-            <p className="text-xs text-muted-foreground">
-              Equipo del estudio, sus disciplinas y con qué cuenta entra cada una
-            </p>
-          </div>
-        </div>
-        {canWrite && (
+    <>
+    <SeccionPlegable
+      id="profesores"
+      icono={Users}
+      titulo="Profesores"
+      ayuda="Equipo del estudio, sus disciplinas y con qué cuenta entra cada una"
+      resumen={<Conteo n={teachers.length} singular="profesor" plural="profesores" />}
+      accion={
+        canWrite ? (
           <button
             onClick={() => {
               setEditing(undefined)
@@ -474,11 +483,11 @@ function TeachersSection() {
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity"
           >
             <Plus className="w-3.5 h-3.5" />
-            Agregar
+            <span className="hidden sm:inline">Agregar</span>
           </button>
-        )}
-      </div>
-
+        ) : undefined
+      }
+    >
       <div className="divide-y divide-border">
         {teachers.length === 0 && (
           <p className="px-5 py-6 text-sm text-muted-foreground text-center">Sin profesores cargados</p>
@@ -543,9 +552,10 @@ function TeachersSection() {
           </p>
         </div>
       )}
+    </SeccionPlegable>
 
-      {showForm && <TeacherFormModal teacher={editing} onClose={() => setShowForm(false)} />}
-    </div>
+    {showForm && <TeacherFormModal teacher={editing} onClose={() => setShowForm(false)} />}
+    </>
   )
 }
 
@@ -572,17 +582,14 @@ function RoomsSection() {
   }
 
   return (
-    <div className="bg-card rounded-2xl border border-border overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
-        <div className="w-9 h-9 rounded-xl bg-accent/10 flex items-center justify-center">
-          <DoorOpen className="w-5 h-5 text-accent" />
-        </div>
-        <div>
-          <h2 className="text-sm font-bold text-foreground">Salas</h2>
-          <p className="text-xs text-muted-foreground">Espacios disponibles para las clases</p>
-        </div>
-      </div>
-
+    <SeccionPlegable
+      id="salas"
+      icono={DoorOpen}
+      colorIcono="bg-accent/10 text-accent"
+      titulo="Salas"
+      ayuda="Espacios disponibles para las clases"
+      resumen={<Conteo n={rooms.length} singular="sala" plural="salas" />}
+    >
       <div className="px-5 py-4 space-y-2">
         {rooms.length === 0 && (
           <p className="text-xs text-muted-foreground">
@@ -678,7 +685,7 @@ function RoomsSection() {
         )}
         {error && <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
       </div>
-    </div>
+    </SeccionPlegable>
   )
 }
 
@@ -827,26 +834,24 @@ function UsersSection() {
   }
 
   return (
-    <div className="bg-card rounded-2xl border border-border overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-[#5E8FA8]/10 flex items-center justify-center">
-            <UserPlus className="w-5 h-5 text-[#5E8FA8]" />
-          </div>
-          <div>
-            <h2 className="text-sm font-bold text-foreground">Usuarios del sistema</h2>
-            <p className="text-xs text-muted-foreground">Quiénes pueden ingresar y con qué permisos</p>
-          </div>
-        </div>
+    <>
+    <SeccionPlegable
+      id="usuarios"
+      icono={UserPlus}
+      colorIcono="bg-[#5E8FA8]/10 text-[#5E8FA8]"
+      titulo="Usuarios del sistema"
+      ayuda="Quiénes pueden ingresar y con qué permisos"
+      resumen={<Conteo n={users.filter((u) => u.active).length} singular="cuenta activa" plural="cuentas activas" />}
+      accion={
         <button
           onClick={() => setShowForm(true)}
           className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity"
         >
           <Plus className="w-3.5 h-3.5" />
-          Agregar
+          <span className="hidden sm:inline">Agregar</span>
         </button>
-      </div>
-
+      }
+    >
       <div className="divide-y divide-border">
         {loadError && <p className="px-5 py-4 text-sm text-destructive">{loadError}</p>}
         {users.map((u) => {
@@ -909,8 +914,10 @@ function UsersSection() {
         })}
       </div>
 
-      {showForm && <UserFormModal onClose={() => setShowForm(false)} onCreated={load} />}
-    </div>
+    </SeccionPlegable>
+
+    {showForm && <UserFormModal onClose={() => setShowForm(false)} onCreated={load} />}
+    </>
   )
 }
 
@@ -984,21 +991,24 @@ function SettingsSection({ group }: { group: SettingGroup }) {
   if (meta.length === 0) return null
 
   return (
-    <div className="bg-card rounded-2xl border border-border overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
-        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-          {group === 'estudio' ? (
-            <Building2 className="w-5 h-5 text-primary" />
-          ) : (
-            <SlidersHorizontal className="w-5 h-5 text-primary" />
-          )}
-        </div>
-        <div>
-          <h2 className="text-sm font-bold text-foreground">{info.title}</h2>
-          <p className="text-xs text-muted-foreground">{info.help}</p>
-        </div>
-      </div>
-
+    <SeccionPlegable
+      id={`parametros-${group}`}
+      icono={group === 'estudio' ? Building2 : SlidersHorizontal}
+      titulo={info.title}
+      ayuda={info.help}
+      abiertaPorDefecto={group === 'estudio'}
+      resumen={
+        // Contraer la sección no descarta lo tipeado, pero sí lo esconde:
+        // el cartel es para que nadie se vaya creyendo que guardó.
+        dirty ? (
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+            Sin guardar
+          </span>
+        ) : (
+          <Conteo n={meta.length} singular="parámetro" plural="parámetros" />
+        )
+      }
+    >
       <div className="px-5 py-4 space-y-4">
         {meta.map((s) => (
           <div key={s.key}>
@@ -1100,7 +1110,7 @@ function SettingsSection({ group }: { group: SettingGroup }) {
           </div>
         )}
       </div>
-    </div>
+    </SeccionPlegable>
   )
 }
 
@@ -1274,20 +1284,16 @@ function DisciplinesSection() {
   }
 
   return (
-    <div className="bg-card rounded-2xl border border-border overflow-hidden">
-      <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-accent/10 flex items-center justify-center">
-            <Shapes className="w-5 h-5 text-accent" />
-          </div>
-          <div>
-            <h2 className="text-sm font-bold text-foreground">Disciplinas</h2>
-            <p className="text-xs text-muted-foreground">
-              Las que aparecen en la agenda, los planes y la web
-            </p>
-          </div>
-        </div>
-        {canWrite && (
+    <>
+    <SeccionPlegable
+      id="disciplinas"
+      icono={Shapes}
+      colorIcono="bg-accent/10 text-accent"
+      titulo="Disciplinas"
+      ayuda="Las que aparecen en la agenda, los planes y la web"
+      resumen={<Conteo n={disciplines.length} singular="disciplina" plural="disciplinas" />}
+      accion={
+        canWrite ? (
           <button
             onClick={() => {
               setEditing(undefined)
@@ -1298,9 +1304,9 @@ function DisciplinesSection() {
           >
             <Plus className="w-4 h-4" />
           </button>
-        )}
-      </div>
-
+        ) : undefined
+      }
+    >
       <div className="px-5 py-4 space-y-2">
         {disciplines.length === 0 && (
           <p className="text-xs text-muted-foreground">
@@ -1342,8 +1348,10 @@ function DisciplinesSection() {
         ))}
       </div>
 
-      {showForm && <DisciplineFormModal discipline={editing} onClose={() => setShowForm(false)} />}
-    </div>
+    </SeccionPlegable>
+
+    {showForm && <DisciplineFormModal discipline={editing} onClose={() => setShowForm(false)} />}
+    </>
   )
 }
 
@@ -1370,19 +1378,20 @@ function PaymentMethodsSection() {
   }
 
   return (
-    <div className="bg-card rounded-2xl border border-border overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
-        <div className="w-9 h-9 rounded-xl bg-accent/10 flex items-center justify-center">
-          <Wallet className="w-5 h-5 text-accent" />
-        </div>
-        <div>
-          <h2 className="text-sm font-bold text-foreground">Medios de pago</h2>
-          <p className="text-xs text-muted-foreground">
-            Con los que se puede cobrar, y qué le hace cada uno al precio
-          </p>
-        </div>
-      </div>
-
+    <SeccionPlegable
+      id="medios-de-pago"
+      icono={Wallet}
+      colorIcono="bg-accent/10 text-accent"
+      titulo="Medios de pago"
+      ayuda="Con los que se puede cobrar, y qué le hace cada uno al precio"
+      resumen={
+        <Conteo
+          n={paymentMethods.filter((m) => m.active).length}
+          singular="medio activo"
+          plural="medios activos"
+        />
+      }
+    >
       <div className="px-5 py-4 space-y-2">
         <p className="text-[11px] text-muted-foreground pb-1">
           El porcentaje ajusta el precio de lista al cobrar: <strong>−5</strong> es
@@ -1513,7 +1522,7 @@ function PaymentMethodsSection() {
 
         {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
-    </div>
+    </SeccionPlegable>
   )
 }
 
@@ -1581,17 +1590,23 @@ function PermisosSection() {
   const total = matriz?.keys.length ?? 0
 
   return (
-    <div className="bg-card rounded-2xl border border-border overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
-        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-          <ShieldCheck className="w-5 h-5 text-primary" />
-        </div>
-        <div>
-          <h2 className="text-sm font-bold text-foreground">Permisos</h2>
-          <p className="text-xs text-muted-foreground">Qué puede hacer cada rol</p>
-        </div>
-      </div>
-
+    <SeccionPlegable
+      id="permisos"
+      icono={ShieldCheck}
+      titulo="Permisos"
+      ayuda="Qué puede hacer cada rol"
+      resumen={
+        // Que algo esté en sombra es lo que más conviene ver sin abrir:
+        // significa que lo que se tilde acá todavía no rige.
+        matriz && enSombra > 0 ? (
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+            {enSombra === total ? 'En sombra' : `${enSombra} en sombra`}
+          </span>
+        ) : (
+          <Conteo n={total} singular="permiso" plural="permisos" />
+        )
+      }
+    >
       {loadError && (
         <p className="px-5 py-4 text-xs text-destructive">
           {loadError} — si dice que la tabla no existe, falta correr la migración 0012.
@@ -1721,7 +1736,7 @@ function PermisosSection() {
           </p>
         )}
       </div>
-    </div>
+    </SeccionPlegable>
   )
 }
 
@@ -1746,67 +1761,95 @@ export function ConfiguracionPage() {
     })
 
   return (
-    <div className="p-4 md:p-6 max-w-2xl space-y-8">
-      <div>
-        <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-          <Building2 className="w-4 h-4" />
-          El estudio
-        </div>
-        <SettingsSection group="estudio" />
-      </div>
+    <SeccionesPlegables memoria="configuracion">
+      <div className="p-4 md:p-6 max-w-2xl space-y-7">
+        <BarraDeControl />
 
-      <div>
-        <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-          <SlidersHorizontal className="w-4 h-4" />
-          Reglas del negocio
-        </div>
-        <div className="space-y-5">
+        <BloqueDeSecciones icono={Building2} titulo="El estudio">
+          <SettingsSection group="estudio" />
+        </BloqueDeSecciones>
+
+        <BloqueDeSecciones icono={SlidersHorizontal} titulo="Reglas del negocio">
           {gruposDeReglas.map((g) => (
             <SettingsSection key={g} group={g} />
           ))}
-        </div>
-      </div>
+        </BloqueDeSecciones>
 
-      <div>
-        <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-          <Shapes className="w-4 h-4" />
-          Catálogos
-        </div>
-        <div className="space-y-5">
+        <BloqueDeSecciones icono={Shapes} titulo="Catálogos">
           <DisciplinesSection />
           <PaymentMethodsSection />
-        </div>
-      </div>
+        </BloqueDeSecciones>
 
-      <div>
-        <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-          <Users className="w-4 h-4" />
-          Equipo y espacios
-        </div>
-        <div className="space-y-5">
+        <BloqueDeSecciones icono={Users} titulo="Equipo y espacios">
           <TeachersSection />
           <RoomsSection />
-        </div>
-      </div>
+        </BloqueDeSecciones>
 
-      <div>
-        <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-          <UserPlus className="w-4 h-4" />
-          Accesos
-        </div>
-        <div className="space-y-5">
+        <BloqueDeSecciones icono={UserPlus} titulo="Accesos">
           <UsersSection />
           <PermisosSection />
-        </div>
-      </div>
+        </BloqueDeSecciones>
 
-      <div>
-        <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-          <Settings className="w-4 h-4" />
-          Integraciones
-        </div>
-        <MercadoPagoSection />
+        <BloqueDeSecciones icono={Settings} titulo="Integraciones">
+          <MercadoPagoSection />
+        </BloqueDeSecciones>
       </div>
+    </SeccionesPlegables>
+  )
+}
+
+/**
+ * Un bloque agrupa secciones afines bajo un rótulo. El rótulo no se
+ * plega: es lo que queda fijo para orientarse cuando todo lo demás está
+ * cerrado.
+ */
+function BloqueDeSecciones({
+  icono: Icono,
+  titulo,
+  children,
+}: {
+  icono: React.ComponentType<{ className?: string }>
+  titulo: string
+  children: React.ReactNode
+}) {
+  return (
+    <section>
+      <h2 className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2.5 px-1">
+        <Icono className="w-3.5 h-3.5" />
+        {titulo}
+      </h2>
+      <div className="space-y-2.5">{children}</div>
+    </section>
+  )
+}
+
+/** Abrir o cerrar todo de una vez, para quien vino a revisar y no a tocar. */
+function BarraDeControl() {
+  const { cantidadAbiertas, desplegarTodo, contraerTodo } = useSeccionesPlegables()
+  const todoCerrado = cantidadAbiertas === 0
+
+  return (
+    <div className="flex items-center justify-between gap-3 flex-wrap">
+      <p className="text-xs text-muted-foreground">
+        Tocá el título de cada sección para abrirla o cerrarla. El sistema
+        recuerda cómo la dejaste.
+      </p>
+      <button
+        onClick={todoCerrado ? desplegarTodo : contraerTodo}
+        className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-card text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+      >
+        {todoCerrado ? (
+          <>
+            <ChevronsUpDown className="w-3.5 h-3.5" />
+            Desplegar todo
+          </>
+        ) : (
+          <>
+            <ChevronsDownUp className="w-3.5 h-3.5" />
+            Contraer todo
+          </>
+        )}
+      </button>
     </div>
   )
 }
