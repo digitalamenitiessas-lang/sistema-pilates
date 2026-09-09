@@ -383,13 +383,24 @@ Verificado creando un cliente de prueba y asignándole el plan dos veces: la pri
 quedó 09/09 → 08/10 y la segunda 09/10 → 08/11, encolada y con estado `futura`. El
 cliente y sus dos membresías se borraron después.
 
+**Verificado con la 0037 y la 0038 aplicadas**, ejerciendo el camino completo con
+la sesión real: el pase de prueba arranca hoy junto a la mensualidad y termina a
+los siete días contando el de inicio (`09/09 → 15/09`, antes daba 16/09); una
+reserva en el día correcto **entra** —y esa es la prueba del arreglo de
+`consumir_clase`, porque fue la primera reserva real desde que el motor está
+encendido y es la que ejercita el `old.status` en un INSERT—; una en el día
+equivocado se rechaza con *"Esa clase se dicta los lunes, y el 15/09/2026 es
+martes"*; y la clase se descuenta del pase y no de la mensualidad, que es el
+desempate nuevo funcionando: las dos tenían saldo y gana la que primero se
+pierde. El cliente de prueba y sus dos membresías se borraron después.
+
 **Lo que quedó sin resolver, y es una decisión del estudio:** "Cambiar plan" y
 "Renovar membresía" son el mismo botón, así que un cambio de plan también se encola
 — la clienta paga el plan grande hoy y lo empieza a usar el mes que viene.
 Resolverlo obliga a decidir qué pasa con lo que le queda del plan viejo. Hasta
 entonces la pantalla avisa cuándo va a arrancar antes de cobrar.
 
-### ✅ No se reserva una clase que ya empezó (09/09) — `0038`, sin correr
+### ✅ No se reserva una clase que ya empezó (09/09)
 El portal ofrecía "Reservar" en las clases de hoy que ya habían terminado, porque
 la comparación era por fecha y no por fecha y hora. **El bug no cambió ese día;
 cambió lo que cuesta**: hasta la mañana del 09/09 era un botón inútil —sin grilla
@@ -490,7 +501,7 @@ fallara al correrse, y encontraron siete cosas. Las que importan:
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a `0036` ✅ · **`0037` y `0038` escritas, sin correr** (verificadas 09/09 con las consultas de abajo). **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Migraciones aplicadas | `0001` a `0038` ✅ (verificadas 09/09 con las consultas de abajo y contra la aplicación andando). **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
 | Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |
