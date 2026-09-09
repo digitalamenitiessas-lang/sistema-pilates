@@ -225,6 +225,29 @@ con la lista cerrada en 1.600 px.
       salieron del cuerpo plegable — si no, "Agregar" con la sección cerrada
       abría un modal invisible.
 
+### ✅ Volver a la pestaña ya no recarga el estudio (09/09)
+Síntoma: con el sistema abierto, ir a otra pestaña y volver dejaba la
+pantalla en "Cargando datos del estudio..." unos segundos.
+
+Causa: Supabase reemite `SIGNED_IN` con la **misma** sesión (idéntico
+`access_token`) cuando la pestaña vuelve al frente. `setSession` guardaba ese
+objeto nuevo, el efecto de carga dependía del objeto y volvía a pedir el
+bundle entero — catorce consultas — mientras `dataLoading` tapaba todo con el
+loader a pantalla completa. Medido con una sonda: mientras la pestaña está
+oculta esos eventos llegan **cada dos segundos**, o sea que también se
+recargaba el estudio en segundo plano todo el tiempo.
+- [x] `onAuthStateChange` conserva el objeto anterior cuando el usuario y el
+      token no cambiaron, y la carga se dispara por `session.user.id` y no por
+      el objeto: renovar el token ya no recarga nada.
+- [x] El loader tapa la pantalla solo cuando no hay datos. Un refresco con
+      datos en pantalla se hace por debajo.
+- [x] Al volver, si hace más de un minuto de la última carga, se refrescan
+      los datos en segundo plano (el estudio siguió operando). Con una
+      bandera para que varios `visibilitychange` seguidos no disparen dos o
+      tres bundles en paralelo.
+- [x] Un refresco que falla ya no borra la pantalla: avisa en una tira con
+      "Reintentar" y se sigue trabajando con la última versión cargada.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.

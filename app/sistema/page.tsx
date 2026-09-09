@@ -42,7 +42,7 @@ function FullScreenLoader({ message }: { message: string }) {
 }
 
 function AppShell() {
-  const { session, sessionLoading, profile, profileReady, data, dataLoading, dataError, refresh } = useData()
+  const { session, sessionLoading, profile, profileReady, data, dataError, refresh } = useData()
   const [currentPage, setCurrentPage] = useState<PageKey>('dashboard')
   const [collapsed, setCollapsed] = useState(false)
   // En mobile el sidebar es un drawer superpuesto; acá vive su apertura
@@ -61,7 +61,10 @@ function AppShell() {
 
   if (sessionLoading) return <FullScreenLoader message="Iniciando..." />
   if (!session) return <LoginPage />
-  if (dataLoading || (!data && !dataError)) return <FullScreenLoader message="Cargando datos del estudio..." />
+  // El loader tapa la pantalla solo cuando no hay nada que mostrar. Si ya
+  // hay datos, una recarga se hace por debajo: borrar lo que la persona
+  // estaba mirando para volver a poner lo mismo es peor que esperar.
+  if (!data && !dataError) return <FullScreenLoader message="Cargando datos del estudio..." />
   // No mostrar ninguna interfaz hasta conocer el rol del usuario
   if (!profileReady && !dataError) return <FullScreenLoader message="Cargando tu perfil..." />
 
@@ -75,7 +78,10 @@ function AppShell() {
     )
   }
 
-  if (dataError || !data) {
+  // Con datos en pantalla, un error es de un refresco que no salió: se
+  // avisa en una tira y se sigue trabajando con lo que había. La pantalla
+  // de error completa queda para cuando no hay nada que mostrar.
+  if (!data) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4 p-6 text-center">
         <p className="text-sm text-destructive">No se pudieron cargar los datos: {dataError}</p>
@@ -111,6 +117,21 @@ function AppShell() {
           onNavigate={setCurrentPage}
           onOpenMobileMenu={() => setMobileMenuOpen(true)}
         />
+
+        {dataError && (
+          <div className="flex items-center justify-between gap-3 px-4 md:px-6 py-2 bg-destructive/10 border-b border-destructive/20 shrink-0">
+            <p className="text-xs text-destructive min-w-0">
+              No se pudieron actualizar los datos: {dataError}. Estás viendo la
+              última versión que se pudo cargar.
+            </p>
+            <button
+              onClick={() => refresh()}
+              className="shrink-0 text-xs font-semibold text-destructive underline hover:no-underline"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
 
         <main className="flex-1 overflow-auto">
           <PageComponent onNavigate={setCurrentPage} />

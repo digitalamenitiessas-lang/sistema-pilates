@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { fetchStudioData, type StudioData } from './api'
@@ -38,6 +38,14 @@ interface DataContextValue {
 
 const DataContext = createContext<DataContextValue | null>(null)
 
+/**
+ * Cuánto tiene que hacer que se cargaron los datos para que valga la pena
+ * volver a traerlos al reaparecer la pestaña. No es una regla del negocio
+ * sino el costo de las consultas: alternar entre dos pestañas no debería
+ * pedirle el estudio entero a la base cada vez.
+ */
+const ESPERA_ENTRE_REFRESCOS_MS = 60_000
+
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -54,11 +62,37 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     })
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
+    } = supabase.auth.onAuthStateChange((_evento, session) => {
+      setSession((anterior) => {
+        // Supabase vuelve a emitir SIGNED_IN con la MISMA sesión (mismo
+        // token) cada vez que la pestaña vuelve al frente. Si guardáramos
+        // ese objeto nuevo, la referencia cambiaría y el efecto de abajo
+        // recargaría el estudio entero por nada. Cuando de verdad no
+        // cambió nada, conservamos el objeto anterior.
+        if (
+          anterior &&
+          session &&
+          anterior.user.id === session.user.id &&
+          anterior.access_token === session.access_token
+        ) {
+          return anterior
+        }
+        return session
+      })
     })
     return () => subscription.unsubscribe()
   }, [])
+
+  /**
+   * Cuándo terminó la última carga. Sirve para no repetir las catorce
+   * consultas del bundle cada vez que alguien alterna entre dos pestañas.
+   */
+  const ultimaCarga = useRef(0)
+  /**
+   * Hay un refresco automático en curso. No frena a los refrescos que pide
+   * una pantalla después de guardar: esos tienen que ver el dato nuevo.
+   */
+  const refrescoDeFondo = useRef(false)
 
   const refresh = useCallback(async () => {
     try {
@@ -67,11 +101,22 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       setData(bundle)
     } catch (err) {
       setDataError(err instanceof Error ? err.message : 'Error al cargar los datos')
+    } finally {
+      ultimaCarga.current = Date.now()
     }
   }, [])
 
+  // La carga del estudio se dispara por QUIÉN entró, no por el objeto de
+  // sesión: el token se renueva cada tanto y eso no cambia nada de lo que
+  // hay que traer. El email sale de una ref para no volverlo dependencia.
+  const userId = session?.user?.id ?? null
+  const emailRef = useRef(session?.user?.email ?? '')
   useEffect(() => {
-    if (!session) {
+    emailRef.current = session?.user?.email ?? ''
+  }, [session])
+
+  useEffect(() => {
+    if (!userId) {
       setData(null)
       setProfile(null)
       setProfileReady(false)
@@ -85,15 +130,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       supabase
         .from('profiles')
         .select('*')
-        .eq('id', session.user.id)
+        .eq('id', userId)
         .single()
         .then(({ data: p }) => {
           if (cancelled) return
           if (p) {
             setProfile({
               id: p.id,
-              fullName: p.full_name || session.user.email || '',
-              email: session.user.email ?? '',
+              fullName: p.full_name || emailRef.current || '',
+              email: emailRef.current,
               role: p.role as Role,
               active: p.active ?? true,
             })
@@ -107,7 +152,30 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [session, refresh])
+  }, [userId, refresh])
+
+  // Al volver a la pestaña sí conviene traer datos frescos: el estudio
+  // siguió operando mientras la persona estaba en otra cosa. Pero por
+  // debajo, sin tapar la pantalla — que es lo que hacía antes, cuando la
+  // recarga venía disparada por el SIGNED_IN repetido de Supabase.
+  useEffect(() => {
+    if (!userId) return
+    const alVolver = () => {
+      if (document.visibilityState !== 'visible') return
+      // Volver al frente puede disparar varios visibilitychange en menos de
+      // un segundo, y ultimaCarga recién se marca al terminar: sin esta
+      // bandera el estudio se pedía dos o tres veces en paralelo.
+      if (refrescoDeFondo.current) return
+      const esperado = Date.now() - ultimaCarga.current
+      if (esperado < ESPERA_ENTRE_REFRESCOS_MS) return
+      refrescoDeFondo.current = true
+      void refresh().finally(() => {
+        refrescoDeFondo.current = false
+      })
+    }
+    document.addEventListener('visibilitychange', alVolver)
+    return () => document.removeEventListener('visibilitychange', alVolver)
+  }, [userId, refresh])
 
   const canWrite = profile?.role === 'admin' || profile?.role === 'recepcion'
 
