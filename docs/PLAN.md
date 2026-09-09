@@ -353,6 +353,78 @@ con 12 y cupo 0/8, el sábado con 4 de Leandro de 9 a 12.
 reales y cobrar. Lo que sigue es desarrollo (vigencia mensual, renovación,
 turno fijo) y los datos que el estudio todavía no dio.
 
+### ✅ La vigencia de un mes, y el pago anticipado que se encola (09/09)
+La respuesta del estudio eligió la fecha individual —lo que el sistema ya hacía— pero
+le sumó dos reglas que no eran gratis. Migraciones `0036` (corrida) y `0037`
+(correcciones, escrita).
+- [x] **Un mes de calendario, no 30 días.** `plans.duration_months` y la función
+      `vigencia_hasta`, que es la autoridad. Los 30 días acertaban solo cuando el
+      mes tiene 31: con el ejemplo del estudio daban un día de más, y desde un
+      15/02, tres.
+- [x] **El cálculo bajó a la base.** Un trigger `BEFORE INSERT` que pisa lo que
+      manda el navegador. Antes se calculaba en dos lugares con la misma fórmula
+      duplicada, que es lo que la `0029` vino a terminar con el consumo de clases.
+- [x] **El pago anticipado se encola** detrás del período en curso en vez de
+      solaparse. Y eso resolvió de paso la pregunta que la `0029` y la `0030`
+      habían contestado distinto: sin solapamiento hay a lo sumo una membresía que
+      cubra una fecha.
+- [x] **Estado `futura`** para la membresía pagada que todavía no empezó, y la
+      ficha pasó a elegir "la que cubre hoy" en vez de "la más reciente" — si no,
+      a quien paga adelantado se le mostraba la del mes que viene como si fuera la
+      suya, y el portal la dejaba reservar.
+- [x] **Solo se encolan las mensualidades** (`0037`). El pase de prueba arranca el
+      día que se compra: encolarlo rompía el embudo más común del estudio —probar y
+      contratar el mismo día— dejando la mensualidad para la semana siguiente.
+
+Verificado creando un cliente de prueba y asignándole el plan dos veces: la primera
+quedó 09/09 → 08/10 y la segunda 09/10 → 08/11, encolada y con estado `futura`. El
+cliente y sus dos membresías se borraron después.
+
+**Lo que quedó sin resolver, y es una decisión del estudio:** "Cambiar plan" y
+"Renovar membresía" son el mismo botón, así que un cambio de plan también se encola
+— la clienta paga el plan grande hoy y lo empieza a usar el mes que viene.
+Resolverlo obliga a decidir qué pasa con lo que le queda del plan viejo. Hasta
+entonces la pantalla avisa cuándo va a arrancar antes de cobrar.
+
+### ✅ No se reserva una clase que ya empezó (09/09) — `0038`, sin correr
+El portal ofrecía "Reservar" en las clases de hoy que ya habían terminado, porque
+la comparación era por fecha y no por fecha y hora. **El bug no cambió ese día;
+cambió lo que cuesta**: hasta la mañana del 09/09 era un botón inútil —sin grilla
+cargada y con el motor de consumo apagado— y a la tarde, con las 64 clases y el
+motor encendido, anotarse a la noche en la clase de las 8:00 le descuenta la clase.
+- [x] El freno va en **su propio trigger** y no dentro de `consumir_clase`, que era
+      el lugar obvio: esa función arranca con `if not consumo_rige() then return
+      new`, así que el freno de mano de la `0029` apagaría también esta regla y
+      dejaría el sistema en el estado que produjo el problema. Reservar una clase
+      que ya pasó está mal descuente o no descuente.
+- [x] Se llama `reservations_agenda` para que corra **primero**: Postgres dispara
+      los BEFORE por orden alfabético, y así el mensaje dice "esa clase ya empezó"
+      en vez de "la clase ya está completa".
+- [x] **Recepción sí puede anotar después** —el que llega sin reserva y se la
+      cargan cuando terminó es el flujo normal del mostrador—, y el corte es por
+      permiso (`reservas.crear`), no por `override_reason`: ese texto **lo lee la
+      clienta**, porque RLS filtra filas y no columnas y el portal hace `select('*')`
+      sobre sus reservas. El rastro ya existe sin agregar nada: `source = 'staff'`
+      con `created_at` doce horas después de su `date` dice lo que pasó.
+- [x] **No dispara al marcar asistencia**, para que una profesora con
+      `reservas.asistencia` pueda corregir un ausente después de la clase — que es,
+      por definición, después de que la clase empezó.
+- [x] El margen es configurable (`booking_cutoff_minutes`, cero por defecto), toma
+      la hora real de la clase de ese día si se corrió (`class_occurrences`) y
+      compara en el huso del estudio: sin el `at time zone` serían tres horas de
+      diferencia, justo la clase de la mañana.
+- [x] De paso, **la fecha de la reserva tiene que caer en el día de la semana de su
+      clase**. Antes se podía anotar a alguien en la clase de los lunes para un
+      martes, y esa reserva no aparecía en ninguna lista hasta que la clienta
+      reclamaba la clase que pagó. Acá no hay excepción por permiso: no es una
+      excepción autorizada, es un dato que no cierra.
+- [x] En el portal, el reloj **se refresca cada 30 segundos**. Con la comparación
+      por fecha no hacía falta; por hora sí, porque la pantalla queda abierta en el
+      teléfono y la clase de las 8:00 seguía con su botón a las 8:30 para quien
+      entró a las 7:50.
+
+Se escribió en una sesión aparte, numerada `0036`, y se renumeró al traerla.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
@@ -392,7 +464,7 @@ turno fijo) y los datos que el estudio todavía no dio.
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a `0035` ✅ (verificadas 09/09 con las consultas de abajo). **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Migraciones aplicadas | `0001` a `0036` ✅ · **`0037` y `0038` escritas, sin correr** (verificadas 09/09 con las consultas de abajo). **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
 | Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |
@@ -418,7 +490,11 @@ select
   (select count(*) from information_schema.columns where table_name='studio_settings' and column_name='rige')        as col_rige_0024,
   (select count(*) from information_schema.columns where table_name='payment_methods' and column_name='ajuste_pct')  as col_ajuste_0028,
   (select count(*) from information_schema.columns where table_name='plans' and column_name='weekly_frequency')      as col_weekly_0025,
-  (select count(*) from information_schema.columns where table_name='reservations' and column_name='membership_id')  as col_membership_id_0022;
+  (select count(*) from information_schema.columns where table_name='reservations' and column_name='membership_id')  as col_membership_id_0022,
+  (select count(*) from information_schema.columns where table_name='plans' and column_name='duration_months')        as col_duration_months_0036,
+  (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='vigencia_hasta')  as fn_vigencia_hasta_0036,
+  (select count(*) from pg_trigger where tgname='memberships_fechas' and not tgisinternal)                            as trg_membresia_fechas_0036,
+  (select count(*) from information_schema.columns where table_name='public_plans' and column_name='duration_months') as vista_publica_0037;
 ```
 
 ```sql

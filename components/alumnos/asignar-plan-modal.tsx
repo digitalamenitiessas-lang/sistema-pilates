@@ -2,10 +2,10 @@
 
 import { useState } from 'react'
 import { X, Loader2, BookOpen } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, cuantoDura } from '@/lib/utils'
 import { useData } from '@/lib/data-context'
-import { assignMembership } from '@/lib/api'
-import type { Student } from '@/lib/types'
+import { assignMembership, addDays, hoyISO } from '@/lib/api'
+import type { Membership, Student } from '@/lib/types'
 
 interface AsignarPlanModalProps {
   student: Student
@@ -16,6 +16,7 @@ export function AsignarPlanModal({ student, onClose }: AsignarPlanModalProps) {
   const { data, refresh } = useData()
   const plans = data?.plans ?? []
   const settings = data?.settings ?? {}
+  const memberships = data?.memberships ?? []
   // Solo se preselecciona el plan actual si sigue estando entre los activos.
   // Si se dio de baja —que es lo que va a pasar con los planes de demo— el
   // botón quedaba habilitado apuntando a un id que la base rechaza, y el
@@ -26,6 +27,44 @@ export function AsignarPlanModal({ student, onClose }: AsignarPlanModalProps) {
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const hoy = hoyISO()
+  /** El `T00:00` evita que un ISO suelto se lea como UTC y muestre el día anterior. */
+  const fecha = (iso: string) => new Date(`${iso}T00:00`).toLocaleDateString('es-AR')
+  const plan = plans.find((p) => p.id === planId)
+
+  // Qué día va a arrancar, para no prometerle "arranca hoy" a quien está
+  // pagando adelantado. La base es la que decide (trigger memberships_fechas,
+  // 0036 y 0037) y acá se repite su cuenta exacta, que es el MÁXIMO end_date
+  // de las membresías que le siguen vivas — no la que cubre hoy. La
+  // diferencia se paga en el mostrador: con la actual hasta el 19/10 y otra
+  // ya encolada hasta el 19/11, mirar `student.membership` anunciaba el
+  // 20/10 y la base la creaba arrancando el 20/11.
+  //
+  // Los pases de prueba quedan fuera de los dos lados del encolado (0037):
+  // ni empujan a una mensualidad ni se encolan detrás de una. Un plan que no
+  // viaja en el paquete —dado de baja, `plans` solo trae los activos— se
+  // cuenta como mensualidad, que es lo que es en casi todos los casos.
+  const esPrueba = (idDelPlan: string) => plans.find((p) => p.id === idDelPlan)?.isTrial === true
+  const ultima = memberships
+    .filter(
+      (m) =>
+        m.studentId === student.id &&
+        // El trigger pide status = 'activa' y end_date >= el día que entra:
+        // en la base los únicos estados guardados son 'activa' y
+        // 'suspendida', y 'vencida' se deriva de la fecha al leer.
+        m.status !== 'suspendida' &&
+        m.endDate >= hoy &&
+        !esPrueba(m.planId)
+    )
+    .reduce<Membership | null>((max, m) => (max === null || m.endDate > max.endDate ? m : max), null)
+  const arranca = plan && !plan.isTrial && ultima ? addDays(ultima.endDate, 1) : null
+
+  // El encolado alcanza también al cambio de plan, y eso sigue sin resolver
+  // a propósito (lo explica la 0037): hace falta que el estudio decida qué
+  // pasa con lo que le queda del plan viejo. Mientras no esté decidido, lo
+  // único honesto es que quien cobra lo sepa antes de cobrar.
+  const cambioDePlan = !!plan && !!ultima && !!arranca && ultima.planId !== plan.id
 
   const handleSubmit = async () => {
     if (!planId) return
@@ -91,7 +130,8 @@ export function AsignarPlanModal({ student, onClose }: AsignarPlanModalProps) {
                   )}
                 </p>
                 <p className="text-[11px] text-muted-foreground">
-                  {p.classCount} clases · {p.durationDays} días
+                  {p.classCount} clase{p.classCount !== 1 ? 's' : ''} ·{' '}
+                  {cuantoDura(p)}
                 </p>
               </div>
               <p className="text-sm font-bold text-foreground shrink-0">
@@ -110,9 +150,26 @@ export function AsignarPlanModal({ student, onClose }: AsignarPlanModalProps) {
           {error && (
             <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
           )}
+          {cambioDePlan && plan && ultima && arranca && (
+            <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+              <span className="font-semibold">{plan.name}</span> no es el plan del último período que
+              ya tiene asignado ({ultima.planName}), así que esto es un cambio de plan — y el cambio
+              de plan también se encola: paga hoy y lo empieza a usar el {fecha(arranca)}. Hasta ese
+              día sigue con las clases de los períodos que ya tiene asignados. El sistema todavía no
+              sabe adelantar un cambio de plan: decíselo antes de cobrarle.
+            </p>
+          )}
+
           {plans.length > 0 && (
             <p className="text-[11px] text-muted-foreground pt-1">
-              La membresía arranca hoy. Si el plan tiene precio, la deuda queda generada en Pagos para cobrarla.
+              {!plan
+                ? 'Elegí un plan para ver desde qué día va a estar vigente.'
+                : plan.isTrial
+                ? 'El pase de prueba arranca hoy: no se encola detrás de lo que ya tenga.'
+                : arranca && ultima
+                ? `La membresía arranca el ${fecha(arranca)}, el día siguiente al último período que ya tiene asignado (termina el ${fecha(ultima.endDate)}): pagar antes no le corta el mes.`
+                : 'La membresía arranca hoy.'}{' '}
+              Si el plan tiene precio, la deuda queda generada en Pagos para cobrarla.
             </p>
           )}
         </div>

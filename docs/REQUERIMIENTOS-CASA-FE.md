@@ -98,7 +98,7 @@ De las 10 prioridades que la clienta puso en la página 16, las **1, 2, 3, 4, 9 
 | **Agregado 1** · Lista de espera con aviso | 🟡 | La alumna se anota; recepción promueve a mano | Aviso automático al liberarse el lugar, oferta con tiempo límite, confirmación de la alumna y pase a la siguiente |
 | **Agregado 2** · Días y horarios fijos | 🔴 | Nada (las reservas son de a una, por fecha) | Elección de horarios fijos del mes, materialización de reservas recurrentes, gestión desde administración |
 | **Agregado 3** · Prioridad por pago del 1 al 9 | ⚫ **derogado** | Nada, y nunca hizo falta | El estudio lo dio de baja el 09/09: *"No existe un período general de pago del 1 al 9"*. La prioridad pasa a colgar de la fecha individual de vencimiento (§8) |
-| **Agregado 4** · Vigencia desde la activación | 🟡 | Ya funciona así (start + días del plan) | Contestado el 09/09 y confirmado: vigencia individual de **un mes calendario**, no 30 días. Falta la unidad de vigencia en el plan, el encadenado del pago anticipado y el día de gracia (§8) |
+| **Agregado 4** · Vigencia desde la activación | 🟢 | **Hecho** (`0036` + `0037`): mes de calendario, cálculo en la base y pago anticipado encolado | Queda el día de gracia, que es parte del turno fijo, y la decisión sobre el cambio de plan (§8) |
 
 ## 4. Los choques con lo que ya funciona
 

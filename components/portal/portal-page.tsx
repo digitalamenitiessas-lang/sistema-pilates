@@ -23,11 +23,13 @@ import { disciplineStyle } from '@/lib/disciplines'
 import {
   addDays,
   mondayOf,
-  hoyISO,
+  ahoraDelEstudio,
+  reservaCerrada,
   createReservation,
   updateReservationStatus,
   fetchWeekOccupancy,
   type Occupancy,
+  settingNum,
   settingText,
 } from '@/lib/api'
 import type { Discipline, Reservation, Student } from '@/lib/types'
@@ -159,6 +161,8 @@ function MembershipCard({ student }: { student: Student }) {
       ? { label: 'Por vencer', class: 'bg-amber-100 text-amber-700' }
       : ms.status === 'vencida'
       ? { label: 'Vencida', class: 'bg-red-100 text-red-700' }
+      : ms.status === 'futura'
+      ? { label: 'Empieza después', class: 'bg-sky-100 text-sky-700' }
       : { label: 'Suspendida', class: 'bg-gray-100 text-gray-600' }
 
   return (
@@ -186,7 +190,13 @@ function MembershipCard({ student }: { student: Student }) {
         <span>
           Te quedan <strong className="text-primary">{left}</strong> clase{left !== 1 ? 's' : ''}
         </span>
-        <span>Vence el {pretty(ms.endDate)}</span>
+        {/* A un período que todavía no arrancó no se le dice cuándo vence:
+            el dato que la clienta necesita es desde cuándo lo puede usar. */}
+        <span>
+          {ms.status === 'futura'
+            ? `Arranca el ${pretty(ms.startDate)}`
+            : `Vence el ${pretty(ms.endDate)}`}
+        </span>
       </div>
     </div>
   )
@@ -280,7 +290,24 @@ export function PortalPage() {
   const [showChangePassword, setShowChangePassword] = useState(false)
 
   const weekStart = addDays(mondayOf(), weekOffset * 7)
-  const today = hoyISO()
+
+  // El ahora del estudio, y se refresca solo. Leerlo una vez por render
+  // alcanzaba mientras la comparación era por fecha; ahora que también es
+  // por hora, no: el portal queda abierto en el teléfono, y si el reloj
+  // se congela en el primer render, la clase de las 8:00 sigue con su
+  // botón de reservar a las 8:30 para quien entró a las 7:50.
+  const [ahora, setAhora] = useState(ahoraDelEstudio)
+  useEffect(() => {
+    const t = setInterval(() => setAhora(ahoraDelEstudio()), 30_000)
+    return () => clearInterval(t)
+  }, [])
+  const today = ahora.fecha
+
+  // Cuánto antes del inicio se cierra la reserva. Cero —el default de la
+  // 0038— cierra justo al empezar; el estudio puede pedir margen sin que
+  // haya que tocar código. Si la migración todavía no corrió, la clave no
+  // existe y el fallback deja el mismo cero.
+  const minutosDeCorte = settingNum(settings, 'booking_cutoff_minutes', 0)
 
   useEffect(() => {
     fetchWeekOccupancy(weekStart).then(setOccupancy)
@@ -517,8 +544,13 @@ export function PortalPage() {
           {!canBook && (
             <div className="bg-muted rounded-2xl px-4 py-3 mb-3">
               <p className="text-xs text-muted-foreground">
+                {/* La rama de 'futura' va antes que la de las clases: a quien
+                    pagó adelantado no se le puede decir que está vencida ni
+                    que gastó un plan que todavía no empezó. */}
                 {!ms
                   ? 'Necesitás una membresía activa para reservar.'
+                  : ms.status === 'futura'
+                  ? `Tu plan arranca el ${pretty(ms.startDate)}: desde ese día podés reservar. Para una clase de antes, consultá en recepción.`
                   : classesLeft === 0
                   ? 'Usaste todas las clases de tu plan. Consultá en recepción para renovar.'
                   : 'Tu membresía está vencida o suspendida. Consultá en recepción.'}
@@ -580,7 +612,11 @@ export function PortalPage() {
               <p className="text-xs text-muted-foreground text-center py-4">Sin clases este día.</p>
             )}
             {dayClasses.map((c) => {
-              const isPast = c.date < today
+              // Por fecha Y HORA. `c.time` ya es el horario efectivo de
+              // ese día, con el cambio de la instancia aplicado (0018):
+              // si la clase se corrió a la tarde, la reserva cierra a la
+              // tarde.
+              const isPast = reservaCerrada(c.date, c.time, ahora, minutosDeCorte)
               const isFull = c.occ.confirmed >= c.capacity
               const spotsLeft = Math.max(0, c.capacity - c.occ.confirmed)
               return (
@@ -621,7 +657,18 @@ export function PortalPage() {
                         Suspendida
                         {c.suspendedReason ? `: ${c.suspendedReason}` : ''}
                       </span>
-                    ) : isPast || !canBook ? null : !c.bookable ? (
+                    ) : isPast ? (
+                      // Antes acá no iba nada, y con la comparación por
+                      // fecha daba igual: un día pasado no se puede
+                      // abrir. Pero hoy la lista mezcla clases que ya
+                      // pasaron con las que faltan, y un renglón sin
+                      // botón, sin explicación, se lee como un error.
+                      c.date === today ? (
+                        <span className="text-[10px] font-semibold text-muted-foreground text-right leading-tight block max-w-[92px]">
+                          {reservaCerrada(c.date, c.time, ahora) ? 'Ya empezó' : 'Cerró la reserva'}
+                        </span>
+                      ) : null
+                    ) : !canBook ? null : !c.bookable ? (
                       <span className="text-[10px] font-semibold text-muted-foreground text-right leading-tight block max-w-[92px]">
                         Reservás en recepción
                       </span>

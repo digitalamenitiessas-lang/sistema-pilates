@@ -11,6 +11,7 @@ import { AlumnoFormModal } from './alumno-form-modal'
 const STATUS_CONFIG = {
   activa: { label: 'Activa', class: 'bg-[#E8F2EB] text-[#2E6040]' },
   'por vencer': { label: 'Por vencer', class: 'bg-amber-100 text-amber-700' },
+  futura: { label: 'Empieza después', class: 'bg-sky-100 text-sky-700' },
   vencida: { label: 'Vencida', class: 'bg-red-100 text-red-700' },
   suspendida: { label: 'Suspendida', class: 'bg-gray-100 text-gray-600' },
   sin_membresia: { label: 'Sin membresía', class: 'bg-gray-100 text-gray-500' },

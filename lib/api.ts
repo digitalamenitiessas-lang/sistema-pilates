@@ -56,6 +56,67 @@ export function hoyISO(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: HUSO_DEL_ESTUDIO })
 }
 
+/**
+ * El ahora del estudio: qué día es y qué hora es, en el mismo huso.
+ *
+ * Las dos cosas juntas y de una sola lectura del reloj, a propósito.
+ * Pedirlas por separado —hoyISO() y después la hora— abre una ventana de
+ * un instante en la que las dos llamadas caen a los dos lados de la
+ * medianoche, y ahí la fecha dice hoy y la hora dice 00:00 de mañana.
+ * Pasa una vez cada nunca y sería imposible de reproducir.
+ */
+export function ahoraDelEstudio(): { fecha: string; hora: string } {
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: HUSO_DEL_ESTUDIO,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    // h23 y no hour12: false: con hour12 en false, algunos motores
+    // devuelven "24:00" a la medianoche en vez de "00:00", y "24:00"
+    // compara mal contra cualquier horario de clase.
+    hourCycle: 'h23',
+  }).formatToParts(new Date())
+  const p = (tipo: string) => partes.find((x) => x.type === tipo)?.value ?? '00'
+  return {
+    fecha: `${p('year')}-${p('month')}-${p('day')}`,
+    hora: `${p('hour')}:${p('minute')}`,
+  }
+}
+
+const enMinutos = (hhmm: string): number => {
+  const [h, m] = hhmm.split(':').map(Number)
+  return (h || 0) * 60 + (m || 0)
+}
+
+/**
+ * ¿Ya cerró la reserva de esta clase?
+ *
+ * El bug que esto arregla: hasta acá la comparación era solo por fecha, y
+ * entonces a las 20:00 el portal seguía ofreciendo "Reservar" en la clase
+ * de las 8:00 de esa misma mañana. Desde que el motor de la 0029 está
+ * encendido eso no es un botón inútil: la base acepta la reserva y le
+ * descuenta la clase.
+ *
+ * `minutosDeCorte` es booking_cutoff_minutes (migración 0038): cuánto
+ * antes del inicio se cierra. En cero cierra al empezar, que es el
+ * default y lo que arregla el síntoma.
+ *
+ * Esto es lo que la pantalla muestra, no lo que decide: el reloj del
+ * navegador lo maneja quien mira. El freno de verdad es el trigger
+ * `reservations_agenda` de la 0038.
+ */
+export function reservaCerrada(
+  fecha: string,
+  hora: string,
+  ahora: { fecha: string; hora: string } = ahoraDelEstudio(),
+  minutosDeCorte = 0
+): boolean {
+  if (fecha !== ahora.fecha) return fecha < ahora.fecha
+  return enMinutos(hora) - minutosDeCorte <= enMinutos(ahora.hora)
+}
+
 export function addDays(iso: string, days: number): string {
   const [y, m, d] = iso.split('-').map(Number)
   const date = new Date(y, m - 1, d + days)
@@ -140,11 +201,18 @@ export function settingText(settings: Settings, key: string, fallback = ''): str
 function deriveMembershipStatus(
   status: string,
   endDate: string,
-  warningDays: number = EXPIRY_WARNING_DAYS
+  warningDays: number = EXPIRY_WARNING_DAYS,
+  startDate?: string
 ): Membership['status'] {
   if (status === 'suspendida') return 'suspendida'
   const today = hoyISO()
   if (endDate < today) return 'vencida'
+  // Con el encolado de la 0036 el pago anticipado ya no se solapa: crea una
+  // membresía que arranca cuando muere la actual. Sin esta rama diría
+  // "activa" un mes antes de empezar, y el portal le ofrecería reservar una
+  // clase que la base va a rechazar: el motor de la 0029 descuenta de la
+  // membresía que cubre la fecha de la clase, y esta todavía no cubre nada.
+  if (startDate && startDate > today) return 'futura'
   if (endDate <= addDays(today, warningDays)) return 'por vencer'
   return 'activa'
 }
@@ -361,6 +429,7 @@ export async function fetchStudioData(): Promise<StudioData> {
     // ?? 0 mientras la 0025 no haya corrido
     weeklyFrequency: p.weekly_frequency ?? 0,
     durationDays: p.duration_days,
+    durationMonths: p.duration_months ?? 0,
     disciplines: p.disciplines as Discipline[],
     description: p.description,
     color: p.color,
@@ -377,15 +446,45 @@ export async function fetchStudioData(): Promise<StudioData> {
     endDate: m.end_date,
     classesTotal: m.classes_total,
     classesUsed: m.classes_used,
-    status: deriveMembershipStatus(m.status, m.end_date, warningDays),
+    status: deriveMembershipStatus(m.status, m.end_date, warningDays, m.start_date),
     price: Number(m.price),
     autoRenew: m.auto_renew ?? true,
   }))
 
-  // A cada alumno se le adjunta su membresía más reciente
+  // A cada cliente se le adjunta LA QUE CUBRE HOY, y si ninguna la cubre,
+  // la de end_date más alto: la que tenga encolada si pagó adelantado, o la
+  // última que se le venció.
+  //
+  // Antes era "la más reciente", que con la consulta ordenada por end_date
+  // desc alcanzaba. Desde la 0036 no: el pago anticipado se encola en vez
+  // de solaparse, así que el end_date más alto puede ser de una membresía
+  // que arranca el mes que viene, y la ficha mostraría esa. La base elige
+  // con el mismo criterio (membresia_para, 0036), y las dos tienen que
+  // decir lo mismo o el mostrador informa un saldo que el motor no usa.
+  const hoy = hoyISO()
+  // Las mismas condiciones que membresia_para: activa, y la fecha entre
+  // inicio y fin. El estado derivado dice 'suspendida' solo cuando la fila
+  // lo dice —la columna admite 'activa' o 'suspendida', nada más—, así que
+  // descartarlo es el mismo filtro que el `status = 'activa'` de la función.
+  // Una suspendida no compite, porque el motor no la va a elegir para
+  // descontar; pero puede quedar como último recurso abajo, que es lo que
+  // hace que un cliente con una sola membresía suspendida siga mostrando la
+  // suya en vez de parecer que nunca compró nada.
+  const cubreHoy = (m: Membership) =>
+    m.status !== 'suspendida' && m.startDate <= hoy && m.endDate >= hoy
   const latestMembership = new Map<string, Membership>()
   for (const m of memberships) {
-    if (!latestMembership.has(m.studentId)) latestMembership.set(m.studentId, m)
+    const previa = latestMembership.get(m.studentId)
+    if (!previa) {
+      latestMembership.set(m.studentId, m)
+      continue
+    }
+    // La que cubre hoy manda. Entre dos que cubren hoy —posible desde la
+    // 0037, que dejó a los pases de prueba arrancar el día que se compran en
+    // vez de encolarse— la que primero se pierde, igual que membresia_para.
+    if (cubreHoy(m) && (!cubreHoy(previa) || m.endDate < previa.endDate)) {
+      latestMembership.set(m.studentId, m)
+    }
   }
 
   const students: Student[] = (studentsRes.data ?? []).map((s) => ({
@@ -546,7 +645,12 @@ function buildAlerts(
   const today = hoyISO()
 
   for (const m of memberships) {
-    // solo la membresía más reciente de cada alumno genera alerta
+    // Solo la que la ficha muestra como suya genera alerta: la que cubre
+    // hoy, o la de end_date más alto si ninguna la cubre —que es la que
+    // dispara el aviso de vencida de acá abajo—. No es "la más reciente"
+    // desde el encolado de la 0036: una que arranca el mes que viene no
+    // tiene por qué avisar nada todavía, y de hecho su estado 'futura' no
+    // entra en ninguna de las tres ramas.
     if (students.find((s) => s.id === m.studentId)?.membership?.id !== m.id) continue
     if (m.status === 'vencida' && m.endDate >= addDays(today, -30)) {
       alerts.push({
@@ -693,6 +797,15 @@ export async function assignMembership(
   const plan = plans.find((p) => p.id === planId)
   if (!plan) throw new Error('Plan inexistente')
 
+  // Las dos fechas las decide la base (trigger memberships_fechas, 0036 y
+  // 0037): corre el inicio detrás de la mensualidad que le quede viva —los
+  // pases de prueba no encolan ni empujan— y calcula el fin con
+  // vigencia_hasta. Lo de acá viaja igual por una sola razón: si esas
+  // migraciones no corrieron no hay trigger que pise nada y estos son los
+  // valores que quedan escritos. Por eso cuenta como la rama de DÍAS de
+  // vigencia_hasta —la única que puede regir sin la 0036, que es la que
+  // trajo duration_months—: son días de USO y end_date es inclusivo, así
+  // que 7 días arrancando el 20 llegan hasta el 26 y no hasta el 27.
   const start = hoyISO()
   const { data: membership, error } = await supabase
     .from('memberships')
@@ -700,7 +813,7 @@ export async function assignMembership(
       student_id: studentId,
       plan_id: planId,
       start_date: start,
-      end_date: addDays(start, plan.durationDays),
+      end_date: addDays(start, plan.durationDays - 1),
       classes_total: plan.classCount,
       classes_used: 0,
       price: plan.price,
@@ -710,6 +823,14 @@ export async function assignMembership(
   if (error) throw error
 
   if (plan.price > 0) {
+    // El vencimiento se cuenta desde que arranca el período, no desde hoy:
+    // con el encolado, un período pagado el 5/10 que empieza el 20/10 dejaba
+    // la cuota vencida el 10/10, o sea que pagarla el día que la membresía
+    // empieza ya figuraba como deuda atrasada en Pagos. El start_date que
+    // vuelve del insert es el que puso el trigger; si la fila no volviera
+    // con fecha, se cae a hoy, que es el arranque que se pidió.
+    const inicio: string = membership?.start_date ?? start
+    const desde = inicio > start ? inicio : start
     const { error: payError } = await supabase.from('payments').insert({
       student_id: studentId,
       membership_id: membership.id,
@@ -718,7 +839,7 @@ export async function assignMembership(
       // El plazo lo pone el estudio desde Configuración. Estaba escrito en
       // el código mientras el parámetro ya existía y nadie lo leía: la
       // estudio lo cambiaba y la cuota seguía venciendo a los cinco días.
-      due_date: addDays(start, settingNum(settings, 'payment_grace_days', PAYMENT_GRACE_DAYS)),
+      due_date: addDays(desde, settingNum(settings, 'payment_grace_days', PAYMENT_GRACE_DAYS)),
       status: 'pendiente',
     })
     if (payError) throw payError
@@ -815,6 +936,8 @@ export interface PlanInput {
   /** Veces por semana. 0 = no aplica, como el pase de un día. */
   weeklyFrequency: number
   durationDays: number
+  /** Meses de calendario (0036). 0 = manda durationDays. */
+  durationMonths: number
   disciplines: Discipline[]
   description: string
   color: string
@@ -830,6 +953,7 @@ function planRow(input: PlanInput) {
     class_count: input.classCount,
     weekly_frequency: input.weeklyFrequency,
     duration_days: input.durationDays,
+    duration_months: input.durationMonths,
     disciplines: input.disciplines,
     description: input.description,
     color: input.color,
@@ -839,22 +963,45 @@ function planRow(input: PlanInput) {
 }
 
 /**
- * Escribe el plan tolerando que la 0025 no haya corrido: si la base
- * todavía no conoce weekly_frequency, se reintenta sin esa columna. Sin
- * esto, crear o editar un plan falla entero hasta que alguien corra la
- * migración a mano — que es como se corren acá.
+ * La columna que la base dice no conocer, si el error la nombró.
+ *
+ * PostgREST la escribe entre comillas simples ("Could not find the
+ * 'duration_months' column of 'plans' in the schema cache") y Postgres entre
+ * dobles ("column \"duration_months\" of relation \"plans\" does not
+ * exist"), así que se aceptan las dos.
+ */
+function columnaDesconocida(mensaje: string): string | null {
+  const enCache = /could not find the ['"]([^'"]+)['"] column/i.exec(mensaje)
+  if (enCache) return enCache[1]
+  const enTabla = /column ['"]([^'"]+)['"].*does not exist/i.exec(mensaje)
+  return enTabla?.[1] ?? null
+}
+
+/**
+ * Escribe el plan tolerando que una migración de columna no haya corrido:
+ * si la base dice que no conoce una columna, se reintenta sin ella.
+ *
+ * Antes miraba solo el nombre weekly_frequency (0025), y con duration_months
+ * (0036) en el row eso ya no alcanzaba: el mensaje no matcheaba, el error
+ * subía y guardar un plan fallaba en la pantalla. Se parsea el nombre que
+ * trae el mensaje en vez de mantener una lista, que hay que ampliar en cada
+ * migración y falla justo el día que alguien se olvida.
  */
 async function escribirPlan(
   escribir: (row: Record<string, unknown>) => PromiseLike<{ error: { message: string } | null }>,
   row: Record<string, unknown>
 ): Promise<void> {
-  const { error } = await escribir(row)
-  if (!error) return
-  if (!/weekly_frequency/.test(error.message)) throw error
-  const sinColumna = { ...row }
-  delete sinColumna.weekly_frequency
-  const reintento = await escribir(sinColumna)
-  if (reintento.error) throw reintento.error
+  const fila = { ...row }
+  // Termina siempre: solo reintenta cuando saca una columna que el row
+  // tenía, así que cada vuelta lo deja más chico. Y cualquier otro error
+  // —un CHECK, un permiso, la conexión— sube tal cual, como antes.
+  for (;;) {
+    const { error } = await escribir(fila)
+    if (!error) return
+    const columna = columnaDesconocida(error.message)
+    if (!columna || !(columna in fila)) throw error
+    delete fila[columna]
+  }
 }
 
 export async function createPlan(input: PlanInput): Promise<void> {

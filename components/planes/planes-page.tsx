@@ -14,7 +14,7 @@ import {
   Trash2,
   Loader2,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, vigenciaTexto } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { createPlan, updatePlan, deactivatePlan, type PlanInput } from '@/lib/api'
 import type { Plan, Discipline } from '@/lib/types'
@@ -70,7 +70,13 @@ function PlanCard({ plan, onEdit, onDelete }: { plan: Plan; onEdit: () => void; 
           ) : (
             <>
               ${plan.price.toLocaleString('es-AR')}
-              <span className="text-sm font-normal text-muted-foreground">/mes</span>
+              {/* "/mes" solo si el plan dura meses. FE FIRST son 7 días y
+                  decía "$20.000/mes" justo al lado de "Vigencia 7 días". */}
+              {plan.durationMonths > 0 && (
+                <span className="text-sm font-normal text-muted-foreground">
+                  {plan.durationMonths === 1 ? '/mes' : `/${plan.durationMonths} meses`}
+                </span>
+              )}
             </>
           )}
         </div>
@@ -78,15 +84,21 @@ function PlanCard({ plan, onEdit, onDelete }: { plan: Plan; onEdit: () => void; 
         <div className="space-y-2 my-4">
           <div className="flex items-center gap-2 text-sm">
             <Check className="w-4 h-4 shrink-0" style={{ color: plan.color }} />
+            {/* Las clases son las de toda la membresía (classes_total sale de
+                classCount), así que "por mes" es cierto solo cuando la
+                membresía dura un mes. En un pase por días queda la cantidad
+                sola y el plazo lo dice la línea de vigencia. */}
             <span className="text-foreground font-medium">
-              {plan.classCount} clase{plan.classCount !== 1 ? 's' : ''}{plan.isTrial ? '' : ' por mes'}
+              {plan.classCount} clase{plan.classCount !== 1 ? 's' : ''}{plan.durationMonths === 1 ? ' por mes' : ''}
             </span>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <CalendarDays className="w-4 h-4 shrink-0" style={{ color: plan.color }} />
-            <span className="text-muted-foreground">Vigencia {plan.durationDays} días</span>
+            <span className="text-muted-foreground">{vigenciaTexto(plan)}</span>
           </div>
-          {plan.price > 0 && (
+          {/* Sin clases cargadas la división da infinito y la tarjeta muestra
+              "∞ por clase": la base no exige class_count > 0. */}
+          {plan.price > 0 && plan.classCount > 0 && (
             <div className="flex items-center gap-2 text-sm">
               <Clock className="w-4 h-4 shrink-0" style={{ color: plan.color }} />
               <span className="text-muted-foreground">
@@ -148,7 +160,16 @@ function PlanFormModal({ plan, onClose }: { plan?: Plan; onClose: () => void }) 
   const [name, setName] = useState(plan?.name ?? '')
   const [price, setPrice] = useState(plan ? String(plan.price) : '')
   const [classCount, setClassCount] = useState(plan ? String(plan.classCount) : '')
-  const [durationDays, setDurationDays] = useState(plan ? String(plan.durationDays) : '30')
+  // Un plan dura meses de calendario o días, y son dos cosas distintas: el
+  // mes de las membresías (el 20 al 19) y los días de un pase suelto. La
+  // unidad elegida es la que manda: con duration_months > 0 la base calcula
+  // por mes de calendario y no mira duration_days.
+  const [durationUnit, setDurationUnit] = useState<'meses' | 'dias'>(
+    plan ? (plan.durationMonths > 0 ? 'meses' : 'dias') : 'meses'
+  )
+  const [durationValue, setDurationValue] = useState(
+    plan ? String(plan.durationMonths > 0 ? plan.durationMonths : plan.durationDays) : '1'
+  )
   const [color, setColor] = useState(plan?.color ?? PLAN_COLORS[0])
   const [disciplines, setDisciplines] = useState<Discipline[]>(plan?.disciplines ?? [])
   const [description, setDescription] = useState(plan?.description ?? '')
@@ -177,7 +198,23 @@ function PlanFormModal({ plan, onClose }: { plan?: Plan; onClose: () => void }) 
       price: Number(price) || 0,
       classCount: Number(classCount) || 1,
       weeklyFrequency: Number(weeklyFrequency) || 0,
-      durationDays: Number(durationDays) || 30,
+      // `duration_days` no es una columna muerta cuando el plan se mide en
+      // meses: es el respaldo con el que lib/api.ts calcula el vencimiento
+      // si el trigger de la 0036 todavía no corrió. Guardarlo en 0 —lo que
+      // hacía este formulario— alcanzaba con entrar a cambiarle el precio a
+      // un plan mensual para dejar el respaldo en cero, y ahí la membresía
+      // nacía vencida: el número del plan son días de USO y end_date es
+      // inclusivo, así que con 0 el respaldo escribe un fin anterior al
+      // inicio. Se guarda el equivalente en días contando el mes como 30, y
+      // no el valor que el plan ya tenía: un plan nuevo no tiene valor
+      // anterior, y 30 es justo lo que hoy tienen los cinco planes FE
+      // mensuales, así que sin trigger el mes queda aproximado en 30 días de
+      // uso y un plan de dos meses en 60.
+      durationDays:
+        durationUnit === 'dias'
+          ? Number(durationValue) || 30
+          : (Number(durationValue) || 1) * 30,
+      durationMonths: durationUnit === 'meses' ? Number(durationValue) || 1 : 0,
       disciplines,
       description,
       color,
@@ -233,7 +270,10 @@ function PlanFormModal({ plan, onClose }: { plan?: Plan; onClose: () => void }) 
               <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="Ej: Reformer Plus" className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>Precio mensual ($)</label>
+              {/* Sin "mensual": es el precio del período que dure el plan, y
+                  el período puede ser un pase de 7 días. Cuál es lo dice el
+                  campo Vigencia, dos casilleros más abajo. */}
+              <label className={labelClass}>Precio ($)</label>
               <input type="number" min="0" value={price} onChange={(e) => setPrice(e.target.value)} required placeholder="25000" className={inputClass} />
             </div>
             <div>
@@ -248,8 +288,37 @@ function PlanFormModal({ plan, onClose }: { plan?: Plan; onClose: () => void }) 
               </p>
             </div>
             <div>
-              <label className={labelClass}>Vigencia (días)</label>
-              <input type="number" min="1" value={durationDays} onChange={(e) => setDurationDays(e.target.value)} required placeholder="30" className={inputClass} />
+              <label className={labelClass}>Vigencia</label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  value={durationValue}
+                  onChange={(e) => setDurationValue(e.target.value)}
+                  required
+                  placeholder={durationUnit === 'meses' ? '1' : '7'}
+                  className={cn(inputClass, 'flex-1')}
+                />
+                <select
+                  value={durationUnit}
+                  onChange={(e) => {
+                    const u = e.target.value as 'meses' | 'dias'
+                    setDurationUnit(u)
+                    // 1 mes y 1 día no son intercambiables como número: al
+                    // cambiar la unidad se ofrece el valor típico de la nueva.
+                    setDurationValue(u === 'meses' ? '1' : '7')
+                  }}
+                  className={cn(inputClass, 'w-28')}
+                >
+                  <option value="meses">meses</option>
+                  <option value="dias">días</option>
+                </select>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {durationUnit === 'meses'
+                  ? 'Meses de calendario: arrancando el 20/09, un mes vence el 19/10 inclusive.'
+                  : 'Días corridos contando el que arranca: 7 desde el 20/09 vencen el 26/09.'}
+              </p>
             </div>
             <div>
               <label className={labelClass}>Color</label>

@@ -15,7 +15,7 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, vigenciaTexto } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 
 // ---------------------------------------------------------------
@@ -138,6 +138,17 @@ interface PublicPlan {
   price: number
   class_count: number
   duration_days: number
+  /**
+   * Meses de calendario que dura (0036). Opcional porque la vista
+   * `public_plans` enumera columnas y recién lo agrega la 0037: mientras esa
+   * migración no corra el dato no viaja. Ausente se toma como UN MES, que es
+   * lo que hoy dura todo plan pago del estudio —la 0036 les puso
+   * duration_months = 1 y les dejó duration_days en 30—, porque el respaldo
+   * tiene que ser el valor correcto de hoy: publicar "Vigencia 30 días" de
+   * un mes de calendario es justo la promesa de más que hay que dejar de
+   * hacer. Presente manda el dato, el 0 incluido.
+   */
+  duration_months?: number
   disciplines: string[]
   description: string
   color: string
@@ -685,7 +696,23 @@ function Planes({ plans }: { plans: PublicPlan[] }) {
   const paid = plans
     .filter((p) => !p.is_trial)
     .sort((a, b) => a.price - b.price)
-    .map((plan) => ({ plan, consulta: contacto(`Me interesa el plan ${plan.name}`) }))
+    .map((plan) => {
+      // 0 = la vigencia se cuenta en días; ausente = un mes (ver PublicPlan).
+      // Un respaldo solo para las tres líneas de la tarjeta, y el mismo para
+      // las tres: el plan pago medido en días no existe todavía, y el único
+      // que se mide así —el pase de prueba— está filtrado de esta lista.
+      const meses = plan.duration_months ?? 1
+      // Cobrar por mes y durar un mes son lo mismo acá: el precio y las
+      // clases son de todo el período, no de un mes suelto adentro.
+      const mensual = meses === 1
+      return {
+        plan,
+        consulta: contacto(`Me interesa el plan ${plan.name}`),
+        meses,
+        mensual,
+        sufijoPrecio: mensual ? '/mes' : meses > 1 ? `/${meses} meses` : null,
+      }
+    })
 
   return (
     <section id="planes" className="py-24 md:py-32">
@@ -742,7 +769,7 @@ function Planes({ plans }: { plans: PublicPlan[] }) {
           </Reveal>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
-            {paid.map(({ plan, consulta }, i) => (
+            {paid.map(({ plan, consulta, meses, mensual, sufijoPrecio }, i) => (
               <Reveal key={plan.id} delay={i * 100} className="h-full">
                 <TiltCard className="h-full">
                   <div
@@ -765,22 +792,43 @@ function Planes({ plans }: { plans: PublicPlan[] }) {
                         <span className="text-4xl font-bold text-foreground">
                           ${plan.price.toLocaleString('es-AR')}
                         </span>
-                        <span className="text-sm text-muted-foreground">/mes</span>
+                        {/* Sin sufijo cuando el plan se mide en días: ahí
+                            "/mes" promete otra cosa que lo que se cobra. */}
+                        {sufijoPrecio && (
+                          <span className="text-sm text-muted-foreground">{sufijoPrecio}</span>
+                        )}
                       </div>
 
                       <ul className="space-y-2 text-sm text-foreground/70 mb-5">
                         <li className="flex items-center gap-2">
                           <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: plan.color }} />
-                          {plan.class_count} clases por mes
+                          {/* Las clases son las de toda la membresía, así que
+                              "por mes" vale solo si la membresía dura un mes
+                              (de ahí `mensual`). El plazo, en la línea de abajo. */}
+                          {plan.class_count} {plural(plan.class_count, 'clase', 'clases')}
+                          {mensual ? ' por mes' : ''}
                         </li>
                         <li className="flex items-center gap-2">
                           <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: plan.color }} />
-                          Vigencia {plan.duration_days} días
+                          {/* El mismo helper que Planes y el modal de asignación,
+                              para que las tres pantallas digan una sola cosa.
+                              Acá decía "Vigencia 30 días" para un plan de un mes
+                              de calendario, y un mes arrancado el 31/01 da 28:
+                              la promesa pública era más larga que la vigencia,
+                              en la página que se lee antes de pagar. */}
+                          {vigenciaTexto({
+                            durationDays: plan.duration_days,
+                            durationMonths: meses,
+                          })}
                         </li>
-                        <li className="flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: plan.color }} />
-                          ${Math.round(plan.price / plan.class_count).toLocaleString('es-AR')} por clase
-                        </li>
+                        {/* Sin clases cargadas la división da infinito: la base
+                            no exige class_count > 0. */}
+                        {plan.class_count > 0 && (
+                          <li className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: plan.color }} />
+                            ${Math.round(plan.price / plan.class_count).toLocaleString('es-AR')} por clase
+                          </li>
+                        )}
                       </ul>
 
                       <div className="flex flex-wrap gap-1.5 mb-7">

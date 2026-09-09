@@ -3,9 +3,13 @@
 --
 -- La semana como el estudio la dicta, según lo que pasó el 09/09:
 --
---   Lunes a viernes   8:00 a 13:00   Ivana                   6 clases
---                    14:00 a 19:00   Profesora turno tarde   6 clases
---   Sábados           9:00 a 12:00   Leandro                 4 clases
+--   Lunes a viernes   Ivana                   6 clases, arrancan 8:00 a 13:00
+--   Lunes a viernes   Profesora turno tarde   6 clases, arrancan 14:00 a 19:00
+--   Sábados           Leandro                 4 clases, arrancan 9:00 a 12:00
+--
+-- Son horas de INICIO: la de las 13:00 termina 13:50, y el turno de Ivana
+-- va hasta las 14:00. La última de la tarde termina 19:50 sobre un turno
+-- que va hasta las 20:00, y la del sábado 12:50 sobre uno hasta las 13:00.
 --
 -- Todas de 50 minutos, 8 lugares, Pilates Reformer, Sala Reformer. En
 -- total 64 clases: 12 por día de lunes a viernes y 4 el sábado.
@@ -73,10 +77,15 @@ end $$;
 -- de Ivana que va hasta las 14:00. La última de la tarde arranca 19:00 y
 -- termina 19:50, y el turno tarde va hasta las 20:00.
 --
--- La duración, el cupo y el color NO se escriben acá: salen de los
--- parámetros y del catálogo, que es de donde los toma la pantalla al
--- crear una clase. Escritos a mano, recolorear la disciplina o cambiar la
--- duración por defecto dejaría 64 clases desalineadas del resto.
+-- La duración, el cupo y el color se leen de los parámetros y del catálogo
+-- en vez de escribirse acá. Y hay que ser preciso con el motivo, porque es
+-- tentador decir de más: las tres columnas son COPIAS: quedan congeladas en
+-- el valor que tenían al insertar, igual que si se hubieran escrito a mano.
+-- Cambiar el parámetro después no toca estas 64 filas.
+-- Se leen porque es exactamente lo que hace el formulario al crear una
+-- clase, así que la grilla nace idéntica a como habría nacido cargada a
+-- mano, y porque si el estudio ya movió alguno de esos números, esta
+-- migración lo respeta en vez de imponer el suyo.
 insert into public.class_sessions
   (id, title, discipline, teacher_id, day_of_week, start_time,
    duration_minutes, capacity, room, color, kind, bookable, active)
@@ -113,14 +122,21 @@ commit;
 -- ============================================================
 -- CÓMO VERIFICAR
 --
---   -- 64 clases, todas de 50 minutos y 8 lugares, en una sola sala
+--   -- Las 64 que cargó ESTA migración, con los valores a la vista. Contar
+--   -- valores distintos no sirve: count(distinct duration_minutes) = 1 da
+--   -- igual si las 64 quedaron en 50 o las 64 en 55.
 --   select count(*) as clases,
---          count(distinct duration_minutes) as duraciones,
---          count(distinct capacity) as cupos,
---          count(distinct room) as salas,
---          count(distinct discipline) as disciplinas
---   from public.class_sessions where active;
---   → 64 / 1 / 1 / 1 / 1
+--          min(duration_minutes) || '-' || max(duration_minutes) as duracion,
+--          min(capacity) || '-' || max(capacity) as cupo,
+--          string_agg(distinct room, ', ') as salas,
+--          string_agg(distinct discipline, ', ') as disciplinas
+--   from public.class_sessions where id::text like 'ca5afe01%';
+--   → 64 / 50-50 / 8-8 / Sala Reformer / Pilates Reformer
+--
+--   -- Y qué quedó afuera de esta grilla, que debería ser nada
+--   select count(*) from public.class_sessions
+--   where active and id::text not like 'ca5afe01%';
+--   → 0
 --
 --   -- La semana, como la lee el mostrador
 --   select case day_of_week
@@ -166,10 +182,14 @@ commit;
 -- ============================================================
 -- VUELTA ATRÁS (no ejecutar salvo que haga falta)
 --
--- Solo si todavía no hay reservas: `reservations.class_id` tiene
--- `on delete cascade`, así que este delete se llevaría las reservas de
--- esas clases sin preguntar. Si el estudio ya operó, la baja es lógica
--- (`active = false`), no un delete.
+-- Solo si todavía no hay reservas, y el alcance es más ancho de lo que
+-- parece: `reservations.class_id` tiene `on delete cascade`, así que el
+-- delete se lleva las reservas de esas clases sin preguntar, y con ellas
+-- las excepciones por fecha de `class_occurrences` (misma cascada, 0018).
+-- Y como el motor de consumo de la 0029 recalcula sobre las reservas que
+-- quedan, borrar las clases le DEVUELVE a cada cliente las clases que ya
+-- había usado. Si el estudio ya operó, la baja es lógica (`active =
+-- false`), no un delete.
 --
 --   begin;
 --   delete from public.class_sessions where id::text like 'ca5afe01%';

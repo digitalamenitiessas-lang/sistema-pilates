@@ -221,12 +221,23 @@ export async function reporteMembresias(r: Rango): Promise<FilaMembresia[]> {
     hasta: m.end_date,
     usadas: m.classes_used,
     total: m.classes_total,
+    // El mismo orden que deriveMembershipStatus en lib/api.ts, y con la
+    // rama 'futura' que le faltaba: desde el encolado de la 0036 una
+    // membresía pagada puede tener un end_date lejano y todavía no haber
+    // empezado. Sin esa rama, el listado con el que el estudio llama para
+    // renovar mostraba dos filas "vigentes" de la misma persona. Acá se
+    // deriva de nuevo —y no con la función de api.ts— porque el reporte lee
+    // las filas de la base sin el paquete del estudio, así que no tiene a
+    // mano la ventana de aviso y tampoco distingue "por vencer": para
+    // llamar y renovar, eso es vigente.
     estado:
       m.status === 'suspendida'
         ? 'suspendida'
         : m.end_date < hoy
           ? 'vencida'
-          : 'vigente',
+          : m.start_date > hoy
+            ? 'futura'
+            : 'vigente',
   }))
 }
 
