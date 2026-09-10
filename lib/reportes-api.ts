@@ -39,6 +39,11 @@ export interface FilaCobro {
   monto: number
 }
 
+/**
+ * Lo que entró, por fecha de cobro. Filtra por 'pagado', así que una cuota
+ * de renovación (0041) aparece acá cuando se cobró y no antes: cobrada es
+ * plata como cualquier otra, sin cobrar no entró a la caja ni es deuda.
+ */
 export async function reporteCobros(r: Rango): Promise<FilaCobro[]> {
   const { data, error } = await supabase
     .from('payments')
@@ -67,14 +72,36 @@ export interface FilaDeuda {
   monto: number
 }
 
-/** Lo que falta cobrar, con la antigüedad de cada deuda. */
+/**
+ * Lo que falta cobrar, con la antigüedad de cada deuda.
+ *
+ * Las ofertas de renovación sin tomar (0041) no son deuda y quedan afuera:
+ * cobran un período que todavía no existe, así que sumarlas era inventar
+ * plata a cobrar y, peor, ponerle días de atraso a alguien que no debe
+ * nada. Es el mismo criterio que `esOferta()` de lib/api.ts, dicho en SQL
+ * porque este reporte no pasa por el paquete del estudio.
+ *
+ * El filtro va en la base y no en memoria, y el reintento es por la
+ * migración: si la columna todavía no existe, PostgREST rechaza la
+ * consulta entera. Sin columna no hay ofertas que excluir, así que la
+ * segunda vuelta es exactamente el reporte de siempre.
+ */
 export async function reporteDeudas(hasta: string): Promise<FilaDeuda[]> {
-  const { data, error } = await supabase
-    .from('payments')
-    .select('due_date, concept, amount, students(name)')
-    .eq('status', 'pendiente')
-    .lte('due_date', hasta)
-    .order('due_date')
+  const traer = (sinOfertas: boolean) => {
+    const q = supabase
+      .from('payments')
+      .select('due_date, concept, amount, students(name)')
+      .eq('status', 'pendiente')
+      .lte('due_date', hasta)
+    return (sinOfertas ? q.is('renueva_membresia_id', null) : q).order('due_date')
+  }
+
+  const primera = await traer(true)
+  const res =
+    primera.error && /renueva_membresia_id/.test(primera.error.message)
+      ? await traer(false)
+      : primera
+  const { data, error } = res
   if (error) throw error
   const hoy = new Date(hasta + 'T12:00:00').getTime()
   return (data ?? []).map((p) => ({

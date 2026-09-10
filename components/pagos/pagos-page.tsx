@@ -19,13 +19,14 @@ import {
   MessageCircle,
   Wallet,
   Ban,
+  RefreshCw,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
-import { registerPayment, collectPayment, createMpLink, syncMpPayments, voidPayment, precioConAjuste, settingText } from '@/lib/api'
+import { registerPayment, collectPayment, createMpLink, syncMpPayments, voidPayment, precioConAjuste, settingText, esOferta, hoyISO } from '@/lib/api'
 import type { Payment } from '@/lib/types'
 
-type FilterStatus = 'todos' | 'pagado' | 'pendiente' | 'vencido'
+type FilterStatus = 'todos' | 'pagado' | 'pendiente' | 'renovacion' | 'vencido'
 type Method = 'efectivo' | 'transferencia' | 'tarjeta'
 type AnyMethod = Method | 'mercadopago'
 
@@ -46,16 +47,36 @@ const METHOD_LABEL: Record<AnyMethod, string> = {
 // Métodos que se registran a mano (MP se acredita solo)
 const MANUAL_METHODS: Method[] = ['efectivo', 'transferencia', 'tarjeta']
 
-/** Link de WhatsApp con el recordatorio de deuda ya escrito. */
+/** El `T00:00` evita que un ISO suelto se lea como UTC y muestre el día anterior. */
+const fechaCorta = (iso: string) => new Date(`${iso}T00:00`).toLocaleDateString('es-AR')
+
+/** Link de WhatsApp con el mensaje de cobranza —o de renovación— ya escrito. */
 export function paymentReminderLink(payment: Payment, phone: string): string | null {
   const digits = phone.replace(/\D/g, '')
   if (!digits) return null
   const firstName = payment.studentName.split(' ')[0]
+  const monto = `$${payment.amount.toLocaleString('es-AR')}`
+  const oferta = esOferta(payment)
+  // A una oferta de renovación no se le reclama nada: todavía no debe. Con
+  // un solo texto para las dos cosas, a la clienta al día le llegaba
+  // "tenés pendiente el pago" por el mes que recién le estamos ofreciendo.
+  //
+  // "No perder la prioridad" y no "conservar tus días y horarios": el turno
+  // fijo no existe en el sistema —una reserva es una fila por clase y
+  // fecha, no un derecho recurrente— así que conservarlos no se lo puede
+  // prometer nadie. La prioridad sí es del estudio, es la palabra que usó
+  // ("pierde la prioridad sobre sus dias y horarios fijos"), y es lo mismo
+  // que dicen los mails del proceso diario.
+  const cuerpo = oferta
+    ? `Ya podés renovar ${payment.planName} (${monto}). ` +
+      `Tenés hasta el ${fechaCorta(payment.dueDate)} para renovar y no perder la prioridad en tus días y horarios.`
+    : `Te recordamos que tenés pendiente el pago de ${payment.planName} (${monto}).`
   const text =
     `¡Hola ${firstName}! Te escribimos del estudio 🙂 ` +
-    `Te recordamos que tenés pendiente el pago de ${payment.planName} ` +
-    `($${payment.amount.toLocaleString('es-AR')}).` +
-    (payment.mpLink ? ` Podés abonarlo con este link: ${payment.mpLink}` : '') +
+    cuerpo +
+    (payment.mpLink
+      ? ` Podés ${oferta ? 'renovar' : 'abonarlo'} con este link: ${payment.mpLink}`
+      : '') +
     ` ¡Gracias!`
   return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
 }
@@ -67,7 +88,22 @@ const METHOD_COLORS: Record<AnyMethod, string> = {
   mercadopago: '#009EE3',
 }
 
-function PaymentStatusBadge({ status }: { status: Payment['status'] }) {
+function PaymentStatusBadge({ pago }: { pago: Payment }) {
+  const { status } = pago
+  // La oferta se pregunta antes que el estado, porque sin pagar es
+  // 'pendiente' igual que una deuda y de las dos es la única que no se le
+  // puede reclamar: cobra un período que todavía no existe. En celeste,
+  // que en el resto del sistema es el color del período que no arrancó.
+  if (esOferta(pago)) {
+    return (
+      <span
+        title="Cuota del período siguiente. Todavía no es deuda: el período nuevo se crea cuando se cobra."
+        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-sky-100 text-sky-700"
+      >
+        <RefreshCw className="w-3 h-3" /> Renovación
+      </span>
+    )
+  }
   if (status === 'pagado') {
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-[#E8F2EB] text-[#2E6040]">
@@ -400,6 +436,19 @@ function CobrarModal({ payment, onClose }: { payment: Payment; onClose: () => vo
                 )}
               </div>
 
+              {/* Cobrar una renovación no es cobrar una deuda: es lo que
+                  crea el período. Conviene decirlo acá, que es donde
+                  alguien duda de si le está cobrando dos veces el mes. */}
+              {esOferta(payment) && (
+                <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-[11px] text-sky-900 space-y-1">
+                  <p className="font-semibold">Es la renovación del período siguiente.</p>
+                  <p>
+                    El período nuevo lo crea este cobro: si la membresía en curso todavía no
+                    venció, arranca cuando esa termina; si ya venció, arranca hoy.
+                  </p>
+                </div>
+              )}
+
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
                   Método de pago
@@ -485,6 +534,16 @@ function MpLinkModal({ payment, onClose }: { payment: Payment; onClose: () => vo
             <p className="text-xs text-muted-foreground">
               {payment.studentName} · {payment.planName} · ${payment.amount.toLocaleString('es-AR')}
             </p>
+            {/* Con el plazo cumplido la oferta sigue viva hasta que el
+                proceso diario la anula, así que el modal se abre igual:
+                decirle "puede pagarla hasta el 21" un 23 sería falso. */}
+            {esOferta(payment) && (
+              <p className="text-[11px] text-sky-700 mt-0.5">
+                {payment.dueDate < hoyISO()
+                  ? `Renovación · el plazo venció el ${fechaCorta(payment.dueDate)}`
+                  : `Renovación · puede pagarla hasta el ${fechaCorta(payment.dueDate)}`}
+              </p>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -529,6 +588,7 @@ function MpLinkModal({ payment, onClose }: { payment: Payment; onClose: () => vo
               <p className="text-[11px] text-muted-foreground">
                 Cuando el cliente pague, el sistema lo acredita automáticamente y genera el
                 comprobante (se actualiza al abrir esta pantalla).
+                {esOferta(payment) && ' Con ese pago acreditado se crea el período nuevo.'}
               </p>
             </>
           )}
@@ -658,10 +718,32 @@ export function PagosPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Las ofertas de renovación sin cobrar, aparte de la deuda.
+  //
+  // Son cuotas del período que viene, emitidas antes de que venza el
+  // actual (0041), y la clienta no las debe: si no las paga, el período no
+  // se crea y la oferta se anula sola. Sumadas a "Pendientes", ese total
+  // dejaba de significar plata a cobrar desde el día que se emite la
+  // primera —toda clienta al día figuraba con una— y es justo el número
+  // que el estudio mira para saber cuánto tiene por cobrar.
+  //
+  // Mientras la 0041 no haya corrido no hay ninguna: `esOferta` da false
+  // sin la columna y todo se cuenta como se contaba hasta hoy.
+  const ofertas = PAYMENTS.filter((p) => esOferta(p))
+  const pendientes = PAYMENTS.filter((p) => p.status === 'pendiente' && !esOferta(p))
+  const montoOfertas = ofertas.reduce((a, p) => a + p.amount, 0)
+
   const filtered = PAYMENTS.filter((p) => {
     const matchSearch =
       search === '' || p.studentName.toLowerCase().includes(search.toLowerCase())
-    const matchStatus = filterStatus === 'todos' || p.status === filterStatus
+    const matchStatus =
+      filterStatus === 'todos'
+        ? true
+        : filterStatus === 'renovacion'
+        ? esOferta(p)
+        : filterStatus === 'pendiente'
+        ? p.status === 'pendiente' && !esOferta(p)
+        : p.status === filterStatus
     return matchSearch && matchStatus
   })
 
@@ -690,41 +772,62 @@ export function PagosPage() {
     })
     .sort((a, b) => b.monto - a.monto)
 
+  const tarjetas = [
+    {
+      icon: TrendingUp,
+      label: `Ingresos ${currentMonth?.month ?? ''}`,
+      value: `$${(currentMonthRevenue / 1000).toFixed(0)}k`,
+      sub: 'Cobrado este mes',
+      color: '#7D9B76',
+    },
+    {
+      icon: Check,
+      label: 'Pagos al día',
+      value: String(PAYMENTS.filter((p) => p.status === 'pagado').length),
+      sub: `$${totalPaid.toLocaleString('es-AR')}`,
+      color: '#7D9B76',
+    },
+    {
+      icon: Clock,
+      label: 'Pendientes',
+      value: String(pendientes.length),
+      sub: `$${pendientes.reduce((a, p) => a + p.amount, 0).toLocaleString('es-AR')}`,
+      color: '#D4A854',
+    },
+    {
+      icon: X,
+      label: 'Vencidos',
+      value: String(overdueCount),
+      sub: `$${PAYMENTS.filter((p) => p.status === 'vencido').reduce((a, p) => a + p.amount, 0).toLocaleString('es-AR')}`,
+      color: '#EF4444',
+    },
+    // La quinta tarjeta aparece solo si hay ofertas: es plata sobre la mesa
+    // y hay que poder verla, pero en su propio número y no dentro de la
+    // deuda. Sin ofertas —el estado de hoy— la fila queda igual que antes.
+    ...(ofertas.length > 0
+      ? [
+          {
+            icon: RefreshCw,
+            label: 'Renovaciones',
+            value: String(ofertas.length),
+            sub: `$${montoOfertas.toLocaleString('es-AR')} · no cuenta como deuda`,
+            color: '#38BDF8',
+          },
+        ]
+      : []),
+  ]
+
   return (
     <div className="flex flex-col h-full">
       {/* Stats */}
       <div className="px-6 py-5 border-b border-border bg-card">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            {
-              icon: TrendingUp,
-              label: `Ingresos ${currentMonth?.month ?? ''}`,
-              value: `$${(currentMonthRevenue / 1000).toFixed(0)}k`,
-              sub: 'Cobrado este mes',
-              color: '#7D9B76',
-            },
-            {
-              icon: Check,
-              label: 'Pagos al día',
-              value: String(PAYMENTS.filter((p) => p.status === 'pagado').length),
-              sub: `$${totalPaid.toLocaleString('es-AR')}`,
-              color: '#7D9B76',
-            },
-            {
-              icon: Clock,
-              label: 'Pendientes',
-              value: String(PAYMENTS.filter((p) => p.status === 'pendiente').length),
-              sub: `$${PAYMENTS.filter((p) => p.status === 'pendiente').reduce((a, p) => a + p.amount, 0).toLocaleString('es-AR')}`,
-              color: '#D4A854',
-            },
-            {
-              icon: X,
-              label: 'Vencidos',
-              value: String(overdueCount),
-              sub: `$${PAYMENTS.filter((p) => p.status === 'vencido').reduce((a, p) => a + p.amount, 0).toLocaleString('es-AR')}`,
-              color: '#EF4444',
-            },
-          ].map(({ icon: Icon, label, value, sub, color }) => (
+        <div
+          className={cn(
+            'grid grid-cols-2 gap-4',
+            ofertas.length > 0 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'
+          )}
+        >
+          {tarjetas.map(({ icon: Icon, label, value, sub, color }) => (
             <div key={label} className="bg-muted rounded-2xl p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs text-muted-foreground font-medium">{label}</span>
@@ -756,18 +859,32 @@ export function PagosPage() {
         </div>
 
         <div className="flex items-center gap-1.5 flex-wrap">
-          {(['todos', 'pagado', 'pendiente', 'vencido'] as const).map((s) => (
+          {([
+            { key: 'todos', label: 'Todos' },
+            { key: 'pagado', label: 'Pagado' },
+            { key: 'pendiente', label: 'Pendiente' },
+            // Con este filtro se llega a las ofertas, que ya no salen por
+            // "Pendiente": ahí quedó solo la deuda. Aparece cuando hay
+            // alguna, así que sin la 0041 los botones son los de siempre.
+            // Y también cuando es el filtro elegido, aunque ya no quede
+            // ninguna: cobrar la última refresca la pantalla, y si el chip
+            // desaparecía quedaba una lista vacía sin ningún filtro marcado.
+            ...(ofertas.length > 0 || filterStatus === 'renovacion'
+              ? [{ key: 'renovacion', label: 'Renovaciones' }]
+              : []),
+            { key: 'vencido', label: 'Vencido' },
+          ] as { key: FilterStatus; label: string }[]).map(({ key, label }) => (
             <button
-              key={s}
-              onClick={() => setFilterStatus(s)}
+              key={key}
+              onClick={() => setFilterStatus(key)}
               className={cn(
                 'px-3 py-1 rounded-full text-xs font-medium transition-colors border',
-                filterStatus === s
+                filterStatus === key
                   ? 'bg-primary text-primary-foreground border-primary'
                   : 'bg-muted text-muted-foreground border-border hover:border-primary/30'
               )}
             >
-              {s.charAt(0).toUpperCase() + s.slice(1)}
+              {label}
             </button>
           ))}
         </div>
@@ -853,6 +970,11 @@ export function PagosPage() {
                                   Pagado {p.date}
                                 </p>
                               )}
+                              {/* En una oferta la fecha no es un vencimiento
+                                  de deuda: es el último día para renovar. */}
+                              {esOferta(p) && (
+                                <p className="text-[10px] text-sky-700">Límite para renovar</p>
+                              )}
                             </div>
                           </td>
                           <td className="px-4 py-3 hidden lg:table-cell">
@@ -875,7 +997,7 @@ export function PagosPage() {
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <PaymentStatusBadge status={p.status} />
+                            <PaymentStatusBadge pago={p} />
                           </td>
                           <td className="px-4 py-3">
                             {/* Un cobro ya hecho se puede anular; el

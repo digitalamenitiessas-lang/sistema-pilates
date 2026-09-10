@@ -151,7 +151,15 @@ export interface Membership {
   classesUsed: number
   status: MembershipStatus
   price: number
-  /** Al vencer, el cron la renueva y genera la cuota (migración 0010) */
+  /**
+   * El interruptor de la renovación automática (0010). Con la 0041 cambió lo
+   * que hace, y conviene tenerlo escrito acá: ya no dice "al vencer se le
+   * crea el período nuevo y su cuota" sino "unos días antes de vencer se le
+   * emite la cuota del siguiente"; el período lo crea el pago. Apagado, la
+   * renovación la arma el mostrador a mano. Mientras la 0041 no esté
+   * aplicada el proceso diario saltea ese bloque entero, así que la marca no
+   * dispara nada.
+   */
   autoRenew: boolean
 }
 
@@ -229,6 +237,14 @@ export interface Payment {
   method?: 'efectivo' | 'transferencia' | 'tarjeta' | 'mercadopago'
   receiptNumber?: number | null
   mpLink?: string | null
+  /**
+   * La membresía que esta cuota renueva (0041). Mientras no se cobra es una
+   * OFERTA y no una deuda: cobra un período que todavía no existe —lo crea
+   * el pago— así que no se puede exigir. Vacío en las cuotas de siempre, y
+   * también mientras la migración no haya corrido. Se pregunta con
+   * `esOferta()` de lib/api.ts, no a mano.
+   */
+  renuevaMembresiaId?: string | null
 }
 
 export interface Profile {

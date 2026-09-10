@@ -19,11 +19,12 @@ import {
   Edit3,
   Smartphone,
   Loader2,
+  RefreshCw,
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData } from '@/lib/data-context'
-import { createSystemUser, setMembershipAutoRenew } from '@/lib/api'
+import { createSystemUser, setMembershipAutoRenew, esOferta, hoyISO } from '@/lib/api'
 import type { Membership, MembershipStatus, Student, Reservation, Payment } from '@/lib/types'
 import { AlumnoFormModal } from './alumno-form-modal'
 import { AsignarPlanModal } from './asignar-plan-modal'
@@ -219,6 +220,30 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
     return propias.sort((a, b) => b.startDate.localeCompare(a.startDate) || b.endDate.localeCompare(a.endDate))
   }, [data, student.id])
   const futuras = misMembresias.filter((m) => m.status === 'futura')
+  // Las renovaciones que le ofrecimos y todavía no pagó (0041). Es el
+  // estado anterior a `futuras`: la misma plata, pero el período todavía
+  // no existe porque lo crea el cobro.
+  const ofertas = payments.filter((p) => esOferta(p))
+  // Si la renovación de esa oferta ya se resolvió por otro camino —el
+  // mostrador le asignó el período, o le cambió el plan—, cobrarla no crea
+  // nada: `renovar_por_pago` (0041) corta con este mismo predicado
+  // (`nueva.start_date > vieja.end_date`) y solo le deja una nota al pago.
+  // Hace falta decirlo porque los dos bloques de abajo conviven hasta que
+  // el proceso diario anula la oferta, y este es el bloque que existe para
+  // no cobrarle dos veces el mismo mes.
+  const ofertaYaResuelta = (p: Payment) => {
+    const vieja = misMembresias.find((m) => m.id === p.renuevaMembresiaId)
+    return !!vieja && misMembresias.some((m) => m.startDate > vieja.endDate)
+  }
+  // La 0041 invirtió el orden: la cuota primero, el período cuando el pago
+  // entra. El parámetro que ella misma inserta sirve para saber si ya
+  // corrió, y a diferencia de mirar las cuotas contesta también para la
+  // clienta que no tiene ninguna oferta. Hace falta porque el texto de la
+  // renovación automática describe lo que el sistema hace, y sin la 0041 no
+  // hace ninguna de las dos cosas: el proceso diario necesita la columna
+  // para marcar la cuota como oferta, así que saltea el bloque entero y al
+  // vencer no pasa nada.
+  const renuevaCobrandoPrimero = data?.settings?.renewal_invoice_days !== undefined
   // 'activa' y 'por vencer' son exactamente los dos estados que cubren hoy:
   // el estado derivado ya descartó antes la suspendida, la vencida y la
   // futura. Hace falta porque `ms` puede ser el último recurso de arriba, y
@@ -310,6 +335,50 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
               <p className="text-[11px] text-muted-foreground mt-0.5">Próximas</p>
             </div>
           </div>
+
+          {/* Lo que le ofrecimos y todavía no pagó. Va antes del bloque de
+              abajo porque es el estado anterior —y el único de los dos que
+              pide hacer algo—, y se distingue por el borde punteado: el
+              período no está asignado todavía, lo crea el cobro. Sin eso
+              los dos avisos se leerían igual y son cosas opuestas: uno
+              dice que el mes que viene está cerrado, este que no. */}
+          {ofertas.length > 0 && (
+            <div className="mt-4 rounded-xl border border-dashed border-sky-300 bg-card p-3.5">
+              <p className="text-xs font-bold text-sky-900 flex items-center gap-1.5">
+                <RefreshCw className="w-3.5 h-3.5 shrink-0" />
+                {ofertas.length === 1
+                  ? 'Le ofrecimos la renovación y todavía no la pagó'
+                  : `Le ofrecimos ${ofertas.length} renovaciones y todavía no las pagó`}
+              </p>
+              <div className="mt-1.5 space-y-1">
+                {ofertas.map((p) => (
+                  <p key={p.id} className="text-[11px] text-sky-900/90 leading-relaxed">
+                    <span className="font-semibold">{p.planName}</span> · $
+                    {p.amount.toLocaleString('es-AR')} ·{' '}
+                    {ofertaYaResuelta(p)
+                      ? 'su renovación ya está asignada'
+                      : p.dueDate < hoyISO()
+                      ? `el plazo para renovar venció el ${fecha(p.dueDate)}`
+                      : `puede renovarla hasta el ${fecha(p.dueDate)}`}
+                  </p>
+                ))}
+              </div>
+              <p className="text-[10px] text-sky-800 mt-1.5">
+                No es deuda: se cobra desde Pagos y ahí nace el período nuevo. Si no la paga, el
+                sistema anula la oferta y el período no existe.
+              </p>
+              {/* La excepción, y es la única que cuesta plata: con el período
+                  ya asignado, cobrar la oferta no crea nada —el pago queda
+                  registrado con una nota— así que el mes se le cobraría dos
+                  veces si además se cobra la cuota del período nuevo. */}
+              {ofertas.some(ofertaYaResuelta) && (
+                <p className="text-[10px] font-semibold text-amber-700 mt-1">
+                  Con el período ya asignado, la oferta no se cobra: el sistema la anula sola y lo
+                  que se cobra es la cuota de ese período.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Va acá, junto al nombre y fuera de las pestañas, porque es lo que
               evita cobrarle dos veces el mismo mes: si está escondido en una
@@ -502,7 +571,33 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                   <p className="text-sm">Sin pagos registrados</p>
                 </div>
               ) : (
-                payments.map((p) => (
+                payments.map((p) => {
+                  const oferta = esOferta(p)
+                  const anulada = p.status === 'anulado'
+                  // Una oferta anulada es la renovación que nadie tomó, y
+                  // con la 0041 ese es el final normal de toda oferta que
+                  // no se paga. Se pregunta por la columna y no por
+                  // `esOferta` —que descarta las anuladas a propósito— y
+                  // se exige que nunca se haya cobrado: una renovación
+                  // cobrada y después anulada desde el mostrador sí se
+                  // tomó, y decirle "no tomada" sería falso.
+                  const ofertaCaducada = anulada && !!p.renuevaMembresiaId && !p.date
+                  // 'anulado' no tenía rama: caía en el último tramo del
+                  // ternario y decía "Vencido" —sin color, porque tampoco
+                  // había clase para su estado— o sea una deuda que ya
+                  // nadie debe. Con la 0041 esa fila pasa a ser común.
+                  const detalle = p.status === 'pagado'
+                    ? `Pagado el ${p.date} · ${p.method === 'mercadopago' ? 'Mercado Pago' : p.method ?? ''}`
+                    : ofertaCaducada
+                    ? `Renovación no tomada · vencía el ${fecha(p.dueDate)}`
+                    : anulada
+                    ? 'Anulado'
+                    : oferta
+                    ? p.dueDate < hoyISO()
+                      ? `Renovación · el plazo venció el ${fecha(p.dueDate)}`
+                      : `Renovación · puede pagarla hasta el ${fecha(p.dueDate)}`
+                    : `Vence ${p.dueDate}`
+                  return (
                   <div
                     key={p.id}
                     className="bg-card rounded-xl border border-border p-4 flex items-center gap-3"
@@ -511,35 +606,49 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                       className={cn(
                         'w-2 h-2 rounded-full shrink-0',
                         p.status === 'pagado' && 'bg-accent',
-                        p.status === 'pendiente' && 'bg-amber-500',
+                        oferta && 'bg-sky-400',
+                        anulada && 'bg-muted-foreground/40',
+                        p.status === 'pendiente' && !oferta && 'bg-amber-500',
                         p.status === 'vencido' && 'bg-destructive'
                       )}
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{p.planName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {p.status === 'pagado'
-                          ? `Pagado el ${p.date} · ${p.method === 'mercadopago' ? 'Mercado Pago' : p.method ?? ''}`
-                          : `Vence ${p.dueDate}`}
-                      </p>
+                      <p className="text-xs text-muted-foreground">{detalle}</p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-sm font-bold text-foreground">
+                      <p
+                        className={cn(
+                          'text-sm font-bold',
+                          anulada ? 'text-muted-foreground line-through' : 'text-foreground'
+                        )}
+                      >
                         ${p.amount.toLocaleString('es-AR')}
                       </p>
                       <span
                         className={cn(
                           'text-[10px] font-semibold',
                           p.status === 'pagado' && 'text-accent',
-                          p.status === 'pendiente' && 'text-amber-600',
+                          oferta && 'text-sky-700',
+                          anulada && 'text-muted-foreground',
+                          p.status === 'pendiente' && !oferta && 'text-amber-600',
                           p.status === 'vencido' && 'text-destructive'
                         )}
                       >
-                        {p.status === 'pagado' ? 'Pagado' : p.status === 'pendiente' ? 'Pendiente' : 'Vencido'}
+                        {oferta
+                          ? 'Renovación'
+                          : p.status === 'pagado'
+                          ? 'Pagado'
+                          : anulada
+                          ? 'Anulado'
+                          : p.status === 'pendiente'
+                          ? 'Pendiente'
+                          : 'Vencido'}
                       </span>
                     </div>
                   </div>
-                ))
+                  )
+                })
               )}
             </div>
           )}
@@ -606,8 +715,21 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                     <div className="flex items-center justify-between gap-3 mt-4 pt-4 border-t border-border">
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-foreground">Renovación automática</p>
+                        {/* Dos textos porque la 0041 cambia lo que hace el
+                            interruptor, no solo cuándo: antes creaba el
+                            período y después la cuota; ahora emite la cuota
+                            antes de vencer y el período lo crea el pago.
+                            Y el segundo texto es el de HOY: sin la columna
+                            de la 0041 el proceso diario no puede marcar la
+                            cuota como oferta, así que saltea la renovación
+                            entera y al vencer no pasa nada. Dejar acá el
+                            texto de antes —"el sistema renueva el plan y
+                            genera la cuota"— manda a recepción a esperar
+                            una renovación que ya no llega. */}
                         <p className="text-xs text-muted-foreground">
-                          Al vencer, el sistema renueva el plan y genera la cuota del período nuevo.
+                          {renuevaCobrandoPrimero
+                            ? 'Unos días antes de vencer, el sistema le genera la cuota del período siguiente. El período nuevo se crea cuando esa cuota se cobra.'
+                            : 'Todavía no rige: hasta que se aplique el cambio pendiente en la base, al vencer no se emite ninguna cuota. El período nuevo se arma a mano con «Renovar membresía».'}
                         </p>
                       </div>
                       {canWrite ? (

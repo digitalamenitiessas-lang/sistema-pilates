@@ -217,12 +217,58 @@ function deriveMembershipStatus(
   return 'activa'
 }
 
-function derivePaymentStatus(status: string, dueDate: string): Payment['status'] {
+/**
+ * ¿Es una oferta de renovación sin tomar?
+ *
+ * La cuota de renovación (0041) se emite ANTES de que venza la membresía, y
+ * la membresía nueva la crea el pago. Mientras no se paga, entonces, cobra
+ * un período que todavía no existe: es lo que el estudio le OFRECIÓ, no lo
+ * que la clienta debe. Por eso no suma a la deuda, no genera alerta de
+ * cobranza y no entra en el reporte de deudas.
+ *
+ * Ya cobrada es un cobro como cualquier otro y se cuenta igual que siempre:
+ * de ahí que el estado entre en la pregunta y no alcance la columna sola.
+ *
+ * Se pregunta por lo que NO es —cobrada ni anulada— en vez de comparar
+ * contra 'pendiente': así cualquier estado futuro sin cobrar entra solo, en
+ * lugar de contarse como deuda hasta que alguien se acuerde de sumarlo acá.
+ *
+ * Mientras la 0041 no haya corrido la columna no existe, así que esto
+ * devuelve false siempre y todo se cuenta como se contaba hasta hoy.
+ */
+export function esOferta(pago: Pick<Payment, 'status' | 'renuevaMembresiaId'>): boolean {
+  if (!pago.renuevaMembresiaId) return false
+  return pago.status !== 'pagado' && pago.status !== 'anulado'
+}
+
+function derivePaymentStatus(
+  status: string,
+  dueDate: string,
+  renuevaMembresiaId: string | null = null
+): Payment['status'] {
   // 'anulado' es un estado propio: no es deuda, pero tampoco es plata
   // cobrada. Mostrarlo como pagado lo sumaba al total cobrado, que es
   // justo el número que la caja tiene que hacer coincidir con lo contado.
   if (status === 'anulado') return 'anulado'
   if (status === 'pagado') return 'pagado'
+  // Una oferta de renovación no vence: pasada su fecha sigue siendo una
+  // oferta que nadie tomó, por un período que el sistema ya decidió que no
+  // existió. Derivarla a 'vencido' la pintaba de rojo en toda pantalla que
+  // lee el estado derivado y le armaba la alerta de cobranza del tablero
+  // (el `p.status === 'vencido'` de buildAlerts, en este mismo archivo).
+  //
+  // Y solo eso: acá no se arregla ninguna otra de las tres cuentas que la
+  // oferta ensuciaba. Los totales de Pagos y del portal no dependen de esta
+  // línea —la contaban igual, derivara 'pendiente' o 'vencido'— y los deja
+  // afuera `esOferta()`. El mail "Tenés un pago pendiente" tampoco
+  // pasa por acá: el proceso diario consulta la base por su cuenta
+  // (status 'pendiente' con due_date pasado) y ahí la oferta se saltea
+  // mirando la columna en la fila.
+  //
+  // Queda 'pendiente' hasta que renovacion_caducar() (0041) la anule, que
+  // es lo que el proceso diario tiene que llamar todos los días: sin esa
+  // llamada la oferta no se cierra nunca.
+  if (renuevaMembresiaId) return 'pendiente'
   if (dueDate < hoyISO()) return 'vencido'
   return 'pendiente'
 }
@@ -563,20 +609,26 @@ export async function fetchStudioData(): Promise<StudioData> {
     } as ClassSession & { weekDate: string }
   })
 
-  const payments: Payment[] = (paymentsRes.data ?? []).map((p) => ({
-    id: p.id,
-    studentId: p.student_id,
-    studentName: (p.students as { name: string } | null)?.name ?? studentName(p.student_id),
-    membershipId: p.membership_id ?? '',
-    planName: p.concept,
-    amount: Number(p.amount),
-    date: p.paid_date ?? '',
-    dueDate: p.due_date,
-    status: derivePaymentStatus(p.status, p.due_date),
-    method: p.method ?? undefined,
-    receiptNumber: p.receipt_number,
-    mpLink: p.mp_link ?? null,
-  }))
+  const payments: Payment[] = (paymentsRes.data ?? []).map((p) => {
+    // ?? null mientras la 0041 no haya corrido: sin la columna no hay
+    // ofertas de renovación, y cada cuota pendiente es deuda como antes.
+    const renueva: string | null = p.renueva_membresia_id ?? null
+    return {
+      id: p.id,
+      studentId: p.student_id,
+      studentName: (p.students as { name: string } | null)?.name ?? studentName(p.student_id),
+      membershipId: p.membership_id ?? '',
+      planName: p.concept,
+      amount: Number(p.amount),
+      date: p.paid_date ?? '',
+      dueDate: p.due_date,
+      status: derivePaymentStatus(p.status, p.due_date, renueva),
+      method: p.method ?? undefined,
+      receiptNumber: p.receipt_number,
+      mpLink: p.mp_link ?? null,
+      renuevaMembresiaId: renueva,
+    }
+  })
 
   // Si Mercado Pago está conectado, sin leer el token.
   //
@@ -675,6 +727,11 @@ function buildAlerts(
   }
 
   for (const p of payments) {
+    // La oferta de renovación queda afuera: no es plata que alguien deba,
+    // así que no hay a quién reclamarle. Se pregunta explícito y no se
+    // confía en que su estado nunca sea 'vencido': el día que la derivación
+    // cambie, esta alerta de cobranza no tiene que volver con ella.
+    if (esOferta(p)) continue
     if (p.status === 'vencido') {
       alerts.push({
         id: `pv-${p.id}`, type: 'danger',

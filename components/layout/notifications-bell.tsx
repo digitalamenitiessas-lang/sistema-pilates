@@ -71,6 +71,15 @@ const ESTILOS: Record<NotificationType, EstiloAviso> = {
  * lo lleva a su listado, que es más útil que Inicio.
  */
 function estiloDeAviso(n: AppNotification): EstiloAviso {
+  // `renovacion_omitida` tiene dos usos con destinos distintos, y el
+  // discriminador es si el aviso apunta a una cuota. Sin cuota es el plan
+  // desactivado que no se pudo renovar, y lo que hay que arreglar está en
+  // Planes. Con cuota es el aviso de la 0041 —el pago entró y el período
+  // no se creó— y ahí lo que hay que hacer es asignarle el plan a mano,
+  // que se hace desde su ficha.
+  if (n.type === 'renovacion_omitida' && n.paymentId) {
+    return { ...ESTILOS.renovacion_omitida, page: 'alumnos' }
+  }
   // El índice es texto que viene de la base, no la unión: puede no estar.
   const propio: EstiloAviso | undefined = ESTILOS[n.type as NotificationType]
   if (propio) return propio
