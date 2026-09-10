@@ -1,4 +1,4 @@
-<title>Casa Fé pantalla por pantalla</title>
+<title>Casa Fe pantalla por pantalla</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -309,16 +309,16 @@
 <div class="envoltorio">
 
   <header class="tapa">
-    <p class="marca">Casa Fé · Sistema de gestión</p>
-    <h1>Qué hace el sistema, pantalla por pantalla</h1>
+    <p class="marca">Casa Fe · Sistema de gestión</p>
+    <h1>Cómo se usa el sistema, pantalla por pantalla</h1>
     <p class="bajada">
-      Qué puede hacer cada persona según su rol, en cada parte del sistema, y
-      qué queda por construir del documento de requerimientos.
+      Qué puede hacer cada persona según su rol, en cada parte del sistema.
+      Al final, lo que se sumó en septiembre y lo que todavía falta.
     </p>
 
     <div class="cifras">
       <div class="cifra">
-        <span class="n hecho">12</span>
+        <span class="n hecho">13</span>
         <span class="q">pantallas funcionando</span>
       </div>
       <div class="cifra">
@@ -326,12 +326,12 @@
         <span class="q">roles protegidos en la base</span>
       </div>
       <div class="cifra">
-        <span class="n parcial">58</span>
-        <span class="q">permisos configurables</span>
+        <span class="n hecho">64</span>
+        <span class="q">clases cargadas en la grilla</span>
       </div>
       <div class="cifra">
-        <span class="n falta">7</span>
-        <span class="q">módulos por construir</span>
+        <span class="n falta">1</span>
+        <span class="q">módulo por construir de lo que pediste</span>
       </div>
     </div>
   </header>
@@ -352,7 +352,7 @@
             <th class="rol">Admin</th>
             <th class="rol">Recepción</th>
             <th class="rol">Profesora</th>
-            <th class="rol">Alumna</th>
+            <th class="rol">Cliente</th>
           </tr>
         </thead>
         <tbody>
@@ -378,7 +378,7 @@
             <td class="rol"><span class="marca-no">—</span></td>
           </tr>
           <tr>
-            <td class="pantalla">Alumnas <span>Listado y ficha</span></td>
+            <td class="pantalla">Clientes <span>Listado y ficha</span></td>
             <td class="rol"><span class="marca-si">Todo</span></td>
             <td class="rol"><span class="marca-si">Todo</span></td>
             <td class="rol"><span class="marca-parcial">Sin salud</span></td>
@@ -434,7 +434,7 @@
             <td class="rol"><span class="marca-no">—</span></td>
           </tr>
           <tr>
-            <td class="pantalla">Portal <span>La app de la alumna</span></td>
+            <td class="pantalla">Portal <span>La app del cliente</span></td>
             <td class="rol"><span class="marca-no">—</span></td>
             <td class="rol"><span class="marca-no">—</span></td>
             <td class="rol"><span class="marca-no">—</span></td>
@@ -485,14 +485,14 @@
         <h3>Inicio</h3>
         <p class="quien">Admin · Recepción · Profesora</p>
         <ul>
-          <li>Alumnas activas, clases del día con su ocupación, ingresos del mes y pagos pendientes.</li>
+          <li>Clientes activos, clases del día con su ocupación, ingresos del mes y pagos pendientes.</li>
           <li><strong>La plata del mes</strong>: cuánto entró, cuánto salió, el resultado —diciendo de qué está hecho— y en cuánto quedó el cajón para arquear, con el saldo de cada cuenta debajo.</li>
           <li>Alertas de membresías vencidas y deudas, con aviso por WhatsApp en un click y el mensaje ya escrito.</li>
           <li>Tomar asistencia de una clase del día, directo desde el listado.</li>
-          <li>Campana de avisos en vivo: pago acreditado, alumna nueva, membresía renovada o por vencer.</li>
+          <li>Campana de avisos en vivo: pago acreditado, cliente nueva, membresía renovada o por vencer.</li>
         </ul>
         <p class="nota-rol">
-          <strong>La profesora</strong> ve las alumnas y las clases del día, pero
+          <strong>La profesora</strong> ve los clientes y las clases del día, pero
           donde va el dinero dice “Sin acceso” en lugar de un cero que engañaría.
         </p>
       </article>
@@ -504,14 +504,14 @@
           <li>Grilla semanal por día, con cupos en vivo y filtro por disciplina.</li>
           <li>Crear clases regulares, y también <strong>talleres y eventos con fecha propia</strong>: nombre, descripción, nivel o público, precio, requisitos y cupo.</li>
           <li>Marcar una clase como “la reserva recepción”, para que no se autorreserve desde el portal.</li>
-          <li>Reservar una alumna al toque, o anotarla en lista de espera si está completa.</li>
+          <li>Reservar un cliente al toque, o anotarla en lista de espera si está completa.</li>
           <li><strong>Suspender un día puntual</strong> (un feriado) con su motivo, sin tocar el resto de las semanas.</li>
           <li><strong>Cambiar la profesora de un día</strong>, cuando alguien cubre a otra.</li>
           <li>Tomar asistencia desde el detalle de la clase.</li>
         </ul>
         <p class="nota-rol">
           <strong>La profesora</strong> consulta la grilla. Tomar asistencia y
-          anotar alumnas son permisos aparte, que se le pueden dar sin darle
+          anotar clientes son permisos aparte, que se le pueden dar sin darle
           nada más.
         </p>
       </article>
@@ -524,17 +524,23 @@
           <li>Lista de quienes reservaron, con botones grandes de presente y ausente.</li>
           <li>Contador de presentes, ausentes y sin marcar.</li>
           <li>Corregir una marca es un toque, y si se marcó presente por error la clase vuelve a la membresía.</li>
-          <li>Marcar presente descuenta la clase del plan de la alumna.</li>
+          <li>Marcar presente descuenta la clase del plan del cliente.</li>
         </ul>
       </article>
 
       <article class="ficha">
-        <h3>Alumnas</h3>
+        <h3>Clientes</h3>
         <p class="quien">Admin · Recepción · Profesora</p>
         <ul>
           <li>Listado con búsqueda y filtros por estado de la membresía.</li>
           <li>Ficha con datos de contacto, notas médicas, observaciones y contacto de emergencia.</li>
           <li>Membresía con clases usadas y disponibles, e interruptor de renovación automática.</li>
+          <li><strong>Si el próximo período ya está pagado, la ficha lo avisa arriba</strong> con su
+              fecha y su cuota, y aclara que asignar el mismo plan otra vez suma un período más
+              detrás en vez de reemplazarlo. Es lo que evita cobrarle dos veces a quien pagó
+              adelantado.</li>
+          <li>Historial de membresías: cada período es una fila, con la que corre hoy marcada.
+              Renovar no reemplaza la anterior, la deja atrás.</li>
           <li>Historial de reservas, asistencias y pagos.</li>
           <li>Asignar un plan, y crear el acceso al portal desde la misma ficha.</li>
         </ul>
@@ -549,9 +555,15 @@
         <h3>Planes</h3>
         <p class="quien">Admin · Recepción · Profesora</p>
         <ul>
-          <li>Crear y editar planes: precio, cantidad de clases, vigencia en días, disciplinas habilitadas y color.</li>
+          <li>Crear y editar planes: precio, cantidad de clases, <strong>vigencia en meses o en
+              días</strong>, disciplinas habilitadas y color. Un mes es un mes de calendario:
+              arrancando el 20 de septiembre vence el 19 de octubre.</li>
           <li>Marcar un plan como clase de prueba, que nunca se renueva sola.</li>
-          <li>Asignar una membresía a una alumna, que genera su cuota.</li>
+          <li>Asignar una membresía a un cliente, que genera su cuota. Si todavía le queda
+              período vigente, el nuevo <strong>se encola detrás</strong>: pagar antes no le corta
+              el mes.</li>
+          <li>Las disciplinas que habilita un plan ahora rigen: no se puede anotar a alguien en una
+              clase de una modalidad que su plan no incluye.</li>
           <li>Listado de membresías activas con su estado.</li>
         </ul>
       </article>
@@ -560,7 +572,12 @@
         <h3>Reservas</h3>
         <p class="quien">Admin · Recepción · Profesora</p>
         <ul>
-          <li>Todas las reservas con filtro por estado y por fecha.</li>
+          <li><strong>Hoy y mañana arriba, agrupadas por clase</strong>, con su hora, su profesora
+              y sus anotados. El historial va abajo, cerrado.</li>
+          <li>El encabezado de Hoy dice <strong>cuántas quedan sin marcar</strong>, que es la tarea
+              pendiente del mostrador, y cada clase de hoy tiene su botón de tomar asistencia.</li>
+          <li>Buscar por nombre o filtrar por fecha muestra una lista sola, porque lo buscado suele
+              estar en el historial.</li>
           <li>Confirmar a alguien desde la lista de espera.</li>
           <li>Marcar asistió o ausente, y cancelar.</li>
         </ul>
@@ -571,7 +588,7 @@
         <p class="quien">Admin · Recepción</p>
         <ul>
           <li>Cobrar en efectivo, transferencia, tarjeta o Mercado Pago, con comprobante numerado automático.</li>
-          <li>Generar el link de pago de Mercado Pago por cada deuda; cuando la alumna paga, el sistema lo acredita solo.</li>
+          <li>Generar el link de pago de Mercado Pago por cada deuda; cuando el cliente paga, el sistema lo acredita solo.</li>
           <li>Recordatorio de deuda por WhatsApp con el mensaje escrito y el link de pago incluido.</li>
           <li>Total cobrado, pendiente y vencido, y cuánto entró por cada medio de pago <strong>en plata</strong>, no en cantidad de cobros.</li>
           <li><strong>Anular un cobro</strong> con su motivo: el comprobante emitido queda, el cobro deja de contar y baja el saldo de su cuenta. Si ese día ya se arqueó, el cierre firmado no cambia.</li>
@@ -615,7 +632,7 @@
         <h3>Reportes</h3>
         <p class="quien">Admin · Recepción</p>
         <ul>
-          <li><strong>Nueve reportes</strong> en tres grupos. <em>Plata</em>: cobros, deudas, egresos, resultado por mes y cobrado por medio. <em>Alumnas</em>: altas nuevas y membresías que vencen. <em>Clases</em>: asistencias y ocupación por clase.</li>
+          <li><strong>Nueve reportes</strong> en tres grupos. <em>Plata</em>: cobros, deudas, egresos, resultado por mes y cobrado por medio. <em>Clientes</em>: altas nuevas y membresías que vencen. <em>Clases</em>: asistencias y ocupación por clase.</li>
           <li>El período se elige una vez y se pasa de un reporte a otro sin volver a cargarlo.</li>
           <li>Cada reporte cierra con su total —lo cobrado, lo adeudado, cuántas asistieron— al pie.</li>
           <li><strong>Descarga a Excel</strong> con el período en el nombre del archivo, y a PDF para imprimir o archivar.</li>
@@ -647,8 +664,8 @@
       </article>
 
       <article class="ficha">
-        <h3>Portal de la alumna</h3>
-        <p class="quien">Alumna, en su celular</p>
+        <h3>Portal del cliente</h3>
+        <p class="quien">Cliente, en su celular</p>
         <ul>
           <li>Se registra sola con su email y DNI: si coinciden con su ficha, entra al instante. Nadie ajeno al estudio puede crearse una cuenta.</li>
           <li>Su membresía con las clases que le quedan.</li>
@@ -659,7 +676,7 @@
           <li>Se instala como app en el teléfono, con ícono propio.</li>
         </ul>
         <p class="nota-rol">
-          Cada alumna ve <strong>solo sus propios datos</strong>. Eso no es un
+          Cada cliente ve <strong>solo sus propios datos</strong>. Eso no es un
           permiso que alguien pueda apagar por error: está fijo en la base.
         </p>
       </article>
@@ -670,67 +687,97 @@
   <section>
     <h2>Lo último que se sumó</h2>
     <p class="intro">
-      Septiembre de 2026. Lo que antes era un cuaderno.
+      Septiembre de 2026. El estudio contestó qué reglas quiere, y esto es lo que
+      esas respuestas se volvieron adentro del sistema.
     </p>
 
     <div class="bloques">
       <div class="bloque">
-        <p class="etiqueta">Caja</p>
-        <div>
-          <p class="titulo">La plata tiene lugar</p>
-          <p class="detalle">
-            El sistema ya no sabe solo cuánto entró: sabe dónde está. Cuánto hay
-            en el cajón, cuánto en el banco, cuánto todavía debe la tarjeta.
-            Cerrar la caja pide un solo dato, cuánto contaste, y el resto ya está
-            calculado.
-          </p>
-        </div>
-      </div>
-
-      <div class="bloque">
-        <p class="etiqueta">Gastos</p>
-        <div>
-          <p class="titulo">Los egresos, con sus filtros</p>
-          <p class="detalle">
-            Categoría, proveedor, comprobante y de qué cuenta salió. Con el total
-            de lo filtrado siempre a la vista, que es lo que convierte un listado
-            en una herramienta para decidir.
-          </p>
-        </div>
-      </div>
-
-      <div class="bloque">
         <p class="etiqueta">Agenda</p>
         <div>
-          <p class="titulo">Talleres, suspensiones y asistencia</p>
+          <p class="titulo">La semana de Casa Fe, cargada</p>
           <p class="detalle">
-            Clases especiales con fecha propia, suspender un día puntual sin
-            tocar el resto de las semanas, cambiar la profesora de una fecha, y
-            tomar asistencia desde el celular.
+            Las 64 clases reales: doce por día de lunes a viernes y cuatro el sábado,
+            todas de 50 minutos y 8 lugares en la Sala Reformer. En una primera
+            instancia se dicta solo Pilates Reformer, así que el resto del catálogo
+            quedó apagado — y vuelve a encenderse el día que existan las clases de
+            embarazadas, sin desarrollo.
           </p>
         </div>
       </div>
-
       <div class="bloque">
-        <p class="etiqueta">Reportes</p>
+        <p class="etiqueta">Membresías</p>
         <div>
-          <p class="titulo">Nueve reportes y un botón</p>
+          <p class="titulo">El mes dura un mes</p>
           <p class="detalle">
-            Cobros, deudas, egresos, resultado del mes, medios de pago, altas,
-            vencimientos, asistencias y ocupación. Se elige el período, se mira
-            en pantalla y se baja a Excel.
+            Antes duraba 30 días, que no es lo mismo: arrancando el 20 de septiembre
+            daba un día de más, y desde un 15 de febrero daba tres. Ahora es un mes
+            de calendario, y el sistema resuelve solo el caso que siempre se olvida
+            — no existe el 31 de febrero.
           </p>
         </div>
       </div>
-
       <div class="bloque">
-        <p class="etiqueta">Permisos</p>
+        <p class="etiqueta">Membresías</p>
         <div>
-          <p class="titulo">58 permisos con casilleros</p>
+          <p class="titulo">Pagar antes no corta el mes</p>
           <p class="detalle">
-            Quién puede hacer qué, configurable por rol y por persona, sin
-            depender de programación. Y 30 reglas del negocio que el estudio
-            ajusta desde el sistema.
+            Quien paga adelantado ya no pierde lo que le quedaba: el período nuevo
+            arranca el día siguiente al vencimiento del que está usando. Y quien
+            paga tarde arranca el día que paga, eligiendo entre los horarios que
+            queden disponibles.
+          </p>
+        </div>
+      </div>
+      <div class="bloque">
+        <p class="etiqueta">Cobros</p>
+        <div>
+          <p class="titulo">La renovación se cobra primero</p>
+          <p class="detalle">
+            Este es el cambio más grande. Antes, al vencer una membresía el sistema
+            creaba la nueva y después mandaba la cuota: quien no pagaba seguía
+            viniendo. Ahora al revés — unos días antes del vencimiento se emite la
+            cuota con su link de pago, y <strong>el período nuevo nace cuando el
+            pago entra</strong>. Con tres recordatorios antes de la fecha límite, y
+            si no se paga, la cuota se anula sola: no queda como una deuda que nadie
+            debe.
+          </p>
+        </div>
+      </div>
+      <div class="bloque">
+        <p class="etiqueta">Reservas</p>
+        <div>
+          <p class="titulo">La base dice no cuando corresponde</p>
+          <p class="detalle">
+            No se puede anotar a alguien en una clase que ya empezó, ni en la clase de
+            los lunes para un martes, ni sin membresía vigente, ni pasando el tope
+            de clases de su plan. No es que el botón se esconda: la base lo rechaza
+            con un mensaje que dice por qué. Recepción sí puede anotar a quien llegó
+            sin reserva, incluso después de la clase, que es el flujo del
+            mostrador.
+          </p>
+        </div>
+      </div>
+      <div class="bloque">
+        <p class="etiqueta">Clases</p>
+        <div>
+          <p class="titulo">Reservar descuenta la clase</p>
+          <p class="detalle">
+            El descuento pasó a la base y ahora es al reservar, no al marcar asistencia.
+            Cancelar con más de tres horas la devuelve; con menos, no. Y si el
+            estudio suspende un día, les vuelve la clase a todas las anotadas sin
+            que nadie cancele nada.
+          </p>
+        </div>
+      </div>
+      <div class="bloque">
+        <p class="etiqueta">Todo el sistema</p>
+        <div>
+          <p class="titulo">Se dice "cliente"</p>
+          <p class="detalle">
+            En las 32 pantallas, en los títulos de las planillas que se bajan a Excel y
+            en los avisos. Y el nombre del estudio quedó como lo confirmaste: Casa
+            Fe, sin tilde, en la web, en los mails y en los comprobantes.
           </p>
         </div>
       </div>
@@ -740,90 +787,83 @@
   <section>
     <h2>Lo que falta</h2>
     <p class="intro">
-      Del documento de requerimientos quedan siete módulos por construir. Este
-      es el orden propuesto, corregido por dependencias técnicas: hay cosas que
-      si no van primero obligan a rehacer lo que venga después.
+      Tres cosas dependen de una decisión del estudio y no de desarrollo. Están
+      primero porque son las que hoy trababan algo.
     </p>
 
     <div class="bloques">
       <div class="bloque">
-        <p class="etiqueta">En curso</p>
+        <p class="etiqueta">Falta decidir</p>
         <div>
-          <p class="titulo">Agenda y asistencias</p>
+          <p class="titulo">La tarjeta por Mercado Pago</p>
           <p class="detalle">
-            Falta: cancelación dentro y fuera de plazo, clase recuperada, y que
-            la profesora anote a quien llega sin reserva. Depende de dos
-            definiciones del estudio: si la ausencia consume la clase y cuántos
-            recuperos se permiten.
+            Dos cosas. El link de pago manda el precio de transferencia, así que quien
+            paga con tarjeta por ahí <strong>no paga el recargo del 25%</strong>. No
+            se puede resolver solo: adentro del link la clienta elige tarjeta,
+            débito o saldo, y ponerle el recargo también se lo cobraría a las que
+            pagan con débito. Y el tope de 3 cuotas que dice el documento de
+            condiciones no está puesto: hoy el link ofrece todas las que la tarjeta
+            permita, y a más cuotas, más comisión.
           </p>
         </div>
       </div>
-
+      <div class="bloque">
+        <p class="etiqueta">Falta decidir</p>
+        <div>
+          <p class="titulo">Cambiar de plan en medio del mes</p>
+          <p class="detalle">
+            Quien tiene FE START y quiere pasar a FE FULL el día 5 paga el plan nuevo y
+            lo empieza a usar el mes que viene. Resolverlo pide definir qué pasa con
+            lo que le queda del plan viejo: si se pierde, si se prorratea o si se le
+            acredita. Mientras tanto la pantalla lo avisa antes de cobrar.
+          </p>
+        </div>
+      </div>
+      <div class="bloque">
+        <p class="etiqueta">Falta decidir</p>
+        <div>
+          <p class="titulo">Congelar, y los precios redondos</p>
+          <p class="detalle">
+            Si existe el congelamiento de una membresía —y con qué reglas—, cuántos días
+            sin pagar hacen que un cliente aparezca en una lista para llamarlo, y si
+            Pilates 3ra Edad se combina con Reformer en un mismo plan. Y el redondeo
+            al millar: tal como se pidió, cambia 8 de los 12 precios publicados, así
+            que quedó sin aplicar esperando la tabla nueva.
+          </p>
+        </div>
+      </div>
       <div class="bloque">
         <p class="etiqueta">Sigue</p>
         <div>
           <p class="titulo">Días y horarios fijos</p>
           <p class="detalle">
-            Que la alumna elija sus días fijos del mes, la prioridad por pago
-            del 1 al 9, la liberación automática de lugares el día 10, y el
-            aviso automático cuando se libera un lugar de la lista de espera.
+            Que el cliente tenga su día y horario del mes reservado, que se libere solo
+            al día siguiente si no renueva, y el aviso automático cuando se libera un
+            lugar de la lista de espera. Es lo único que queda por construir de todo
+            lo que el estudio pidió, y mientras no exista el mostrador lleva los
+            horarios fijos como los lleva hoy.
           </p>
         </div>
       </div>
-
       <div class="bloque">
-        <p class="etiqueta">Sigue</p>
+        <p class="etiqueta">Falta el material</p>
         <div>
-          <p class="titulo">Membresías y ficha integral</p>
+          <p class="titulo">El diseño</p>
           <p class="detalle">
-            Tres precios por plan según medio de pago, congelar una membresía,
-            datos físicos y de salud en campos separados, bitácora de
-            observaciones, baja de alumna con motivo, lista de recuperación y
-            cumpleaños del mes.
+            El logo en alta calidad, la paleta, las tipografías y las fotos del estudio.
+            El sistema arranca con lo que hay —el logo es hoy la inicial del nombre—
+            y el diseño se cambia después sin tocar el funcionamiento.
           </p>
         </div>
       </div>
-
-      <div class="bloque">
-        <p class="etiqueta">Segunda etapa</p>
-        <div>
-          <p class="titulo">Cupones, beneficios y gift cards</p>
-          <p class="detalle">
-            Cupones de descuento con control de usos, beneficios de marcas
-            aliadas, regalar clases o extender una membresía, y gift cards.
-          </p>
-        </div>
-      </div>
-
       <div class="bloque">
         <p class="etiqueta">Segunda etapa</p>
         <div>
-          <p class="titulo">Personal y remuneraciones</p>
+          <p class="titulo">Lo que quedó fuera de alcance</p>
           <p class="detalle">
-            Ficha laboral, registro de horas trabajadas, reemplazos, condiciones
-            salariales con historial y liquidación por período.
-          </p>
-        </div>
-      </div>
-
-      <div class="bloque">
-        <p class="etiqueta">Segunda etapa</p>
-        <div>
-          <p class="titulo">Inventario y venta de productos</p>
-          <p class="detalle">
-            Productos con variantes, stock en tiempo real, venta en mostrador,
-            ingreso de mercadería y alertas de bajo stock.
-          </p>
-        </div>
-      </div>
-
-      <div class="bloque">
-        <p class="etiqueta">Segunda etapa</p>
-        <div>
-          <p class="titulo">Web autoadministrable y email marketing</p>
-          <p class="detalle">
-            Editor de textos, fotos y promociones de la web, con vista previa
-            antes de publicar. Y campañas de email con segmentación y métricas.
+            Cupones, beneficios y gift cards. Personal y remuneraciones. Inventario y
+            venta de productos. Web autoadministrable y email marketing. Nada de eso
+            es necesario para operar.
           </p>
         </div>
       </div>
@@ -831,8 +871,10 @@
   </section>
 
   <footer>
-    Sistema de gestión Casa Fé · Estado al 5 de septiembre de 2026 ·
-    Refleja funcionalidades desarrolladas, probadas y en línea a la fecha.
+    Sistema de gestión Casa Fe · Estado al 10 de septiembre de 2026 ·
+    Refleja lo que está desarrollado, probado y en línea a la fecha. Lo que
+    todavía no rige está dicho como tal: el sistema avisa cuando un parámetro
+    está cargado y aún no se aplica.
   </footer>
 
 </div>
