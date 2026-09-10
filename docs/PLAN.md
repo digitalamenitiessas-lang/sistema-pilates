@@ -2,6 +2,18 @@
 
 > Documento vivo. Se actualiza con cada bloque de trabajo.
 > Última actualización: **05/09/2026** (cruce del documento de requerimientos de Casa Fé).
+> Para entregarle al estudio:
+> [`Casa-Fe-como-se-usa.pdf`](Casa-Fe-como-se-usa.pdf) — el pantalla por
+> pantalla **sin la sección de pendientes**, para que el PDF diga cómo se usa y
+> nada más. La versión completa, con lo que falta, es
+> [`casa-fe-pantalla-por-pantalla.html`](casa-fe-pantalla-por-pantalla.html), que
+> además está publicada como página con link propio.
+>
+> Y lo que falta va por mensaje, aparte:
+> [`casa-fe-lo-que-falta-preguntar.md`](casa-fe-lo-que-falta-preguntar.md) — las
+> siete definiciones y los cinco datos, ordenados por lo que cuesta plata
+> primero, para que los contesten mientras usan el sistema.
+
 > Guía de testeo por rol (para Matías, no para la clienta):
 > [`Casa-Fe-guia-de-testeo.pdf`](Casa-Fe-guia-de-testeo.pdf) — qué hacer en cada
 > rol y qué tiene que pasar, más los ocho casos donde la base rechaza a
