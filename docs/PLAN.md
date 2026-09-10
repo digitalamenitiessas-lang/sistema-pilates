@@ -498,6 +498,54 @@ ofrece lo que la base va a rechazar. El portal muestra todas las clases del día
 sin mirar el plan del cliente. Con una disciplina es invisible; con dos hay que
 filtrar. El orden correcto es este: primero el freno, después el filtro.
 
+### ✅ La renovación se cobra primero (09/09) — `0041`, sin correr
+Hasta acá el proceso diario, al vencer una membresía, **insertaba la nueva** y
+recién después generaba la cuota: quien no pagaba seguía vigente y —con el motor
+de la `0029` encendido— gastando clases de un mes que no compró. Lo contrario de
+lo que pidió el estudio.
+
+Se invierte el orden: la renovación emite **la cuota**, y **la membresía la crea
+el pago**, desde un trigger sobre `payments`. Sale bien por algo que ya estaba
+construido: `memberships_fechas` (`0036`/`0037`) encola detrás del período en
+curso si el pago entra antes del vencimiento, y arranca el día del pago si entra
+después. **Las dos reglas del estudio, sin calcular una sola fecha acá.**
+
+El diseño salió de un panel: tres propuestas independientes desde ángulos
+incompatibles y tres jueces con criterios distintos —el mostrador, el
+mantenimiento, y el daño del peor caso—. Ganó la más chica (24 puntos contra 20 y
+17), y se le sumó de las otras dos lo que le faltaba.
+
+**Lo que el panel encontró y ninguna de las tres propuestas había visto: la cuota
+fantasma.** Emitir la cuota antes del vencimiento parece inofensivo. No lo es: una
+cuota pendiente que nadie paga se muestra vencida, dispara el mail "Tenés un pago
+pendiente" con link de Mercado Pago por un mes, arma una alerta en el tablero y
+suma al total por cobrar. O sea que el bloque que viene a matar dos mails
+contradictorios **creaba un par nuevo** — "tu membresía venció" y "tenés un pago
+pendiente", el mismo día, sobre la misma plata. Y desde el día de la oferta, toda
+clienta al día figuraba "Pendiente".
+- [x] Por eso `payments.renueva_membresia_id` no es plumbing: **distingue "debe"
+      de "le ofrecimos"**. Una oferta no se cuenta como deuda, no dispara
+      cobranza, y **caduca sola** cuando pasa su fecha límite.
+- [x] También caduca la oferta de una membresía que ya tiene período posterior.
+      Sin eso, pagar una oferta vieja **acuñaba una tercera membresía** con el
+      plan viejo, encolada detrás de todo — el peor daño que tenía el diseño.
+- [x] **Cobrar no puede fallar, pero tampoco fallar callado.** Si la creación de
+      la membresía se cae, el pago se registra igual y aparece un aviso en la
+      campana: "No se pudo crear el período pagado", con el motivo.
+- [x] **Recordatorios plurales con catch-up.** `expiry_reminder_days` = "5,2,0",
+      con el escalón en el `dedupe_key`. Si el cron no corre un día, al siguiente
+      emite el escalón pendiente de menor anticipación: la regla deja de depender
+      de que corra un día exacto. Reusa `membresia_por_vencer`, sin tipos nuevos.
+- [x] `renovacion_control()` tiene que dar cero filas, como `perm_diff()`,
+      `caja_control()` y `consumo_control()`. Una fila es plata cobrada sin
+      entregar el mes.
+
+**Y algo que hay que saber antes de desplegar:** mientras la `0041` no esté
+aplicada, el bloque de renovación **se saltea entero y nadie se renueva**. Es
+deliberado —emitir la cuota sin poder marcarla como oferta es exactamente el daño
+de arriba— pero no puede pasar en silencio, así que el proceso diario avisa al
+mostrador una vez por día mientras dure.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
@@ -537,7 +585,7 @@ filtrar. El orden correcto es este: primero el freno, después el filtro.
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a `0038` ✅ · **`0039` y `0040` escritas, sin correr** (verificadas 09/09 con las consultas de abajo y contra la aplicación andando). **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Migraciones aplicadas | `0001` a `0041` ✅ · **`0042` escrita, sin correr** (verificadas 09/09 con las consultas de abajo y contra la aplicación andando). La `0041` se comprobó con una sonda: la columna existe, y `renovacion_control()` y `consumo_control()` dan cero filas | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
 | Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |

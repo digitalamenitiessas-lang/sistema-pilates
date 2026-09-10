@@ -13,6 +13,7 @@ import {
   Loader2,
   LogOut,
   MapPin,
+  RefreshCw,
   X,
   XCircle,
 } from 'lucide-react'
@@ -31,6 +32,7 @@ import {
   type Occupancy,
   settingNum,
   settingText,
+  esOferta,
 } from '@/lib/api'
 import type { Discipline, Reservation, Student } from '@/lib/types'
 
@@ -277,7 +279,8 @@ function UpcomingList({
 
 export function PortalPage() {
   const { profile, refresh, signOut } = useData()
-  const { students, classes, reservations, payments, disciplines, occurrences, settings } = useStudio()
+  const { students, classes, reservations, payments, disciplines, occurrences, settings, memberships } =
+    useStudio()
 
   // Con RLS, el cliente solo recibe su propia ficha
   const me = students.find((s) => s.userId === profile?.id) ?? students[0] ?? null
@@ -350,7 +353,33 @@ export function PortalPage() {
   // mostrar. Al revés —cortar en ocho y después filtrar— el cliente con
   // nueve pagos dejaba de ver que debía, y cuanto más antigua la deuda,
   // antes desaparecía: justo la que hay que cobrar.
-  const myDebts = misPagos.filter((p) => p.status === 'pendiente' || p.status === 'vencido')
+  const myDebts = misPagos.filter(
+    (p) => (p.status === 'pendiente' || p.status === 'vencido') && !esOferta(p)
+  )
+  // Una oferta cuya renovación ya se resolvió por otro camino —el mostrador
+  // le asignó el período, o le cambió el plan— no se le ofrece: pagarla no
+  // crea nada, porque `renovar_por_pago` (0041) corta con este mismo
+  // predicado (`nueva.start_date > vieja.end_date`) y solo le deja una nota
+  // al pago. La oferta vive hasta que el proceso diario la anula, y en esa
+  // ventana el botón de pagar online le cobraría un mes que ya tiene, que
+  // además viene con su propia cuota. Sin membresías a la vista —o sin la
+  // 0041— nunca da true y el bloque se comporta como si esto no estuviera.
+  const misMembresias = useMemo(
+    () => memberships.filter((m) => m.studentId === me?.id),
+    [memberships, me]
+  )
+  const yaResuelta = (renuevaId?: string | null) => {
+    const vieja = misMembresias.find((m) => m.id === renuevaId)
+    return !!vieja && misMembresias.some((m) => m.startDate > vieja.endDate)
+  }
+  // La renovación que el estudio le ofreció (0041) sale del bloque de
+  // deudas y tiene el suyo: no es plata que deba, es el mes que viene, que
+  // todavía no compró. Y como la cuota se emite antes de que venza la
+  // membresía, dejarla ahí le reclamaba un pago pendiente a toda clienta
+  // que está al día.
+  const misRenovaciones = misPagos.filter((p) => esOferta(p) && !yaResuelta(p.renuevaMembresiaId))
+  /** Alguna oferta todavía dentro de su plazo: es la que se puede tomar. */
+  const renovacionATiempo = misRenovaciones.some((p) => p.dueDate >= today)
   const myPayments = misPagos.slice(0, 8)
 
   const dayClasses = useMemo(() => {
@@ -486,6 +515,82 @@ export function PortalPage() {
         )}
 
         <MembershipCard student={me} />
+
+        {/* La renovación, como una invitación y no como un reclamo. Va
+            pegada a la tarjeta del plan porque es su continuación: arriba
+            dice cuándo vence, acá cómo sigue. */}
+        {misRenovaciones.length > 0 && (
+          <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4">
+            <p className="text-xs font-bold text-sky-900 mb-2 flex items-center gap-1.5">
+              <RefreshCw className="w-3.5 h-3.5" />
+              {/* Con el plazo cumplido ya no se le puede decir "ya podés":
+                  la oferta está por anularse y de acá en adelante lo
+                  resuelve el mostrador. */}
+              {!renovacionATiempo
+                ? 'El plazo para renovar venció'
+                : misRenovaciones.length === 1
+                ? 'Ya podés renovar tu plan'
+                : 'Ya podés renovar tus planes'}
+            </p>
+            {misRenovaciones.map((p) => {
+              // Pasado el plazo no se le ofrece pagar sola: el estudio
+              // decide con qué horarios sigue, así que la manda a
+              // recepción. El sistema la anula sola ese mismo día.
+              const aTiempo = p.dueDate >= today
+              return (
+                <div key={p.id} className="flex items-center justify-between gap-2 py-1.5">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-sky-900 truncate">{p.planName}</p>
+                    {/* "No perder la prioridad" y no "conservar tus días y
+                        horarios": el turno fijo no existe en el sistema
+                        —una reserva es una fila por clase y fecha, no un
+                        derecho recurrente— así que el lugar no se le puede
+                        prometer. La prioridad sí es del estudio, y es la
+                        palabra que usó. */}
+                    <p className="text-[10px] text-sky-700">
+                      {aTiempo
+                        ? `Tenés hasta el ${pretty(p.dueDate)} para renovar y no perder la prioridad en tus días y horarios`
+                        : `El plazo para renovar venció el ${pretty(p.dueDate)}: consultá en recepción`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-sm font-bold text-sky-900">
+                      ${p.amount.toLocaleString('es-AR')}
+                    </span>
+                    {p.mpLink && aTiempo && (
+                      <a
+                        href={p.mpLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-3 py-1.5 rounded-lg bg-[#009EE3] text-white text-[11px] font-bold hover:opacity-90"
+                      >
+                        Renovar online
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+            {/* Lo que pasa al pagar, dicho sin prometer de más: la fecha de
+                arranque la decide el trigger de la 0036/0037 según cuándo
+                entró el pago, así que esto solo vale para el caso de pagar
+                a tiempo. Vencido el plazo, la línea desaparece y lo que
+                queda dicho es que consulte en recepción. */}
+            {renovacionATiempo && (
+              <>
+                <p className="text-[10px] text-sky-700 mt-1">
+                  Si renovás antes de que venza el plan que estás usando, el período nuevo arranca
+                  recién cuando ese termina.
+                </p>
+                {!misRenovaciones.some((p) => p.mpLink) && (
+                  <p className="text-[10px] text-sky-700 mt-1">
+                    Podés renovar en recepción o pedir el link de pago por WhatsApp.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        )}
 
         {/* Deudas destacadas */}
         {myDebts.length > 0 && (
@@ -706,13 +811,27 @@ export function PortalPage() {
             <p className="text-xs text-muted-foreground text-center py-4">Sin pagos registrados.</p>
           ) : (
             <div className="bg-card rounded-2xl border border-border divide-y divide-border">
-              {myPayments.map((p) => (
+              {myPayments.map((p) => {
+                const oferta = esOferta(p)
+                const anulada = p.status === 'anulado'
+                // La oferta que no se tomó termina anulada, y así llega
+                // acá. Sin esta rama caía en el "Vence ..." de abajo con
+                // el monto en negrita: a la clienta le quedaba un cargo
+                // pendiente en pantalla por un mes que no compró y que el
+                // sistema ya dio por no vendido. Se pregunta por la
+                // columna —`esOferta` descarta las anuladas— y se exige
+                // que nunca se haya cobrado, porque una renovación
+                // cobrada y anulada después es otra cosa.
+                const ofertaCaducada = anulada && !!p.renuevaMembresiaId && !p.date
+                return (
                 <div key={p.id} className="px-4 py-3 flex items-center gap-3">
                   <div
                     className={cn(
                       'w-2 h-2 rounded-full shrink-0',
                       p.status === 'pagado' && 'bg-accent',
-                      p.status === 'pendiente' && 'bg-amber-500',
+                      oferta && 'bg-sky-400',
+                      anulada && 'bg-muted-foreground/40',
+                      p.status === 'pendiente' && !oferta && 'bg-amber-500',
                       p.status === 'vencido' && 'bg-destructive'
                     )}
                   />
@@ -721,14 +840,28 @@ export function PortalPage() {
                     <p className="text-[10px] text-muted-foreground">
                       {p.status === 'pagado'
                         ? `Pagado el ${pretty(p.date)}${p.receiptNumber ? ` · Comp. ${String(p.receiptNumber).padStart(6, '0')}` : ''}`
+                        : ofertaCaducada
+                        ? `Renovación no tomada · venció el ${pretty(p.dueDate)}`
+                        : anulada
+                        ? 'Anulado'
+                        : oferta
+                        ? p.dueDate >= today
+                          ? `Renovación · hasta el ${pretty(p.dueDate)}`
+                          : `Renovación · el plazo venció el ${pretty(p.dueDate)}`
                         : `Vence ${pretty(p.dueDate)}`}
                     </p>
                   </div>
-                  <p className="text-sm font-bold text-foreground shrink-0">
+                  <p
+                    className={cn(
+                      'text-sm font-bold shrink-0',
+                      anulada ? 'text-muted-foreground line-through' : 'text-foreground'
+                    )}
+                  >
                     ${p.amount.toLocaleString('es-AR')}
                   </p>
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </section>

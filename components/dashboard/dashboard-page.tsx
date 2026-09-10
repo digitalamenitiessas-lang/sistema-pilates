@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { TomarAsistencia } from '@/components/asistencia/tomar-asistencia'
 import { fetchResumenPlata, type ResumenPlata } from '@/lib/caja-api'
-import { hoyISO, settingBool, settingText, todayDayIndex } from '@/lib/api'
+import { esOferta, hoyISO, settingBool, settingText, todayDayIndex } from '@/lib/api'
 import { paymentReminderLink } from '../pagos/pagos-page'
 import type { PageKey } from '../layout/sidebar'
 
@@ -139,7 +139,14 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
     .filter((c) => c.dayOfWeek === todayDayIndex())
     .sort((a, b) => a.time.localeCompare(b.time))
   const expiringStudents = students.filter((s) => s.membership?.status === 'por vencer')
-  const pendingPayments = payments.filter((p) => p.status === 'pendiente' || p.status === 'vencido')
+  // Sin las ofertas de renovación: una cuota que se emitió para que la
+  // clienta pueda pagar el mes que viene no es plata que el estudio tenga
+  // por cobrar. Contándolas acá, desde el día en que se emite la oferta
+  // TODA clienta al día engrosaba "Pagos pendientes" y el total adeudado
+  // dejaba de significar deuda.
+  const pendingPayments = payments.filter(
+    (p) => (p.status === 'pendiente' || p.status === 'vencido') && !esOferta(p)
+  )
   const activeMembers = students.filter(
     (s) => s.membership?.status === 'activa' || s.membership?.status === 'por vencer'
   ).length
