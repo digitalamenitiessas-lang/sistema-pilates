@@ -3,6 +3,13 @@
 > Documento vivo. Se actualiza con cada bloque de trabajo.
 > Última actualización: **05/09/2026** (cruce del documento de requerimientos de Casa Fé).
 > Para entregarle al estudio:
+> [`Casa-Fe-manual-del-mostrador.pdf`](Casa-Fe-manual-del-mostrador.pdf) — el
+> manual **por tarea**, que es el que sirve para usar el sistema: las 12 cosas
+> de todos los días en pocos pasos, los avisos que manda solo, y qué hacer
+> cuando la base rechaza algo. El script que lo genera es
+> [`manual-del-mostrador.py`](manual-del-mostrador.py): el PDF se regenera
+> corriéndolo, así que se edita el script y no el PDF.
+>
 > [`Casa-Fe-como-se-usa.pdf`](Casa-Fe-como-se-usa.pdf) — el pantalla por
 > pantalla **sin la sección de pendientes**, para que el PDF diga cómo se usa y
 > nada más. La versión completa, con lo que falta, es
