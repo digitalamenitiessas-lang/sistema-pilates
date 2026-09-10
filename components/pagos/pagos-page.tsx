@@ -230,14 +230,14 @@ function RegistrarPagoModal({ onClose }: { onClose: () => void }) {
 
             <div className="px-6 py-5 space-y-4 overflow-y-auto">
               <div>
-                <label className={labelClass}>Clienta *</label>
+                <label className={labelClass}>Cliente *</label>
                 <select
                   value={studentId}
                   onChange={(e) => applyPlanDefaults(e.target.value)}
                   required
                   className={inputClass}
                 >
-                  <option value="">Seleccionar clienta...</option>
+                  <option value="">Seleccionar cliente...</option>
                   {students.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
@@ -527,7 +527,7 @@ function MpLinkModal({ payment, onClose }: { payment: Payment; onClose: () => vo
                 )}
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Cuando la clienta pague, el sistema lo acredita automáticamente y genera el
+                Cuando el cliente pague, el sistema lo acredita automáticamente y genera el
                 comprobante (se actualiza al abrir esta pantalla).
               </p>
             </>
@@ -750,7 +750,7 @@ export function PagosPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar clienta..."
+            placeholder="Buscar cliente..."
             className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground outline-none text-sm"
           />
         </div>
@@ -799,7 +799,7 @@ export function PagosPage() {
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Clienta
+                      Cliente
                     </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">
                       Concepto

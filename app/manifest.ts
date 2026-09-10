@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next'
 import { nombreDelEstudio } from '@/lib/estudio'
 
 // Async a propósito: el nombre sale del sistema, no del código. Es el que
-// la clienta ve debajo del ícono cuando instala la app en el celular.
+// el cliente ve debajo del ícono cuando instala la app en el celular.
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const nombre = await nombreDelEstudio()
   return {

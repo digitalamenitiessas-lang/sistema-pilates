@@ -43,7 +43,7 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
       await refresh()
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar la clienta')
+      setError(err instanceof Error ? err.message : 'No se pudo guardar el cliente')
       setSaving(false)
     }
   }
@@ -65,7 +65,7 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
           <h2 className="text-base font-bold text-foreground">
-            {isEdit ? 'Editar clienta' : 'Nueva clienta'}
+            {isEdit ? 'Editar cliente' : 'Nuevo cliente'}
           </h2>
           <button
             type="button"
@@ -149,7 +149,7 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
             className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-            {isEdit ? 'Guardar cambios' : 'Crear clienta'}
+            {isEdit ? 'Guardar cambios' : 'Crear cliente'}
           </button>
         </div>
       </form>

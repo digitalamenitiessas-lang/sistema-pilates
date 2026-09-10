@@ -87,7 +87,7 @@ const ROLE_LABELS: Record<string, string> = {
   admin: 'Admin',
   recepcion: 'Recepción',
   profesor: 'Profesor/a',
-  alumno: 'Clienta',
+  alumno: 'Cliente',
 }
 
 const inputClass =
@@ -750,7 +750,7 @@ function UserFormModal({ onClose, onCreated }: { onClose: () => void; onCreated:
           <div>
             <label className={labelClass}>Rol</label>
             <select value={role} onChange={(e) => setRole(e.target.value as Role)} className={inputClass}>
-              <option value="recepcion">Recepción — gestiona clientas, reservas y cobros</option>
+              <option value="recepcion">Recepción — gestiona clientes, reservas y cobros</option>
               <option value="profesor">Profesor/a — solo consulta</option>
               <option value="admin">Admin — acceso total y configuración</option>
             </select>
@@ -930,8 +930,8 @@ function UsersSection() {
 const NOMBRE_GRUPO: Record<string, { title: string; help: string }> = {
   estudio: { title: 'Datos del estudio', help: 'Lo que se muestra en la web pública y en los emails' },
   reservas: { title: 'Reservas y clases', help: 'Reglas de cancelación y lista de espera' },
-  membresias: { title: 'Membresías', help: 'Avisos de vencimiento, congelamientos y recuperación' },
-  cobros: { title: 'Cobros y prioridad del horario', help: 'Vencimiento de cuotas y ventana de pago mensual' },
+  membresias: { title: 'Membresías', help: 'Aviso de vencimiento, congelamiento y lista de contacto' },
+  cobros: { title: 'Cobros', help: 'Vencimiento de la cuota y redondeo del precio' },
   avisos: { title: 'Avisos automáticos', help: 'Con cuánta anticipación sale cada recordatorio' },
   caja: { title: 'Caja y arqueo', help: 'Cómo se cierra la caja y qué diferencia se tolera' },
   gastos: { title: 'Gastos', help: 'Cómo se cargan los egresos del estudio' },
@@ -1529,8 +1529,8 @@ function PaymentMethodsSection() {
 const ROLES_MATRIZ: Array<{ key: Role; label: string }> = [
   { key: 'admin', label: 'Admin' },
   { key: 'recepcion', label: 'Recepción' },
-  { key: 'profesor', label: 'Profesora' },
-  { key: 'alumno', label: 'Clienta' },
+  { key: 'profesor', label: 'Profesor/a' },
+  { key: 'alumno', label: 'Cliente' },
 ]
 
 /** Por qué una clave no se puede tocar. */
@@ -1731,7 +1731,7 @@ function PermisosSection() {
             <br />
             Ojo con una cosa: sacarle <strong>Ver información financiera</strong> a
             un rol le esconde los pagos y la facturación, pero no el precio que
-            figura en la membresía de cada clienta. La base filtra por dato, no por
+            figura en la membresía de cada cliente. La base filtra por dato, no por
             campo suelto.
           </p>
         )}

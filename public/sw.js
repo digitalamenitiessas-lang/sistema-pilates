@@ -1,4 +1,4 @@
-// Service worker de Casa Fé: recibe notificaciones push y las
+// Service worker de Casa Fe: recibe notificaciones push y las
 // muestra. No cachea nada a propósito — el deploy de Vercel maneja los
 // assets y un cache acá solo traería versiones viejas.
 
@@ -14,10 +14,10 @@ self.addEventListener('push', (event) => {
   try {
     payload = event.data.json()
   } catch {
-    payload = { title: 'Casa Fé', body: event.data.text() }
+    payload = { title: 'Casa Fe', body: event.data.text() }
   }
   event.waitUntil(
-    self.registration.showNotification(payload.title || 'Casa Fé', {
+    self.registration.showNotification(payload.title || 'Casa Fe', {
       body: payload.body || '',
       icon: '/icon-192.png',
       badge: '/icon-192.png',

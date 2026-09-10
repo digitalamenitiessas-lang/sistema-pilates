@@ -11,6 +11,7 @@ import { AlumnoFormModal } from './alumno-form-modal'
 const STATUS_CONFIG = {
   activa: { label: 'Activa', class: 'bg-[#E8F2EB] text-[#2E6040]' },
   'por vencer': { label: 'Por vencer', class: 'bg-amber-100 text-amber-700' },
+  futura: { label: 'Empieza después', class: 'bg-sky-100 text-sky-700' },
   vencida: { label: 'Vencida', class: 'bg-red-100 text-red-700' },
   suspendida: { label: 'Suspendida', class: 'bg-gray-100 text-gray-600' },
   sin_membresia: { label: 'Sin membresía', class: 'bg-gray-100 text-gray-500' },
@@ -127,7 +128,7 @@ export function AlumnosPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar clienta..."
+            placeholder="Buscar cliente..."
             className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground outline-none text-sm"
           />
         </div>
@@ -163,7 +164,7 @@ export function AlumnosPage() {
             className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity shrink-0"
           >
             <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Nueva clienta</span>
+            <span className="hidden sm:inline">Nuevo cliente</span>
           </button>
         )}
       </div>
@@ -171,7 +172,7 @@ export function AlumnosPage() {
       {/* Count */}
       <div className="px-4 md:px-6 py-3 flex items-center justify-between gap-3 flex-wrap border-b border-border">
         <p className="text-sm text-muted-foreground">
-          <strong className="text-foreground">{filtered.length}</strong> clienta
+          <strong className="text-foreground">{filtered.length}</strong> cliente
           {filtered.length !== 1 ? 's' : ''}
         </p>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -201,7 +202,7 @@ export function AlumnosPage() {
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
             <Search className="w-10 h-10 mb-3 opacity-30" />
-            <p className="text-sm">No se encontraron clientas</p>
+            <p className="text-sm">No se encontraron clientes</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

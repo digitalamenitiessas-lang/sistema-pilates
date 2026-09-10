@@ -85,7 +85,18 @@ export interface StudioSetting {
   rige: boolean
 }
 
-export type MembershipStatus = 'activa' | 'vencida' | 'por vencer' | 'suspendida'
+export type MembershipStatus =
+  | 'activa'
+  | 'vencida'
+  | 'por vencer'
+  /**
+   * Pagada y con su período ya reservado, pero todavía sin empezar. Existe
+   * desde la 0036: el pago anticipado no se solapa con la membresía en
+   * curso, se encola detrás. No habilita reservar — la base tampoco la
+   * elige para una clase de hoy.
+   */
+  | 'futura'
+  | 'suspendida'
 
 export type PaymentStatus = 'pagado' | 'pendiente' | 'vencido' | 'anulado'
 
@@ -115,6 +126,13 @@ export interface Plan {
   /** Veces por semana (0025). 0 = no aplica, como el pase de un día. */
   weeklyFrequency: number
   durationDays: number
+  /**
+   * Meses de calendario que dura (0036). 0 = manda durationDays. Con 1,
+   * arrancar el 20/09 vence el 19/10 inclusive, que es lo que pidió el
+   * estudio; 30 días fijos daban un día de más y se corrían en los meses
+   * de 31.
+   */
+  durationMonths: number
   disciplines: Discipline[]
   description: string
   color: string

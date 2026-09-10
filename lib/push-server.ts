@@ -14,7 +14,7 @@ function vapidReady(): boolean {
   const pub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
   const priv = process.env.VAPID_PRIVATE_KEY
   if (!pub || !priv) return false
-  webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:avisos@pilatestudio.com', pub, priv)
+  webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:casafe.pilates@gmail.com', pub, priv)
   return true
 }
 

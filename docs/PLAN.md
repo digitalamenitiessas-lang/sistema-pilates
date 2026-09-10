@@ -2,6 +2,12 @@
 
 > Documento vivo. Se actualiza con cada bloque de trabajo.
 > Última actualización: **05/09/2026** (cruce del documento de requerimientos de Casa Fé).
+> Guía de testeo por rol (para Matías, no para la clienta):
+> [`Casa-Fe-guia-de-testeo.pdf`](Casa-Fe-guia-de-testeo.pdf) — qué hacer en cada
+> rol y qué tiene que pasar, más los ocho casos donde la base rechaza a
+> propósito. Se acompaña con la migración `0039`, que carga diez clientes de
+> prueba y trae su propia vuelta atrás.
+
 > Documentos para la clienta (presentables, no este plan interno):
 > `docs/PilatesStudio-que-incluye-el-sistema.pdf` (qué abarca hoy + roles) ·
 > `docs/PilatesStudio-integraciones-y-etapas.pdf` (integraciones y etapas).
@@ -285,6 +291,213 @@ por fila (mostrador), y en el modal por clase de `tomar-asistencia.tsx`, que
 se abre desde **Inicio → Clases de Hoy** y desde el panel de la clase en
 **Agenda** (profesora en la sala, con el celular). Los tres escriben lo mismo.
 
+### ✅ Las respuestas del estudio, cargadas y verificadas (09/09)
+El estudio contestó el pedido de datos. Lo que era configuración entró en la
+`0033`; lo que era desarrollo quedó anotado en §8 de
+[`REQUERIMIENTOS-CASA-FE.md`](REQUERIMIENTOS-CASA-FE.md).
+- [x] **"Casa Fe" sin tilde** en la base y en los siete respaldos del código,
+      incluido `public/sw.js`, que se sirve estático y es la única marca que no
+      puede leer `studio_settings`.
+- [x] **Dirección, Instagram, email y horario** reales. Y el WhatsApp de la demo
+      **vaciado**: no era un campo pendiente, era un campo que mandaba a la
+      gente a un teléfono ajeno. Igual el link de Maps, que apuntaba a otra
+      dirección. Donde no hay dato, la pantalla esconde el elemento — y en
+      Planes, que es donde alguien ya decidió venir, repliega al mail.
+- [x] **Solo Pilates Reformer**, una sola sala, y los seis planes FE habilitando
+      solo esa disciplina. Va **antes** de cargar la grilla: el formulario toma
+      como default la primera disciplina y la primera sala activas, así que al
+      revés se cargan sesenta clases con la disciplina y la sala equivocadas, y
+      como `room` es texto libre sin clave foránea, nada se queja nunca.
+- [x] **50 minutos y 8 lugares** como parámetros (`class_default_minutes`,
+      `class_default_capacity`), no como literales del código.
+- [x] **"cliente", en masculino**, en las 32 pantallas, en los títulos de columna
+      del Excel, en las etiquetas y ayudas de permisos, en las ayudas de
+      Configuración y en dos funciones de aviso. El grupo de permisos va por su
+      **tercer** nombre: `Alumnos` → `Clientas` → `Clientes`.
+      Las referencias que la `0026` no se animó a tocar —`ficha-alumno.tsx:328`,
+      `alumnos.editar`, `'alumno'`— sobrevivieron intactas: se protegen como
+      tokens antes de tocar la prosa. `perm_diff()` sigue en cero.
+- [x] **Derogada la ventana de pago del 1 al 9**, que el estudio dio de baja por
+      escrito. Nunca llegó a regir: la `0024` ya la había marcado `rige = false`.
+- [x] **Datos de prueba borrados** (`0027`) y **las tres profesoras cargadas**
+      (`0034`), con los datos incompletos tal como vinieron y un nombre
+      provisorio para la del turno tarde.
+- [x] **Encendido el motor de consumo** de la `0029`, con las tablas vacías, que
+      es el momento en que el re-anclaje no tiene nada que perder.
+
+**El redondeo NO se tocó.** El estudio contestó "al próximo múltiplo de $1.000"
+a una pregunta que le decía que hoy los precios dan justos y cuya opción más
+gruesa era $100. Esa regla cambia 8 de los 12 precios que él mismo publicó y
+deja falso su propio "Efectivo 5% OFF" (pasa a 4,44% en FE START).
+`price_rounding` queda en `cincuenta` hasta que confirme la tabla nueva.
+
+### ✅ La grilla cargada (09/09)
+Llegó la semana como el estudio la dicta y entró en la `0035`: **64 clases**
+—12 por día de lunes a viernes (Ivana de 8 a 13, turno tarde de 14 a 19) y 4 el
+sábado con Leandro—, todas Pilates Reformer, 50 minutos, 8 lugares, Sala
+Reformer.
+- [x] Va por migración y no por pantalla: son 64 formularios, y sobre todo
+      `class_sessions` **no tiene ningún índice único**, así que cargarla dos
+      veces duplicaría la grilla entera sin que nada avise. Con ids derivados
+      del día y la hora (`ca5afe01-…-<día><hora>…`) y `on conflict do nothing`,
+      correrla de nuevo no hace nada.
+- [x] La duración, el cupo y el color no se escriben en la migración: salen de
+      los parámetros y del catálogo, que es de donde los toma la pantalla. Así
+      recolorear la disciplina no deja 64 clases con el color viejo.
+- [x] Cuatro guardias que se plantan con el motivo en vez de fallar con un
+      error de clave foránea: las tres profesoras, la disciplina, la sala y los
+      dos parámetros.
+- [x] **La tabla de precios no necesitó nada.** Los doce valores dan exactos
+      contra lo cargado (45.000 × 0,95 = 42.750; × 1,25 = 56.250, y así los
+      seis planes). Confirma de paso que el redondeo al millar rompería su
+      propia lista.
+
+Verificado en la Agenda con la sesión real: "64 clases esta semana", el lunes
+con 12 y cupo 0/8, el sábado con 4 de Leandro de 9 a 12.
+
+**Lo que falta para operar: nada del sistema.** Dar de alta a los clientes
+reales y cobrar. Lo que sigue es desarrollo (vigencia mensual, renovación,
+turno fijo) y los datos que el estudio todavía no dio.
+
+### ✅ La vigencia de un mes, y el pago anticipado que se encola (09/09)
+La respuesta del estudio eligió la fecha individual —lo que el sistema ya hacía— pero
+le sumó dos reglas que no eran gratis. Migraciones `0036` (corrida) y `0037`
+(correcciones, escrita).
+- [x] **Un mes de calendario, no 30 días.** `plans.duration_months` y la función
+      `vigencia_hasta`, que es la autoridad. Los 30 días acertaban solo cuando el
+      mes tiene 31: con el ejemplo del estudio daban un día de más, y desde un
+      15/02, tres.
+- [x] **El cálculo bajó a la base.** Un trigger `BEFORE INSERT` que pisa lo que
+      manda el navegador. Antes se calculaba en dos lugares con la misma fórmula
+      duplicada, que es lo que la `0029` vino a terminar con el consumo de clases.
+- [x] **El pago anticipado se encola** detrás del período en curso en vez de
+      solaparse. A lo sumo una **mensualidad** cubre una fecha; el pase de prueba
+      se solapa a propósito desde la `0037`, y ahí el desempate es la que tiene
+      saldo y después la que primero se pierde. Sin ese desempate, arreglar el
+      encolado del pase movía el problema en vez de sacarlo: el motor elegía el
+      pase agotado y rechazaba la reserva con "Ya usó la clase de su plan"
+      mientras la mensualidad tenía ocho clases sin tocar.
+- [x] **Estado `futura`** para la membresía pagada que todavía no empezó, y la
+      ficha pasó a elegir "la que cubre hoy" en vez de "la más reciente" — si no,
+      a quien paga adelantado se le mostraba la del mes que viene como si fuera la
+      suya, y el portal la dejaba reservar.
+- [x] **Solo se encolan las mensualidades** (`0037`). El pase de prueba arranca el
+      día que se compra: encolarlo rompía el embudo más común del estudio —probar y
+      contratar el mismo día— dejando la mensualidad para la semana siguiente.
+
+Verificado creando un cliente de prueba y asignándole el plan dos veces: la primera
+quedó 09/09 → 08/10 y la segunda 09/10 → 08/11, encolada y con estado `futura`. El
+cliente y sus dos membresías se borraron después.
+
+**Verificado con la 0037 y la 0038 aplicadas**, ejerciendo el camino completo con
+la sesión real: el pase de prueba arranca hoy junto a la mensualidad y termina a
+los siete días contando el de inicio (`09/09 → 15/09`, antes daba 16/09); una
+reserva en el día correcto **entra** —y esa es la prueba del arreglo de
+`consumir_clase`, porque fue la primera reserva real desde que el motor está
+encendido y es la que ejercita el `old.status` en un INSERT—; una en el día
+equivocado se rechaza con *"Esa clase se dicta los lunes, y el 15/09/2026 es
+martes"*; y la clase se descuenta del pase y no de la mensualidad, que es el
+desempate nuevo funcionando: las dos tenían saldo y gana la que primero se
+pierde. El cliente de prueba y sus dos membresías se borraron después.
+
+**Lo que quedó sin resolver, y es una decisión del estudio:** "Cambiar plan" y
+"Renovar membresía" son el mismo botón, así que un cambio de plan también se encola
+— la clienta paga el plan grande hoy y lo empieza a usar el mes que viene.
+Resolverlo obliga a decidir qué pasa con lo que le queda del plan viejo. Hasta
+entonces la pantalla avisa cuándo va a arrancar antes de cobrar.
+
+### ✅ No se reserva una clase que ya empezó (09/09)
+El portal ofrecía "Reservar" en las clases de hoy que ya habían terminado, porque
+la comparación era por fecha y no por fecha y hora. **El bug no cambió ese día;
+cambió lo que cuesta**: hasta la mañana del 09/09 era un botón inútil —sin grilla
+cargada y con el motor de consumo apagado— y a la tarde, con las 64 clases y el
+motor encendido, anotarse a la noche en la clase de las 8:00 le descuenta la clase.
+- [x] El freno va en **su propio trigger** y no dentro de `consumir_clase`, que era
+      el lugar obvio: esa función arranca con `if not consumo_rige() then return
+      new`, así que el freno de mano de la `0029` apagaría también esta regla y
+      dejaría el sistema en el estado que produjo el problema. Reservar una clase
+      que ya pasó está mal descuente o no descuente.
+- [x] Se llama `reservations_agenda` para que corra **primero**: Postgres dispara
+      los BEFORE por orden alfabético, y así el mensaje dice "esa clase ya empezó"
+      en vez de "la clase ya está completa".
+- [x] **Recepción sí puede anotar después** —el que llega sin reserva y se la
+      cargan cuando terminó es el flujo normal del mostrador—, y el corte es por
+      permiso (`reservas.crear`), no por `override_reason`: ese texto **lo lee la
+      clienta**, porque RLS filtra filas y no columnas y el portal hace `select('*')`
+      sobre sus reservas. El rastro ya existe sin agregar nada: `source = 'staff'`
+      con `created_at` doce horas después de su `date` dice lo que pasó.
+- [x] **No dispara al marcar asistencia**, para que una profesora con
+      `reservas.asistencia` pueda corregir un ausente después de la clase — que es,
+      por definición, después de que la clase empezó.
+- [x] El margen es configurable (`booking_cutoff_minutes`, cero por defecto), toma
+      la hora real de la clase de ese día si se corrió (`class_occurrences`) y
+      compara en el huso del estudio: sin el `at time zone` serían tres horas de
+      diferencia, justo la clase de la mañana.
+- [x] De paso, **la fecha de la reserva tiene que caer en el día de la semana de su
+      clase**. Antes se podía anotar a alguien en la clase de los lunes para un
+      martes, y esa reserva no aparecía en ninguna lista hasta que la clienta
+      reclamaba la clase que pagó. Acá no hay excepción por permiso: no es una
+      excepción autorizada, es un dato que no cierra.
+- [x] En el portal, el reloj **se refresca cada 30 segundos**. Con la comparación
+      por fecha no hacía falta; por hora sí, porque la pantalla queda abierta en el
+      teléfono y la clase de las 8:00 seguía con su botón a las 8:30 para quien
+      entró a las 7:50.
+
+Se escribió en una sesión aparte, numerada `0036`, y se renumeró al traerla.
+
+Cuatro lentes más la revisaron junto con la `0037` después de que esta última
+fallara al correrse, y encontraron siete cosas. Las que importan:
+- El trigger leía `old.status` en un `BEFORE INSERT OR UPDATE`, y en un INSERT
+  OLD no existe: es un registro sin asignar y leerle un campo levanta `record
+  "old" is not assigned yet`. Lo único que lo salvaba era que el AND
+  cortocircuitara, y el manual dice que ese orden no está definido. **La misma
+  falla estaba en `consumir_clase` de la `0029`, que ya está aplicada y
+  encendida** — si muerde no falla una reserva, fallan todas. Las dos se
+  reestructuraron con una bandera, que es lo que la `0022` ya había dejado
+  escrito para `stamp_reservation` con este mismo motivo.
+- `inicio_de_clase` es `security definer` y no llevaba el `revoke ... from
+  public, anon` que el resto del proyecto le pone a toda función definer. Lee
+  `class_occurrences`, cuya RLS pide sesión, así que desde la landing sin login
+  se podía pedir por RPC el horario corrido de una clase.
+- En el camino de UPDATE validaba `new.class_id` y `new.date` —los que manda
+  quien reactiva— en vez de los de la fila que va a quedar.
+- El chequeo del día de la semana no tenía salida y aplicaba también a fechas
+  pasadas: el día que el estudio mueva una clase de lunes a martes, cargar una
+  reserva vieja se volvía imposible. Ahora rige solo de hoy en adelante.
+- El escape por permiso miraba solo `reservas.crear`, pero el camino de UPDATE
+  lo ejercen acciones de `reservas.editar` y `reservas.asistencia`: con el grupo
+  en activo, una profesora con asistencia y sin crear quedaba trabada.
+
+### ✅ El plan dice qué disciplina, y ahora rige (09/09) — `0040`, sin correr
+De la respuesta 6c casi todo ya funcionaba sin construir nada: día, hora, cupo y
+profesora son columnas de cada clase, y "grilla separada" se resuelve cargando
+las clases. Lo único que faltaba era **el impedimento**: la `0033` dejó los seis
+planes FE habilitando solo Reformer, pero nada lo validaba al reservar — ni el
+trigger de consumo, ni el de cupo, ni las políticas. El formulario rotulaba
+"Disciplinas habilitadas *", no dejaba guardar sin elegir una, y detrás no había
+nada.
+- [x] El chequeo va en `reserva_en_hora` (el trigger de la `0038`) y **no** en
+      `consumir_clase`, que era el lugar obvio porque ahí ya se resuelve la
+      membresía: esa función arranca con el interruptor de pánico de la `0029`, y
+      qué disciplina puede tomar un cliente no tiene nada que ver con si el
+      descuento de clases está funcionando.
+- [x] Sin membresía no dice nada: de eso se ocupa `consumir_clase`. Duplicar el
+      mensaje sería contestar dos veces la misma pregunta con palabras distintas.
+- [x] Sin salida por permiso, y queda escrito para poder revisarlo: el estudio lo
+      dijo en términos categóricos y las clases de embarazadas tienen cupo y
+      profesora propios, así que meter a alguien de Reformer no es una excepción
+      del mostrador. Si hiciera falta, la salida es darle el plan que
+      corresponde.
+
+**Hoy no cambia ni una reserva** —hay una sola disciplina activa y todos los
+planes la habilitan—, y muerde el día que se cargue la grilla de embarazadas,
+que es justo el día en que nadie va a estar mirando esto.
+
+**Lo que queda pendiente y está anotado en la migración:** la pantalla todavía
+ofrece lo que la base va a rechazar. El portal muestra todas las clases del día
+sin mirar el plan del cliente. Con una disciplina es invisible; con dos hay que
+filtrar. El orden correcto es este: primero el freno, después el filtro.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
@@ -324,7 +537,9 @@ se abre desde **Inicio → Clases de Hoy** y desde el panel de la clase en
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a `0009` ✅ (verificadas 26/08) |
+| Migraciones aplicadas | `0001` a `0038` ✅ · **`0039` y `0040` escritas, sin correr** (verificadas 09/09 con las consultas de abajo y contra la aplicación andando). **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
+| Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |
 | `SUPABASE_SERVICE_ROLE_KEY` | En `.env.local` ✅ · verificar en Vercel |
 | VAPID / push | Claves generadas en `.env.local` · cargar en Vercel |
@@ -333,3 +548,37 @@ se abre desde **Inicio → Clases de Hoy** y desde el panel de la clase en
 | Usuarios de prueba | `admin@pilatestudio.com` (cambiar clave) · `camila.portal@…` (demo) |
 | Roles | admin y recepción escriben; profesor consulta sin pagos ni datos médicos; alumno → portal (UI + RLS) ✅ |
 | Acceso enviado a la clienta | 24/08/2026, cuenta admin + demo del portal |
+
+### Qué migraciones corrieron
+
+Las migraciones se pegan a mano en el SQL Editor, así que el único registro es
+este documento. Cuando queda atrasado, cada migración nueva es una apuesta sobre
+si su `update` encuentra la fila. Estas dos consultas lo contestan sin tocar nada:
+
+```sql
+-- Qué existe en el esquema
+select
+  (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='consumo_rige')      as fn_consumo_rige_0029,
+  (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='reactivar_reserva') as fn_reactivar_0031,
+  (select count(*) from information_schema.columns where table_name='studio_settings' and column_name='rige')        as col_rige_0024,
+  (select count(*) from information_schema.columns where table_name='payment_methods' and column_name='ajuste_pct')  as col_ajuste_0028,
+  (select count(*) from information_schema.columns where table_name='plans' and column_name='weekly_frequency')      as col_weekly_0025,
+  (select count(*) from information_schema.columns where table_name='reservations' and column_name='membership_id')  as col_membership_id_0022,
+  (select count(*) from information_schema.columns where table_name='plans' and column_name='duration_months')        as col_duration_months_0036,
+  (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='vigencia_hasta')  as fn_vigencia_hasta_0036,
+  (select count(*) from pg_trigger where tgname='memberships_fechas' and not tgisinternal)                            as trg_membresia_fechas_0036,
+  (select count(*) from information_schema.columns where table_name='public_plans' and column_name='duration_months') as vista_publica_0037,
+  (select count(*) from pg_trigger where tgname='reservations_agenda' and not tgisinternal)                            as trg_reserva_en_hora_0038,
+  (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='inicio_de_clase') as fn_inicio_de_clase_0038;
+```
+
+```sql
+-- Qué dicen los datos
+select 'estudio' as bloque, key as dato, coalesce(nullif(value,''),'(vacío)') as valor from public.studio_settings where group_key = 'estudio'
+union all select 'params', key, value || case when rige then '  [rige]' else '  [NO rige]' end from public.studio_settings where group_key <> 'estudio'
+union all select 'disciplina', name, case when active then 'activa' else 'apagada' end from public.disciplines
+union all select 'plan', name, case when active then 'activo' else 'apagado' end || ' · ' || duration_days || 'd · ' || class_count || ' clases · ' || array_to_string(disciplines, ' + ') from public.plans
+union all select 'sala', name, case when active then 'activa' else 'apagada' end from public.rooms
+union all select 'permisos', 'grupo ' || grupo, count(*)::text || ' claves' from public.permission_keys group by grupo
+order by 1, 2;
+```

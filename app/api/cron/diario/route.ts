@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createMpCheckoutLink, getMpAccessToken, supabaseAdmin } from '@/lib/mp-server'
 import { pushToStaff } from '@/lib/push-server'
 import { sendEmail, emailLayout } from '@/lib/email-server'
+import { NOMBRE_POR_DEFECTO } from '@/lib/estudio'
 
 // Cron diario (vercel.json lo dispara todas las mañanas):
 //   1. Renueva las membresías vencidas con auto_renew: mismo plan a precio
@@ -190,29 +191,53 @@ export async function GET(request: Request) {
       continue
     }
 
-    const endDate = addDaysISO(today, plan.duration_days)
+    // Propuesta, no decisión: con la 0036 aplicada el trigger
+    // memberships_fechas recalcula el fin siempre y corre el inicio si le
+    // queda una mensualidad viva. Viaja igual para el caso en que esa
+    // migración no haya corrido —ahí no hay trigger y este valor es el que
+    // queda escrito—, y por eso cuenta como la rama de DÍAS de
+    // vigencia_hasta tal como la dejó la 0037: son días de USO y el fin es
+    // inclusivo, así que 7 días arrancando el 20 llegan hasta el 26.
+    const endPropuesto = addDaysISO(today, plan.duration_days - 1)
     const { data: newMembership, error: memError } = await admin
       .from('memberships')
       .insert({
         student_id: m.student_id,
         plan_id: plan.id,
         start_date: today,
-        end_date: endDate,
+        end_date: endPropuesto,
         classes_total: plan.class_count,
         classes_used: 0,
         price: plan.price,
         auto_renew: true,
       })
-      .select('id')
+      .select('id, start_date, end_date')
       .single()
     if (memError || !newMembership) continue
     renewed++
-    maxEnd.set(m.student_id, endDate) // la vieja deja de ser "la más reciente"
+    // Las fechas se leen de vuelta y no se asumen: desde la 0036 el trigger
+    // recalcula el fin como un mes de calendario y corre el inicio si le
+    // quedaba una mensualidad viva, así que lo propuesto arriba es apenas
+    // eso. Todo lo que sigue —maxEnd, el vencimiento de la cuota y el mail—
+    // usa estas dos y no las propuestas, porque la propuesta puede ser una
+    // fecha que no quedó escrita en ninguna fila: isLatest compara por
+    // igualdad, así que un maxEnd inventado deja de reconocer la membresía
+    // nueva y se pierde su aviso de "por vencer", y el mail le prometería a
+    // la clienta un fin que la base no puso (un 22/03 donde la membresía
+    // muere el 19/03).
+    const startReal: string = newMembership.start_date ?? today
+    const endReal: string = newMembership.end_date ?? endPropuesto
+    maxEnd.set(m.student_id, endReal) // la vieja deja de ser "la más reciente"
 
-    // Cuota del mes (igual que la asignación manual: pendiente, 5 días)
+    // Cuota del período (igual que la asignación manual: pendiente, con el
+    // plazo de Configuración contado desde que el período arranca — si el
+    // trigger lo encoló para más adelante, contarlo desde hoy la dejaría
+    // vencida antes de la primera clase). Es una guarda y no la rutina: el
+    // trigger solo encola detrás de algo vivo, y a quien tiene algo vivo lo
+    // saltea isLatest antes de llegar acá. Vale también para el mail.
     let paymentId: string | null = null
     let mpLink: string | null = null
-    const dueDate = addDaysISO(today, paymentGraceDays)
+    const dueDate = addDaysISO(startReal > today ? startReal : today, paymentGraceDays)
     if (Number(plan.price) > 0) {
       const { data: payment } = await admin
         .from('payments')
@@ -256,13 +281,20 @@ export async function GET(request: Request) {
       dedupe_key: `renov-${m.id}`,
     })
     if (student?.email) {
+      // Si el período arranca más adelante hay que decirlo: es lo que la
+      // clienta necesita para saber desde cuándo puede reservar, y callarlo
+      // deja el mail prometiendo un mes que todavía no empezó.
+      const periodo =
+        startReal > today
+          ? `<p>Tu membresía <strong>${plan.name}</strong> se renovó automáticamente. El período nuevo arranca el <strong>${formatDate(startReal)}</strong>, cuando termina el que estás usando, y va hasta el <strong>${formatDate(endReal)}</strong>.</p>`
+          : `<p>Tu membresía <strong>${plan.name}</strong> se renovó automáticamente hasta el <strong>${formatDate(endReal)}</strong>.</p>`
       emails.push({
         to: student.email,
         key: `renov-${m.id}`,
         subject: `Renovamos tu membresía ${plan.name}`,
         html: await emailLayout(
           `¡Hola ${student.name.split(' ')[0]}!`,
-          `<p>Tu membresía <strong>${plan.name}</strong> se renovó automáticamente hasta el <strong>${formatDate(endDate)}</strong>.</p>
+          `${periodo}
            ${Number(plan.price) > 0 ? `<p>La cuota es de <strong>${formatAmount(plan.price)}</strong> y vence el <strong>${formatDate(dueDate)}</strong>.</p>` : ''}
            ${mpLink ? `<p><a href="${mpLink}" style="display:inline-block;background:#A9552F;color:#fff;text-decoration:none;padding:10px 20px;border-radius:10px;font-weight:600;">Pagar online</a></p>` : ''}
            <p>Si no querés renovarla, avisanos en el estudio y la damos de baja. ¡Nos vemos en clase!</p>`
@@ -399,7 +431,7 @@ export async function GET(request: Request) {
       byType('deuda_vencida') && `${byType('deuda_vencida')} deuda(s) vencida(s)`,
     ].filter(Boolean)
     pushSent = await pushToStaff(admin, {
-      title: `${settings.studio_name || 'Casa Fé'} — avisos del día`,
+      title: `${settings.studio_name || NOMBRE_POR_DEFECTO} — avisos del día`,
       body: `Membresías y pagos: ${parts.join(', ')}.`,
       url: '/sistema',
     })

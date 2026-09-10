@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   ArrowLeft,
   Phone,
   Mail,
+  CalendarClock,
   CalendarDays,
   User,
   BookOpen,
@@ -12,6 +13,7 @@ import {
   CreditCard,
   AlertCircle,
   CheckCircle2,
+  History,
   XCircle,
   Clock,
   Edit3,
@@ -22,9 +24,46 @@ import {
 import { cn } from '@/lib/utils'
 import { useData } from '@/lib/data-context'
 import { createSystemUser, setMembershipAutoRenew } from '@/lib/api'
-import type { Student, Reservation, Payment } from '@/lib/types'
+import type { Membership, MembershipStatus, Student, Reservation, Payment } from '@/lib/types'
 import { AlumnoFormModal } from './alumno-form-modal'
 import { AsignarPlanModal } from './asignar-plan-modal'
+
+/**
+ * Los cinco estados, escritos una vez. 'futura' no está en la base —la
+ * columna solo guarda 'activa' y 'suspendida'—: se deriva al leer, y existe
+ * desde que la 0036 encola el pago anticipado en vez de solaparlo.
+ */
+const ESTADO_MEMBRESIA: Record<MembershipStatus, string> = {
+  activa: 'Activa',
+  'por vencer': 'Por vencer',
+  futura: 'Empieza después',
+  vencida: 'Vencida',
+  suspendida: 'Suspendida',
+}
+
+/** El color de cada estado, para que la vigente y el historial coincidan. */
+const COLOR_ESTADO: Record<MembershipStatus, string> = {
+  activa: 'bg-[#E8F2EB] text-[#2E6040]',
+  'por vencer': 'bg-amber-100 text-amber-700',
+  futura: 'bg-sky-100 text-sky-700',
+  vencida: 'bg-red-100 text-red-700',
+  suspendida: 'bg-gray-100 text-gray-600',
+}
+
+/** El `T00:00` evita que un ISO suelto se lea como UTC y muestre el día anterior. */
+const fecha = (iso: string) => new Date(`${iso}T00:00`).toLocaleDateString('es-AR')
+
+/**
+ * Cómo está la cuota de un período que todavía no empezó. Se dice solo si
+ * la fila existe: sin permiso de finanzas los pagos llegan vacíos, y ahí
+ * callar es lo correcto — "sin cobrar" sería una afirmación inventada.
+ */
+function textoCuota(p: Payment): string {
+  const monto = `$${p.amount.toLocaleString('es-AR')}`
+  if (p.status === 'pagado') return `cuota de ${monto} ya cobrada`
+  if (p.status === 'vencido') return `cuota de ${monto} sin cobrar, venció el ${fecha(p.dueDate)}`
+  return `cuota de ${monto} sin cobrar, vence el ${fecha(p.dueDate)}`
+}
 
 function PortalAccessModal({ student, onClose }: { student: Student; onClose: () => void }) {
   const { refresh } = useData()
@@ -108,7 +147,7 @@ function PortalAccessModal({ student, onClose }: { student: Student; onClose: ()
                   className={inputClass}
                 />
                 <p className="text-[11px] text-muted-foreground mt-1.5">
-                  Se la compartís a la clienta; con ella entra a su portal para reservar y ver sus pagos.
+                  Se la compartís al cliente; con ella entra a su portal para reservar y ver sus pagos.
                 </p>
               </div>
               {error && <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
@@ -160,13 +199,31 @@ interface FichaAlumnoProps {
 }
 
 export function FichaAlumno({ student, reservations, payments, onBack }: FichaAlumnoProps) {
-  const { canWrite, refresh } = useData()
+  const { canWrite, refresh, data } = useData()
   const [activeTab, setActiveTab] = useState('resumen')
   const [showEdit, setShowEdit] = useState(false)
   const [showAssignPlan, setShowAssignPlan] = useState(false)
   const [showPortalAccess, setShowPortalAccess] = useState(false)
   const [savingAutoRenew, setSavingAutoRenew] = useState(false)
   const ms = student.membership
+
+  // `student.membership` es la que cubre hoy —lib/api.ts elige con el mismo
+  // criterio que membresia_para— y solo si ninguna cubre hoy cae, como
+  // último recurso, en la de end_date más alto. O sea que mientras haya una
+  // vigente, los períodos encolados por pago anticipado —los que la 0036
+  // dejó en 'futura'— no están ahí, y ese es el caso normal. Hay que ir a
+  // buscarlos al paquete del estudio o el mostrador no tiene forma de saber
+  // que el mes que viene ya está vendido.
+  const misMembresias = useMemo(() => {
+    const propias = (data?.memberships ?? []).filter((m) => m.studentId === student.id)
+    return propias.sort((a, b) => b.startDate.localeCompare(a.startDate) || b.endDate.localeCompare(a.endDate))
+  }, [data, student.id])
+  const futuras = misMembresias.filter((m) => m.status === 'futura')
+  // 'activa' y 'por vencer' son exactamente los dos estados que cubren hoy:
+  // el estado derivado ya descartó antes la suspendida, la vencida y la
+  // futura. Hace falta porque `ms` puede ser el último recurso de arriba, y
+  // ahí decirle "es la que corre hoy" a una vencida sería falso.
+  const correHoy = (m: Membership) => m.status === 'activa' || m.status === 'por vencer'
 
   const toggleAutoRenew = async () => {
     if (!ms || savingAutoRenew) return
@@ -191,7 +248,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
           className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Volver a clientas</span>
+          <span>Volver a clientes</span>
         </button>
       </div>
 
@@ -207,7 +264,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                 <div>
                   <h2 className="text-xl font-bold text-foreground">{student.name}</h2>
                   <p className="text-sm text-muted-foreground">
-                    Clienta desde {new Date(student.joinDate).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}
+                    Cliente desde {new Date(student.joinDate).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}
                   </p>
                 </div>
                 {canWrite && (
@@ -253,6 +310,37 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
               <p className="text-[11px] text-muted-foreground mt-0.5">Próximas</p>
             </div>
           </div>
+
+          {/* Va acá, junto al nombre y fuera de las pestañas, porque es lo que
+              evita cobrarle dos veces el mismo mes: si está escondido en una
+              pestaña, quien atiende el teléfono no lo va a ver. */}
+          {futuras.length > 0 && (
+            <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-3.5">
+              <p className="text-xs font-bold text-sky-900 flex items-center gap-1.5">
+                <CalendarClock className="w-3.5 h-3.5 shrink-0" />
+                {futuras.length === 1
+                  ? 'El próximo período ya está asignado'
+                  : `Tiene ${futuras.length} períodos ya asignados por adelantado`}
+              </p>
+              <div className="mt-1.5 space-y-1">
+                {futuras.map((m) => {
+                  const cuota = payments.find((p) => p.membershipId === m.id && p.status !== 'anulado')
+                  return (
+                    <p key={m.id} className="text-[11px] text-sky-900/90 leading-relaxed">
+                      <span className="font-semibold">{m.planName}</span> · arranca el{' '}
+                      {fecha(m.startDate)} y llega hasta el {fecha(m.endDate)} · {m.classesTotal} clase
+                      {m.classesTotal !== 1 ? 's' : ''}
+                      {cuota ? ` · ${textoCuota(cuota)}` : ''}
+                    </p>
+                  )
+                })}
+              </div>
+              <p className="text-[10px] text-sky-800 mt-1.5">
+                Asignar el mismo plan otra vez no reemplaza esto: suma un período más detrás, con su
+                propia cuota.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Tabs */}
@@ -466,18 +554,16 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                       <div>
                         <h3 className="text-base font-bold text-foreground">{ms.planName}</h3>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {ms.startDate} — {ms.endDate}
+                          {fecha(ms.startDate)} — {fecha(ms.endDate)}
                         </p>
                       </div>
                       <span
                         className={cn(
                           'text-xs font-semibold px-3 py-1 rounded-full',
-                          ms.status === 'activa' && 'bg-[#E8F2EB] text-[#2E6040]',
-                          ms.status === 'por vencer' && 'bg-amber-100 text-amber-700',
-                          ms.status === 'vencida' && 'bg-red-100 text-red-700'
+                          COLOR_ESTADO[ms.status]
                         )}
                       >
-                        {ms.status === 'activa' ? 'Activa' : ms.status === 'por vencer' ? 'Por vencer' : 'Vencida'}
+                        {ESTADO_MEMBRESIA[ms.status]}
                       </span>
                     </div>
 
@@ -509,7 +595,10 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                         <p className="text-xl font-bold text-foreground">
                           ${ms.price.toLocaleString('es-AR')}
                         </p>
-                        <p className="text-[10px] text-muted-foreground">Precio mensual</p>
+                        {/* No "Precio mensual": desde la 0036 la vigencia
+                            puede ser en meses o en días, y FE FIRST vale
+                            siete días. */}
+                        <p className="text-[10px] text-muted-foreground">Precio del plan</p>
                       </div>
                     </div>
 
@@ -518,7 +607,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-foreground">Renovación automática</p>
                         <p className="text-xs text-muted-foreground">
-                          Al vencer, el sistema renueva el plan y genera la cuota del mes.
+                          Al vencer, el sistema renueva el plan y genera la cuota del período nuevo.
                         </p>
                       </div>
                       {canWrite ? (
@@ -577,6 +666,48 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                       Asignar membresía
                     </button>
                   )}
+                </div>
+              )}
+
+              {/* Un período por fila, las encoladas y las vencidas incluidas.
+                  La pestaña mostraba solo la vigente, así que lo que tuvo
+                  antes —y lo que ya pagó para después— no se podía consultar
+                  en ningún lado. */}
+              {misMembresias.length > 0 && (
+                <div className="bg-card rounded-2xl border border-border p-5">
+                  <h3 className="text-sm font-semibold text-foreground mb-1 flex items-center gap-2">
+                    <History className="w-4 h-4 text-primary" />
+                    Historial de membresías
+                  </h3>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Cada período es una fila: renovar no reemplaza la anterior, la deja atrás.
+                  </p>
+                  <div className="divide-y divide-border">
+                    {misMembresias.map((m) => (
+                      <div key={m.id} className="flex items-center gap-3 py-2.5">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{m.planName}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {fecha(m.startDate)} — {fecha(m.endDate)} · {m.classesUsed}/{m.classesTotal}{' '}
+                            clases
+                            {ms?.id !== m.id
+                              ? ''
+                              : correHoy(m)
+                              ? ' · es la que corre hoy'
+                              : ' · es la que la ficha muestra arriba'}
+                          </p>
+                        </div>
+                        <span
+                          className={cn(
+                            'text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0',
+                            COLOR_ESTADO[m.status]
+                          )}
+                        >
+                          {ESTADO_MEMBRESIA[m.status]}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

@@ -6,11 +6,11 @@
 // En sandbox (sin dominio) Resend solo entrega al email del dueño de la
 // cuenta — suficiente para probar.
 
-// El remitente y la firma de cada mail que recibe la clienta salen del
+// El remitente y la firma de cada mail que recibe el cliente salen del
 // sistema, no del código. Se resuelve una vez por instancia y se guarda:
 // el proceso diario manda varios mails seguidos y no tiene sentido
 // preguntarle a la base el nombre del estudio en cada uno.
-import { nombreDelEstudio, NOMBRE_POR_DEFECTO } from './estudio'
+import { nombreDelEstudio } from './estudio'
 
 let marcaCache: string | null = null
 

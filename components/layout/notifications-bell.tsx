@@ -60,15 +60,15 @@ const ESTILOS: Record<NotificationType, EstiloAviso> = {
   caja_diferencia:      { Icon: Scale,         color: 'bg-red-100 text-red-700',     page: 'caja' },
   saldo_sin_imputar:    { Icon: Coins,         color: 'bg-amber-100 text-amber-700', page: 'caja' },
   // El par de RefreshCw: la renovación que no fue. Lleva a Planes y no a
-  // Alumnos porque lo que hay que arreglar es el plan apagado, no la ficha.
+  // Clientes porque lo que hay que arreglar es el plan apagado, no la ficha.
   // Ámbar y no rojo: no se rompió nada, hay algo mal configurado.
   renovacion_omitida:   { Icon: RefreshCwOff,  color: 'bg-amber-100 text-amber-700', page: 'planes' },
 }
 
 /**
  * Resuelve el estilo de un aviso sin devolver nunca `undefined`: el tipo
- * exacto, y si no está, el genérico — que si el aviso apunta a una alumna
- * la lleva a su listado, que es más útil que Inicio.
+ * exacto, y si no está, el genérico — que si el aviso apunta a un cliente
+ * lo lleva a su listado, que es más útil que Inicio.
  */
 function estiloDeAviso(n: AppNotification): EstiloAviso {
   // El índice es texto que viene de la base, no la unión: puede no estar.

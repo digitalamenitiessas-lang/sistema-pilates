@@ -33,7 +33,7 @@ construyen una sola vez (sedes, permisos, categorías de clienta, instancias de
 clase, cupones).
 
 Esto no es una mala noticia, es la información que faltaba para decidir el alcance
-de la primera versión. La sección §8 propone cómo cortarlo.
+de la primera versión. La sección §9 propone cómo cortarlo.
 
 ## 2. Lo que ya está y conviene mostrarle a la clienta
 
@@ -48,8 +48,10 @@ Antes de la lista de faltantes, esto del documento **ya funciona hoy**:
   clase de la membresía.
 - **Planes y membresías**: alta y edición, cantidad de clases, vigencia, clases
   usadas y disponibles a la vista.
-- **La vigencia ya se cuenta desde la activación, no por mes calendario** — el
-  Agregado 4 del documento está prácticamente resuelto de fábrica (ver §5).
+- **La vigencia ya se cuenta desde la activación**, que es lo que el estudio
+  confirmó el 09/09. Pero corre por **días fijos** (30) y él pidió **un mes
+  calendario**: no es lo mismo, y en un mes de 31 días el aniversario se corre
+  (ver §8).
 - **Cobros** en efectivo, transferencia, tarjeta y Mercado Pago, con comprobante
   autonumerado, link de pago por deuda y acreditación automática.
 - **Renovación automática** de membresías con generación de la cuota y email a la
@@ -72,7 +74,7 @@ De las 10 prioridades que la clienta puso en la página 16, las **1, 2, 3, 4, 9 
 
 > Esta tabla es la **foto del análisis inicial**, contra el documento de
 > requerimientos. No se actualiza: sirve de línea de base para medir el avance.
-> El estado vivo, bloque por bloque, está en §8.
+> El estado vivo, bloque por bloque, está en §9.
 
 | Sección | Estado | Qué hay hoy | Lo grande que falta |
 |---|---|---|---|
@@ -95,15 +97,16 @@ De las 10 prioridades que la clienta puso en la página 16, las **1, 2, 3, 4, 9 
 | 17 · Reportes y exportación | 🔴 | Datos sueltos dentro de pantallas operativas | Todo: módulo propio, filtros con rango de fechas, exportación a Excel y PDF. La mitad de los reportes depende de módulos que aún no existen |
 | **Agregado 1** · Lista de espera con aviso | 🟡 | La alumna se anota; recepción promueve a mano | Aviso automático al liberarse el lugar, oferta con tiempo límite, confirmación de la alumna y pase a la siguiente |
 | **Agregado 2** · Días y horarios fijos | 🔴 | Nada (las reservas son de a una, por fecha) | Elección de horarios fijos del mes, materialización de reservas recurrentes, gestión desde administración |
-| **Agregado 3** · Prioridad por pago del 1 al 9 | 🔴 | Nada | Cuota anticipada del mes siguiente, marca de prioridad, recordatorios antes del 9, liberación automática de lugares el día 10 |
-| **Agregado 4** · Vigencia desde la activación | 🟢 | Ya funciona así (start + días del plan) | Solo dos ajustes: “1 mes” exacto en vez de 30 días y arrancar al pagar; más mostrar en la ficha la diferencia entre vigencia y horario fijo |
+| **Agregado 3** · Prioridad por pago del 1 al 9 | ⚫ **derogado** | Nada, y nunca hizo falta | El estudio lo dio de baja el 09/09: *"No existe un período general de pago del 1 al 9"*. La prioridad pasa a colgar de la fecha individual de vencimiento (§8) |
+| **Agregado 4** · Vigencia desde la activación | 🟢 | **Hecho** (`0036` + `0037`): mes de calendario, cálculo en la base y pago anticipado encolado | Queda el día de gracia, que es parte del turno fijo, y la decisión sobre el cambio de plan (§8) |
 
 ## 4. Los choques con lo que ya funciona
 
 Esto es lo más importante del análisis: **algunas cosas del documento no se suman a
 lo que hay, lo cambian**. Conviene resolverlas antes de escribir código.
 
-**1. La renovación automática contra la regla del 1 al 9.**
+**1. La renovación automática contra la regla del 1 al 9.** ⚫ *Resuelto el 09/09: el estudio derogó la regla del 1 al 9. Queda un choque distinto y más chico, en §8: la renovación automática renueva sin exigir el pago, y la regla nueva dice que el que no paga pierde la prioridad.*
+
 Hoy el sistema renueva la membresía *al vencer* (fecha individual de cada alumna) y
 genera la cuota con 5 días de gracia, sin exigir el pago para seguir reservando. El
 Agregado 3 pide lo inverso: pago *anticipado* entre el 1 y el 9 del mes anterior, y
@@ -205,8 +208,9 @@ Ya configurable desde Configuración (migración 0011): datos del estudio (nombr
 dirección, WhatsApp, Instagram, email, horarios), plazo de cancelación, tiempo para
 confirmar un lugar liberado, cuándo se descuenta la clase, si la ausencia la
 consume, días de aviso de vencimiento, tope de congelamiento, días para pasar a
-"por recuperar", vencimiento de la cuota, ventana de pago del 1 al 9, día de
-liberación de lugares y anticipación de cada recordatorio.
+"por recuperar", vencimiento de la cuota y anticipación de cada recordatorio.
+Los cuatro parámetros de la ventana de pago del 1 al 9 se borraron en la 0033,
+cuando el estudio derogó esa regla.
 
 Lo mismo vale para la estética: tipografía, textos y fotos se cargan cuando la
 clienta los tenga, sin frenar la lógica.
@@ -233,11 +237,11 @@ el cruce completo contra el código, con evidencia archivo:línea, en
 | Sin reserva | Si hay lugar, **toma la clase** | `override_by` / `override_reason` (ya están, 0022) |
 | Asistencia | La tildan **profesora y encargada**, una por una | Ya está |
 | Lesiones | **La profesora las ve** | Partir `student_private` en dos niveles |
-| Horario fijo | **Se pierde al vencer sin pagar**; renovar después no garantiza recuperarlo | `slot_release_day = 10` |
+| Horario fijo | **Se pierde al vencer sin pagar**; renovar después no garantiza recuperarlo | Colgaba de `slot_release_day = 10`; desde el 09/09 cuelga de `memberships.end_date` |
 | Caja | **Cierra por día**, controla efectivo, transferencia y tarjetas | Ya está (0020) |
 | Disciplinas | **Tres**: Reformer, Embarazadas, 3ra Edad | Catálogo (0011) |
 | Planes | **Seis FE**, por frecuencia semanal | `plans.weekly_frequency` (nueva) |
-| Cómo se llaman | **"Clientes"** en pantalla, `students` en la base | Género por definir |
+| Cómo se llaman | **"Cliente"**, en masculino, en pantalla; `students` en la base | Decidido el 09/09 · migración `0033` |
 
 **El precio no son tres números, son dos porcentajes.** Verificado sobre las seis
 filas del documento: efectivo es exactamente base × 0,95 y tarjeta base × 1,25,
@@ -297,7 +301,108 @@ Terminar lo que hay, y de lo nuevo **solo Personal y remuneraciones**. Afuera:
 promociones, cupones, beneficios, gift cards, productos e inventario. **Reportes
 ya está hecho** (migración `0021`).
 
-## 8. Cómo arrancamos
+## 8. Lo que el estudio contestó (09/09/2026)
+
+Se le pidió la grilla, las profesoras, las salas, los datos del estudio, el
+material de diseño y cuatro definiciones que habían quedado abiertas. Contestó
+todo menos la grilla, que es justamente lo que apura: **la lista de días y horas
+no llegó** (la captura vino cortada). Lo que sí llegó de la grilla es que en una
+primera instancia se dicta **únicamente Pilates Reformer**, con clases de **50
+minutos** y **8 lugares** en la **Sala Reformer**, que tiene 8 reformers.
+
+### Lo que se aplicó (migración `0033`)
+
+| Respuesta | Qué se hizo |
+|---|---|
+| El nombre es **"Casa Fe", sin tilde** | `studio_name`, más los siete respaldos del código y el service worker, que no puede leer la base |
+| Dirección, Instagram, email y horario | Cargados. El WhatsApp de la demo se **vació**: hasta hoy la web mandaba a un teléfono que no es del estudio |
+| Solo Reformer, una sola sala | Apagadas las cinco disciplinas de demo, las dos que todavía no se dictan y las tres salas de demo. Va **antes** de cargar la grilla: el formulario toma como default la primera disciplina y la primera sala activas |
+| Clases de 50 min y 8 lugares | `class_default_minutes` y `class_default_capacity`. Venían escritos en el código como 55 y 10 |
+| Reformer **no** se combina con embarazadas | Los seis planes FE habilitan solo Reformer, y desde la `0040` **rige**: el trigger de reserva rechaza una clase cuya disciplina el plan no incluye. Hoy no muerde —hay una sola disciplina activa— y muerde el día que se cargue la grilla de embarazadas |
+| En pantalla se dice **"cliente"**, en masculino | Etiquetas y ayudas de permisos, ayudas de Configuración, dos funciones de aviso y el texto de las 19 pantallas. El grupo de permisos va por su **tercer** nombre: `Alumnos` → `Clientas` → `Clientes` |
+| **No existe** el período de pago del 1 al 9 | Borrados `priority_pay_from_day`, `priority_pay_to_day`, `slot_release_day` y `priority_reminder_days`. Nunca llegaron a regir: la `0024` ya los había marcado `rige = false` |
+
+### La vigencia, que era la que bloqueaba
+
+Eligió la **fecha individual**, que es lo que el sistema ya hace: un mes desde la
+fecha de inicio. Pero le sumó cinco reglas, y tres no son gratis.
+
+Su ejemplo, textual: paga e inicia el **20/09**, la usa hasta el **19/10**
+inclusive, debe renovar **como máximo el 20/10**, y el **21/10** pierde la
+prioridad sobre sus días y horarios fijos.
+
+1. **Un mes calendario, no 30 días.** Hoy `end_date = start + plan.duration_days`
+   y los seis planes FE tienen 30. Coincide por casualidad en septiembre y falla
+   en los meses de 31: el aniversario se corre hacia adelante.
+2. **El 20/10 es un día de hueco que nadie modeló.** Conserva la prioridad pero
+   `membresia_para` compara `between start_date and end_date`, así que ese día
+   **no puede reservar**. Es coherente con su regla, pero el mostrador lo va a
+   reportar como un bug si no está escrito. La liberación va en `end_date + 2`,
+   no en `+ 1`.
+3. **El pago anticipado se encola.** Hoy `assignMembership` arranca siempre hoy y
+   no mira la membresía anterior, así que quedan dos vigentes solapadas y
+   `membresia_para` elige la nueva: lo que quedaba de la vieja queda huérfano.
+4. **Las clases no usadas vencen y no se acumulan.** Ya se cumple.
+5. **Recordatorios antes del vencimiento.** Ya se manda uno, con anticipación
+   configurable (`expiry_warning_days`). Ella habla en plural y sin números.
+
+**Y el choque que abre:** la renovación automática hace lo contrario de lo que
+pidió. `auto_renew` nace en `true` y el proceso diario renueva **sin exigir el
+pago** — inserta la membresía vigente y después genera la cuota como pendiente.
+Su regla es que el que no paga pierde la prioridad. Hay que decidir si
+`auto_renew` sigue existiendo antes de escribir los avisos.
+
+### El turno fijo: no existe el sujeto de la frase
+
+Pidió *"liberar automáticamente los turnos fijos"*. Hoy una reserva es una fila
+por **(cliente, clase, fecha)**, no un derecho recurrente sobre un día y hora. No
+hay turno fijo que liberar. Es el Agregado 2, y antes de escribir la tabla hay
+tres cosas que decidir:
+
+- **Qué significa liberar.** Si es pasar la reserva a `'cancelada'`, el cliente
+  entra al portal, toca la clase de siempre y **se la lleva de vuelta**:
+  `reactivar_reserva` es `security definer`, la puede llamar cualquier usuario
+  sobre sus propias reservas y solo valida que la fila esté cancelada — y
+  `createReservation` la llama sola cuando choca con el unique. Hace falta borrar
+  la fila, un estado que se niegue a reactivarse, o una política restrictiva.
+- **El conteo contra el mes calendario.** En el período 20/09–19/10 uno o dos
+  días de la semana caen **cinco** veces, y el plan trae cuatro clases por
+  semana. Un materializador generaría 5 reservas donde hay 4 clases, y
+  `consumir_clase` **lanza excepción**. O topea en `weekly_frequency × 4`, o
+  `classes_total` se calcula por período, o el turno fijo no materializa nada.
+- **Si materializa, `fetchStudioData` se rompe antes que nada.** Trae
+  `reservations` completa, sin filtro de fecha y sin `limit`, en cada login. Con
+  turnos fijos materializados son ~1.250 reservas por mes, acumulativas. La
+  ventana de fechas va en el mismo bloque, no después.
+
+### El redondeo: la respuesta excede la pregunta
+
+Se le preguntó qué hacer **el día que aumente los precios**, aclarando que hoy
+los seis dan justos, y la opción más gruesa que se le ofreció era $100. Contestó
+**al próximo múltiplo de $1.000**, que cambia **8 de los 12 precios que ella
+misma publicó** y deja falso el título de su propia tabla: el "Efectivo 5% OFF"
+de FE START pasa a ser 4,44% ($45.000 → $43.000).
+
+`price_rounding` **no se tocó**, y queda en `cincuenta`, que deja los doce
+valores intactos. Se cambia cuando confirme la tabla nueva.
+
+### Lo que sigue faltando
+
+**Datos:** la lista de días y horas de la grilla · si las clases arrancan en hora
+redonda o corridas · cómo se llama cada clase (el título es obligatorio y se ve
+en el portal) · nombre completo, teléfono y email de Ivana y de Leandro · quién
+es la profesora del turno tarde (se puede arrancar con un nombre provisorio:
+`teacher_id` es `NOT NULL`) · el WhatsApp · el link de Google Maps · si la web
+sigue mostrando ciudad y Facebook · logo, paleta, tipografías y fotos.
+
+**Decisiones:** las cuatro preguntas de la ronda anterior que quedaron sin
+contestar — congelamiento, los días hasta la lista de contacto
+(`recovery_after_days`), las **dos** de Mercado Pago (el 25% del link y el tope
+de 3 cuotas, que hoy no está puesto en ningún lado) y si **3ra Edad** combina con
+Reformer — más qué es un turno fijo, el conteo del mes de cinco lunes, cuántos
+recordatorios y a cuántos días, y la tabla de precios con el redondeo nuevo.
+
+## 9. Cómo arrancamos
 
 Propuesta de orden. Respeta las prioridades de la clienta, pero corregida por
 dependencias técnicas: hay cosas que si no van primero, obligan a rehacer lo que
@@ -311,7 +416,7 @@ es lo que permite que el estudio ajuste sus reglas sin pedirnos un desarrollo.
 
 | | Migración |
 |---|---|
-| ✅ **21 parámetros del negocio configurables** — plazos, anticipaciones, ventana de pago del 1 al 9, cuándo se consume la clase. La pantalla se arma sola con lo que trae la tabla: sumar un parámetro es un `INSERT`, no un deploy | `0011` |
+| ✅ **21 parámetros del negocio configurables** — plazos, anticipaciones, cuándo se consume la clase (los cuatro de la ventana del 1 al 9 se borraron en la `0033`). La pantalla se arma sola con lo que trae la tabla: sumar un parámetro es un `INSERT`, no un deploy | `0011` |
 | ✅ **Datos del estudio fuera del código** — nombre, dirección, mapa, WhatsApp, Instagram, email, horarios. La web los lee de una vista pública, con respaldo | `0011` |
 | ✅ **Catálogo de disciplinas** editable con color y descripción, con renombrado en cascada. Reemplazó seis constantes duplicadas en el código | `0011` |
 | ✅ **Catálogo de medios de pago** editable | `0011` |
@@ -380,7 +485,8 @@ es lo que permite que el estudio ajuste sus reglas sin pedirnos un desarrollo.
 - Avisos a la alumna en el celular (encender la campana y el push en el portal).
 - Oferta automática del lugar liberado con tiempo límite y confirmación.
 - Horarios fijos del mes y su gestión desde administración.
-- Ciclo de pago 1 al 9, recordatorios y liberación de lugares el día 10.
+- Liberación de los lugares al día siguiente de la fecha de gracia individual, y
+  los recordatorios previos al vencimiento. (El ciclo del 1 al 9 quedó derogado.)
 
 ### Bloque 3 — Membresías y ficha (prioridades 2 y 3, ≈ 3 semanas)
 - Tres precios por plan según medio de pago.
@@ -536,7 +642,7 @@ que lo acompaña ya tiene su molde en la `0021`.
 **Fuera del alcance:** promociones, cupones, beneficios, gift cards, productos e
 inventario.
 
-## 9. Lo que este análisis no cubre
+## 10. Lo que este análisis no cubre
 
 - La sección 14-15 (notificaciones y email marketing) se relevó a mano: su auditoría
   automática se cortó por límite de uso de la sesión. El estado está en la tabla de

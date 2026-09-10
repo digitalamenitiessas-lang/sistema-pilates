@@ -25,7 +25,7 @@ const ROLE_LABELS: Record<string, string> = {
   admin: 'Admin',
   recepcion: 'Recepción',
   profesor: 'Profesor/a',
-  alumno: 'Clienta',
+  alumno: 'Cliente',
 }
 
 export type PageKey =
@@ -49,7 +49,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
   { key: 'agenda', label: 'Agenda', icon: CalendarDays },
-  { key: 'alumnos', label: 'Clientas', icon: Users },
+  { key: 'alumnos', label: 'Clientes', icon: Users },
   { key: 'planes', label: 'Planes', icon: BookOpen },
   { key: 'reservas', label: 'Reservas', icon: ClipboardList },
   { key: 'pagos', label: 'Pagos', icon: CreditCard },
@@ -77,7 +77,7 @@ export function Sidebar({
   onMobileClose,
 }: SidebarProps) {
   const { settings } = useStudio()
-  const estudio = settingText(settings, 'studio_name', 'Casa Fé')
+  const estudio = settingText(settings, 'studio_name', 'Casa Fe')
   const { profile, canWrite, can, signOut } = useData()
   // El drawer mobile siempre se muestra expandido; el colapso es cosa de desktop
   const showLabels = !collapsed || mobileOpen

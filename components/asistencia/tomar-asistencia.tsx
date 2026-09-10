@@ -15,7 +15,7 @@ import type { Reservation } from '@/lib/types'
  * confirmaciones intermedias y que corregir una marca equivocada sea un
  * toque y no un menú.
  *
- * Sección 1 del documento de Casa Fé: "Activar el check de asistencia para
+ * Sección 1 del documento de Casa Fe: "Activar el check de asistencia para
  * que profesoras y encargadas puedan marcar".
  */
 export function TomarAsistencia({
@@ -89,7 +89,7 @@ export function TomarAsistencia({
             <div className="min-w-0">
               <h2 className="text-base font-bold text-foreground truncate">{title}</h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {time} · {lista.length} {lista.length === 1 ? 'clienta' : 'clientas'}
+                {time} · {lista.length} {lista.length === 1 ? 'cliente' : 'clientes'}
               </p>
             </div>
             <button

@@ -92,7 +92,7 @@ function TablaDeReservas({
               {mostrarFecha ? 'Fecha' : 'Hora'}
             </th>
             <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Clienta
+              Cliente
             </th>
             <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               Clase
@@ -338,7 +338,7 @@ function ClasesDelDia({
                 <span className="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
                   {onTomarAsistencia
                     ? `${sinMarcar} sin marcar`
-                    : `${sinMarcar} anotada${sinMarcar === 1 ? '' : 's'}`}
+                    : `${sinMarcar} anotado${sinMarcar === 1 ? '' : 's'}`}
                 </span>
               )}
               {onTomarAsistencia && (
@@ -528,7 +528,7 @@ export function ReservasPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar clienta o clase..."
+            placeholder="Buscar cliente o clase..."
             className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground outline-none text-sm"
           />
         </div>

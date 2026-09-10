@@ -2,7 +2,7 @@
  * Cómo se llama el estudio.
  *
  * Estaba escrito "PilatesStudio" en catorce lugares del código: el ícono
- * que la clienta ve al instalar la app, el título del navegador, lo que
+ * que el cliente ve al instalar la app, el título del navegador, lo que
  * aparece al compartir el link, el remitente de los emails y el nombre
  * que le figura en el resumen de la tarjeta. Todo eso es lo primero que
  * ve alguien que no conoce el estudio, y decía el nombre equivocado.
@@ -15,7 +15,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 /** Si no se puede leer, es preferible el nombre real a uno inventado. */
-export const NOMBRE_POR_DEFECTO = 'Casa Fé'
+export const NOMBRE_POR_DEFECTO = 'Casa Fe'
 
 /**
  * Para el servidor: manifest, metadata y emails. Usa la vista pública, que
@@ -41,7 +41,7 @@ export async function nombreDelEstudio(): Promise<string> {
 /**
  * Mercado Pago lo muestra en el resumen de la tarjeta: solo mayúsculas y
  * números, hasta 13 caracteres, y sin espacios ni acentos. Si no entra,
- * la clienta ve un cargo de un comercio que no reconoce.
+ * el cliente ve un cargo de un comercio que no reconoce.
  */
 export function descriptorDeTarjeta(nombre: string): string {
   return (
