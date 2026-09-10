@@ -558,6 +558,42 @@ deliberado —emitir la cuota sin poder marcarla como oferta es exactamente el d
 de arriba— pero no puede pasar en silencio, así que el proceso diario avisa al
 mostrador una vez por día mientras dure.
 
+### ✅ La campana en el portal, y el push a la clienta (10/09)
+Con la renovación nueva **el mecanismo es avisarle**: tres recordatorios y el
+link de pago. Pero al revisar por dónde le llegaban, eran **solo mails** — y los
+tres canales estaban cortados a la vez: a la clienta no le llegaba push (existía
+`pushToUser` y no la llamaba nadie), el portal no tenía campana, y los mails no
+salen en producción porque Resend está en sandbox y `sendEmail` devuelve `false`
+en silencio. O sea: el recordatorio de renovar no le llegaba por ningún canal, y
+el sistema no se rompía ni avisaba.
+- [x] El proceso diario emite ahora los avisos con `audience: 'alumno'` para los
+      tres momentos —la cuota emitida, cada recordatorio y el vencimiento— y le
+      manda push a sus dispositivos. Un helper, no cuatro copias del mismo
+      código.
+- [x] **El push sale solo por los avisos que el upsert devolvió como nuevos**,
+      igual que los mails: si no, el cron corriendo dos veces le vibra el
+      teléfono dos veces por la misma noticia.
+- [x] En el recordatorio, la campana y el push van **antes** del corte por
+      email, que es el motivo de todo esto: quien no tiene mail cargado se
+      enteraba de nada. En el aviso de vencimiento van después, con la misma
+      condición que el mail, porque sin la `0041` aplicada ese aviso es falso y
+      decir por tres canales algo que no pasó es peor que no decirlo.
+- [x] **La campana del portal es el mismo componente del mostrador**, montado
+      sin `onNavigate` porque sus destinos son pantallas que el portal no tiene.
+      Y trae adentro el interruptor de avisos en el celular, que es la razón por
+      la que se monta esto y no una lista aparte.
+- [x] El aislamiento no lo hace el componente ni un filtro en la consulta:
+      `fetchNotifications` no filtra por audiencia y **lo decide la política de
+      la `0007`**, que ya existía y ya era correcta.
+- [x] `pushClientas` va separado de `pushSent` en el resumen del proceso diario:
+      si queda en cero corrida tras corrida mientras los avisos crecen, es que
+      nadie tiene el push activado o faltan las claves VAPID.
+
+**Sin verificar todavía, y hace falta la sesión de una clienta:** ver la campana
+en el portal y que el push llegue de verdad. Lo verificado es que compila, que la
+campana tolera no tener navegación, que su texto no es del mostrador y que los
+dos tipos de aviso que usa ya están en el CHECK de la `0023`.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
@@ -602,7 +638,7 @@ mostrador una vez por día mientras dure.
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |
 | `SUPABASE_SERVICE_ROLE_KEY` | En `.env.local` ✅ · verificar en Vercel |
-| VAPID / push | Claves generadas en `.env.local` · cargar en Vercel |
+| VAPID / push | Claves generadas en `.env.local` · **cargar en Vercel** (sin ellas el push es un no-op silencioso). Desde el 10/09 el push va también **a la clienta**, no solo al mostrador |
 | Resend | ✅ Activo en sandbox (26/08, email real entregado) · key en `.env.local`, cargar en Vercel · dominio del estudio pendiente para emails a alumnas |
 | Webhook MP | Programado; registrar URL en MP al conectar la cuenta real |
 | Usuarios de prueba | `admin@pilatestudio.com` (cambiar clave) · `camila.portal@…` (demo) |

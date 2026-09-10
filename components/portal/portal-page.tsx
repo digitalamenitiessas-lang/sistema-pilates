@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useData, useStudio } from '@/lib/data-context'
 import { disciplineStyle } from '@/lib/disciplines'
+import { NotificationsBell } from '@/components/layout/notifications-bell'
 import {
   addDays,
   mondayOf,
@@ -474,6 +475,18 @@ export function PortalPage() {
             <p className="text-sm font-bold text-foreground truncate">¡Hola, {me.name.split(' ')[0]}!</p>
             <p className="text-[10px] text-muted-foreground">{settingText(settings, 'studio_name', 'Casa Fe')}</p>
           </div>
+          {/* La campana, con el mismo componente que usa el mostrador. No
+              lleva `onNavigate` a propósito: sus destinos son pantallas del
+              sistema que el portal no tiene, y acá el aviso se lee y se
+              cierra. Lo que sí trae es el interruptor de notificaciones en el
+              celular, que vive adentro de la campana — y es la razón por la
+              que se monta esto y no una lista aparte.
+
+              Qué avisos ve: los que la política de la 0007 le deja leer, o
+              sea los suyos con `audience = 'alumno'`. El aislamiento no
+              depende de este componente ni de un filtro en la consulta: lo
+              decide la base. */}
+          <NotificationsBell />
           <button
             onClick={() => setShowChangePassword(true)}
             aria-label="Cambiar contraseña"
