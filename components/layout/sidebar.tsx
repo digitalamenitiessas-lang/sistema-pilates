@@ -17,6 +17,7 @@ import {
   BarChart3,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Logotipo, Sello } from '@/components/layout/logotipo'
 import { settingText } from '@/lib/api'
 import { useData, useStudio } from '@/lib/data-context'
 import { initials } from '@/lib/api'
@@ -114,22 +115,26 @@ export function Sidebar({
         )}
       >
       {/* Logo */}
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-sidebar-border min-h-[64px]">
+      {/* Plegada quedan 64px de ancho: el sello y el botón no entran en fila
+          —el sello se comprimía a 12px— así que ahí se apilan. */}
+      <div
+        className={cn(
+          'flex border-b border-sidebar-border min-h-[72px]',
+          showLabels
+            ? 'items-center gap-3 px-4 py-4'
+            : 'flex-col items-center gap-2 px-2 py-3'
+        )}
+      >
         {showLabels && (
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-              <span className="text-primary-foreground font-serif font-bold text-sm">{estudio.trim().charAt(0)}</span>
-            </div>
             <div className="min-w-0">
-              <p className="font-serif font-semibold text-foreground text-sm leading-tight truncate">{estudio}</p>
-              <p className="text-[10px] text-muted-foreground truncate">Sistema de Gestión</p>
+              <Logotipo nombre={estudio} className="text-xl text-foreground" />
+              <p className="eyebrow text-[9px] text-muted-foreground truncate mt-1.5">Sistema de Gestión</p>
             </div>
           </div>
         )}
         {!showLabels && (
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center mx-auto">
-            <span className="text-primary-foreground font-serif font-bold text-sm">{estudio.trim().charAt(0)}</span>
-          </div>
+          <Sello nombre={estudio} className="w-9 h-9 shrink-0 rounded-lg text-xs" />
         )}
         <button
           onClick={onToggleCollapse}

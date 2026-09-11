@@ -661,6 +661,18 @@ Playfair, y las fotos eran de banco de imágenes.
       banco y los placeholders).
 - [x] Los mails también: el hexadecimal va escrito a mano porque en un mail no
       hay variables CSS, pero son los valores de la marca.
+- [x] **El logotipo reemplazó a la inicial en cuadrito** (11/09) en la sidebar,
+      el login, la recuperación de contraseña y el encabezado del portal. Se
+      dibuja con la tipografía a partir del nombre que el estudio cargó en
+      Configuración, no como imagen fija: escala sin pixelarse, hereda el color
+      del contexto y un estudio con otro nombre no ve el logo de Casa Fé. En un
+      cuadro chico —sidebar plegada, avatar del portal— usa la última palabra
+      del nombre, que es la mitad distintiva: "FE". La imagen solo existe donde
+      el sistema operativo exige un archivo: favicon e íconos de la PWA.
+- [x] El favicon pasó de "FE" al logotipo completo. A 48 px se lee perfecto; a
+      **16 px, que es la pestaña del navegador, las dos líneas de Bodoni son
+      una mancha**. Es lo que la clienta pidió ver, y queda anotado: si quiere
+      que se lea en la pestaña, hay que volver a "FE" o a una sola letra.
 
 **Decisiones que conviene que la clienta confirme:** el reemplazo de Bauer
 Bodoni por Bodoni Moda (o que mande la licencia webfont si la tiene); el
@@ -726,7 +738,7 @@ sección: hace falta que ella mande las preguntas, no se inventan.
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |
 | `SUPABASE_SERVICE_ROLE_KEY` | En `.env.local` ✅ · verificar en Vercel |
-| VAPID / push | Claves generadas en `.env.local` · **cargar en Vercel** (sin ellas el push es un no-op silencioso). Desde el 10/09 el push va también **a la clienta**, no solo al mostrador |
+| VAPID / push | Claves generadas en `.env.local` y **cargadas en Vercel** (11/09, reportado por Matías; sin ellas el push es un no-op silencioso). Desde el 10/09 el push va también **a la clienta**, no solo al mostrador. Se confirma mirando `pushClientas` en el JSON del proceso diario: si crece, están andando |
 | Resend | ✅ Activo en sandbox (26/08, email real entregado) · key en `.env.local`, cargar en Vercel · dominio del estudio pendiente para emails a alumnas |
 | Webhook MP | Programado; registrar URL en MP al conectar la cuenta real |
 | Usuarios de prueba | `admin@pilatestudio.com` (cambiar clave) · `camila.portal@…` (demo) |

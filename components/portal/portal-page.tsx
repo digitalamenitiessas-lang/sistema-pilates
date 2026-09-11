@@ -18,6 +18,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Sello } from '@/components/layout/logotipo'
 import { supabase } from '@/lib/supabase'
 import { useData, useStudio } from '@/lib/data-context'
 import { disciplineStyle } from '@/lib/disciplines'
@@ -468,9 +469,10 @@ export function PortalPage() {
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shrink-0">
-            <span className="text-primary-foreground font-serif font-bold text-base">{settingText(settings, 'studio_name', 'Casa Fe').trim().charAt(0)}</span>
-          </div>
+          <Sello
+            nombre={settingText(settings, 'studio_name', 'Casa Fe')}
+            className="w-9 h-9 rounded-xl text-xs shrink-0"
+          />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-foreground truncate">¡Hola, {me.name.split(' ')[0]}!</p>
             <p className="text-[10px] text-muted-foreground">{settingText(settings, 'studio_name', 'Casa Fe')}</p>
@@ -713,7 +715,9 @@ export function PortalPage() {
                     day === i
                       ? 'bg-primary text-primary-foreground shadow-md'
                       : isPast
-                      ? 'bg-muted/50 text-muted-foreground/40'
+                      // Deshabilitado, no invisible: a /40 el número del
+                      // día quedaba en 1,79:1 y no se leía la fecha.
+                      ? 'bg-muted/50 text-muted-foreground/70'
                       : 'bg-card border border-border text-foreground hover:border-primary/40'
                   )}
                 >

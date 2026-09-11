@@ -23,13 +23,17 @@ const bodoni = Bodoni_Moda({
 // comparte el link por WhatsApp. El nombre sale del sistema y no del
 // código. La descripción no enumera el catálogo: la lista la edita el
 // estudio y una enumeración escrita acá promete clases que no se dictan.
+//
+// Sin `icons` a propósito: declararlo acá PISA los archivos de convención
+// de Next (`app/icon.png`, `app/apple-icon.png`). Cuando esto decía
+// `icons: { apple: ... }`, el <head> salía con el apple-touch-icon y sin
+// ningún <link rel="icon">: el navegador no tenía favicon que mostrar.
 export async function generateMetadata(): Promise<Metadata> {
   const nombre = await nombreDelEstudio()
   return {
     title: `${nombre} — Estudio de Pilates`,
     description:
       'Clases de Pilates Reformer en grupos reducidos, con seguimiento personalizado.',
-    icons: { apple: '/apple-icon.png' },
     appleWebApp: { capable: true, title: nombre, statusBarStyle: 'default' },
   }
 }

@@ -189,6 +189,18 @@
   letter-spacing: -0.015em;
 }
 
+/* El logotipo: Bodoni en mayúsculas, apretado y con la interlínea del
+   manual. Va como clase propia y no como utilidades sueltas porque
+   `.display` está fuera de las capas de Tailwind y le ganaría a un
+   `leading-*` puesto al lado. */
+.lockup {
+  font-family: var(--font-bodoni), 'Bodoni Moda', Georgia, serif;
+  font-variation-settings: 'opsz' 96;
+  text-transform: uppercase;
+  line-height: 0.86;
+  letter-spacing: -0.01em;
+}
+
 /* Mayúsculas espaciadas: la voz de la marca en texto corto. */
 .tracking-marca {
   letter-spacing: 0.12em;
