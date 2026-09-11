@@ -473,7 +473,7 @@ recordatorios y a cuántos días, y la tabla de precios con el redondeo nuevo.
 ## 8.1 La devolución sobre el diseño (11/09/2026)
 
 Con la identidad ya aplicada, la clienta mandó once correcciones sobre la
-landing. **Nueve están resueltas; dos esperan archivos suyos.** El detalle de
+landing. **Diez están resueltas; una espera archivos suyos.** El detalle de
 cómo se resolvió cada una está en [`PLAN.md`](PLAN.md); acá queda lo que cambia
 el estado del proyecto.
 
@@ -481,6 +481,7 @@ el estado del proyecto.
 
 | # | Pidió | Dónde quedó |
 |---|-------|-------------|
+| 1 | El logo de ellos, no reconstruido con otra fuente | Código: el PNG como máscara, tintado por contexto |
 | 2 | Las tres fotos, verticales y no cuadradas | Código (`aspect-3/4`) |
 | 3 | El serif se lee mal, trazos que desaparecen | Código: `opsz` automático por tamaño |
 | 5 | La clase de prueba en marrón y no en negro | Código |
@@ -499,11 +500,14 @@ necesita un desarrollo.
 
 ### Lo que espera algo de ella
 
-- **El logo en PNG** (punto 1). Pidió no reconstruirlo con otra tipografía y usar
-  el archivo que mandó — **ese archivo no llegó**. Hasta que aparezca, el
-  logotipo se dibuja con Bodoni Moda a partir del nombre cargado en
-  Configuración. Va junto con lo que ya estaba pendiente: el logo en vectorial y
-  si tiene licencia webfont de Bauer Bodoni.
+- ~~**El logo en PNG** (punto 1)~~ — **llegó y está aplicado.** Es la Bauer
+  Bodoni de verdad, no una parecida. Se usa como máscara para que un solo
+  archivo sirva sobre fondo claro y sobre la foto. Queda pedido sin apuro el
+  **SVG en curvas**, solo para el día que lo necesiten más grande que el hero.
+  Conviene decirles que pedir el logo *en curvas* saca de la ecuación la
+  licencia de Bauer Bodoni **para el logo**: un logotipo vectorizado es un
+  dibujo, no una fuente. La licencia webfont sigue haciendo falta, pero para
+  otra cosa — el resto de los textos del sitio, que es el punto de abajo.
 - **Su Bodoni** (punto 3). Dijo que va a intentar pasarla. Mientras tanto la
   legibilidad ya mejoró sin cambiar de fuente: el problema no era la familia sino
   el eje óptico clavado en el corte de titular.
