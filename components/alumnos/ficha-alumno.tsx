@@ -548,7 +548,9 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                         className={cn(
                           'text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0',
                           r.status === 'asistió' && 'bg-exito-suave text-exito-fuerte',
-                          r.status === 'confirmada' && 'bg-primary/10 text-primary-fuerte',
+                          // Relleno pleno y no tinte: en tinte, `primary-fuerte` quedaba a
+                          // ΔEok 0.02 de `muted-foreground`, que es el de 'cancelada'.
+                          r.status === 'confirmada' && 'bg-primary text-primary-foreground',
                           r.status === 'cancelada' && 'bg-muted text-muted-foreground',
                           r.status === 'lista de espera' && 'bg-aviso-suave text-aviso-fuerte',
                           r.status === 'ausente' && 'bg-destructive-suave text-destructive-fuerte'

@@ -624,7 +624,7 @@ Playfair, y las fotos eran de banco de imágenes.
       se puede servir como webfont sin licencia. Bodoni Moda (Google Fonts, OFL)
       es un revival del mismo Bodoni, y con el eje `opsz` en 96 da la misma
       hairline fina de los titulares. Montserrat es la del manual tal cual.
-      Como `--font-serif` apunta a la nueva, las 24 pantallas que ya usaban
+      Como `--font-serif` apunta a la nueva, las cinco pantallas que ya usaban
       `font-serif` cambiaron de tipografía sin tocar una línea.
 - [x] **Los tres colores como tokens en oklch**, y todo lo demás derivado de
       ahí. Medido sobre el manual: la Montserrat en mayúsculas va con 0.12em de
@@ -733,7 +733,7 @@ sección: hace falta que ella mande las preguntas, no se inventan.
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a `0041` ✅ · **`0042` escrita, sin correr** (verificadas 09/09 con las consultas de abajo y contra la aplicación andando). La `0041` se comprobó con una sonda: la columna existe, y `renovacion_control()` y `consumo_control()` dan cero filas | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Migraciones aplicadas | `0001` a `0042` ✅ (las de hasta la `0041` verificadas el 09/09 con las consultas de abajo y contra la aplicación andando; la `0041` con una sonda: la columna existe y `renovacion_control()` y `consumo_control()` dan cero filas). La **`0042` corrió el 11/09**: `has_function_privilege` da `service_role` true y `anon`/`authenticated` false, así que el proceso diario ya puede caducar las ofertas | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
 | Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |
