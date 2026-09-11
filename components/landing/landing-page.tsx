@@ -39,7 +39,17 @@ const STUDIO_FALLBACK = {
    */
   address: 'Mercato Shopping Viejo\nMariano Moreno 107, Local 10\nYerba Buena, Tucumán',
   mapsUrl: '',
-  whatsapp: '', // solo dígitos, con código de país
+  /**
+   * Solo dígitos, como lo pide `wa.me`: 54 (país) + 9 (que WhatsApp exige para
+   * los móviles argentinos) + 381 (Tucumán) + el número. Sin el 9 el link
+   * abre un chat que no existe, y eso no da error: abre y no llega nadie.
+   *
+   * Estuvo vacío desde la 0033, que borró el número de la demo porque mandaba
+   * gente a un teléfono que no era del estudio. Vacío era lo correcto mientras
+   * no hubiera número; ahora que el estudio lo dio, el respaldo lo lleva —el
+   * criterio de este bloque es que el respaldo sea siempre el dato real.
+   */
+  whatsapp: '5493816249107',
   instagram: 'casafe.pilates',
   email: 'casafe.pilates@gmail.com',
   /** Dos bloques separados por una línea en blanco: el día arriba, la hora abajo. */
@@ -216,13 +226,18 @@ function useMapa(): string | null {
  * Existe porque Planes es la única sección donde no ofrecer nada es peor
  * que ofrecer el camino largo: es la pantalla donde alguien ya decidió que
  * quiere venir.
+ *
+ * Recibe dos textos y no uno. Lo que sirve de asunto de un mail —corto, sin
+ * saludo— es un mensaje de WhatsApp seco, y al revés un buen mensaje de
+ * WhatsApp es un asunto larguísimo. Antes se mandaba el mismo string a los dos
+ * lados y ganaba la forma del mail, que es el canal que casi nadie usa.
  */
-function useContacto(): (text: string) => string | null {
+function useContacto(): (mensaje: string, asunto: string) => string | null {
   const { studio } = useLanding()
   const wa = useWa()
-  return (text: string) =>
-    wa(text) ??
-    (studio.email ? `mailto:${studio.email}?subject=${encodeURIComponent(text)}` : null)
+  return (mensaje: string, asunto: string) =>
+    wa(mensaje) ??
+    (studio.email ? `mailto:${studio.email}?subject=${encodeURIComponent(asunto)}` : null)
 }
 
 function Instagram({ className }: { className?: string }) {
@@ -516,7 +531,7 @@ function Nav() {
 function Hero() {
   const { studio } = useLanding()
   const wa = useWa()
-  const prueba = wa('¡Hola! Quiero reservar mi primera clase de prueba 🙌')
+  const prueba = wa('¡Hola! Vi la web y me interesa reservar una clase de prueba. ¿Me pasan info? 🙌')
 
   return (
     <section className="relative h-[calc(88vh-4.5rem)] min-h-[520px] max-h-[820px] flex items-center justify-center overflow-hidden">
@@ -698,7 +713,10 @@ function Estudio({ schedule }: { schedule: PublicClass[] }) {
  */
 function Planes({ plans }: { plans: PublicPlan[] }) {
   const contacto = useContacto()
-  const reservaPrueba = contacto('Quiero reservar mi clase de prueba')
+  const reservaPrueba = contacto(
+    '¡Hola! Me interesa la clase de prueba. ¿Me cuentan cómo reservar?',
+    'Quiero reservar mi clase de prueba'
+  )
   const trial = plans.find((p) => p.is_trial)
   const paid = plans
     .filter((p) => !p.is_trial)
@@ -711,7 +729,10 @@ function Planes({ plans }: { plans: PublicPlan[] }) {
       const mensual = meses === 1
       return {
         plan,
-        consulta: contacto(`Me interesa el plan ${plan.name}`),
+        consulta: contacto(
+          `¡Hola! Me interesa el plan ${plan.name}. ¿Me pasan más información?`,
+          `Consulta por el plan ${plan.name}`
+        ),
         meses,
         mensual,
         sufijoPrecio: mensual ? '/mes' : meses > 1 ? `/${meses} meses` : null,
@@ -1108,7 +1129,7 @@ function Cita() {
 function Contacto({ plans }: { plans: PublicPlan[] }) {
   const { studio } = useLanding()
   const wa = useWa()
-  const empezar = wa('¡Hola! Quiero empezar esta semana 💪')
+  const empezar = wa('¡Hola! Me gustaría empezar. ¿Me cuentan cómo arranco? 💪')
   // La clase de prueba se regala solo si el estudio la puso en cero: el
   // precio lo pone él y arriba, en Planes, se muestra el que cargó. Escrita
   // sin condición, la página se contradecía a dos secciones de distancia.
@@ -1168,7 +1189,7 @@ function Contacto({ plans }: { plans: PublicPlan[] }) {
 function Footer() {
   const { studio } = useLanding()
   const wa = useWa()
-  const saludo = wa('¡Hola!')
+  const saludo = wa('¡Hola! Quería hacerles una consulta.')
   const mapa = useMapa()
   return (
     <>

@@ -777,6 +777,29 @@ quemado en una imagen no se reacomoda, no escala entre tamaños de pantalla y no
 lo lee un lector de pantalla; el logotipo real dibujado sobre la foto da lo
 mismo a la vista y se comporta bien en las tres cosas.
 
+### ✅ El WhatsApp del estudio (11/09) — `0045`, sin correr
+Llegó el número y con eso la landing cambia de canal. **No es código**: el
+enlace con el mensaje ya escrito existe desde la `0011`, lo que faltaba era el
+dato, que la `0033` había vaciado a propósito porque tenía el de la demo.
+- [x] Lo que destrabó, que era más de lo que parecía: el botón del hero
+      **"Reservá tu clase de prueba" no se dibujaba** —sin número no hay a
+      dónde mandar a nadie—, y "Reservar mi lugar", los cinco "Consultar" de
+      los planes y el cierre abrían el cliente de correo. Ahora los ocho van a
+      WhatsApp, y el pie suma su enlace.
+- [x] **Los mensajes se reescribieron para que se lean en un chat.** Estaban
+      pensados como asunto de un mail —"Quiero reservar mi clase de prueba",
+      sin saludo— porque el mismo texto servía para los dos canales y ganaba
+      la forma del mail, que es el canal que casi nadie usa. Ahora
+      `useContacto` recibe dos: el mensaje para WhatsApp y el asunto para el
+      correo.
+- [x] El formato es el de `wa.me` y no el de la agenda: `54` + `9` + `381` +
+      abonado. **Sin el 9 el link abre un chat que no existe y no da error**,
+      que es el modo de falla que la `0033` vino a cerrar. El `help` del campo
+      lo explica, porque el estudio va a cambiar el número alguna vez.
+- [ ] **Falta abrir el link una vez y confirmar que el chat es el del
+      estudio.** Una consulta SQL no distingue un número bien escrito de uno
+      con un dígito de más: los dos abren.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
@@ -830,7 +853,7 @@ mismo a la vista y se comporta bien en las tres cosas.
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a **`0044`** ✅. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Migraciones aplicadas | `0001` a **`0044`** ✅. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. **Sin correr: la `0045`** (el WhatsApp del estudio). Hasta que corra, el número sale del respaldo del código y la web ya manda a WhatsApp; lo que no se puede es cambiarlo desde Configuración | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
 | Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |
