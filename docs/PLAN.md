@@ -761,6 +761,22 @@ descripciones de disciplina son datos que el estudio edita.
 consciente", en singular, y pidió usarla "exactamente". Se cargó tal cual. Si
 era un tipeo, se corrige desde Configuración sin migración.
 
+**Y queda anotado para no repetirlo:** con el logo llegaron las fotos del
+estudio a 2121x3000, contra las de 1200 que tenemos, y la tentación era
+reemplazarlas todas. Se midió antes: bajar esos archivos a 1200 y volver a
+subirlos a 2121 los devuelve casi idénticos (RMSE 1,2 a 1,6 sobre 255), o sea
+que **arriba de 1200 no hay detalle real, hay tamaño**. Son fotos de foco corto
+y luz suave, blandas de origen. Reemplazarlas habría sumado medio mega para que
+nada se vea mejor. La única que sí se cambió es la del embarazo, y no por
+tamaño sino por origen: la que teníamos venía de un JPEG de WhatsApp ya
+recomprimido y esta sale del PNG limpio — **de 143 KB a 94 KB, con un poco más
+de ancho (1000 px) y la misma nitidez**.
+
+La foto que mandó con el logotipo ya compuesto encima tampoco se usa. Un texto
+quemado en una imagen no se reacomoda, no escala entre tamaños de pantalla y no
+lo lee un lector de pantalla; el logotipo real dibujado sobre la foto da lo
+mismo a la vista y se comporta bien en las tres cosas.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
