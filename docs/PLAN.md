@@ -738,7 +738,7 @@ sección: hace falta que ella mande las preguntas, no se inventan.
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |
 | `SUPABASE_SERVICE_ROLE_KEY` | En `.env.local` ✅ · verificar en Vercel |
-| VAPID / push | Claves generadas en `.env.local` · **cargar en Vercel** (sin ellas el push es un no-op silencioso). Desde el 10/09 el push va también **a la clienta**, no solo al mostrador |
+| VAPID / push | Claves generadas en `.env.local` y **cargadas en Vercel** (11/09, reportado por Matías; sin ellas el push es un no-op silencioso). Desde el 10/09 el push va también **a la clienta**, no solo al mostrador. Se confirma mirando `pushClientas` en el JSON del proceso diario: si crece, están andando |
 | Resend | ✅ Activo en sandbox (26/08, email real entregado) · key en `.env.local`, cargar en Vercel · dominio del estudio pendiente para emails a alumnas |
 | Webhook MP | Programado; registrar URL en MP al conectar la cuenta real |
 | Usuarios de prueba | `admin@pilatestudio.com` (cambiar clave) · `camila.portal@…` (demo) |
