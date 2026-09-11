@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react'
 import { cn, vigenciaTexto } from '@/lib/utils'
+import { Logotipo } from '@/components/layout/logotipo'
 import { supabase } from '@/lib/supabase'
 
 // ---------------------------------------------------------------
@@ -124,14 +125,6 @@ const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 /** Los números de la web salen de la grilla, y un "1 disciplinas" delata que no. */
 function plural(n: number, uno: string, varios: string): string {
   return n === 1 ? uno : varios
-}
-
-/**
- * El nombre partido en líneas, como en el manual: CASA arriba, FE abajo.
- * Un nombre de una sola palabra queda en una línea sola, sin inventarle un corte.
- */
-function lineasDelNombre(nombre: string): string[] {
-  return nombre.trim().split(/\s+/).filter(Boolean)
 }
 
 /**
@@ -445,7 +438,7 @@ function Nav() {
           href="#"
           onClick={() => setMenuOpen(false)}
           className={cn(
-            'display text-lg uppercase tracking-tight transition-all duration-500 shrink-0',
+            'text-lg transition-all duration-500 shrink-0',
             // En el celular no hay barra de links que sostenga la marca, así
             // que el logotipo va siempre; en desktop aparece al scrollear,
             // como en el manual.
@@ -454,7 +447,7 @@ function Nav() {
               : 'md:opacity-0 md:w-0 md:overflow-hidden md:pointer-events-none'
           )}
         >
-          {studio.name}
+          <Logotipo nombre={studio.name} />
         </a>
 
         <nav className="hidden md:flex items-center gap-8 lg:gap-10">
@@ -524,7 +517,6 @@ function Hero() {
   const { studio } = useLanding()
   const wa = useWa()
   const prueba = wa('¡Hola! Quiero reservar mi primera clase de prueba 🙌')
-  const lineas = lineasDelNombre(studio.name)
 
   return (
     <section className="relative h-[calc(88vh-4.5rem)] min-h-[520px] max-h-[820px] flex items-center justify-center overflow-hidden">
@@ -552,22 +544,21 @@ function Hero() {
           {MARCA.sobre}
         </p>
 
-        <h1 className="display-xl display text-background uppercase my-3 md:my-5">
-          {/* Una línea por palabra, como en el manual: CASA arriba, FE abajo.
-              El `word-mask` va adentro y no en el bloque porque es
-              inline-block: puesto afuera, las palabras se pegan en un renglón. */}
-          {lineas.map((l, i) => (
-            <span key={l} className="block text-[19vw] sm:text-[15vw] md:text-[9.5rem] lg:text-[11rem]">
-              <span className="word-mask">
-                <span
-                  className="word-rise"
-                  style={{ animationDelay: `${300 + i * 140}ms` }}
-                >
-                  {l}
-                </span>
-              </span>
+        {/* El logotipo entra en UNA pieza y no palabra por palabra como
+            antes. La entrada escalonada quedaba linda, pero para hacerla hay
+            que partir el lockup en dos y volver a apilarlo con CSS — o sea,
+            reconstruir el logo, que es justo lo que la clienta pidió que no
+            hiciéramos. El gesto se conserva: sube entero desde abajo.
+
+            Los tamaños son los mismos de antes porque el componente se mide
+            en `em`: acá se fija el cuerpo de la letra y la imagen entra
+            exactamente donde entraba el texto. */}
+        <h1 className="text-background my-3 md:my-5 text-[19vw] sm:text-[15vw] md:text-[9.5rem] lg:text-[11rem]">
+          <span className="word-mask">
+            <span className="word-rise" style={{ animationDelay: '300ms' }}>
+              <Logotipo nombre={studio.name} />
             </span>
-          ))}
+          </span>
         </h1>
 
         <p className="fade-up eyebrow text-xs md:text-base text-background" style={{ animationDelay: '700ms' }}>

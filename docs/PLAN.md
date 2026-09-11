@@ -687,8 +687,8 @@ sección: hace falta que ella mande las preguntas, no se inventan.
 no. Es la segunda vez que esa tabla queda atrás de la realidad, y las dos veces se
 notó consultando la base en vez de leer el documento. Vale como método: antes de
 escribir "sin correr", preguntarle a la base.)*
-Once puntos sobre la landing recién aplicada. Nueve resueltos; dos esperan
-archivos de ella. Cuatro de los nueve no se tocaron en el código sino en la
+Once puntos sobre la landing recién aplicada. Diez resueltos; el que queda
+espera textos de ella. Cuatro de los diez no se tocaron en el código sino en la
 base, que es donde tenían que estar: la dirección, el horario y las dos
 descripciones de disciplina son datos que el estudio edita.
 - [x] **Las tres fotos del tríptico, verticales.** Estaban en `h-[30rem]`, que
@@ -733,10 +733,26 @@ descripciones de disciplina son datos que el estudio edita.
       cambia es de qué lado está el contraste, y por eso las opacidades
       subieron: sobre el natural el negro recién pasa AA desde el 60%, y sobre
       el negro el blanco pasaba al 45%.
-- [ ] **El logo en PNG.** Pidió no reconstruirlo con otra fuente y usar el
-      archivo que mandó. **Ese archivo todavía no llegó.** Hoy el logotipo se
-      dibuja con Bodoni Moda a partir del nombre cargado en Configuración, que
-      es lo que hay hasta que aparezca el PNG.
+- [x] **El logo, el de ella.** Mandó el archivo y se aplicó: el logotipo deja
+      de dibujarse con Bodoni Moda y pasa a ser el PNG que hizo su diseñadora,
+      que es **Bauer Bodoni** — puestas una al lado de la otra se nota que no
+      son la misma letra. Va en el hero, en la barra, en la sidebar, en el
+      login, en la recuperación de contraseña y en el portal.
+      **No se usa como imagen sino como máscara**: el PNG viene en un solo
+      color plano sobre transparente, así que el archivo aporta la forma y el
+      color lo pone el contexto. Con eso un solo archivo sirve para el negro
+      sobre el natural y para el natural sobre la foto del hero; usado como
+      `<img>` habría quedado invisible en media pantalla.
+      Se mide en `em`, así que ninguna pantalla cambió: el `text-4xl` del
+      login y el `text-xl` de la sidebar siguen decidiendo el tamaño y la
+      imagen entra justo donde entraba el texto. Y **alcanza de sobra**: el
+      lugar más grande es el hero, donde "CASA" mide 468 px y no crece porque
+      el tamaño está fijo en `lg`, contra los 908 px que trae el archivo.
+      Queda pedido, sin apuro, el SVG en curvas, para el día que lo quieran
+      más grande que eso.
+      El logo sigue siendo **de Casa Fe y de nadie más**: si el estudio se
+      llama de otra manera —el sistema está hecho para eso— se vuelve a
+      dibujar el nombre con la tipografía de la marca.
 - [ ] **Los cuatro textos pendientes**, que va a mandar por separado: la bajada
       "Bienestar y movimiento", la descripción de Planes, la frase sobre la
       foto y el título de Contacto.
