@@ -110,7 +110,10 @@ export function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
           <h1 className="sr-only">{estudio}</h1>
-          <Logotipo nombre={estudio} className="text-4xl text-foreground text-center mb-4" />
+          {/* El h1 de arriba ya lo anuncia: acá el logotipo es decoración. */}
+          <div aria-hidden>
+            <Logotipo nombre={estudio} className="text-4xl text-foreground text-center mb-4" />
+          </div>
           <p className="text-sm text-muted-foreground mt-1">
             {mode === 'register' ? 'Creá tu acceso al portal' : mode === 'forgot' ? 'Recuperar contraseña' : 'Sistema de Gestión'}
           </p>

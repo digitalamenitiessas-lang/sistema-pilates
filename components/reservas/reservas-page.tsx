@@ -32,7 +32,10 @@ const STATUS_CONFIG: Record<
   ReservationStatus,
   { label: string; bg: string; text: string; icon: React.ComponentType<{ className?: string }> }
 > = {
-  confirmada: { label: 'Confirmada', bg: 'bg-primary/10', text: 'text-primary-fuerte', icon: Check },
+  // Relleno pleno y no tinte: sobre el tinte al 10%, `primary-fuerte` queda
+  // a ΔEok 0.02 del `muted-foreground` de 'cancelada' — a 10px son el mismo
+  // color, y esta es la pantalla donde el mostrador barre la lista de un vistazo.
+  confirmada: { label: 'Confirmada', bg: 'bg-primary', text: 'text-primary-foreground', icon: Check },
   cancelada: { label: 'Cancelada', bg: 'bg-muted', text: 'text-muted-foreground', icon: X },
   'lista de espera': { label: 'Lista de espera', bg: 'bg-aviso-suave', text: 'text-aviso-fuerte', icon: Clock },
   asistió: { label: 'Asistió', bg: 'bg-exito-suave', text: 'text-exito-fuerte', icon: CheckCircle2 },

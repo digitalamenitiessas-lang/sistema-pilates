@@ -201,10 +201,6 @@
   letter-spacing: -0.01em;
 }
 
-/* Mayúsculas espaciadas: la voz de la marca en texto corto. */
-.tracking-marca {
-  letter-spacing: 0.12em;
-}
 .eyebrow {
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -250,20 +246,6 @@
   animation: fadeUp 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Cinta marquee de disciplinas */
-@keyframes marquee {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
-}
-.marquee-track {
-  display: flex;
-  width: max-content;
-  animation: marquee 28s linear infinite;
-}
-.marquee-track:hover {
-  animation-play-state: paused;
-}
-
 /* Reveal por scroll (se activa con IntersectionObserver) */
 .reveal {
   opacity: 0;
@@ -278,18 +260,6 @@
   transform: translateY(0);
 }
 
-/* Chips flotantes del hero */
-@keyframes floatY {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-12px); }
-}
-.float-y {
-  animation: floatY 5s ease-in-out infinite;
-}
-.float-y-slow {
-  animation: floatY 7s ease-in-out 1.2s infinite;
-}
-
 /* Indicador de scroll */
 @keyframes scrollHint {
   0%, 100% { transform: translateY(0); opacity: 1; }
@@ -297,12 +267,6 @@
 }
 .scroll-hint {
   animation: scrollHint 1.8s ease-in-out infinite;
-}
-
-/* Texto contorneado grande de fondo */
-.text-outline {
-  -webkit-text-stroke: 1.5px oklch(0.5628 0.0309 56.4 / 0.28);
-  color: transparent;
 }
 
 /* La textura de óxido del mockup: va debajo del overlay del hero y
@@ -316,7 +280,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .kenburns, .word-rise, .fade-up, .marquee-track, .float-y, .float-y-slow, .scroll-hint {
+  .kenburns, .word-rise, .fade-up, .scroll-hint {
     animation: none;
   }
   .reveal {

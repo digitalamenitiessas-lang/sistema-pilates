@@ -624,7 +624,7 @@ Playfair, y las fotos eran de banco de imágenes.
       se puede servir como webfont sin licencia. Bodoni Moda (Google Fonts, OFL)
       es un revival del mismo Bodoni, y con el eje `opsz` en 96 da la misma
       hairline fina de los titulares. Montserrat es la del manual tal cual.
-      Como `--font-serif` apunta a la nueva, las 24 pantallas que ya usaban
+      Como `--font-serif` apunta a la nueva, las cinco pantallas que ya usaban
       `font-serif` cambiaron de tipografía sin tocar una línea.
 - [x] **Los tres colores como tokens en oklch**, y todo lo demás derivado de
       ahí. Medido sobre el manual: la Montserrat en mayúsculas va con 0.12em de

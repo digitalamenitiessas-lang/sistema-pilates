@@ -37,10 +37,15 @@ const STUDIO_FALLBACK = {
   email: 'casafe.pilates@gmail.com',
   openHours: 'Lunes a viernes de 8 a 20, sábados de 9 a 13',
   /**
-   * La línea que el diseño pone debajo de la dirección. Va por la misma
-   * vía que el resto: si el estudio inserta `studio_parking` en
-   * studio_settings, manda esa; Configuración la muestra sola porque la
-   * pantalla se arma desde la tabla. Vacía, la línea no se dibuja.
+   * La línea que el manual pone debajo de la dirección. Es copy de la
+   * clienta, así que el respaldo es su texto — igual que la dirección.
+   *
+   * La clave `studio_parking` la crea la migración `0043`: hasta que esa
+   * corra, esto se publica y el estudio no lo puede editar ni vaciar,
+   * porque `saveSettings` solo hace `update` y Configuración arma la
+   * pantalla con las filas que trae la tabla. Corrida la 0043, se edita
+   * desde Configuración como cualquier otro dato del estudio y este
+   * respaldo deja de tener efecto.
    */
   parking: 'Estacionamiento exclusivo para alumnas',
 }
@@ -825,7 +830,8 @@ function OpenStudio() {
   return (
     <section className="py-20 md:py-28 px-5">
       <Reveal className="max-w-xl mx-auto text-center">
-        <Titular className="display text-3xl md:text-4xl leading-[0.95]">
+        {/* `leading` con `!`: `.display` es CSS sin capa y le gana a la utilidad. */}
+        <Titular className="text-3xl md:text-4xl leading-[0.95]!">
           Open
           <br />
           Studio
@@ -1026,7 +1032,7 @@ function Cita() {
         <div aria-hidden className="absolute inset-0 bg-foreground/65" />
       </div>
       <Reveal className="relative max-w-3xl mx-auto px-5 text-center">
-        <p className="display text-3xl md:text-5xl text-background leading-tight">
+        <p className="display text-3xl md:text-5xl text-background leading-tight!">
           “La aptitud física es el primer requisito de la felicidad.”
         </p>
         <p className="eyebrow text-[10px] text-background/70 mt-7">Joseph Pilates</p>
@@ -1038,7 +1044,6 @@ function Cita() {
 function Contacto({ plans }: { plans: PublicPlan[] }) {
   const { studio } = useLanding()
   const wa = useWa()
-  const masInfo = wa('¡Hola! Quiero más info del estudio 🙂')
   const empezar = wa('¡Hola! Quiero empezar esta semana 💪')
   // La clase de prueba se regala solo si el estudio la puso en cero: el
   // precio lo pone él y arriba, en Planes, se muestra el que cargó. Escrita
@@ -1090,12 +1095,6 @@ function Contacto({ plans }: { plans: PublicPlan[] }) {
           </a>
         )}
 
-        {/* Un segundo camino por WhatsApp solo si existe el número. */}
-        {masInfo && !empezar && (
-          <a href={masInfo} target="_blank" rel="noreferrer" className="sr-only">
-            WhatsApp
-          </a>
-        )}
       </Reveal>
     </section>
   )
