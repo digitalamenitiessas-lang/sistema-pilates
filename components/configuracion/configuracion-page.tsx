@@ -1057,10 +1057,13 @@ function SettingsSection({ group }: { group: SettingGroup }) {
                 })}
               </select>
             ) : s.kind === 'textarea' ? (
+              // Cuatro renglones y no dos: desde la 0044 la dirección y el
+              // horario se guardan en varias líneas, y con dos el campo
+              // escondía la mitad del dato que el estudio está editando.
               <textarea
                 value={valueOf(s)}
                 disabled={!editable(s)}
-                rows={2}
+                rows={4}
                 onChange={(e) => set(s.key, e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary/50 disabled:opacity-50"
               />

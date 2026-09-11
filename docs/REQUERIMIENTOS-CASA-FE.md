@@ -450,9 +450,13 @@ valores intactos. Se cambia cuando confirme la tabla nueva.
 redonda o corridas · cómo se llama cada clase (el título es obligatorio y se ve
 en el portal) · nombre completo, teléfono y email de Ivana y de Leandro · quién
 es la profesora del turno tarde (se puede arrancar con un nombre provisorio:
-`teacher_id` es `NOT NULL`) · el WhatsApp · el link de Google Maps · si la web
-sigue mostrando ciudad y Facebook · las preguntas del FAQ, que su propio mockup
-pone en la barra y nadie puede escribir por ella.
+`teacher_id` es `NOT NULL`) · el WhatsApp · si la web sigue mostrando ciudad y
+Facebook · las preguntas del FAQ, que su propio mockup pone en la barra y nadie
+puede escribir por ella.
+
+El **link de Google Maps** salió de esta lista el 11/09: sin link cargado la web
+arma la búsqueda con la dirección, así que ya no bloquea nada. Sigue siendo
+mejor el link de su ficha de Google, y se pega desde Configuración.
 
 El material de diseño —logo, paleta, tipografías y fotos— **llegó el 11/09** y
 está aplicado. De eso queda pendiente el logo en vectorial y saber si tiene
@@ -465,6 +469,72 @@ contestar — congelamiento, los días hasta la lista de contacto
 de 3 cuotas, que hoy no está puesto en ningún lado) y si **3ra Edad** combina con
 Reformer — más qué es un turno fijo, el conteo del mes de cinco lunes, cuántos
 recordatorios y a cuántos días, y la tabla de precios con el redondeo nuevo.
+
+## 8.1 La devolución sobre el diseño (11/09/2026)
+
+Con la identidad ya aplicada, la clienta mandó once correcciones sobre la
+landing. **Nueve están resueltas; dos esperan archivos suyos.** El detalle de
+cómo se resolvió cada una está en [`PLAN.md`](PLAN.md); acá queda lo que cambia
+el estado del proyecto.
+
+### Lo que se resolvió
+
+| # | Pidió | Dónde quedó |
+|---|-------|-------------|
+| 2 | Las tres fotos, verticales y no cuadradas | Código (`aspect-3/4`) |
+| 3 | El serif se lee mal, trazos que desaparecen | Código: `opsz` automático por tamaño |
+| 5 | La clase de prueba en marrón y no en negro | Código |
+| 6 | El horario con más aire, en dos bloques | **Dato** (`studio_hours`, migración `0044`) |
+| 7 | La dirección en tres renglones y en su orden | **Dato** (`studio_address`, `0044`) |
+| 8 | Pilates para embarazadas, al lado de Reformer | **Dato** (catálogo de disciplinas, `0044`) + la foto que mandó |
+| 9 | Google Maps en el pie, con link que abra la dirección | Código, con el link propio configurable |
+| 10 | El barquito de la acuarela queda cortado en escritorio | Código (encuadre a `50% 72%`) |
+| 11 | El fondo del cierre, en el natural exacto de la paleta | Código |
+
+Cuatro de las nueve se arreglaron **en la base y no en el código**, que es el
+criterio de la casa (ver [6.1](#61-el-criterio-parametrizar-en-vez-de-preguntar)):
+la dirección, el horario y las dos descripciones de disciplina son textos que el
+estudio edita desde Configuración. La próxima corrección de esos textos no
+necesita un desarrollo.
+
+### Lo que espera algo de ella
+
+- **El logo en PNG** (punto 1). Pidió no reconstruirlo con otra tipografía y usar
+  el archivo que mandó — **ese archivo no llegó**. Hasta que aparezca, el
+  logotipo se dibuja con Bodoni Moda a partir del nombre cargado en
+  Configuración. Va junto con lo que ya estaba pendiente: el logo en vectorial y
+  si tiene licencia webfont de Bauer Bodoni.
+- **Su Bodoni** (punto 3). Dijo que va a intentar pasarla. Mientras tanto la
+  legibilidad ya mejoró sin cambiar de fuente: el problema no era la familia sino
+  el eje óptico clavado en el corte de titular.
+- **Los cuatro textos** (punto 4): la bajada "Bienestar y movimiento", la
+  descripción de Planes, la frase sobre la foto y el título de Contacto. Los
+  cuatro son copy y no se inventan. Los tres primeros viven hoy en el código
+  (`MARCA`, `BAJADA` y los titulares de sección); si van a seguir cambiando,
+  conviene que pasen a `studio_settings` como el resto.
+
+### Lo que hay que preguntarle
+
+La bajada de embarazadas de su referencia dice **"Movimientos consciente"**, en
+singular, y pidió usar "exactamente" ese texto. Se cargó tal cual. Si era un
+tipeo, se corrige desde Configuración y no hace falta migración.
+
+Y el nombre de la disciplina: lo escribió **"Pilates para embarazadas"** en el
+mensaje y **"Pilates Prenatal"** en la referencia. La fila del catálogo se llama
+"Pilates Embarazadas" desde la `0026` y no se tocó, porque el nombre viaja como
+texto a clases, planes y profesoras: renombrar es una cascada que conviene que
+elija ella, desde Configuración.
+
+### Lo que esto destraba
+
+Que **Pilates Embarazadas** se encienda no es solo la web: la disciplina vuelve a
+aparecer en el formulario de clase, así que el horario especial que ella anunció
+se puede cargar. Queda en pie lo que ya dejó anotado la `0033` y sigue sin
+construirse: **que un plan diga "solo Pilates Reformer" es configuración, no una
+regla que rija**. Hoy nada valida la disciplina al reservar, ni el trigger de
+consumo ni las políticas. Si la membresía de Reformer no tiene que poder gastar
+una clase de embarazadas, eso es desarrollo aparte — y ahora que hay dos
+disciplinas activas, es la primera vez que la diferencia se puede notar.
 
 ## 9. Cómo arrancamos
 

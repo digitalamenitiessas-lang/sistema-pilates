@@ -1,7 +1,9 @@
 # Plan de avance — PilatesStudio
 
 > Documento vivo. Se actualiza con cada bloque de trabajo.
-> Última actualización: **10/09/2026** (se entrega el sistema al estudio para que lo use).
+> Última actualización: **11/09/2026** (la identidad de marca aplicada y la
+> devolución de la clienta sobre el diseño, resuelta salvo lo que espera
+> archivos de ella).
 > Para entregarle al estudio:
 > [`Casa-Fe-manual-del-mostrador.pdf`](Casa-Fe-manual-del-mostrador.pdf) — el
 > manual **por tarea**, que es el que sirve para usar el sistema: las 12 cosas
@@ -680,6 +682,69 @@ monograma del ícono; y que el manual escribe "DICIPLINAS" en la barra —en la
 web dice "Disciplinas". El manual también tiene **FAQ** en la barra y no hay
 sección: hace falta que ella mande las preguntas, no se inventan.
 
+### ✅ La devolución de la clienta sobre el diseño (11/09) — `0044` corrida y verificada
+*(De paso apareció que la `0043` **también había corrido** y el registro decía que
+no. Es la segunda vez que esa tabla queda atrás de la realidad, y las dos veces se
+notó consultando la base en vez de leer el documento. Vale como método: antes de
+escribir "sin correr", preguntarle a la base.)*
+Once puntos sobre la landing recién aplicada. Nueve resueltos; dos esperan
+archivos de ella. Cuatro de los nueve no se tocaron en el código sino en la
+base, que es donde tenían que estar: la dirección, el horario y las dos
+descripciones de disciplina son datos que el estudio edita.
+- [x] **Las tres fotos del tríptico, verticales.** Estaban en `h-[30rem]`, que
+      en una pantalla de 1440 daba una celda de 480×480: cuadrada, justo lo que
+      pidió cambiar. Ahora el alto sale del ancho (`aspect-3/4`), así que el
+      recorte se mantiene vertical en cualquier pantalla. Las fotos son
+      1200×1800, o sea que la relación sale del original sin estirar nada.
+- [x] **El serif, más legible.** Marcó que los trazos finos desaparecen. El
+      `opsz` estaba clavado en 96 —el corte de titular del Bodoni— para *todo*
+      lo serif, así que el `CASA FE` de 176 px y el nombre de un plan de 24 se
+      escribían con el mismo pelo. Ahora va `font-optical-sizing: auto` y el
+      navegador mueve el eje según el tamaño real; el hero conserva el 96 a
+      mano. **Es la misma fuente**: si ella manda su Bodoni con licencia
+      webfont, se cambia la familia y este ajuste sigue valiendo.
+- [x] **La clase de prueba, en el marrón de la marca** y no en negro. El texto
+      chico de adentro pasó a blanco pleno: atenuado sobre el marrón no llega a
+      4,5:1.
+- [x] **Open Studio, con aire.** El horario en dos bloques —el día arriba, la
+      hora abajo— y la dirección en tres renglones, empezando por "Mercato
+      Shopping Viejo", que es la referencia que la gente de Yerba Buena conoce.
+      Los saltos de línea **viven en el dato, no en el diseño**: el estudio los
+      edita desde Configuración. Por eso la dirección pasó de `text` a
+      `textarea` (con un input no se puede escribir un salto) y el campo de
+      Configuración pasó de 2 a 4 renglones.
+- [x] **Pilates Embarazadas encendida.** La `0033` la había apagado con el
+      motivo escrito —"todavía no tienen grilla ni profesora"— y avisó que
+      arranca con horario propio. Queda segunda, al lado de Reformer, con la
+      foto que mandó y las tres líneas de su referencia, textuales. **El nombre
+      no se tocó**: lo llamó "Pilates para embarazadas" en el mensaje y "Pilates
+      Prenatal" en la referencia, y el nombre viaja como texto a clases, planes
+      y profesoras — renombrar es una cascada que elige ella desde
+      Configuración, no nosotros en una migración.
+- [x] **Google Maps en el pie.** Sin link propio cargado, la web arma la
+      búsqueda con el nombre y la dirección, que es lo que haría a mano
+      cualquiera. El día que el estudio pegue el link de su ficha, ese manda.
+      También quedó en Open Studio, que es donde ya estaba previsto.
+- [x] **El barquito de la acuarela, entero.** Está al 70% del alto de una
+      imagen de 1600×800 y el recorte centrado se lo comía en pantalla ancha.
+      Con el foco en `50% 72%` se ve completo de 375 a 2560 px, medido contra
+      la caja real y no a ojo.
+- [x] **El pie, en natural y no en negro.** El diseño es el mismo; lo que
+      cambia es de qué lado está el contraste, y por eso las opacidades
+      subieron: sobre el natural el negro recién pasa AA desde el 60%, y sobre
+      el negro el blanco pasaba al 45%.
+- [ ] **El logo en PNG.** Pidió no reconstruirlo con otra fuente y usar el
+      archivo que mandó. **Ese archivo todavía no llegó.** Hoy el logotipo se
+      dibuja con Bodoni Moda a partir del nombre cargado en Configuración, que
+      es lo que hay hasta que aparezca el PNG.
+- [ ] **Los cuatro textos pendientes**, que va a mandar por separado: la bajada
+      "Bienestar y movimiento", la descripción de Planes, la frase sobre la
+      foto y el título de Contacto.
+
+**Queda anotado para preguntarle:** la bajada de embarazadas dice "Movimientos
+consciente", en singular, y pidió usarla "exactamente". Se cargó tal cual. Si
+era un tipeo, se corrige desde Configuración sin migración.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
@@ -733,7 +798,7 @@ sección: hace falta que ella mande las preguntas, no se inventan.
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a `0042` ✅ (las de hasta la `0041` verificadas el 09/09 con las consultas de abajo y contra la aplicación andando; la `0041` con una sonda: la columna existe y `renovacion_control()` y `consumo_control()` dan cero filas). La **`0042` corrió el 11/09**: `has_function_privilege` da `service_role` true y `anon`/`authenticated` false, así que el proceso diario ya puede caducar las ofertas | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Migraciones aplicadas | `0001` a **`0044`** ✅. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
 | Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |

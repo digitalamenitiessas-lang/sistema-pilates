@@ -177,9 +177,25 @@
    titulares con interlínea 0.88 y `opsz` alto.
    ============================================================ */
 
+/*
+   El `opsz` no va clavado en 96. Ese es el corte de titular del Bodoni —el
+   que afina las astas hasta el pelo— y con la clase puesta en todo lo que
+   es serif terminaba escribiendo con el mismo trazo el CASA FE de 176 px y
+   el nombre de un plan de 24. La clienta lo marcó: a tamaño chico los
+   trazos finos desaparecen y hay palabras que cuestan leerse.
+
+   `font-optical-sizing: auto` es la respuesta que ya trae el formato: el
+   navegador mueve el eje según el tamaño real del texto, así que un
+   titular grande conserva la hairline y una línea chica recibe el corte de
+   texto, con el asta gruesa. Es la misma fuente y el mismo dibujo, no una
+   segunda familia.
+
+   El hero sigue en 96 a mano (`.display-xl`): ahí el texto es tan grande
+   que el automático da lo mismo, y clavarlo deja el gesto del mockup fuera
+   de discusión. */
 .display {
   font-family: var(--font-bodoni), 'Bodoni Moda', Georgia, serif;
-  font-variation-settings: 'opsz' 96;
+  font-optical-sizing: auto;
   line-height: 0.92;
   letter-spacing: -0.005em;
 }

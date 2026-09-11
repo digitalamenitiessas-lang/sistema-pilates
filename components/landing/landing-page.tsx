@@ -30,22 +30,28 @@ import { supabase } from '@/lib/supabase'
 // ---------------------------------------------------------------
 const STUDIO_FALLBACK = {
   name: 'Casa Fe',
-  address: 'Mariano Moreno 107, Mercato Shopping Viejo, local 10, Yerba Buena, Tucumán',
+  /**
+   * En tres renglones y en ese orden, como los pidió la clienta: primero
+   * dónde queda (el shopping, que es la referencia que la gente conoce),
+   * después la puerta y el local, y al final la ciudad. Los saltos de
+   * línea son parte del dato, no del diseño — ver `bloquesDeTexto`.
+   */
+  address: 'Mercato Shopping Viejo\nMariano Moreno 107, Local 10\nYerba Buena, Tucumán',
   mapsUrl: '',
   whatsapp: '', // solo dígitos, con código de país
   instagram: 'casafe.pilates',
   email: 'casafe.pilates@gmail.com',
-  openHours: 'Lunes a viernes de 8 a 20, sábados de 9 a 13',
+  /** Dos bloques separados por una línea en blanco: el día arriba, la hora abajo. */
+  openHours: 'Lunes a viernes\nde 8 a 20 horas\n\nSábados\nde 9 a 13 horas',
   /**
    * La línea que el manual pone debajo de la dirección. Es copy de la
    * clienta, así que el respaldo es su texto — igual que la dirección.
    *
-   * La clave `studio_parking` la crea la migración `0043`: hasta que esa
-   * corra, esto se publica y el estudio no lo puede editar ni vaciar,
-   * porque `saveSettings` solo hace `update` y Configuración arma la
-   * pantalla con las filas que trae la tabla. Corrida la 0043, se edita
-   * desde Configuración como cualquier otro dato del estudio y este
-   * respaldo deja de tener efecto.
+   * La clave `studio_parking` la creó la migración `0043`, que **ya corrió**
+   * (verificado el 11/09 contra `public_studio_settings`). O sea que esto
+   * hoy no se publica nunca: el estudio edita y vacía esa línea desde
+   * Configuración, y el respaldo quedó para lo que son todos los respaldos
+   * de acá — que la página no salga vacía si la fila desaparece.
    */
   parking: 'Estacionamiento exclusivo para alumnas',
 }
@@ -129,6 +135,24 @@ function lineasDelNombre(nombre: string): string[] {
 }
 
 /**
+ * Un dato de texto libre del estudio, partido como el estudio lo escribió:
+ * cada salto de línea es un renglón y una línea en blanco abre un bloque
+ * nuevo. Lo usan la dirección y el horario, que la clienta pidió leer en
+ * renglones cortos y no en una frase corrida.
+ *
+ * Existe en vez de un `whitespace-pre-line` porque el diseño separa los
+ * bloques entre sí más que los renglones de adentro, y esa diferencia no
+ * se puede pedir con un salto de línea. De paso tolera el dato viejo: un
+ * texto sin saltos entra como un bloque de un renglón y se ve igual que antes.
+ */
+function bloquesDeTexto(texto: string): string[][] {
+  return texto
+    .split(/\n\s*\n/)
+    .map((bloque) => bloque.split('\n').map((l) => l.trim()).filter(Boolean))
+    .filter((bloque) => bloque.length > 0)
+}
+
+/**
  * La descripción de una disciplina, partida en las líneas cortas del
  * diseño. El catálogo guarda un texto libre: si trae saltos de línea o
  * puntos medios los respeta, y si es una frase sola queda una línea.
@@ -172,6 +196,23 @@ function useWa(): (text: string) => string | null {
     studio.whatsapp
       ? `https://wa.me/${studio.whatsapp}?text=${encodeURIComponent(text)}`
       : null
+}
+
+/**
+ * A dónde lleva "Cómo llegar". Si el estudio pegó su link de Google Maps en
+ * Configuración, ese manda. Si no lo cargó, se arma la búsqueda con el
+ * nombre y la dirección, que es exactamente lo que haría a mano quien
+ * quiere ubicar el estudio — y es un link que no se rompe ni queda viejo.
+ * Sin dirección devuelve null y el elemento no se dibuja.
+ */
+function useMapa(): string | null {
+  const { studio } = useLanding()
+  if (studio.mapsUrl) return studio.mapsUrl
+  if (!studio.address) return null
+  const consulta = [studio.name, studio.address.replace(/\n/g, ', ')]
+    .filter(Boolean)
+    .join(', ')
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(consulta)}`
 }
 
 /**
@@ -611,10 +652,16 @@ function Estudio({ schedule }: { schedule: PublicClass[] }) {
         {fotos.map((f, i) => (
           <Reveal key={f.src} delay={i * 120}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
+            {/* 3:4 y no una altura fija: con `h-[30rem]` en una pantalla de
+                1440 la celda quedaba de 480 de ancho por 480 de alto, o sea
+                cuadrada, que es justo lo que la clienta pidió cambiar. El
+                alto atado al ancho mantiene el recorte vertical en
+                cualquier pantalla, y las fotos son 1200x1800, así que la
+                relación sale del original sin estirar nada. */}
             <img
               src={f.src}
               alt={f.alt}
-              className="w-full h-[38vw] md:h-[30rem] object-cover"
+              className="w-full aspect-3/4 object-cover"
             />
           </Reveal>
         ))}
@@ -696,14 +743,17 @@ function Planes({ plans }: { plans: PublicPlan[] }) {
 
         {trial && (
           <Reveal delay={120}>
-            <div className="rounded-3xl bg-foreground text-background px-8 py-9 md:px-12 mb-10 flex flex-wrap items-center justify-between gap-6">
+            {/* El marrón de la marca y no el negro: lo pidió la clienta. Con
+                blanco encima da 4.64:1, así que el texto chico de adentro va
+                en blanco pleno y no atenuado. */}
+            <div className="rounded-3xl bg-primary text-primary-foreground px-8 py-9 md:px-12 mb-10 flex flex-wrap items-center justify-between gap-6">
               <div>
                 <p className="display text-2xl md:text-3xl uppercase">
                   {trial.price === 0
                     ? 'Tu primera clase es gratis'
                     : `Clase de prueba — $${trial.price.toLocaleString('es-AR')}`}
                 </p>
-                <p className="text-sm text-background/70 max-w-md mt-3">
+                <p className="text-sm text-primary-foreground max-w-md mt-3">
                   {trial.description || 'Vení a conocer el estudio y probá una clase, sin compromiso.'}
                 </p>
               </div>
@@ -827,6 +877,7 @@ function Planes({ plans }: { plans: PublicPlan[] }) {
  */
 function OpenStudio() {
   const { studio } = useLanding()
+  const mapa = useMapa()
   return (
     <section className="py-20 md:py-28 px-5">
       <Reveal className="max-w-xl mx-auto text-center">
@@ -837,24 +888,46 @@ function OpenStudio() {
           Studio
         </Titular>
 
+        {/* El horario y la dirección se leen en renglones cortos y no en una
+            frase corrida: "Lunes a viernes" arriba y "de 8 a 20 horas"
+            abajo, con aire entre los dos bloques. Lo pidió así la clienta y
+            los saltos viven en el dato, no acá — el estudio los edita desde
+            Configuración sin tocar la página. */}
         {studio.openHours && (
-          <p className="eyebrow text-[11px] md:text-sm text-foreground mt-10 leading-loose">
-            {studio.openHours}
-          </p>
+          <div className="mt-10 space-y-7">
+            {bloquesDeTexto(studio.openHours).map((bloque, b) => (
+              <div key={b} className="space-y-1.5">
+                {bloque.map((linea, i) => (
+                  <p key={i} className="eyebrow text-[11px] md:text-sm text-foreground">
+                    {linea}
+                  </p>
+                ))}
+              </div>
+            ))}
+          </div>
         )}
 
         {studio.address && (
-          <p className="eyebrow text-[11px] md:text-sm text-foreground mt-8 leading-loose">
-            {studio.address}
-          </p>
+          <div className="mt-12 space-y-1.5">
+            {bloquesDeTexto(studio.address).flat().map((linea, i) => (
+              <p key={i} className="eyebrow text-[11px] md:text-sm text-foreground">
+                {linea}
+              </p>
+            ))}
+          </div>
         )}
 
-        {studio.mapsUrl && (
+        {mapa && (
           <a
-            href={studio.mapsUrl}
+            href={mapa}
             target="_blank"
             rel="noreferrer"
-            className="eyebrow text-[10px] inline-flex items-center gap-1.5 mt-5 text-foreground hover:text-primary-fuerte transition-colors border-b border-current pb-0.5"
+            // `pt-2` y no más margen: con 10px de letra el link mide 18px de
+            // alto y en un teléfono es un objetivo incómodo. El padding crece
+            // el área táctil a 26px sin mover el subrayado, que sigue pegado
+            // al texto. El margen de arriba baja lo mismo que sube el padding,
+            // así el aire que se ve no cambia.
+            className="eyebrow text-[10px] inline-flex items-center gap-1.5 mt-4 pt-2 text-foreground hover:text-primary-fuerte transition-colors border-b border-current pb-0.5"
           >
             <MapPin className="w-3.5 h-3.5" />
             Cómo llegar
@@ -904,7 +977,7 @@ function Disciplinas() {
                 <img
                   src={foto}
                   alt={`Clase de ${name}`}
-                  className="w-full max-w-xs mx-auto h-72 md:h-80 object-cover mt-9"
+                  className="w-full max-w-xs mx-auto aspect-4/5 object-cover mt-9"
                 />
               )}
 
@@ -1105,46 +1178,73 @@ function Footer() {
   const { studio } = useLanding()
   const wa = useWa()
   const saludo = wa('¡Hola!')
+  const mapa = useMapa()
   return (
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
+      {/* El encuadre bajo, y no el centrado: la acuarela es 1600x800 y en una
+          pantalla ancha el recorte se comía el barquito, que está al 70% de
+          alto. Con el foco ahí, la franja lo deja entero en cualquier ancho
+          —se verificó de 375 a 2560— y sigue mostrando la palmera. */}
       <img
         src="/marca/paisaje.jpg"
         alt=""
         aria-hidden
-        className="w-full h-[38vh] min-h-[220px] max-h-[420px] object-cover"
+        className="w-full h-[38vh] min-h-[220px] max-h-[460px] object-cover object-[50%_72%]"
       />
-      <footer className="bg-foreground text-background/70">
+      {/* El pie en natural y no en negro: lo pidió la clienta. El diseño es
+          el mismo; lo que cambia es de qué lado está el contraste, y por eso
+          las opacidades suben — sobre el natural, el negro recién pasa AA
+          desde el 60%, mientras que sobre el negro el blanco pasaba al 45%. */}
+      <footer className="bg-background text-foreground/70 border-t border-foreground/10">
         <div className="max-w-6xl mx-auto px-5 py-14">
           <div className="flex flex-wrap items-start justify-between gap-10">
             <div>
-              <p className="display text-2xl uppercase text-background">{studio.name}</p>
-              <p className="eyebrow text-[9px] text-background/50 mt-2">{MARCA.bajo}</p>
-              <p className="text-xs text-background/45 max-w-xs leading-relaxed mt-5">
-                {studio.address}
-              </p>
+              <p className="display text-2xl uppercase text-foreground">{studio.name}</p>
+              <p className="eyebrow text-[9px] text-foreground/65 mt-2">{MARCA.bajo}</p>
+              {studio.address && (
+                <div className="text-xs text-foreground/70 max-w-xs leading-relaxed mt-5 space-y-0.5">
+                  {bloquesDeTexto(studio.address).flat().map((linea, i) => (
+                    <p key={i}>{linea}</p>
+                  ))}
+                </div>
+              )}
+              {/* El pie es donde alguien decide si viene, así que la dirección
+                  tiene que poder abrirse en el mapa desde acá y no solo
+                  arriba, en Open Studio. */}
+              {mapa && (
+                <a
+                  href={mapa}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="eyebrow text-[9px] inline-flex items-center gap-1.5 mt-2 pt-2 text-foreground/70 hover:text-foreground transition-colors border-b border-current pb-0.5"
+                >
+                  <MapPin className="w-3 h-3" />
+                  Ver en Google Maps
+                </a>
+              )}
             </div>
 
             <nav className="flex gap-12 text-xs">
               <div className="flex flex-col gap-3">
-                <p className="eyebrow text-[9px] text-background/40">Estudio</p>
-                <a href="#disciplinas" className="hover:text-background transition-colors">Disciplinas</a>
-                <a href="#planes" className="hover:text-background transition-colors">Planes</a>
-                <a href="#horarios" className="hover:text-background transition-colors">Horarios</a>
+                <p className="eyebrow text-[9px] text-foreground/65">Estudio</p>
+                <a href="#disciplinas" className="hover:text-foreground transition-colors">Disciplinas</a>
+                <a href="#planes" className="hover:text-foreground transition-colors">Planes</a>
+                <a href="#horarios" className="hover:text-foreground transition-colors">Horarios</a>
               </div>
               <div className="flex flex-col gap-3">
-                <p className="eyebrow text-[9px] text-background/40">Seguinos</p>
-                <a href={`https://instagram.com/${studio.instagram}`} target="_blank" rel="noreferrer" className="hover:text-background transition-colors">Instagram</a>
+                <p className="eyebrow text-[9px] text-foreground/65">Seguinos</p>
+                <a href={`https://instagram.com/${studio.instagram}`} target="_blank" rel="noreferrer" className="hover:text-foreground transition-colors">Instagram</a>
                 {saludo && (
-                  <a href={saludo} target="_blank" rel="noreferrer" className="hover:text-background transition-colors">WhatsApp</a>
+                  <a href={saludo} target="_blank" rel="noreferrer" className="hover:text-foreground transition-colors">WhatsApp</a>
                 )}
               </div>
             </nav>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 mt-12 pt-6 border-t border-background/10 eyebrow text-[9px] text-background/40">
+          <div className="flex flex-wrap items-center justify-between gap-3 mt-12 pt-6 border-t border-foreground/15 eyebrow text-[9px] text-foreground/65">
             <p>© {new Date().getFullYear()} {studio.name}</p>
-            <Link href="/sistema" className="hover:text-background/70 transition-colors">
+            <Link href="/sistema" className="hover:text-foreground transition-colors">
               Acceso al sistema
             </Link>
           </div>
