@@ -82,9 +82,9 @@ export function paymentReminderLink(payment: Payment, phone: string): string | n
 }
 
 const METHOD_COLORS: Record<AnyMethod, string> = {
-  transferencia: '#7D9B76',
-  efectivo: '#D4A854',
-  tarjeta: '#C4735A',
+  transferencia: '#9AA08C',
+  efectivo: '#B79B72',
+  tarjeta: '#847164',
   mercadopago: '#009EE3',
 }
 
@@ -98,7 +98,7 @@ function PaymentStatusBadge({ pago }: { pago: Payment }) {
     return (
       <span
         title="Cuota del período siguiente. Todavía no es deuda: el período nuevo se crea cuando se cobra."
-        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-sky-100 text-sky-700"
+        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-info-suave text-info-fuerte"
       >
         <RefreshCw className="w-3 h-3" /> Renovación
       </span>
@@ -106,14 +106,14 @@ function PaymentStatusBadge({ pago }: { pago: Payment }) {
   }
   if (status === 'pagado') {
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-[#E8F2EB] text-[#2E6040]">
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-exito-suave text-exito-fuerte">
         <Check className="w-3 h-3" /> Pagado
       </span>
     )
   }
   if (status === 'pendiente') {
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-aviso-suave text-aviso-fuerte">
         <Clock className="w-3 h-3" /> Pendiente
       </span>
     )
@@ -126,7 +126,7 @@ function PaymentStatusBadge({ pago }: { pago: Payment }) {
     )
   }
   return (
-    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-red-100 text-red-700">
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-destructive-suave text-destructive-fuerte">
       <X className="w-3 h-3" /> Vencido
     </span>
   )
@@ -145,7 +145,7 @@ function MethodPicker({ value, onChange }: { value: Method | null; onChange: (m:
             className={cn(
               'flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-medium transition-all',
               value === m
-                ? 'border-primary bg-primary/5 text-primary'
+                ? 'border-primary bg-primary/5 text-primary-fuerte'
                 : 'border-border text-muted-foreground hover:border-primary/40'
             )}
           >
@@ -161,8 +161,8 @@ function MethodPicker({ value, onChange }: { value: Method | null; onChange: (m:
 function ReceiptSuccess({ receiptNumber, onClose }: { receiptNumber: number; onClose: () => void }) {
   return (
     <div className="px-6 py-8 flex flex-col items-center text-center">
-      <div className="w-14 h-14 rounded-full bg-[#E8F2EB] flex items-center justify-center mb-4">
-        <Receipt className="w-6 h-6 text-[#2E6040]" />
+      <div className="w-14 h-14 rounded-full bg-exito-suave flex items-center justify-center mb-4">
+        <Receipt className="w-6 h-6 text-exito-fuerte" />
       </div>
       <h3 className="text-base font-bold text-foreground mb-1">Pago registrado</h3>
       <p className="text-sm text-muted-foreground mb-1">Comprobante generado automáticamente</p>
@@ -322,7 +322,7 @@ function RegistrarPagoModal({ onClose }: { onClose: () => void }) {
                   <p className="text-xs mt-2 bg-muted rounded-xl px-3 py-2 text-foreground">
                     Se cobra{' '}
                     <strong className="tabular-nums">${aCobrar.toLocaleString('es-AR')}</strong>{' '}
-                    <span className={aCobrar < deLista ? 'text-[#2E6040]' : 'text-amber-700'}>
+                    <span className={aCobrar < deLista ? 'text-exito-fuerte' : 'text-aviso-fuerte'}>
                       ({aCobrar < deLista ? 'descuento' : 'recargo'} del{' '}
                       {Math.abs(ajuste).toLocaleString('es-AR')}% por{' '}
                       {METHOD_LABEL[method as Method].toLowerCase()})
@@ -332,7 +332,7 @@ function RegistrarPagoModal({ onClose }: { onClose: () => void }) {
               </div>
 
               {error && (
-                <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
+                <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
               )}
             </div>
 
@@ -427,7 +427,7 @@ function CobrarModal({ payment, onClose }: { payment: Payment; onClose: () => vo
                 {diferencia !== 0 && (
                   <p className="text-[11px] text-muted-foreground mt-1">
                     Precio de lista ${payment.amount.toLocaleString('es-AR')} ·{' '}
-                    <span className={diferencia < 0 ? 'text-[#2E6040]' : 'text-amber-700'}>
+                    <span className={diferencia < 0 ? 'text-exito-fuerte' : 'text-aviso-fuerte'}>
                       {diferencia < 0 ? 'descuento' : 'recargo'} del{' '}
                       {Math.abs(ajuste).toLocaleString('es-AR')}% por pagar con{' '}
                       {METHOD_LABEL[method as Method].toLowerCase()}
@@ -440,7 +440,7 @@ function CobrarModal({ payment, onClose }: { payment: Payment; onClose: () => vo
                   crea el período. Conviene decirlo acá, que es donde
                   alguien duda de si le está cobrando dos veces el mes. */}
               {esOferta(payment) && (
-                <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-[11px] text-sky-900 space-y-1">
+                <div className="rounded-xl border border-info/40 bg-info-suave px-4 py-3 text-[11px] text-info-fuerte space-y-1">
                   <p className="font-semibold">Es la renovación del período siguiente.</p>
                   <p>
                     El período nuevo lo crea este cobro: si la membresía en curso todavía no
@@ -457,7 +457,7 @@ function CobrarModal({ payment, onClose }: { payment: Payment; onClose: () => vo
               </div>
 
               {error && (
-                <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
+                <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
               )}
             </div>
 
@@ -538,7 +538,7 @@ function MpLinkModal({ payment, onClose }: { payment: Payment; onClose: () => vo
                 proceso diario la anula, así que el modal se abre igual:
                 decirle "puede pagarla hasta el 21" un 23 sería falso. */}
             {esOferta(payment) && (
-              <p className="text-[11px] text-sky-700 mt-0.5">
+              <p className="text-[11px] text-info-fuerte mt-0.5">
                 {payment.dueDate < hoyISO()
                   ? `Renovación · el plazo venció el ${fechaCorta(payment.dueDate)}`
                   : `Renovación · puede pagarla hasta el ${fechaCorta(payment.dueDate)}`}
@@ -555,7 +555,7 @@ function MpLinkModal({ payment, onClose }: { payment: Payment; onClose: () => vo
 
         <div className="px-6 py-5 space-y-3">
           {error ? (
-            <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
+            <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
           ) : !link ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
               <Loader2 className="w-4 h-4 animate-spin" /> Generando link en Mercado Pago...
@@ -667,7 +667,7 @@ function AnularCobroModal({
             />
           </div>
 
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          {error && <p className="text-xs text-destructive-fuerte">{error}</p>}
         </div>
 
         <div className="px-5 py-4 border-t border-border flex gap-2">
@@ -778,28 +778,28 @@ export function PagosPage() {
       label: `Ingresos ${currentMonth?.month ?? ''}`,
       value: `$${(currentMonthRevenue / 1000).toFixed(0)}k`,
       sub: 'Cobrado este mes',
-      color: '#7D9B76',
+      color: 'var(--exito)',
     },
     {
       icon: Check,
       label: 'Pagos al día',
       value: String(PAYMENTS.filter((p) => p.status === 'pagado').length),
       sub: `$${totalPaid.toLocaleString('es-AR')}`,
-      color: '#7D9B76',
+      color: 'var(--exito)',
     },
     {
       icon: Clock,
       label: 'Pendientes',
       value: String(pendientes.length),
       sub: `$${pendientes.reduce((a, p) => a + p.amount, 0).toLocaleString('es-AR')}`,
-      color: '#D4A854',
+      color: 'var(--aviso)',
     },
     {
       icon: X,
       label: 'Vencidos',
       value: String(overdueCount),
       sub: `$${PAYMENTS.filter((p) => p.status === 'vencido').reduce((a, p) => a + p.amount, 0).toLocaleString('es-AR')}`,
-      color: '#EF4444',
+      color: 'var(--destructive)',
     },
     // La quinta tarjeta aparece solo si hay ofertas: es plata sobre la mesa
     // y hay que poder verla, pero en su propio número y no dentro de la
@@ -811,7 +811,7 @@ export function PagosPage() {
             label: 'Renovaciones',
             value: String(ofertas.length),
             sub: `$${montoOfertas.toLocaleString('es-AR')} · no cuenta como deuda`,
-            color: '#38BDF8',
+            color: 'var(--info)',
           },
         ]
       : []),
@@ -831,9 +831,12 @@ export function PagosPage() {
             <div key={label} className="bg-muted rounded-2xl p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs text-muted-foreground font-medium">{label}</span>
+                {/* El tinte se arma con color-mix y no pegando el alfa al
+                    final del color: `var(--exito)18` no es CSS válido y el
+                    fondo desaparece sin avisar. */}
                 <div
                   className="w-7 h-7 rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: `${color}18` }}
+                  style={{ backgroundColor: `color-mix(in oklab, ${color} 10%, transparent)` }}
                 >
                   <Icon className="w-3.5 h-3.5" style={{ color }} />
                 </div>
@@ -901,7 +904,7 @@ export function PagosPage() {
       </div>
 
       {syncMsg && (
-        <div className="mx-6 mt-4 px-4 py-2.5 rounded-xl bg-[#E8F2EB] text-sm text-[#2E6040] flex items-center gap-2">
+        <div className="mx-6 mt-4 px-4 py-2.5 rounded-xl bg-exito-suave text-sm text-exito-fuerte flex items-center gap-2">
           <Check className="w-4 h-4 shrink-0" />
           {syncMsg} — comprobante generado automáticamente
         </div>
@@ -973,7 +976,7 @@ export function PagosPage() {
                               {/* En una oferta la fecha no es un vencimiento
                                   de deuda: es el último día para renovar. */}
                               {esOferta(p) && (
-                                <p className="text-[10px] text-sky-700">Límite para renovar</p>
+                                <p className="text-[10px] text-info-fuerte">Límite para renovar</p>
                               )}
                             </div>
                           </td>
@@ -1006,7 +1009,7 @@ export function PagosPage() {
                               <button
                                 onClick={() => setAnulando(p)}
                                 title="Anular este cobro"
-                                className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive-fuerte transition-colors"
                               >
                                 <Ban className="w-3.5 h-3.5" />
                               </button>
@@ -1015,7 +1018,7 @@ export function PagosPage() {
                               <div className="flex items-center gap-1">
                                 <button
                                   onClick={() => setCollectingPayment(p)}
-                                  className="px-2.5 py-1 rounded-lg bg-primary/10 text-primary text-[10px] font-semibold hover:bg-primary/20 transition-colors whitespace-nowrap"
+                                  className="px-2.5 py-1 rounded-lg bg-primary/10 text-primary-fuerte text-[10px] font-semibold hover:bg-primary/20 transition-colors whitespace-nowrap"
                                 >
                                   Cobrar
                                 </button>
@@ -1063,7 +1066,7 @@ export function PagosPage() {
           {/* Revenue chart sidebar */}
           <div className="bg-card rounded-2xl border border-border p-5">
             <h3 className="text-sm font-semibold text-foreground mb-1 flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-primary" />
+              <TrendingUp className="w-4 h-4 text-primary-fuerte" />
               Evolución de ingresos
             </h3>
             <p className="text-xs text-muted-foreground mb-5">Últimos 6 meses</p>
@@ -1086,7 +1089,7 @@ export function PagosPage() {
                       <span
                         className={cn(
                           'text-xs font-semibold',
-                          isLast ? 'text-primary' : 'text-muted-foreground'
+                          isLast ? 'text-primary-fuerte' : 'text-muted-foreground'
                         )}
                       >
                         ${(m.amount / 1000).toFixed(0)}k

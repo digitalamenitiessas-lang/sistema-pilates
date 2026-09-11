@@ -81,14 +81,14 @@ export default function RecuperarPage() {
 
         {status === 'checking' && (
           <div className="bg-card rounded-2xl border border-border p-8 flex flex-col items-center gap-3 shadow-sm">
-            <Loader2 className="w-6 h-6 text-primary animate-spin" />
+            <Loader2 className="w-6 h-6 text-primary-fuerte animate-spin" />
             <p className="text-sm text-muted-foreground">Verificando el enlace...</p>
           </div>
         )}
 
         {status === 'invalid' && (
           <div className="bg-card rounded-2xl border border-border p-8 flex flex-col items-center gap-3 text-center shadow-sm">
-            <XCircle className="w-8 h-8 text-destructive" />
+            <XCircle className="w-8 h-8 text-destructive-fuerte" />
             <p className="text-sm font-semibold text-foreground">El enlace no es válido o venció</p>
             <p className="text-xs text-muted-foreground">
               Pedí uno nuevo desde &quot;¿Olvidaste tu contraseña?&quot; en la pantalla de ingreso.
@@ -138,7 +138,7 @@ export default function RecuperarPage() {
             </div>
 
             {error && (
-              <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
+              <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
             )}
 
             <button
@@ -154,7 +154,7 @@ export default function RecuperarPage() {
 
         {status === 'done' && (
           <div className="bg-card rounded-2xl border border-border p-8 flex flex-col items-center gap-3 text-center shadow-sm">
-            <CheckCircle2 className="w-8 h-8 text-[#2E6040]" />
+            <CheckCircle2 className="w-8 h-8 text-exito-fuerte" />
             <p className="text-sm font-semibold text-foreground">¡Contraseña actualizada!</p>
             <p className="text-xs text-muted-foreground">Ya podés usar el sistema con tu clave nueva.</p>
             <Link

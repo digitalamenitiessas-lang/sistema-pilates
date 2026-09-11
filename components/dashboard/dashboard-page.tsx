@@ -39,7 +39,7 @@ interface DashboardPageProps {
 function OccupancyBar({ enrolled, capacity }: { enrolled: number; capacity: number }) {
   const pct = Math.round((enrolled / capacity) * 100)
   const color =
-    pct >= 100 ? 'bg-destructive' : pct >= 80 ? 'bg-amber-500' : 'bg-accent'
+    pct >= 100 ? 'bg-destructive' : pct >= 80 ? 'bg-aviso' : 'bg-exito'
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
@@ -97,7 +97,7 @@ function StatCard({
         <span className="text-sm text-muted-foreground font-medium">{label}</span>
         <div
           className="w-9 h-9 rounded-xl flex items-center justify-center"
-          style={{ backgroundColor: `${accent}18` }}
+          style={{ backgroundColor: `color-mix(in oklab, ${accent} 10%, transparent)` }}
         >
           <Icon className="w-5 h-5" style={{ color: accent }} />
         </div>
@@ -168,14 +168,14 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
           label="Clientes activos"
           value={String(activeMembers)}
           sub={`${students.length} clientes totales`}
-          accent="#C4735A"
+          accent="var(--primary)"
         />
         <StatCard
           icon={CalendarCheck}
           label="Clases hoy"
           value={String(TODAY_CLASSES.length)}
           sub={`${todayTotal} reservas confirmadas`}
-          accent="#7D9B76"
+          accent="var(--exito)"
         />
         {(canWrite || sinFinanzas) && (
           <StatCard
@@ -183,7 +183,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
             label={sinFinanzas ? 'Ingresos del mes' : `Ingresos ${currentMonth?.month ?? ''}`}
             value={`$${(currentMonthRevenue / 1000).toFixed(0)}k`}
             sub={`${Number(revenueDiff) >= 0 ? '+' : ''}${revenueDiff}% vs ${prevMonth?.month ?? 'mes anterior'}`}
-            accent="#D4A854"
+            accent="var(--aviso)"
             sinAcceso={sinFinanzas}
           />
         )}
@@ -193,7 +193,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
             label="Pagos pendientes"
             value={String(pendingPayments.length)}
             sub={`$${pendingPayments.reduce((a, p) => a + p.amount, 0).toLocaleString('es-AR')} total`}
-            accent="#EF4444"
+            accent="var(--destructive)"
             sinAcceso={sinFinanzas}
           />
         )}
@@ -204,19 +204,19 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
         <div className="bg-card rounded-2xl border border-border overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
             <div className="flex items-center gap-2">
-              <Wallet className="w-4 h-4 text-primary" />
+              <Wallet className="w-4 h-4 text-primary-fuerte" />
               <h2 className="font-semibold text-foreground text-sm">La plata del mes</h2>
             </div>
             <button
               onClick={() => onNavigate('caja')}
-              className="text-xs text-primary font-medium hover:underline flex items-center gap-1"
+              className="text-xs text-primary-fuerte font-medium hover:underline flex items-center gap-1"
             >
               Ver caja <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
           {!plata.completo && (
-            <p className="px-5 pt-3 text-[11px] text-amber-800">
+            <p className="px-5 pt-3 text-[11px] text-aviso-fuerte">
               Tu rol no ve una parte de estos números, así que el resultado está incompleto.
             </p>
           )}
@@ -224,13 +224,13 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
           <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-border">
             <div className="px-5 py-4">
               <p className="text-xs text-muted-foreground">Entró este mes</p>
-              <p className="text-xl font-bold text-[#2E6040] tabular-nums mt-1">
+              <p className="text-xl font-bold text-exito-fuerte tabular-nums mt-1">
                 ${Math.round(plata.ingresosMes).toLocaleString('es-AR')}
               </p>
             </div>
             <div className="px-5 py-4">
               <p className="text-xs text-muted-foreground">Salió este mes</p>
-              <p className="text-xl font-bold text-destructive tabular-nums mt-1">
+              <p className="text-xl font-bold text-destructive-fuerte tabular-nums mt-1">
                 ${Math.round(plata.egresosMes).toLocaleString('es-AR')}
               </p>
               <p className="text-[11px] text-muted-foreground mt-0.5">
@@ -244,7 +244,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
               <p
                 className={cn(
                   'text-xl font-bold tabular-nums mt-1',
-                  plata.neto >= 0 ? 'text-foreground' : 'text-destructive'
+                  plata.neto >= 0 ? 'text-foreground' : 'text-destructive-fuerte'
                 )}
               >
                 ${Math.round(plata.neto).toLocaleString('es-AR')}
@@ -276,7 +276,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
                     <span
                       className={cn(
                         'text-xs font-semibold tabular-nums',
-                        c.isSystem && c.saldo !== 0 ? 'text-amber-700' : 'text-foreground'
+                        c.isSystem && c.saldo !== 0 ? 'text-aviso-fuerte' : 'text-foreground'
                       )}
                     >
                       ${Math.round(c.saldo).toLocaleString('es-AR')}
@@ -293,12 +293,12 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
         <div className="lg:col-span-2 bg-card rounded-2xl border border-border overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
             <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-primary" />
+              <Clock className="w-4 h-4 text-primary-fuerte" />
               <h2 className="font-semibold text-foreground text-sm">Clases de Hoy</h2>
             </div>
             <button
               onClick={() => onNavigate('agenda')}
-              className="text-xs text-primary font-medium hover:underline flex items-center gap-1"
+              className="text-xs text-primary-fuerte font-medium hover:underline flex items-center gap-1"
             >
               Ver agenda <ChevronRight className="w-3.5 h-3.5" />
             </button>
@@ -330,20 +330,20 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
                   <div className="w-32 shrink-0">
                     <OccupancyBar enrolled={cls.enrolled} capacity={cls.capacity} />
                     {isFull && cls.waitlist > 0 && (
-                      <p className="text-[10px] text-amber-600 mt-0.5">
+                      <p className="text-[10px] text-aviso-fuerte mt-0.5">
                         +{cls.waitlist} en espera
                       </p>
                     )}
                   </div>
                   {isFull && (
-                    <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-destructive/10 text-destructive">
+                    <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-destructive/10 text-destructive-fuerte">
                       Llena
                     </span>
                   )}
                   {puedeMarcarAsistencia && cls.enrolled > 0 && (
                     <button
                       onClick={() => setAsistenciaDe(cls)}
-                      className="shrink-0 px-3 py-1.5 rounded-lg border border-primary/40 text-primary text-[11px] font-bold hover:bg-primary/5 transition-colors flex items-center gap-1.5"
+                      className="shrink-0 px-3 py-1.5 rounded-lg border border-primary/40 text-primary-fuerte text-[11px] font-bold hover:bg-primary/5 transition-colors flex items-center gap-1.5"
                     >
                       <ClipboardCheck className="w-3.5 h-3.5" />
                       Asistencia
@@ -360,9 +360,9 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
           {/* Alerts */}
           <div className="bg-card rounded-2xl border border-border overflow-hidden">
             <div className="flex items-center gap-2 px-5 py-4 border-b border-border">
-              <Flame className="w-4 h-4 text-destructive" />
+              <Flame className="w-4 h-4 text-destructive-fuerte" />
               <h2 className="font-semibold text-foreground text-sm">Alertas</h2>
-              <span className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full bg-destructive/10 text-destructive">
+              <span className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full bg-destructive/10 text-destructive-fuerte">
                 {alerts.length}
               </span>
             </div>
@@ -385,8 +385,8 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
                       className={cn(
                         'w-1.5 h-1.5 rounded-full mt-1.5 shrink-0',
                         alert.type === 'danger' && 'bg-destructive',
-                        alert.type === 'warning' && 'bg-amber-500',
-                        alert.type === 'info' && 'bg-accent'
+                        alert.type === 'warning' && 'bg-aviso',
+                        alert.type === 'info' && 'bg-info'
                       )}
                     />
                     <div className="min-w-0 flex-1">
@@ -420,7 +420,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
               <h2 className="font-semibold text-foreground text-sm">Por vencer</h2>
               <button
                 onClick={() => onNavigate('planes')}
-                className="text-xs text-primary font-medium hover:underline"
+                className="text-xs text-primary-fuerte font-medium hover:underline"
               >
                 Ver todas
               </button>
@@ -435,8 +435,8 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
                 const m = student.membership!
                 return (
                   <div key={m.id} className="flex items-center gap-3 px-4 py-3">
-                    <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-                      <span className="text-amber-700 text-xs font-bold">{student.avatar}</span>
+                    <div className="w-7 h-7 rounded-full bg-aviso-suave flex items-center justify-center shrink-0">
+                      <span className="text-aviso-fuerte text-xs font-bold">{student.avatar}</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-foreground truncate">
@@ -444,7 +444,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
                       </p>
                       <p className="text-[10px] text-muted-foreground truncate">{m.planName}</p>
                     </div>
-                    <p className="text-[11px] font-semibold text-amber-600 shrink-0">
+                    <p className="text-[11px] font-semibold text-aviso-fuerte shrink-0">
                       {m.endDate}
                     </p>
                   </div>
@@ -464,7 +464,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
               <h2 className="font-semibold text-foreground text-sm">Ingresos mensuales</h2>
               <p className="text-xs text-muted-foreground mt-0.5">Últimos 6 meses</p>
             </div>
-            <div className="flex items-center gap-1 text-accent text-xs font-semibold bg-accent/10 px-2.5 py-1 rounded-full">
+            <div className="flex items-center gap-1 text-exito-fuerte text-xs font-semibold bg-exito-suave px-2.5 py-1 rounded-full">
               <ArrowUpRight className="w-3.5 h-3.5" />
               {Number(revenueDiff) >= 0 ? '+' : ''}{revenueDiff}%
             </div>
@@ -487,7 +487,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
                   <span
                     className={cn(
                       'text-[10px] font-medium',
-                      isLast ? 'text-primary' : 'text-muted-foreground'
+                      isLast ? 'text-primary-fuerte' : 'text-muted-foreground'
                     )}
                   >
                     {m.month}
@@ -508,12 +508,12 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
         <div className="bg-card rounded-2xl border border-border overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
             <div className="flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-primary" />
+              <CreditCard className="w-4 h-4 text-primary-fuerte" />
               <h2 className="font-semibold text-foreground text-sm">Pagos pendientes</h2>
             </div>
             <button
               onClick={() => onNavigate('pagos')}
-              className="text-xs text-primary font-medium hover:underline flex items-center gap-1"
+              className="text-xs text-primary-fuerte font-medium hover:underline flex items-center gap-1"
             >
               Ver todos <ChevronRight className="w-3.5 h-3.5" />
             </button>
@@ -527,7 +527,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
                   <div
                     className={cn(
                       'w-2 h-2 rounded-full shrink-0',
-                      p.status === 'vencido' ? 'bg-destructive' : 'bg-amber-500'
+                      p.status === 'vencido' ? 'bg-destructive' : 'bg-aviso'
                     )}
                   />
                   <div className="flex-1 min-w-0">
@@ -541,7 +541,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
                     <p
                       className={cn(
                         'text-[10px] font-medium',
-                        p.status === 'vencido' ? 'text-destructive' : 'text-amber-600'
+                        p.status === 'vencido' ? 'text-destructive-fuerte' : 'text-aviso-fuerte'
                       )}
                     >
                       {p.status === 'vencido' ? 'Vencido' : `Vence ${p.dueDate}`}
@@ -565,7 +565,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
           <div className="px-5 py-3 border-t border-border bg-muted/40">
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">Total adeudado</span>
-              <span className="text-sm font-bold text-destructive">
+              <span className="text-sm font-bold text-destructive-fuerte">
                 ${pendingPayments.reduce((a, p) => a + p.amount, 0).toLocaleString('es-AR')}
               </span>
             </div>

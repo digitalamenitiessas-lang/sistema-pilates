@@ -125,7 +125,7 @@ function ChangePasswordModal({ onClose, onDone }: { onClose: () => void; onDone:
             />
           </div>
           {error && (
-            <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
+            <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
           )}
           <button
             type="submit"
@@ -159,14 +159,14 @@ function MembershipCard({ student }: { student: Student }) {
   const pct = Math.min(100, Math.round((ms.classesUsed / ms.classesTotal) * 100))
   const statusCfg =
     ms.status === 'activa'
-      ? { label: 'Activa', class: 'bg-[#E8F2EB] text-[#2E6040]' }
+      ? { label: 'Activa', class: 'bg-exito-suave text-exito-fuerte' }
       : ms.status === 'por vencer'
-      ? { label: 'Por vencer', class: 'bg-amber-100 text-amber-700' }
+      ? { label: 'Por vencer', class: 'bg-aviso-suave text-aviso-fuerte' }
       : ms.status === 'vencida'
-      ? { label: 'Vencida', class: 'bg-red-100 text-red-700' }
+      ? { label: 'Vencida', class: 'bg-destructive-suave text-destructive-fuerte' }
       : ms.status === 'futura'
-      ? { label: 'Empieza después', class: 'bg-sky-100 text-sky-700' }
-      : { label: 'Suspendida', class: 'bg-gray-100 text-gray-600' }
+      ? { label: 'Empieza después', class: 'bg-info-suave text-info-fuerte' }
+      : { label: 'Suspendida', class: 'bg-muted text-muted-foreground' }
 
   return (
     <div className="bg-card rounded-2xl border border-border p-5">
@@ -191,7 +191,7 @@ function MembershipCard({ student }: { student: Student }) {
 
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>
-          Te quedan <strong className="text-primary">{left}</strong> clase{left !== 1 ? 's' : ''}
+          Te quedan <strong className="text-primary-fuerte">{left}</strong> clase{left !== 1 ? 's' : ''}
         </span>
         {/* A un período que todavía no arrancó no se le dice cuándo vence:
             el dato que la clienta necesita es desde cuándo lo puede usar. */}
@@ -236,7 +236,7 @@ function UpcomingList({
         <div key={r.id} className="bg-card rounded-2xl border border-border px-4 py-3 flex items-center gap-3">
           <div
             className="w-1 self-stretch rounded-full shrink-0"
-            style={{ backgroundColor: motivo !== undefined ? '#C4B5AE' : disciplineStyle(disciplines, r.discipline).dot }}
+            style={{ backgroundColor: motivo !== undefined ? 'var(--secondary)' : disciplineStyle(disciplines, r.discipline).dot }}
           />
           <div className="flex-1 min-w-0">
             <p className={cn('text-sm font-semibold truncate', motivo !== undefined ? 'text-muted-foreground line-through' : 'text-foreground')}>
@@ -246,17 +246,17 @@ function UpcomingList({
               {pretty(r.date)} · {r.time} · {r.teacherName}
             </p>
             {motivo !== undefined && (
-              <p className="text-xs text-destructive font-medium mt-0.5">
+              <p className="text-xs text-destructive-fuerte font-medium mt-0.5">
                 El estudio suspendió esta clase{motivo ? `: ${motivo}` : ''}
               </p>
             )}
           </div>
           {motivo !== undefined ? (
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-destructive/10 text-destructive shrink-0">
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-destructive/10 text-destructive-fuerte shrink-0">
               Suspendida
             </span>
           ) : r.status === 'lista de espera' ? (
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 shrink-0">
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-aviso-suave text-aviso-fuerte shrink-0">
               En espera
             </span>
           ) : null}
@@ -266,7 +266,7 @@ function UpcomingList({
             <button
               disabled={busyId === r.id}
               onClick={() => onCancel(r)}
-              className="shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
+              className="shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-muted-foreground hover:bg-destructive/10 hover:text-destructive-fuerte transition-colors disabled:opacity-50"
             >
               {busyId === r.id ? '...' : 'Cancelar'}
             </button>
@@ -520,7 +520,7 @@ export function PortalPage() {
           <div
             className={cn(
               'fixed top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl text-sm font-semibold shadow-lg',
-              notice.type === 'ok' ? 'bg-[#2E6040] text-white' : 'bg-destructive text-white'
+              notice.type === 'ok' ? 'bg-exito-fuerte text-white' : 'bg-destructive text-white'
             )}
           >
             {notice.text}
@@ -533,8 +533,8 @@ export function PortalPage() {
             pegada a la tarjeta del plan porque es su continuación: arriba
             dice cuándo vence, acá cómo sigue. */}
         {misRenovaciones.length > 0 && (
-          <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4">
-            <p className="text-xs font-bold text-sky-900 mb-2 flex items-center gap-1.5">
+          <div className="bg-info-suave border border-info/40 rounded-2xl p-4">
+            <p className="text-xs font-bold text-info-fuerte mb-2 flex items-center gap-1.5">
               <RefreshCw className="w-3.5 h-3.5" />
               {/* Con el plazo cumplido ya no se le puede decir "ya podés":
                   la oferta está por anularse y de acá en adelante lo
@@ -553,21 +553,21 @@ export function PortalPage() {
               return (
                 <div key={p.id} className="flex items-center justify-between gap-2 py-1.5">
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold text-sky-900 truncate">{p.planName}</p>
+                    <p className="text-xs font-semibold text-info-fuerte truncate">{p.planName}</p>
                     {/* "No perder la prioridad" y no "conservar tus días y
                         horarios": el turno fijo no existe en el sistema
                         —una reserva es una fila por clase y fecha, no un
                         derecho recurrente— así que el lugar no se le puede
                         prometer. La prioridad sí es del estudio, y es la
                         palabra que usó. */}
-                    <p className="text-[10px] text-sky-700">
+                    <p className="text-[10px] text-info-fuerte">
                       {aTiempo
                         ? `Tenés hasta el ${pretty(p.dueDate)} para renovar y no perder la prioridad en tus días y horarios`
                         : `El plazo para renovar venció el ${pretty(p.dueDate)}: consultá en recepción`}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-sm font-bold text-sky-900">
+                    <span className="text-sm font-bold text-info-fuerte">
                       ${p.amount.toLocaleString('es-AR')}
                     </span>
                     {p.mpLink && aTiempo && (
@@ -591,12 +591,12 @@ export function PortalPage() {
                 queda dicho es que consulte en recepción. */}
             {renovacionATiempo && (
               <>
-                <p className="text-[10px] text-sky-700 mt-1">
+                <p className="text-[10px] text-info-fuerte mt-1">
                   Si renovás antes de que venza el plan que estás usando, el período nuevo arranca
                   recién cuando ese termina.
                 </p>
                 {!misRenovaciones.some((p) => p.mpLink) && (
-                  <p className="text-[10px] text-sky-700 mt-1">
+                  <p className="text-[10px] text-info-fuerte mt-1">
                     Podés renovar en recepción o pedir el link de pago por WhatsApp.
                   </p>
                 )}
@@ -607,19 +607,19 @@ export function PortalPage() {
 
         {/* Deudas destacadas */}
         {myDebts.length > 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-            <p className="text-xs font-bold text-amber-800 mb-2 flex items-center gap-1.5">
+          <div className="bg-aviso-suave border border-aviso/40 rounded-2xl p-4">
+            <p className="text-xs font-bold text-aviso-fuerte mb-2 flex items-center gap-1.5">
               <CreditCard className="w-3.5 h-3.5" />
               Tenés {myDebts.length} pago{myDebts.length !== 1 ? 's' : ''} pendiente{myDebts.length !== 1 ? 's' : ''}
             </p>
             {myDebts.map((p) => (
               <div key={p.id} className="flex items-center justify-between gap-2 py-1.5">
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold text-amber-900 truncate">{p.planName}</p>
-                  <p className="text-[10px] text-amber-700">Vence {pretty(p.dueDate)}</p>
+                  <p className="text-xs font-semibold text-aviso-fuerte truncate">{p.planName}</p>
+                  <p className="text-[10px] text-aviso-fuerte">Vence {pretty(p.dueDate)}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-sm font-bold text-amber-900">
+                  <span className="text-sm font-bold text-aviso-fuerte">
                     ${p.amount.toLocaleString('es-AR')}
                   </span>
                   {p.mpLink && (
@@ -636,7 +636,7 @@ export function PortalPage() {
               </div>
             ))}
             {!myDebts.some((p) => p.mpLink) && (
-              <p className="text-[10px] text-amber-700 mt-1">
+              <p className="text-[10px] text-aviso-fuerte mt-1">
                 Podés abonar en recepción o pedir el link de pago por WhatsApp.
               </p>
             )}
@@ -646,7 +646,7 @@ export function PortalPage() {
         {/* Próximas clases */}
         <section>
           <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
-            <CalendarDays className="w-4 h-4 text-primary" />
+            <CalendarDays className="w-4 h-4 text-primary-fuerte" />
             Tus próximas clases
           </h2>
           <UpcomingList reservations={myUpcoming} suspendidas={suspendidas} onCancel={cancel} busyId={busyId} />
@@ -655,7 +655,7 @@ export function PortalPage() {
         {/* Reservar */}
         <section>
           <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-primary" />
+            <Clock className="w-4 h-4 text-primary-fuerte" />
             Reservar una clase
           </h2>
 
@@ -758,7 +758,7 @@ export function PortalPage() {
                     <p className="text-[10px] text-muted-foreground truncate flex items-center gap-1">
                       {c.teacherName} · <MapPin className="w-2.5 h-2.5 inline" /> {c.room}
                     </p>
-                    <p className={cn('text-[10px] font-medium', isFull ? 'text-destructive' : 'text-[#2E6040]')}>
+                    <p className={cn('text-[10px] font-medium', isFull ? 'text-destructive-fuerte' : 'text-exito-fuerte')}>
                       {isFull
                         ? `Completa${c.occ.waitlist > 0 ? ` · ${c.occ.waitlist} en espera` : ''}`
                         : `${spotsLeft} lugar${spotsLeft !== 1 ? 'es' : ''} libre${spotsLeft !== 1 ? 's' : ''}`}
@@ -766,7 +766,7 @@ export function PortalPage() {
                   </div>
                   <div className="shrink-0">
                     {c.mine ? (
-                      <span className="flex items-center gap-1 text-[10px] font-bold text-[#2E6040]">
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-exito-fuerte">
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         {c.mine.status === 'lista de espera' ? 'En espera' : 'Reservada'}
                       </span>
@@ -791,11 +791,11 @@ export function PortalPage() {
                         Reservás en recepción
                       </span>
                     ) : busyId === c.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                      <Loader2 className="w-4 h-4 animate-spin text-primary-fuerte" />
                     ) : isFull ? (
                       <button
                         onClick={() => book(c.id, c.date, true)}
-                        className="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-700 text-[11px] font-bold hover:bg-amber-200 transition-colors"
+                        className="px-3 py-1.5 rounded-lg bg-aviso-suave text-aviso-fuerte text-[11px] font-bold hover:bg-aviso/30 transition-colors"
                       >
                         Lista de espera
                       </button>
@@ -817,7 +817,7 @@ export function PortalPage() {
         {/* Historial de pagos */}
         <section>
           <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
-            <CreditCard className="w-4 h-4 text-primary" />
+            <CreditCard className="w-4 h-4 text-primary-fuerte" />
             Tus pagos
           </h2>
           {myPayments.length === 0 ? (
@@ -841,10 +841,10 @@ export function PortalPage() {
                   <div
                     className={cn(
                       'w-2 h-2 rounded-full shrink-0',
-                      p.status === 'pagado' && 'bg-accent',
-                      oferta && 'bg-sky-400',
+                      p.status === 'pagado' && 'bg-exito',
+                      oferta && 'bg-info',
                       anulada && 'bg-muted-foreground/40',
-                      p.status === 'pendiente' && !oferta && 'bg-amber-500',
+                      p.status === 'pendiente' && !oferta && 'bg-aviso',
                       p.status === 'vencido' && 'bg-destructive'
                     )}
                   />

@@ -100,22 +100,22 @@ export function InstallPrompt() {
             </p>
             <ol className="space-y-3">
               <li className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
+                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary-fuerte text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
                 <p className="text-sm text-foreground">
                   Tocá el botón <strong>Compartir</strong>{' '}
-                  <Share className="w-4 h-4 inline text-primary" /> en la barra de abajo del
+                  <Share className="w-4 h-4 inline text-primary-fuerte" /> en la barra de abajo del
                   navegador.
                 </p>
               </li>
               <li className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
+                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary-fuerte text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
                 <p className="text-sm text-foreground">
                   Deslizá hacia abajo y elegí <strong>&quot;Agregar a inicio&quot;</strong>{' '}
-                  <SquarePlus className="w-4 h-4 inline text-primary" />.
+                  <SquarePlus className="w-4 h-4 inline text-primary-fuerte" />.
                 </p>
               </li>
               <li className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
+                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary-fuerte text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
                 <p className="text-sm text-foreground">
                   Tocá <strong>&quot;Agregar&quot;</strong> arriba a la derecha. Listo: vas a ver
                   el ícono del estudio junto a tus apps.

@@ -131,7 +131,7 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
           )}
 
           {error && (
-            <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
+            <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
           )}
         </div>
 

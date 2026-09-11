@@ -4,9 +4,30 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ============================================================
+   Identidad Casa Fé
+   ------------------------------------------------------------
+   La marca define tres colores y dos tipografías. Todo lo demás
+   —bordes, fondos suaves, estados— se deriva de ahí, en oklch,
+   para que un ajuste de la clienta no obligue a repintar a mano
+   veinte pantallas.
+
+     Natural      #e1dfdb   fondo
+     Marrón       #847164   acción
+     Verde claro  #bcbaae   superficies y acentos
+     Negro        #000000   texto y titulares
+
+   Bauer Bodoni es una fuente comercial y no se puede servir como
+   webfont sin licencia. Se usa Bodoni Moda (Google Fonts, OFL),
+   que es un revival del mismo Bodoni: misma estructura didone,
+   mismo contraste de trazo. El eje `opsz` en 96 es lo que le da
+   la hairline fina de los titulares del mockup.
+   ============================================================ */
+
 @theme inline {
-  --font-sans: 'DM Sans', 'DM Sans Fallback';
-  --font-serif: 'Playfair Display', 'Playfair Display Fallback';
+  --font-sans: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-bodoni), 'Bodoni Moda', Georgia, serif;
+  --font-display: var(--font-bodoni), 'Bodoni Moda', Georgia, serif;
 
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -24,7 +45,26 @@
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
+
+  /* Estados. Tres tonos cada uno —suave para fondo, pleno para
+     puntos y barras, fuerte para texto— y el par suave/fuerte
+     siempre pasa AA. Reemplazan a amber/sky/red de Tailwind, que
+     junto al natural se veían de otra marca. */
+  --color-primary-fuerte: var(--primary-fuerte);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-aviso: var(--aviso);
+  --color-aviso-suave: var(--aviso-suave);
+  --color-aviso-fuerte: var(--aviso-fuerte);
+  --color-info: var(--info);
+  --color-info-suave: var(--info-suave);
+  --color-info-fuerte: var(--info-fuerte);
+  --color-exito: var(--exito);
+  --color-exito-suave: var(--exito-suave);
+  --color-exito-fuerte: var(--exito-fuerte);
   --color-destructive: var(--destructive);
+  --color-destructive-suave: var(--destructive-suave);
+  --color-destructive-fuerte: var(--destructive-fuerte);
+
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -50,45 +90,71 @@
 
 :root {
   color-scheme: light;
-  /* Warm Pilates palette — terracotta, sand, sage */
-  --background: oklch(0.975 0.012 68);
-  --foreground: oklch(0.22 0.025 55);
+
+  /* Natural #e1dfdb */
+  --background: oklch(0.9041 0.0058 84.6);
+  /* Negro. El mockup lo usa pleno: 15.8:1 sobre el natural. */
+  --foreground: oklch(0 0 0);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.22 0.025 55);
+  --card-foreground: oklch(0 0 0);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.22 0.025 55);
-  /* Primary: terracotta */
-  --primary: oklch(0.56 0.13 37);
-  --primary-foreground: oklch(0.99 0 0);
-  /* Secondary: sage cream */
-  --secondary: oklch(0.92 0.03 145);
-  --secondary-foreground: oklch(0.30 0.04 145);
-  /* Muted: warm sand */
-  --muted: oklch(0.94 0.015 68);
-  --muted-foreground: oklch(0.52 0.025 55);
-  /* Accent: sage green */
-  --accent: oklch(0.62 0.10 148);
-  --accent-foreground: oklch(0.99 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.88 0.015 68);
-  --input: oklch(0.91 0.012 68);
-  --ring: oklch(0.56 0.13 37);
-  /* Charts */
-  --chart-1: oklch(0.56 0.13 37);
-  --chart-2: oklch(0.62 0.10 148);
-  --chart-3: oklch(0.72 0.14 78);
-  --chart-4: oklch(0.68 0.09 340);
-  --chart-5: oklch(0.60 0.09 225);
+  --popover-foreground: oklch(0 0 0);
+  /* Marrón #847164. Con texto blanco encima da 4.64:1. Como texto
+     sobre el natural solo llega a 3.49:1, así que va en rellenos y
+     titulares grandes, nunca en texto chico. */
+  --primary: oklch(0.5628 0.0309 56.4);
+  --primary-foreground: oklch(1 0 0);
+  /* El marrón de la marca como texto chico sobre fondo claro da 3.49:1 y no
+     pasa AA. Este es el mismo marrón dos escalones más abajo, para texto;
+     el pleno queda para rellenos y titulares. Misma regla que aviso, info
+     y éxito: el tono pleno pinta, el `-fuerte` escribe. */
+  --primary-fuerte: oklch(0.46 0.032 56);
+  /* Verde claro #bcbaae */
+  --secondary: oklch(0.7871 0.0168 99.1);
+  --secondary-foreground: oklch(0 0 0);
+  --muted: oklch(0.94 0.006 85);
+  --muted-foreground: oklch(0.47 0.014 62);
+  --accent: oklch(0.7871 0.0168 99.1);
+  --accent-foreground: oklch(0 0 0);
+  --border: oklch(0.845 0.012 92);
+  --input: oklch(0.78 0.014 90);
+  --ring: oklch(0.5628 0.0309 56.4);
+
+  /* Estados */
+  --aviso: oklch(0.72 0.09 78);
+  --aviso-suave: oklch(0.935 0.033 85);
+  --aviso-fuerte: oklch(0.44 0.07 70);
+  --info: oklch(0.62 0.07 240);
+  --info-suave: oklch(0.935 0.02 235);
+  --info-fuerte: oklch(0.43 0.06 245);
+  --exito: oklch(0.62 0.07 150);
+  --exito-suave: oklch(0.935 0.025 145);
+  --exito-fuerte: oklch(0.43 0.055 152);
+  --destructive: oklch(0.53 0.14 28);
+  --destructive-foreground: oklch(1 0 0);
+  --destructive-suave: oklch(0.935 0.03 32);
+  --destructive-fuerte: oklch(0.42 0.115 28);
+
+  /* Gráficos: marrón, verde claro, salvia, ocre, pizarra. Salen de
+     la paleta, no de una rueda de colores. */
+  --chart-1: oklch(0.5628 0.0309 56.4);
+  --chart-2: oklch(0.7871 0.0168 99.1);
+  --chart-3: oklch(0.62 0.07 150);
+  --chart-4: oklch(0.72 0.09 78);
+  --chart-5: oklch(0.62 0.07 240);
+
+  /* El mockup dibuja las tarjetas con esquinas suaves pero no
+     redondeadas de más: 283x336 con radio ~28, o sea 0.1 del ancho. */
   --radius: 0.75rem;
-  /* Sidebar: warm sand */
-  --sidebar: oklch(0.97 0.018 68);
-  --sidebar-foreground: oklch(0.22 0.025 55);
-  --sidebar-primary: oklch(0.56 0.13 37);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.92 0.02 68);
-  --sidebar-accent-foreground: oklch(0.22 0.025 55);
-  --sidebar-border: oklch(0.88 0.015 68);
-  --sidebar-ring: oklch(0.56 0.13 37);
+
+  --sidebar: oklch(0.94 0.006 85);
+  --sidebar-foreground: oklch(0 0 0);
+  --sidebar-primary: oklch(0.5628 0.0309 56.4);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.88 0.010 90);
+  --sidebar-accent-foreground: oklch(0 0 0);
+  --sidebar-border: oklch(0.845 0.012 92);
+  --sidebar-ring: oklch(0.5628 0.0309 56.4);
 }
 
 @layer base {
@@ -101,6 +167,36 @@
   body {
     @apply bg-background text-foreground font-sans;
   }
+}
+
+/* ============================================================
+   Tipografía de marca
+   ------------------------------------------------------------
+   Medido sobre el mockup: la Montserrat en mayúsculas va con
+   0.12em de tracking (nav, etiquetas, bajadas) y la Bodoni de
+   titulares con interlínea 0.88 y `opsz` alto.
+   ============================================================ */
+
+.display {
+  font-family: var(--font-bodoni), 'Bodoni Moda', Georgia, serif;
+  font-variation-settings: 'opsz' 96;
+  line-height: 0.92;
+  letter-spacing: -0.005em;
+}
+.display-xl {
+  font-variation-settings: 'opsz' 96;
+  line-height: 0.88;
+  letter-spacing: -0.015em;
+}
+
+/* Mayúsculas espaciadas: la voz de la marca en texto corto. */
+.tracking-marca {
+  letter-spacing: 0.12em;
+}
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 500;
 }
 
 /* ============================================================
@@ -193,8 +289,18 @@
 
 /* Texto contorneado grande de fondo */
 .text-outline {
-  -webkit-text-stroke: 1.5px oklch(0.56 0.13 37 / 0.28);
+  -webkit-text-stroke: 1.5px oklch(0.5628 0.0309 56.4 / 0.28);
   color: transparent;
+}
+
+/* La textura de óxido del mockup: va debajo del overlay del hero y
+   le saca el plano perfecto a la foto. */
+.textura-oxido {
+  background-image: url('/marca/textura-oxido.jpg');
+  background-size: cover;
+  background-position: center;
+  mix-blend-mode: multiply;
+  opacity: 0.28;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -596,7 +596,7 @@ export async function fetchStudioData(): Promise<StudioData> {
       enrolled: ofWeek.filter((r) => r.status === 'confirmada' || r.status === 'asistió').length,
       waitlist: ofWeek.filter((r) => r.status === 'lista de espera').length,
       room: c.room,
-      color: c.color ?? '#C4735A',
+      color: c.color ?? '#847164',
       kind: (c.kind ?? 'regular') as ClassSession['kind'],
       date: c.date ?? '',
       description: c.description ?? '',

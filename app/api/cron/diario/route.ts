@@ -114,7 +114,7 @@ function formatAmount(n: number): string {
 }
 
 const BOTON_PAGAR =
-  'display:inline-block;background:#A9552F;color:#fff;text-decoration:none;padding:10px 20px;border-radius:10px;font-weight:600;'
+  'display:inline-block;background:#847164;color:#fff;text-decoration:none;padding:10px 20px;border-radius:10px;font-weight:600;'
 
 interface NotificationRow {
   type: string

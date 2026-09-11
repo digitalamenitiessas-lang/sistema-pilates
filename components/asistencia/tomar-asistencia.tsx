@@ -79,7 +79,7 @@ export function TomarAsistencia({
     students.find((s) => s.id === studentId)?.avatar ?? '??'
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-foreground/40 flex items-end sm:items-center justify-center" onClick={onClose}>
       <div
         className="bg-card w-full sm:max-w-md sm:rounded-2xl rounded-t-3xl shadow-2xl border border-border max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
@@ -103,11 +103,11 @@ export function TomarAsistencia({
 
           {lista.length > 0 && (
             <div className="flex items-center gap-3 mt-3 text-xs">
-              <span className="font-semibold text-[#2E6040]">
+              <span className="font-semibold text-exito-fuerte">
                 {presentes} {presentes === 1 ? 'presente' : 'presentes'}
               </span>
               {ausentes > 0 && (
-                <span className="font-semibold text-destructive">
+                <span className="font-semibold text-destructive-fuerte">
                   {ausentes} {ausentes === 1 ? 'ausente' : 'ausentes'}
                 </span>
               )}
@@ -135,14 +135,14 @@ export function TomarAsistencia({
                   className={cn(
                     'rounded-2xl border px-3 py-2.5 flex items-center gap-3 transition-colors',
                     r.status === 'asistió'
-                      ? 'border-[#7D9B76]/40 bg-[#E8F2EB]'
+                      ? 'border-exito/40 bg-exito-suave'
                       : r.status === 'ausente'
                         ? 'border-destructive/30 bg-destructive/5'
                         : 'border-border'
                   )}
                 >
                   <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <span className="text-primary text-[11px] font-bold">{avatar(r.studentId)}</span>
+                    <span className="text-primary-fuerte text-[11px] font-bold">{avatar(r.studentId)}</span>
                   </div>
 
                   <p className="flex-1 min-w-0 text-sm font-medium text-foreground truncate">
@@ -150,7 +150,7 @@ export function TomarAsistencia({
                   </p>
 
                   {busyId === r.id ? (
-                    <Loader2 className="w-5 h-5 animate-spin text-primary shrink-0" />
+                    <Loader2 className="w-5 h-5 animate-spin text-primary-fuerte shrink-0" />
                   ) : !puedeMarcar ? (
                     <span className="text-xs text-muted-foreground shrink-0">
                       {r.status === 'asistió' ? 'Presente' : r.status === 'ausente' ? 'Ausente' : '—'}
@@ -169,14 +169,14 @@ export function TomarAsistencia({
                     <div className="flex gap-2 shrink-0">
                       <button
                         onClick={() => marcar(r, 'ausente')}
-                        className="w-11 h-11 rounded-xl border border-border flex items-center justify-center text-muted-foreground hover:border-destructive/50 hover:text-destructive transition-colors"
+                        className="w-11 h-11 rounded-xl border border-border flex items-center justify-center text-muted-foreground hover:border-destructive/50 hover:text-destructive-fuerte transition-colors"
                         aria-label={`${r.studentName} ausente`}
                       >
                         <X className="w-5 h-5" />
                       </button>
                       <button
                         onClick={() => marcar(r, 'asistió')}
-                        className="w-11 h-11 rounded-xl bg-[#7D9B76] text-white flex items-center justify-center hover:opacity-90 transition-opacity"
+                        className="w-11 h-11 rounded-xl bg-exito text-white flex items-center justify-center hover:opacity-90 transition-opacity"
                         aria-label={`${r.studentName} presente`}
                       >
                         <Check className="w-5 h-5" />
@@ -189,7 +189,7 @@ export function TomarAsistencia({
           </div>
 
           {error && (
-            <p className="text-xs text-destructive bg-destructive/10 rounded-xl px-3 py-2 mt-3">
+            <p className="text-xs text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2 mt-3">
               {error}
             </p>
           )}

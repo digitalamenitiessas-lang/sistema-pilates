@@ -117,11 +117,11 @@ function CierreModal({
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Entró</span>
-              <Monto n={ingresos} className="text-[#2E6040]" />
+              <Monto n={ingresos} className="text-exito-fuerte" />
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Salió</span>
-              <Monto n={egresos} className="text-destructive" />
+              <Monto n={egresos} className="text-destructive-fuerte" />
             </div>
             <div className="flex justify-between pt-1.5 border-t border-border font-semibold">
               <span>Debería haber</span>
@@ -148,7 +148,7 @@ function CierreModal({
             <div
               className={cn(
                 'rounded-xl px-4 py-3 text-sm',
-                Math.abs(diferencia) > 0 ? 'bg-amber-50 text-amber-800' : ''
+                Math.abs(diferencia) > 0 ? 'bg-aviso-suave text-aviso-fuerte' : ''
               )}
             >
               <p className="font-semibold">
@@ -162,7 +162,7 @@ function CierreModal({
           )}
 
           {diferencia === 0 && (
-            <p className="text-sm text-[#2E6040] font-semibold flex items-center gap-1.5">
+            <p className="text-sm text-exito-fuerte font-semibold flex items-center gap-1.5">
               <Check className="w-4 h-4" /> La caja cierra justo
             </p>
           )}
@@ -181,7 +181,7 @@ function CierreModal({
             </div>
           )}
 
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          {error && <p className="text-xs text-destructive-fuerte">{error}</p>}
         </div>
 
         <div className="px-5 py-4 border-t border-border flex gap-2">
@@ -339,7 +339,7 @@ function MovimientoModal({
             />
           </div>
 
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          {error && <p className="text-xs text-destructive-fuerte">{error}</p>}
         </div>
 
         <div className="px-5 py-4 border-t border-border flex gap-2">
@@ -463,7 +463,7 @@ export function CajaPage() {
   if (cargando) {
     return (
       <div className="flex-1 flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        <Loader2 className="w-6 h-6 animate-spin text-primary-fuerte" />
       </div>
     )
   }
@@ -484,7 +484,7 @@ export function CajaPage() {
             className={cn(
               'px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px whitespace-nowrap transition-colors',
               tab === k
-                ? 'border-primary text-primary'
+                ? 'border-primary text-primary-fuerte'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             )}
           >
@@ -494,13 +494,13 @@ export function CajaPage() {
       </div>
 
       {error && (
-        <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-4 py-3">{error}</p>
+        <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-4 py-3">{error}</p>
       )}
 
       {sinPermisoCompleto && (
-        <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex gap-2.5">
-          <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-800 leading-relaxed">
+        <div className="rounded-xl bg-aviso-suave border border-aviso/40 px-4 py-3 flex gap-2.5">
+          <AlertTriangle className="w-4 h-4 text-aviso-fuerte shrink-0 mt-0.5" />
+          <p className="text-xs text-aviso-fuerte leading-relaxed">
             Tu rol no ve {!cajaPrincipal?.veCobros ? 'los cobros' : 'los gastos'}, así que estos
             saldos están incompletos. No los uses para arquear.
           </p>
@@ -509,7 +509,7 @@ export function CajaPage() {
 
       {problemas.length > 0 && (
         <div className="rounded-xl bg-destructive/5 border border-destructive/30 px-4 py-3">
-          <p className="text-xs font-semibold text-destructive mb-1.5">
+          <p className="text-xs font-semibold text-destructive-fuerte mb-1.5">
             {problemas.length === 1 ? 'Hay algo que revisar' : `Hay ${problemas.length} cosas que revisar`}
           </p>
           <ul className="space-y-1">
@@ -557,7 +557,7 @@ export function CajaPage() {
                       <button
                         onClick={abrir}
                         disabled={abriendo}
-                        className="px-4 py-2 rounded-xl border border-primary text-primary text-sm font-semibold flex items-center gap-2 disabled:opacity-50"
+                        className="px-4 py-2 rounded-xl border border-primary text-primary-fuerte text-sm font-semibold flex items-center gap-2 disabled:opacity-50"
                       >
                         {abriendo && <Loader2 className="w-4 h-4 animate-spin" />}
                         Abrir caja
@@ -569,13 +569,13 @@ export function CajaPage() {
                 <div className="grid grid-cols-3 divide-x divide-border">
                   <div className="px-5 py-4">
                     <p className="text-xs text-muted-foreground">Entró hoy</p>
-                    <p className="text-xl font-bold text-[#2E6040] tabular-nums mt-1">
+                    <p className="text-xl font-bold text-exito-fuerte tabular-nums mt-1">
                       {plata(dia?.ingresos ?? 0)}
                     </p>
                   </div>
                   <div className="px-5 py-4">
                     <p className="text-xs text-muted-foreground">Salió hoy</p>
-                    <p className="text-xl font-bold text-destructive tabular-nums mt-1">
+                    <p className="text-xl font-bold text-destructive-fuerte tabular-nums mt-1">
                       {plata(dia?.egresos ?? 0)}
                     </p>
                   </div>
@@ -594,7 +594,7 @@ export function CajaPage() {
                   {puedeOperar && (
                     <button
                       onClick={() => setNuevoMov(true)}
-                      className="text-xs font-semibold text-primary flex items-center gap-1.5"
+                      className="text-xs font-semibold text-primary-fuerte flex items-center gap-1.5"
                     >
                       <Plus className="w-3.5 h-3.5" /> Nuevo
                     </button>
@@ -618,7 +618,7 @@ export function CajaPage() {
                 key={c.accountId}
                 className={cn(
                   'bg-card rounded-2xl border p-4',
-                  destacar ? 'border-amber-300 bg-amber-50/50' : 'border-border'
+                  destacar ? 'border-aviso/40 bg-aviso-suave' : 'border-border'
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -641,7 +641,7 @@ export function CajaPage() {
                   {c.movimientos} {c.movimientos === 1 ? 'movimiento' : 'movimientos'}
                 </p>
                 {destacar && (
-                  <p className="text-[11px] text-amber-800 mt-2 leading-tight">
+                  <p className="text-[11px] text-aviso-fuerte mt-2 leading-tight">
                     Hay plata sin asignar a una cuenta real. Revisá estos cobros y ponelos donde van.
                   </p>
                 )}
@@ -659,7 +659,7 @@ export function CajaPage() {
             {puedeOperar && (
               <button
                 onClick={() => setNuevoMov(true)}
-                className="text-xs font-semibold text-primary flex items-center gap-1.5"
+                className="text-xs font-semibold text-primary-fuerte flex items-center gap-1.5"
               >
                 <ArrowRightLeft className="w-3.5 h-3.5" /> Nuevo movimiento
               </button>
@@ -702,14 +702,14 @@ export function CajaPage() {
                       <p
                         className={cn(
                           'text-[11px] font-semibold tabular-nums',
-                          a.diferencia > 0 ? 'text-amber-700' : 'text-destructive'
+                          a.diferencia > 0 ? 'text-aviso-fuerte' : 'text-destructive-fuerte'
                         )}
                       >
                         {a.diferencia > 0 ? 'sobró ' : 'faltó '}
                         {plata(Math.abs(a.diferencia))}
                       </p>
                     ) : (
-                      <p className="text-[11px] text-[#2E6040] font-semibold">cerró justo</p>
+                      <p className="text-[11px] text-exito-fuerte font-semibold">cerró justo</p>
                     )}
                   </div>
                   {puedeReabrir && (
@@ -773,7 +773,7 @@ function LibroLista({ entradas }: { entradas: LedgerEntry[] }) {
           <div
             className={cn(
               'w-7 h-7 rounded-full flex items-center justify-center shrink-0',
-              e.sentido === 'ingreso' ? 'bg-[#E8F2EB] text-[#2E6040]' : 'bg-destructive/10 text-destructive'
+              e.sentido === 'ingreso' ? 'bg-exito-suave text-exito-fuerte' : 'bg-destructive/10 text-destructive-fuerte'
             )}
           >
             {e.sentido === 'ingreso' ? <Check className="w-3.5 h-3.5" /> : <X className="w-3.5 h-3.5" />}
@@ -789,7 +789,7 @@ function LibroLista({ entradas }: { entradas: LedgerEntry[] }) {
           <span
             className={cn(
               'text-sm font-semibold tabular-nums shrink-0',
-              e.sentido === 'ingreso' ? 'text-[#2E6040]' : 'text-destructive'
+              e.sentido === 'ingreso' ? 'text-exito-fuerte' : 'text-destructive-fuerte'
             )}
           >
             {e.sentido === 'ingreso' ? '+' : '−'}

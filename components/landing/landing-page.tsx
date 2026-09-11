@@ -3,15 +3,12 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
-  ArrowRight,
   ArrowUpRight,
   ChevronDown,
-  Clock,
   Mail,
   MapPin,
   Menu,
   MessageCircle,
-  Sparkles,
   Users,
   X,
 } from 'lucide-react'
@@ -39,9 +36,40 @@ const STUDIO_FALLBACK = {
   instagram: 'casafe.pilates',
   email: 'casafe.pilates@gmail.com',
   openHours: 'Lunes a viernes de 8 a 20, sábados de 9 a 13',
+  /**
+   * La línea que el diseño pone debajo de la dirección. Va por la misma
+   * vía que el resto: si el estudio inserta `studio_parking` en
+   * studio_settings, manda esa; Configuración la muestra sola porque la
+   * pantalla se arma desde la tabla. Vacía, la línea no se dibuja.
+   */
+  parking: 'Estacionamiento exclusivo para alumnas',
 }
 
 type Studio = typeof STUDIO_FALLBACK
+
+/**
+ * El logotipo. Estas tres líneas no son datos del estudio sino parte de la
+ * marca —vienen dibujadas así en el manual— y por eso viven acá y no en
+ * studio_settings: cambiarlas es rehacer el logo, no ajustar un parámetro.
+ * El nombre sí sale de la base, y se parte en líneas como en el manual.
+ */
+const MARCA = {
+  sobre: 'Pilates Studio',
+  bajo: 'Wellness & Movement',
+  desde: 'ESTD / 2026',
+}
+
+/**
+ * La bajada del manual, palabra por palabra. Es copy de la clienta, no
+ * texto de relleno, y el paréntesis final va en negrita como en el diseño.
+ */
+const BAJADA = {
+  lineas: [
+    'Estudio boutique de Pilates y movimiento consciente,',
+    'pensado como una experiencia integral del bienestar,',
+  ],
+  cierre: '( El movimiento se convierte en pausa )',
+}
 
 interface DisciplineStyle { dot: string; bg: string; text: string; blurb: string }
 
@@ -53,22 +81,58 @@ interface DisciplineStyle { dot: string; bg: string; text: string; blurb: string
  * el estudio no dicta. Mostrar menos es recuperable; prometer de más, no.
  */
 const ESTILO_GENERICO: DisciplineStyle = {
-  dot: '#C4735A', bg: '#FDEEE8', text: '#8B3A25', blurb: '',
+  dot: '#847164', bg: '#bcbaae', text: '#000000', blurb: '',
 }
 
 /** Vacío a propósito: las disciplinas salen del catálogo (migración 0011). */
 const DISCIPLINE_FALLBACK: Record<string, DisciplineStyle> = {}
 
-const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
-
-/** La inicial del logo sale del nombre: escrita a mano queda la de otro estudio. */
-function inicial(nombre: string): string {
-  return nombre.trim().charAt(0).toUpperCase()
+/**
+ * Las fotos que mandó la clienta, atadas a la disciplina por nombre. Vive
+ * acá y no en el catálogo porque `disciplines` no tiene columna de imagen:
+ * el día que la tenga, esto se borra y la foto viaja con el dato. Una
+ * disciplina sin foto se dibuja igual, sin el bloque de imagen.
+ */
+const FOTO_DISCIPLINA: Record<string, string> = {
+  reformer: '/marca/reformer.jpg',
+  prenatal: '/marca/prenatal.jpg',
+  embarazadas: '/marca/prenatal.jpg',
 }
+
+function fotoDe(nombre: string): string | null {
+  const limpio = nombre
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+  const clave = Object.keys(FOTO_DISCIPLINA).find((k) => limpio.includes(k))
+  return clave ? FOTO_DISCIPLINA[clave] : null
+}
+
+const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
 /** Los números de la web salen de la grilla, y un "1 disciplinas" delata que no. */
 function plural(n: number, uno: string, varios: string): string {
   return n === 1 ? uno : varios
+}
+
+/**
+ * El nombre partido en líneas, como en el manual: CASA arriba, FE abajo.
+ * Un nombre de una sola palabra queda en una línea sola, sin inventarle un corte.
+ */
+function lineasDelNombre(nombre: string): string[] {
+  return nombre.trim().split(/\s+/).filter(Boolean)
+}
+
+/**
+ * La descripción de una disciplina, partida en las líneas cortas del
+ * diseño. El catálogo guarda un texto libre: si trae saltos de línea o
+ * puntos medios los respeta, y si es una frase sola queda una línea.
+ */
+function lineasDelBlurb(blurb: string): string[] {
+  return blurb
+    .split(/\n|·|;/)
+    .map((l) => l.trim())
+    .filter(Boolean)
 }
 
 // ---------------------------------------------------------------
@@ -124,7 +188,7 @@ function useContacto(): (text: string) => string | null {
 
 function Instagram({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
       <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
       <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
@@ -267,31 +331,31 @@ function useParallax(factor: number) {
   return ref
 }
 
-/** Inclinación 3D siguiendo el mouse. */
-function TiltCard({ children, className }: { children: React.ReactNode; className?: string }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const onMove = (e: React.MouseEvent) => {
-    const el = ref.current
-    if (!el) return
-    const rect = el.getBoundingClientRect()
-    const px = (e.clientX - rect.left) / rect.width - 0.5
-    const py = (e.clientY - rect.top) / rect.height - 0.5
-    el.style.transform = `perspective(800px) rotateY(${px * 7}deg) rotateX(${py * -7}deg) translateY(-4px)`
-  }
-  const onLeave = () => {
-    const el = ref.current
-    if (el) el.style.transform = ''
-  }
+// ---------------------------------------------------------------
+// Piezas tipográficas de la marca
+//
+// Dos gestos, medidos sobre el manual: la Montserrat en mayúsculas va con
+// 0.12em de tracking, y la Bodoni de titulares con interlínea 0.88. Están
+// acá y no repetidos en cada sección para que un ajuste sea un solo lugar.
+// ---------------------------------------------------------------
+function Rotulo({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div
-      ref={ref}
-      onMouseMove={onMove}
-      onMouseLeave={onLeave}
-      className={cn('transition-transform duration-300 will-change-transform', className)}
-    >
+    <p className={cn('eyebrow text-[11px] md:text-xs text-foreground/60', className)}>
       {children}
-    </div>
+    </p>
   )
+}
+
+function Titular({
+  children,
+  className,
+  as: Tag = 'h2',
+}: {
+  children: React.ReactNode
+  className?: string
+  as?: 'h1' | 'h2' | 'h3'
+}) {
+  return <Tag className={cn('display uppercase', className)}>{children}</Tag>
 }
 
 // ---------------------------------------------------------------
@@ -302,16 +366,17 @@ function Nav() {
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24)
+    const onScroll = () => setScrolled(window.scrollY > 120)
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  // El orden y los rótulos son los del manual, en mayúsculas.
   const links = [
-    { href: '#estudio', label: 'El estudio' },
-    { href: '#disciplinas', label: 'Disciplinas' },
+    { href: '#estudio', label: 'Estudio' },
     { href: '#planes', label: 'Planes' },
+    { href: '#disciplinas', label: 'Disciplinas' },
     { href: '#horarios', label: 'Horarios' },
     { href: '#contacto', label: 'Contacto' },
   ]
@@ -319,36 +384,49 @@ function Nav() {
   return (
     <header
       className={cn(
-        'fixed top-0 inset-x-0 z-50 transition-all duration-500',
-        scrolled || menuOpen
-          ? 'bg-background/90 backdrop-blur-md shadow-sm py-2.5'
-          : 'bg-transparent py-5'
+        // Sticky y no fixed: así la barra ocupa su lugar en el flujo y el
+        // hero no necesita un margen superior a mano que quede desfasado
+        // cuando cambia la altura de la barra.
+        'sticky top-0 z-50 transition-all duration-500 bg-background',
+        scrolled || menuOpen ? 'py-3 shadow-[0_1px_0_0_var(--border)]' : 'py-5'
       )}
     >
-      <div className="max-w-6xl mx-auto px-5 flex items-center justify-between">
-        <a href="#" className="flex items-center gap-2.5" onClick={() => setMenuOpen(false)}>
-          <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-serif font-bold text-base">{inicial(studio.name)}</span>
-          </div>
-          <span className="font-serif font-semibold text-foreground text-lg">{studio.name}</span>
+      <div className="max-w-6xl mx-auto px-5 flex items-center gap-8">
+        {/* El logotipo aparece recién cuando el hero salió de pantalla: en el
+            manual la barra arranca limpia, pero más abajo hay que saber de
+            quién es la página. */}
+        <a
+          href="#"
+          onClick={() => setMenuOpen(false)}
+          className={cn(
+            'display text-lg uppercase tracking-tight transition-all duration-500 shrink-0',
+            // En el celular no hay barra de links que sostenga la marca, así
+            // que el logotipo va siempre; en desktop aparece al scrollear,
+            // como en el manual.
+            scrolled
+              ? 'opacity-100 w-auto'
+              : 'md:opacity-0 md:w-0 md:overflow-hidden md:pointer-events-none'
+          )}
+        >
+          {studio.name}
         </a>
 
-        <nav className="hidden md:flex items-center gap-7">
+        <nav className="hidden md:flex items-center gap-8 lg:gap-10">
           {links.map((l) => (
             <a
               key={l.href}
               href={l.href}
-              className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors"
+              className="eyebrow text-[11px] lg:text-xs text-foreground hover:text-primary-fuerte transition-colors"
             >
               {l.label}
             </a>
           ))}
         </nav>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 ml-auto">
           <Link
             href="/sistema"
-            className="px-4 py-2 rounded-xl border border-foreground/15 text-sm font-semibold text-foreground hover:bg-foreground hover:text-background transition-colors"
+            className="eyebrow text-[11px] lg:text-xs px-5 py-2.5 rounded-full border border-foreground text-foreground hover:bg-foreground hover:text-background transition-colors"
           >
             Ingresar
           </Link>
@@ -356,9 +434,9 @@ function Nav() {
             onClick={() => setMenuOpen((o) => !o)}
             aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}
             aria-expanded={menuOpen}
-            className="md:hidden w-10 h-10 rounded-xl border border-foreground/15 flex items-center justify-center text-foreground"
+            className="md:hidden w-10 h-10 rounded-full border border-foreground/25 flex items-center justify-center text-foreground"
           >
-            {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {menuOpen ? <X className="w-4.5 h-4.5" /> : <Menu className="w-4.5 h-4.5" />}
           </button>
         </div>
       </div>
@@ -370,14 +448,14 @@ function Nav() {
           menuOpen ? 'max-h-96' : 'max-h-0'
         )}
       >
-        <nav className="px-5 pt-3 pb-5 flex flex-col gap-1 bg-background/90 backdrop-blur-md">
+        <nav className="px-5 pt-4 pb-5 flex flex-col">
           {links.map((l, i) => (
             <a
               key={l.href}
               href={l.href}
               onClick={() => setMenuOpen(false)}
               className={cn(
-                'py-3 px-2 rounded-xl text-base font-medium text-foreground/80 hover:bg-primary/8 hover:text-primary transition-all border-b border-border/60 last:border-0',
+                'eyebrow text-xs py-3.5 text-foreground border-b border-border last:border-0',
                 menuOpen && 'fade-up'
               )}
               style={{ animationDelay: `${i * 60}ms` }}
@@ -391,114 +469,85 @@ function Nav() {
   )
 }
 
-function Hero({ schedule }: { schedule: PublicClass[] }) {
+/**
+ * El hero es el logotipo del manual sobre la foto, con la textura de óxido
+ * encima para sacarle el plano perfecto. El texto va en natural (#e1dfdb),
+ * no en blanco: es el color de la marca y el manual lo usa así.
+ */
+function Hero() {
+  const { studio } = useLanding()
   const wa = useWa()
   const prueba = wa('¡Hola! Quiero reservar mi primera clase de prueba 🙌')
-  const words = ['Fuerza,', 'control', 'y', 'calma.']
-
-  // Los chips salen de la grilla real. Sin grilla no se dibujan: eran dos
-  // números escritos a mano y le mentían el tamaño del estudio a quien entra.
-  const cupos = schedule.map((c) => c.capacity)
-  const minCupo = cupos.length ? Math.min(...cupos) : 0
-  const maxCupo = cupos.length ? Math.max(...cupos) : 0
+  const lineas = lineasDelNombre(studio.name)
 
   return (
-    <section className="relative min-h-screen flex items-center overflow-hidden">
-      {/* Imagen de fondo con zoom lento */}
+    <section className="relative h-[calc(88vh-4.5rem)] min-h-[520px] max-h-[820px] flex items-center justify-center overflow-hidden">
       <div className="absolute inset-0">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/pilates.jpg"
-          alt="Clase de Pilates Reformer en el estudio"
-          className="w-full h-full object-cover kenburns"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/75 md:via-background/55 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background to-transparent" />
+        {/* El recorte apaisado pesa 290 KB y en un teléfono no se ve entero.
+            `images.unoptimized` está en true, así que la versión chica hay
+            que servirla a mano — Next no la genera. */}
+        {/* `contents` para que la que dimensione sea la <img>: un <picture>
+            inline no tiene alto y el h-full de adentro daría cero. */}
+        <picture className="contents">
+          <source media="(max-width: 640px)" srcSet="/marca/hero-movil.jpg" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/marca/hero.jpg"
+            alt="Clase de Pilates Reformer en el estudio"
+            className="w-full h-full object-cover kenburns"
+          />
+        </picture>
+        <div aria-hidden className="absolute inset-0 textura-oxido" />
+        <div aria-hidden className="absolute inset-0 bg-foreground/35" />
       </div>
 
-      <div className="relative max-w-6xl mx-auto px-5 w-full pt-28 pb-24">
-        <div className="max-w-xl">
-          <p className="fade-up text-[11px] md:text-xs font-bold tracking-[0.3em] text-primary uppercase mb-5" style={{ animationDelay: '200ms' }}>
-            Estudio de Pilates
-          </p>
+      <div className="relative text-center px-5">
+        <p className="fade-up eyebrow font-bold text-xs md:text-base text-background" style={{ animationDelay: '150ms' }}>
+          {MARCA.sobre}
+        </p>
 
-          <h1 className="font-serif text-5xl md:text-7xl leading-[1.04] text-foreground mb-6">
-            {words.map((w, i) => (
-              <span key={w} className="word-mask mr-[0.22em]">
+        <h1 className="display-xl display text-background uppercase my-3 md:my-5">
+          {/* Una línea por palabra, como en el manual: CASA arriba, FE abajo.
+              El `word-mask` va adentro y no en el bloque porque es
+              inline-block: puesto afuera, las palabras se pegan en un renglón. */}
+          {lineas.map((l, i) => (
+            <span key={l} className="block text-[19vw] sm:text-[15vw] md:text-[9.5rem] lg:text-[11rem]">
+              <span className="word-mask">
                 <span
-                  className={cn('word-rise', (w === 'control' || w === 'calma.') && 'italic text-primary')}
-                  style={{ animationDelay: `${300 + i * 120}ms` }}
+                  className="word-rise"
+                  style={{ animationDelay: `${300 + i * 140}ms` }}
                 >
-                  {w}
+                  {l}
                 </span>
               </span>
-            ))}
-            <br />
-            <span className="word-mask">
-              <span className="word-rise text-3xl md:text-5xl text-foreground/70" style={{ animationDelay: '800ms' }}>
-                En cada movimiento.
-              </span>
             </span>
-          </h1>
+          ))}
+        </h1>
 
-          <p className="fade-up text-base md:text-lg text-foreground/70 leading-relaxed mb-9 max-w-md" style={{ animationDelay: '950ms' }}>
-            Grupos reducidos, seguimiento real y un espacio pensado para que tu
-            cuerpo trabaje mejor — sea cual sea tu punto de partida.
-          </p>
+        <p className="fade-up eyebrow text-xs md:text-base text-background" style={{ animationDelay: '700ms' }}>
+          {MARCA.bajo}
+        </p>
+        <p className="fade-up eyebrow text-xs md:text-base text-background/85 mt-2" style={{ animationDelay: '800ms' }}>
+          {MARCA.desde}
+        </p>
 
-          <div className="fade-up flex flex-wrap items-center gap-3" style={{ animationDelay: '1100ms' }}>
-            {prueba && (
-              <a
-                href={prueba}
-                target="_blank"
-                rel="noreferrer"
-                className="group flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-primary text-primary-foreground text-sm font-bold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 transition-all"
-              >
-                <Sparkles className="w-4 h-4" />
-                Probá tu primera clase
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </a>
-            )}
-            {/* Sin WhatsApp, "Ver planes" queda como única acción y toma el peso. */}
-            <a
-              href="#planes"
-              className={cn(
-                'px-6 py-3.5 rounded-2xl text-sm font-bold transition-all',
-                prueba
-                  ? 'border border-foreground/20 text-foreground hover:bg-foreground hover:text-background'
-                  : 'bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5'
-              )}
-            >
-              Ver planes
-            </a>
-          </div>
-        </div>
+        {prueba && (
+          <a
+            href={prueba}
+            target="_blank"
+            rel="noreferrer"
+            className="fade-up eyebrow text-[11px] md:text-xs inline-block mt-9 px-7 py-3 rounded-full border border-background/70 text-background hover:bg-background hover:text-foreground transition-colors"
+            style={{ animationDelay: '950ms' }}
+          >
+            Reservá tu clase de prueba
+          </a>
+        )}
       </div>
-
-      {/* Chips flotantes */}
-      {schedule.length > 0 && (
-        <div className="absolute right-10 top-1/3 hidden lg:flex flex-col gap-4">
-          <div className="float-y bg-background/80 backdrop-blur rounded-2xl px-5 py-4 shadow-lg border border-border">
-            <p className="text-2xl font-bold text-foreground">{schedule.length}</p>
-            <p className="text-xs text-muted-foreground">
-              {plural(schedule.length, 'clase por semana', 'clases por semana')}
-            </p>
-          </div>
-          <div className="float-y-slow bg-background/80 backdrop-blur rounded-2xl px-5 py-4 shadow-lg border border-border ml-10">
-            <p className="text-2xl font-bold text-foreground">
-              {minCupo === maxCupo ? maxCupo : `${minCupo}–${maxCupo}`}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {plural(maxCupo, 'persona por clase', 'personas por clase')}
-            </p>
-          </div>
-        </div>
-      )}
 
       <a
         href="#estudio"
         aria-label="Bajar al contenido"
-        className="absolute bottom-7 left-1/2 -translate-x-1/2 text-foreground/50 hover:text-primary transition-colors"
+        className="absolute bottom-6 left-1/2 -translate-x-1/2 text-background/70 hover:text-background transition-colors"
       >
         <ChevronDown className="w-6 h-6 scroll-hint" />
       </a>
@@ -506,48 +555,40 @@ function Hero({ schedule }: { schedule: PublicClass[] }) {
   )
 }
 
-function Marquee() {
-  const { disciplineNames } = useLanding()
-  const items = disciplineNames
-  // Sin catálogo quedaba una banda naranja vacía cruzando la página.
-  if (items.length === 0) return null
-  // La cinta se repite hasta llenar el ancho: con una sola disciplina, tres
-  // copias no alcanzan y el bucle se ve cortado a la mitad.
-  const copias = Math.max(3, Math.ceil(12 / items.length))
-  const row = Array.from({ length: copias }, () => items).flat()
+/** La bajada del manual: tres líneas centradas, la última entre paréntesis. */
+function Bajada() {
   return (
-    <div className="relative -rotate-2 -mx-4 my-2 z-10">
-      <div className="bg-primary py-3.5 overflow-hidden shadow-md">
-        <div className="marquee-track">
-          {[0, 1].map((half) => (
-            <div key={half} className="flex shrink-0">
-              {row.map((item, i) => (
-                <span
-                  key={`${half}-${i}`}
-                  className="font-serif italic text-primary-foreground/95 text-lg md:text-xl whitespace-nowrap px-6 flex items-center gap-6"
-                >
-                  {item} <span className="text-primary-foreground/50 not-italic text-sm">✦</span>
-                </span>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+    <section className="py-16 md:py-24 px-5">
+      <Reveal className="max-w-3xl mx-auto text-center">
+        {BAJADA.lineas.map((l) => (
+          <p key={l} className="eyebrow text-[11px] md:text-sm text-foreground leading-relaxed">
+            {l}
+          </p>
+        ))}
+        <p className="eyebrow font-bold text-[11px] md:text-sm text-foreground leading-relaxed">
+          {BAJADA.cierre}
+        </p>
+      </Reveal>
+    </section>
   )
 }
 
+/**
+ * El tríptico de fotos del manual y, debajo, el bloque del estudio. Los
+ * números se cuentan sobre lo publicado: las clases, las profesoras y las
+ * salas salen de la grilla, y las disciplinas del catálogo, que es donde el
+ * estudio las edita. Antes había un respaldo escrito a mano (23 clases, 6
+ * disciplinas) que aparecía justo cuando la consulta no volvía: el momento
+ * en que nadie podía desmentirlo. En cero no se muestra: es que no hay dato.
+ */
 function Estudio({ schedule }: { schedule: PublicClass[] }) {
   const { disciplineNames } = useLanding()
-  const imgRef = useParallax(0.06)
+  const fotos = [
+    { src: '/marca/estudio-pelota.jpg', alt: 'Alumna estirando con pelota en el estudio' },
+    { src: '/marca/estudio-aro.jpg', alt: 'Trabajo de piernas con aro de Pilates' },
+    { src: '/marca/estudio-sala.jpg', alt: 'Sala del estudio con camas de Reformer' },
+  ]
 
-  // Los números se cuentan sobre lo publicado: las clases, las profesoras y
-  // las salas salen de la grilla, y las disciplinas del catálogo, que es
-  // donde el estudio las edita — contarlas en la grilla anunciaba seis
-  // arriba mientras abajo se dibujaba una sola tarjeta. Antes había un
-  // respaldo escrito a mano (23 clases, 6 disciplinas, 4 profesoras, 3
-  // salas) que aparecía justo cuando la consulta no volvía: el momento en
-  // que nadie podía desmentirlo. En cero no se muestra: es que no hay dato.
   const cuenta = (valor: (c: PublicClass) => string) =>
     new Set(schedule.map(valor)).size
   const profesoras = cuenta((c) => c.teacher_name)
@@ -555,140 +596,63 @@ function Estudio({ schedule }: { schedule: PublicClass[] }) {
   const stats = [
     { n: schedule.length, label: plural(schedule.length, 'clase por semana', 'clases por semana') },
     { n: disciplineNames.length, label: plural(disciplineNames.length, 'disciplina', 'disciplinas') },
-    { n: profesoras, label: plural(profesoras, 'instructor certificado', 'instructores certificados') },
+    { n: profesoras, label: plural(profesoras, 'profesora', 'profesoras') },
     { n: salas, label: plural(salas, 'sala equipada', 'salas equipadas') },
   ].filter((s) => s.n > 0)
 
   return (
-    <section id="estudio" className="relative py-24 md:py-32 overflow-hidden">
-      <span
-        aria-hidden
-        className="text-outline font-serif absolute -top-4 left-0 text-[22vw] leading-none font-bold select-none pointer-events-none"
-      >
-        Pilates
-      </span>
-
-      <div className="relative max-w-6xl mx-auto px-5 grid md:grid-cols-2 gap-14 items-center">
-        <div>
-          <Reveal>
-            <p className="text-[11px] font-bold tracking-[0.3em] text-primary uppercase mb-4">El estudio</p>
-          </Reveal>
-          <Reveal delay={100}>
-            <h2 className="font-serif text-4xl md:text-5xl text-foreground leading-tight mb-6">
-              Un espacio para <em className="text-primary">moverte bien</em>, a tu ritmo
-            </h2>
-          </Reveal>
-          <Reveal delay={200}>
-            <p className="text-foreground/70 leading-relaxed mb-8">
-              No creemos en clases multitudinarias ni en rutinas copiadas. Cada
-              persona entra con una historia distinta — una lesión, un objetivo,
-              unas ganas — y el plan se arma alrededor de eso. Equipamiento
-              completo de Reformer, profesores certificados y grupos chicos donde
-              tu nombre se conoce desde el primer día.
-            </p>
-          </Reveal>
-
-          {stats.length > 0 && (
-            <div className="grid grid-cols-2 gap-x-8 gap-y-6">
-              {stats.map((s, i) => (
-                <Reveal key={s.label} delay={250 + i * 100}>
-                  <div className="border-l-2 border-primary/40 pl-4">
-                    <p className="text-4xl font-bold text-foreground font-serif">
-                      <Counter target={s.n} />
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
-                  </div>
-                </Reveal>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <Reveal delay={150} className="relative">
-          <div className="absolute -inset-3 translate-x-6 translate-y-6 rounded-[2rem] border-2 border-primary/25" />
-          <div ref={imgRef} className="relative rounded-[2rem] overflow-hidden shadow-2xl">
+    <section id="estudio" className="scroll-mt-24">
+      <div className="grid grid-cols-3 gap-1 md:gap-1.5">
+        {fotos.map((f, i) => (
+          <Reveal key={f.src} delay={i * 120}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/Pilates2.jpg"
-              alt="Clientes en clase de Reformer"
-              className="w-full h-[420px] md:h-[520px] object-cover hover:scale-105 transition-transform duration-700"
+              src={f.src}
+              alt={f.alt}
+              className="w-full h-[38vw] md:h-[30rem] object-cover"
             />
-          </div>
-        </Reveal>
-      </div>
-    </section>
-  )
-}
-
-function Disciplinas() {
-  const { disciplines, disciplineNames } = useLanding()
-  // Sin catálogo no se dibuja la sección: sacado el respaldo escrito a
-  // mano, quedaría el título prometiendo disciplinas y abajo nada.
-  if (disciplineNames.length === 0) return null
-  return (
-    <section id="disciplinas" className="py-24 bg-foreground/[0.025]">
-      <div className="max-w-6xl mx-auto px-5">
-        <Reveal>
-          <p className="text-[11px] font-bold tracking-[0.3em] text-primary uppercase mb-4">Disciplinas</p>
-        </Reveal>
-        <div className="flex items-end justify-between gap-6 flex-wrap mb-12">
-          <Reveal delay={100}>
-            <h2 className="font-serif text-4xl md:text-5xl text-foreground leading-tight">
-              {/* Sin número: el catálogo lo edita el estudio, y un "Seis" escrito
-                  a mano se vuelve mentira la primera vez que agregue una. */}
-              Maneras de <em className="text-primary">volver al cuerpo</em>
-            </h2>
           </Reveal>
-          {/* La bajada solo tiene sentido si hay más de una disciplina para combinar. */}
-          {disciplineNames.length > 1 && (
-            <Reveal delay={200}>
-              <p className="text-sm text-foreground/60 max-w-xs">
-                Todas combinables entre sí según tu plan. Empezá por una, probalas todas.
-              </p>
-            </Reveal>
-          )}
-        </div>
+        ))}
+      </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {disciplineNames.map((name, i) => {
-            const s = disciplines[name] ?? ESTILO_GENERICO
-            return (
-            <Reveal key={name} delay={i * 90}>
-              <div
-                className="group relative rounded-3xl border border-border bg-card p-7 overflow-hidden transition-all duration-500 hover:-translate-y-1.5 hover:shadow-xl cursor-default h-full"
-              >
-                <div
-                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                  style={{ backgroundColor: s.bg }}
-                />
-                <div className="relative">
-                  <div className="flex items-center justify-between mb-5">
-                    <span className="text-xs font-bold text-muted-foreground/60">
-                      {String(i + 1).padStart(2, '0')}
-                    </span>
-                    <span
-                      className="w-3 h-3 rounded-full transition-transform duration-500 group-hover:scale-[1.8]"
-                      style={{ backgroundColor: s.dot }}
-                    />
-                  </div>
-                  <h3
-                    className="font-serif text-2xl text-foreground mb-2.5 transition-colors duration-500"
-                    style={{ color: undefined }}
-                  >
-                    {name}
-                  </h3>
-                  <p className="text-sm leading-relaxed text-foreground/60">{s.blurb}</p>
-                </div>
-              </div>
-            </Reveal>
-            )
-          })}
-        </div>
+      <div className="max-w-4xl mx-auto px-5 pt-16 md:pt-24 pb-20 md:pb-28 text-center">
+        <Reveal>
+          <Titular className="text-[9vw] sm:text-5xl md:text-6xl">
+            Bienestar &amp; Movimiento
+          </Titular>
+        </Reveal>
+        <Reveal delay={120}>
+          <p className="text-sm md:text-base text-foreground/75 leading-relaxed mt-8 max-w-2xl mx-auto">
+            No creemos en clases multitudinarias ni en rutinas copiadas. Cada
+            persona entra con una historia distinta — una lesión, un objetivo,
+            unas ganas — y el plan se arma alrededor de eso. Equipamiento
+            completo de Reformer, profesoras certificadas y grupos chicos donde
+            tu nombre se conoce desde el primer día.
+          </p>
+        </Reveal>
+
+        {stats.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-14">
+            {stats.map((s, i) => (
+              <Reveal key={s.label} delay={200 + i * 90}>
+                <p className="display text-4xl md:text-5xl text-foreground">
+                  <Counter target={s.n} />
+                </p>
+                <p className="eyebrow text-[10px] text-foreground/55 mt-2.5">{s.label}</p>
+              </Reveal>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   )
 }
 
+/**
+ * Los planes, en la retícula de seis del manual: tarjetas en verde claro
+ * con filete negro. Si el estudio publica otro número de planes la grilla
+ * se acomoda sola — seis es lo que hay hoy, no una constante.
+ */
 function Planes({ plans }: { plans: PublicPlan[] }) {
   const contacto = useContacto()
   const reservaPrueba = contacto('Quiero reservar mi clase de prueba')
@@ -698,9 +662,6 @@ function Planes({ plans }: { plans: PublicPlan[] }) {
     .sort((a, b) => a.price - b.price)
     .map((plan) => {
       // 0 = la vigencia se cuenta en días; ausente = un mes (ver PublicPlan).
-      // Un respaldo solo para las tres líneas de la tarjeta, y el mismo para
-      // las tres: el plan pago medido en días no existe todavía, y el único
-      // que se mide así —el pase de prueba— está filtrado de esta lista.
       const meses = plan.duration_months ?? 1
       // Cobrar por mes y durar un mes son lo mismo acá: el precio y las
       // clases son de todo el período, no de un mes suelto adentro.
@@ -715,33 +676,29 @@ function Planes({ plans }: { plans: PublicPlan[] }) {
     })
 
   return (
-    <section id="planes" className="py-24 md:py-32">
+    <section id="planes" className="scroll-mt-24 py-20 md:py-28 bg-muted">
       <div className="max-w-6xl mx-auto px-5">
-        <Reveal>
-          <p className="text-[11px] font-bold tracking-[0.3em] text-primary uppercase mb-4">Planes</p>
-        </Reveal>
-        <Reveal delay={100}>
-          <h2 className="font-serif text-4xl md:text-5xl text-foreground leading-tight mb-4">
-            Planes simples, <em className="text-primary">sin letra chica</em>
-          </h2>
-        </Reveal>
-        <Reveal delay={180}>
-          <p className="text-foreground/60 max-w-lg mb-12">
-            Elegí cuántas veces por semana querés venir. Sin matrícula, sin
-            permanencia mínima.
+        <Reveal className="text-center mb-14">
+          <Rotulo>Planes</Rotulo>
+          <Titular className="text-[9vw] sm:text-5xl md:text-6xl mt-5">
+            Elegí tu frecuencia
+          </Titular>
+          <p className="text-sm text-foreground/65 max-w-md mx-auto mt-6">
+            Sin matrícula y sin permanencia mínima. Lo que elegís es cuántas
+            veces por semana venís.
           </p>
         </Reveal>
 
         {trial && (
-          <Reveal delay={220}>
-            <div className="relative overflow-hidden rounded-3xl bg-primary text-primary-foreground p-8 md:p-10 mb-10 flex flex-wrap items-center justify-between gap-6 shadow-xl shadow-primary/20">
-              <div className="absolute -right-10 -top-14 w-52 h-52 rounded-full bg-primary-foreground/10" />
-              <div className="absolute -right-24 top-10 w-52 h-52 rounded-full bg-primary-foreground/5" />
-              <div className="relative">
-                <p className="font-serif italic text-2xl md:text-3xl mb-1.5">
-                  {trial.price === 0 ? 'Tu primera clase es gratis' : `Clase de prueba — $${trial.price.toLocaleString('es-AR')}`}
+          <Reveal delay={120}>
+            <div className="rounded-3xl bg-foreground text-background px-8 py-9 md:px-12 mb-10 flex flex-wrap items-center justify-between gap-6">
+              <div>
+                <p className="display text-2xl md:text-3xl uppercase">
+                  {trial.price === 0
+                    ? 'Tu primera clase es gratis'
+                    : `Clase de prueba — $${trial.price.toLocaleString('es-AR')}`}
                 </p>
-                <p className="text-sm text-primary-foreground/80 max-w-md">
+                <p className="text-sm text-background/70 max-w-md mt-3">
                   {trial.description || 'Vení a conocer el estudio y probá una clase, sin compromiso.'}
                 </p>
               </div>
@@ -750,10 +707,10 @@ function Planes({ plans }: { plans: PublicPlan[] }) {
                   href={reservaPrueba}
                   target="_blank"
                   rel="noreferrer"
-                  className="relative group flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-primary-foreground text-primary text-sm font-bold hover:-translate-y-0.5 transition-transform"
+                  className="eyebrow text-[11px] group flex items-center gap-2 px-7 py-3.5 rounded-full bg-background text-foreground hover:opacity-85 transition-opacity"
                 >
                   Reservar mi lugar
-                  <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                  <ArrowUpRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                 </a>
               )}
             </div>
@@ -763,107 +720,92 @@ function Planes({ plans }: { plans: PublicPlan[] }) {
         {paid.length === 0 ? (
           <Reveal>
             {/* Sin canal escrito a mano: puede no haber WhatsApp cargado. */}
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-foreground/60 text-center">
               Consultanos para conocer los planes vigentes.
             </p>
           </Reveal>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 items-stretch">
             {paid.map(({ plan, consulta, meses, mensual, sufijoPrecio }, i) => (
-              <Reveal key={plan.id} delay={i * 100} className="h-full">
-                <TiltCard className="h-full">
-                  <div
-                    className={cn(
-                      'relative h-full rounded-3xl border bg-card overflow-hidden flex flex-col',
-                      plan.popular ? 'border-primary shadow-xl shadow-primary/10' : 'border-border shadow-sm'
+              <Reveal key={plan.id} delay={i * 80} className="h-full">
+                <div
+                  className={cn(
+                    'group relative h-full rounded-[1.75rem] border border-foreground/25 bg-secondary p-7 md:p-8 flex flex-col transition-all duration-500 hover:-translate-y-1',
+                    plan.popular && 'border-foreground shadow-[0_0_0_1px_var(--color-foreground)]'
+                  )}
+                >
+                  {plan.popular && (
+                    <span className="eyebrow absolute -top-2.5 left-7 text-[9px] px-3 py-1 rounded-full bg-foreground text-background">
+                      El más elegido
+                    </span>
+                  )}
+
+                  <h3 className="display text-2xl md:text-3xl uppercase text-foreground">{plan.name}</h3>
+                  {plan.description && (
+                    <p className="text-xs text-foreground/65 mt-2.5 leading-relaxed">{plan.description}</p>
+                  )}
+
+                  <div className="mt-7 mb-6 flex items-baseline gap-1.5">
+                    <span className="display text-4xl md:text-[2.75rem] text-foreground">
+                      ${plan.price.toLocaleString('es-AR')}
+                    </span>
+                    {/* Sin sufijo cuando el plan se mide en días: ahí
+                        "/mes" promete otra cosa que lo que se cobra. */}
+                    {sufijoPrecio && (
+                      <span className="eyebrow text-[10px] text-foreground/60">{sufijoPrecio}</span>
                     )}
-                  >
-                    {plan.popular && (
-                      <span className="absolute top-4 right-4 text-[10px] font-bold px-2.5 py-1 rounded-full bg-primary text-primary-foreground">
-                        El más elegido
-                      </span>
-                    )}
-                    <div className="h-1.5" style={{ backgroundColor: plan.color }} />
-                    <div className="p-7 flex flex-col flex-1">
-                      <h3 className="font-serif text-2xl text-foreground">{plan.name}</h3>
-                      <p className="text-xs text-foreground/55 mt-1 mb-5 min-h-8">{plan.description}</p>
-
-                      <div className="mb-5">
-                        <span className="text-4xl font-bold text-foreground">
-                          ${plan.price.toLocaleString('es-AR')}
-                        </span>
-                        {/* Sin sufijo cuando el plan se mide en días: ahí
-                            "/mes" promete otra cosa que lo que se cobra. */}
-                        {sufijoPrecio && (
-                          <span className="text-sm text-muted-foreground">{sufijoPrecio}</span>
-                        )}
-                      </div>
-
-                      <ul className="space-y-2 text-sm text-foreground/70 mb-5">
-                        <li className="flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: plan.color }} />
-                          {/* Las clases son las de toda la membresía, así que
-                              "por mes" vale solo si la membresía dura un mes
-                              (de ahí `mensual`). El plazo, en la línea de abajo. */}
-                          {plan.class_count} {plural(plan.class_count, 'clase', 'clases')}
-                          {mensual ? ' por mes' : ''}
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: plan.color }} />
-                          {/* El mismo helper que Planes y el modal de asignación,
-                              para que las tres pantallas digan una sola cosa.
-                              Acá decía "Vigencia 30 días" para un plan de un mes
-                              de calendario, y un mes arrancado el 31/01 da 28:
-                              la promesa pública era más larga que la vigencia,
-                              en la página que se lee antes de pagar. */}
-                          {vigenciaTexto({
-                            durationDays: plan.duration_days,
-                            durationMonths: meses,
-                          })}
-                        </li>
-                        {/* Sin clases cargadas la división da infinito: la base
-                            no exige class_count > 0. */}
-                        {plan.class_count > 0 && (
-                          <li className="flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: plan.color }} />
-                            ${Math.round(plan.price / plan.class_count).toLocaleString('es-AR')} por clase
-                          </li>
-                        )}
-                      </ul>
-
-                      <div className="flex flex-wrap gap-1.5 mb-7">
-                        {plan.disciplines.map((d) => (
-                          <span
-                            key={d}
-                            className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                            style={{
-                              backgroundColor: `${plan.color}18`,
-                              color: plan.color,
-                            }}
-                          >
-                            {d}
-                          </span>
-                        ))}
-                      </div>
-
-                      {consulta && (
-                        <a
-                          href={consulta}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={cn(
-                            'mt-auto text-center py-3 rounded-2xl text-sm font-bold transition-all',
-                            plan.popular
-                              ? 'bg-primary text-primary-foreground hover:opacity-90'
-                              : 'border border-foreground/15 text-foreground hover:bg-foreground hover:text-background'
-                          )}
-                        >
-                          Consultar por este plan
-                        </a>
-                      )}
-                    </div>
                   </div>
-                </TiltCard>
+
+                  <ul className="eyebrow space-y-2.5 text-[10px] text-foreground/75 border-t border-foreground/15 pt-5">
+                    <li>
+                      {/* Las clases son las de toda la membresía, así que
+                          "por mes" vale solo si la membresía dura un mes
+                          (de ahí `mensual`). El plazo, en la línea de abajo. */}
+                      {plan.class_count} {plural(plan.class_count, 'clase', 'clases')}
+                      {mensual ? ' por mes' : ''}
+                    </li>
+                    <li>
+                      {/* El mismo helper que Planes y el modal de asignación,
+                          para que las tres pantallas digan una sola cosa. */}
+                      {vigenciaTexto({
+                        durationDays: plan.duration_days,
+                        durationMonths: meses,
+                      })}
+                    </li>
+                    {/* Sin clases cargadas la división da infinito: la base
+                        no exige class_count > 0. */}
+                    {plan.class_count > 0 && (
+                      <li>
+                        ${Math.round(plan.price / plan.class_count).toLocaleString('es-AR')} por clase
+                      </li>
+                    )}
+                  </ul>
+
+                  {plan.disciplines.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-6">
+                      {plan.disciplines.map((d) => (
+                        <span
+                          key={d}
+                          className="eyebrow text-[9px] px-2.5 py-1 rounded-full border border-foreground/25 text-foreground/70"
+                        >
+                          {d}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {consulta && (
+                    <a
+                      href={consulta}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="eyebrow mt-auto pt-7 text-[10px] text-foreground flex items-center gap-1.5 group-hover:gap-2.5 transition-all"
+                    >
+                      Consultar
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                </div>
               </Reveal>
             ))}
           </div>
@@ -873,6 +815,111 @@ function Planes({ plans }: { plans: PublicPlan[] }) {
   )
 }
 
+/**
+ * El bloque OPEN STUDIO del manual: cuándo abre, dónde queda y el
+ * estacionamiento. Todo sale de Configuración; lo que el estudio no cargó
+ * no se dibuja.
+ */
+function OpenStudio() {
+  const { studio } = useLanding()
+  return (
+    <section className="py-20 md:py-28 px-5">
+      <Reveal className="max-w-xl mx-auto text-center">
+        <Titular className="display text-3xl md:text-4xl leading-[0.95]">
+          Open
+          <br />
+          Studio
+        </Titular>
+
+        {studio.openHours && (
+          <p className="eyebrow text-[11px] md:text-sm text-foreground mt-10 leading-loose">
+            {studio.openHours}
+          </p>
+        )}
+
+        {studio.address && (
+          <p className="eyebrow text-[11px] md:text-sm text-foreground mt-8 leading-loose">
+            {studio.address}
+          </p>
+        )}
+
+        {studio.mapsUrl && (
+          <a
+            href={studio.mapsUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="eyebrow text-[10px] inline-flex items-center gap-1.5 mt-5 text-foreground hover:text-primary-fuerte transition-colors border-b border-current pb-0.5"
+          >
+            <MapPin className="w-3.5 h-3.5" />
+            Cómo llegar
+          </a>
+        )}
+
+        {studio.parking && (
+          <p className="eyebrow font-bold text-[11px] md:text-sm text-foreground mt-10">
+            {studio.parking}
+          </p>
+        )}
+      </Reveal>
+    </section>
+  )
+}
+
+/**
+ * Las disciplinas del catálogo, con la foto de la clienta cuando la hay.
+ * Sin catálogo no se dibuja la sección: sacado el respaldo escrito a mano,
+ * quedaría el título prometiendo disciplinas y abajo nada.
+ */
+function Disciplinas() {
+  const { disciplines, disciplineNames } = useLanding()
+  if (disciplineNames.length === 0) return null
+
+  return (
+    <section id="disciplinas" className="scroll-mt-24 border-t border-foreground/15">
+      <div
+        className={cn(
+          'max-w-6xl mx-auto grid divide-y md:divide-y-0 md:divide-x divide-foreground/15',
+          disciplineNames.length > 1 && 'md:grid-cols-2',
+          disciplineNames.length > 2 && 'lg:grid-cols-3'
+        )}
+      >
+        {disciplineNames.map((name, i) => {
+          const s = disciplines[name] ?? ESTILO_GENERICO
+          const foto = fotoDe(name)
+          const lineas = lineasDelBlurb(s.blurb)
+          return (
+            <Reveal key={name} delay={i * 120} className="px-6 py-16 md:py-20 text-center">
+              <Titular as="h3" className="text-3xl md:text-4xl leading-[0.95]">
+                {name}
+              </Titular>
+
+              {foto && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={foto}
+                  alt={`Clase de ${name}`}
+                  className="w-full max-w-xs mx-auto h-72 md:h-80 object-cover mt-9"
+                />
+              )}
+
+              {lineas.length > 0 && (
+                <div className={cn('space-y-1.5', foto ? 'mt-8' : 'mt-9')}>
+                  {lineas.map((l) => (
+                    <p key={l} className="eyebrow text-[10px] md:text-xs text-foreground/80">
+                      {l}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </Reveal>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+/** La grilla semanal publicada. Sin clases cargadas no se dibuja. */
 function Horarios({ schedule }: { schedule: PublicClass[] }) {
   const { disciplines } = useLanding()
   const todayIdx = Math.min((new Date().getDay() + 6) % 7, 5)
@@ -884,28 +931,26 @@ function Horarios({ schedule }: { schedule: PublicClass[] }) {
     .sort((a, b) => a.start_time.localeCompare(b.start_time))
 
   return (
-    <section id="horarios" className="py-24 bg-foreground/[0.025]">
+    <section id="horarios" className="scroll-mt-24 py-20 md:py-28 bg-muted">
       <div className="max-w-4xl mx-auto px-5">
-        <Reveal>
-          <p className="text-[11px] font-bold tracking-[0.3em] text-primary uppercase mb-4 text-center">Horarios</p>
-        </Reveal>
-        <Reveal delay={100}>
-          <h2 className="font-serif text-4xl md:text-5xl text-foreground leading-tight mb-10 text-center">
-            La grilla de <em className="text-primary">esta semana</em>
-          </h2>
+        <Reveal className="text-center mb-12">
+          <Rotulo>Horarios</Rotulo>
+          <Titular className="text-[9vw] sm:text-5xl md:text-6xl mt-5">
+            La semana
+          </Titular>
         </Reveal>
 
-        <Reveal delay={200}>
-          <div className="flex justify-center gap-1.5 flex-wrap mb-9">
+        <Reveal delay={100}>
+          <div className="flex justify-center gap-1 flex-wrap mb-10">
             {DAYS.map((d, i) => (
               <button
                 key={d}
                 onClick={() => setDay(i)}
                 className={cn(
-                  'px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300',
+                  'eyebrow text-[10px] px-4 py-2.5 rounded-full transition-colors duration-300',
                   day === i
-                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25 scale-105'
-                    : 'bg-card border border-border text-foreground/60 hover:border-primary/40 hover:text-foreground'
+                    ? 'bg-foreground text-background'
+                    : 'border border-foreground/20 text-foreground/60 hover:border-foreground hover:text-foreground'
                 )}
               >
                 {d}
@@ -914,9 +959,9 @@ function Horarios({ schedule }: { schedule: PublicClass[] }) {
           </div>
         </Reveal>
 
-        <div key={day} className="space-y-2.5">
+        <div key={day} className="divide-y divide-foreground/10 border-y border-foreground/10">
           {ofDay.length === 0 ? (
-            <p className="fade-up text-center text-sm text-muted-foreground py-10">
+            <p className="fade-up eyebrow text-center text-[10px] text-foreground/50 py-12">
               No hay clases programadas este día.
             </p>
           ) : (
@@ -925,27 +970,28 @@ function Horarios({ schedule }: { schedule: PublicClass[] }) {
               return (
                 <div
                   key={c.id}
-                  className="fade-up flex items-center gap-4 bg-card rounded-2xl border border-border px-5 py-4 hover:shadow-md hover:border-primary/30 transition-all"
-                  style={{ animationDelay: `${i * 70}ms` }}
+                  className="fade-up flex items-center gap-4 px-1 py-4 hover:bg-background/60 transition-colors"
+                  style={{ animationDelay: `${i * 60}ms` }}
                 >
-                  <div className="w-14 shrink-0 text-center">
-                    <p className="text-base font-bold text-foreground">{c.start_time.slice(0, 5)}</p>
-                    <p className="text-[10px] text-muted-foreground">{c.duration_minutes}min</p>
+                  <div className="w-16 shrink-0">
+                    <p className="display text-lg text-foreground">{c.start_time.slice(0, 5)}</p>
+                    <p className="eyebrow text-[9px] text-foreground/50">{c.duration_minutes}min</p>
                   </div>
-                  <div className="w-1 self-stretch rounded-full" style={{ backgroundColor: s?.dot ?? '#C4735A' }} />
+                  {/* El color lo pone el catálogo de disciplinas, no la hoja de estilos. */}
+                  <div className="w-px self-stretch" style={{ backgroundColor: s.dot }} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">{c.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">
+                    <p className="text-sm font-medium text-foreground truncate">{c.title}</p>
+                    <p className="eyebrow text-[9px] text-foreground/55 truncate mt-1">
                       {c.teacher_name} · {c.room}
                     </p>
                   </div>
-                  <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
+                  <div className="hidden sm:flex items-center gap-1.5 eyebrow text-[9px] text-foreground/55 shrink-0">
                     <Users className="w-3.5 h-3.5" />
                     hasta {c.capacity}
                   </div>
                   <span
-                    className="hidden md:inline-block text-[10px] font-semibold px-2.5 py-1 rounded-full shrink-0"
-                    style={{ backgroundColor: s?.bg, color: s?.text }}
+                    className="hidden md:inline-block eyebrow text-[9px] px-2.5 py-1 rounded-full shrink-0"
+                    style={{ backgroundColor: s.bg, color: s.text }}
                   >
                     {c.discipline}
                   </span>
@@ -955,9 +1001,9 @@ function Horarios({ schedule }: { schedule: PublicClass[] }) {
           )}
         </div>
 
-        <Reveal delay={150}>
-          <p className="text-center text-xs text-muted-foreground mt-8">
-            Los cupos se reservan por orden de llegada — escribinos para asegurar tu lugar.
+        <Reveal delay={120}>
+          <p className="eyebrow text-center text-[10px] text-foreground/50 mt-8">
+            Los cupos se reservan por orden de llegada
           </p>
         </Reveal>
       </div>
@@ -965,27 +1011,25 @@ function Horarios({ schedule }: { schedule: PublicClass[] }) {
   )
 }
 
-function Quote() {
-  const imgRef = useParallax(-0.12)
+function Cita() {
+  const imgRef = useParallax(-0.1)
   return (
-    <section className="relative py-36 md:py-44 overflow-hidden">
+    <section className="relative py-32 md:py-40 overflow-hidden">
       <div ref={imgRef} className="absolute -inset-y-20 inset-x-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/pilates3.jpg"
+          src="/marca/estudio-sala.jpg"
           alt=""
           aria-hidden
           className="w-full h-full object-cover scale-110"
         />
-        <div className="absolute inset-0 bg-foreground/70" />
+        <div aria-hidden className="absolute inset-0 bg-foreground/65" />
       </div>
       <Reveal className="relative max-w-3xl mx-auto px-5 text-center">
-        <p className="font-serif italic text-3xl md:text-5xl text-background leading-snug mb-6">
+        <p className="display text-3xl md:text-5xl text-background leading-tight">
           “La aptitud física es el primer requisito de la felicidad.”
         </p>
-        <p className="text-xs font-bold tracking-[0.3em] uppercase text-background/70">
-          Joseph Pilates
-        </p>
+        <p className="eyebrow text-[10px] text-background/70 mt-7">Joseph Pilates</p>
       </Reveal>
     </section>
   )
@@ -1000,158 +1044,114 @@ function Contacto({ plans }: { plans: PublicPlan[] }) {
   // precio lo pone él y arriba, en Planes, se muestra el que cargó. Escrita
   // sin condición, la página se contradecía a dos secciones de distancia.
   const pruebaGratis = plans.some((p) => p.is_trial && p.price === 0)
+
   return (
-    <section id="contacto" className="py-24 md:py-32">
-      <div className="max-w-6xl mx-auto px-5 grid md:grid-cols-2 gap-8 items-stretch">
-        <Reveal>
-          <div className="h-full bg-card rounded-3xl border border-border p-8 md:p-10">
-            <p className="text-[11px] font-bold tracking-[0.3em] text-primary uppercase mb-4">Contacto</p>
-            <h2 className="font-serif text-3xl md:text-4xl text-foreground mb-8">
-              Vení a <em className="text-primary">conocernos</em>
-            </h2>
+    <section id="contacto" className="scroll-mt-24 py-20 md:py-28 px-5">
+      <Reveal className="max-w-2xl mx-auto text-center">
+        <Rotulo>Contacto</Rotulo>
+        <Titular className="text-[9vw] sm:text-5xl md:text-6xl mt-5">
+          Vení a conocernos
+        </Titular>
+        <p className="text-sm md:text-base text-foreground/70 mt-7 max-w-lg mx-auto leading-relaxed">
+          Escribinos, contanos tu punto de partida y te recomendamos por dónde
+          arrancar.
+          {pruebaGratis ? ' La primera clase corre por nuestra cuenta.' : ''}
+        </p>
 
-            <ul className="space-y-5">
-              <li className="flex items-start gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <MapPin className="w-4.5 h-4.5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{studio.address}</p>
-                  {/* Sin link de Maps cargado queda la dirección sola, que ya alcanza. */}
-                  {studio.mapsUrl && (
-                    <a
-                      href={studio.mapsUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs text-primary font-medium hover:underline"
-                    >
-                      Cómo llegar →
-                    </a>
-                  )}
-                </div>
-              </li>
-              <li className="flex items-start gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <Clock className="w-4.5 h-4.5 text-primary" />
-                </div>
-                <p className="text-sm text-foreground/75 pt-2">{studio.openHours}</p>
-              </li>
-              <li className="flex items-start gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <Mail className="w-4.5 h-4.5 text-primary" />
-                </div>
-                <a
-                  href={`mailto:${studio.email}`}
-                  className="text-sm text-foreground/75 pt-2 hover:text-primary transition-colors"
-                >
-                  {studio.email}
-                </a>
-              </li>
-            </ul>
+        <div className="flex flex-wrap items-center justify-center gap-3 mt-10">
+          {/* Sin WhatsApp cargado, el mail es el canal: el cierre de la
+              página no puede quedar sin acción. */}
+          <a
+            href={empezar ?? `mailto:${studio.email}`}
+            target={empezar ? '_blank' : undefined}
+            rel={empezar ? 'noreferrer' : undefined}
+            className="eyebrow text-[11px] flex items-center gap-2 px-8 py-3.5 rounded-full bg-foreground text-background hover:opacity-85 transition-opacity"
+          >
+            {empezar ? <MessageCircle className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
+            {empezar ? 'Escribinos por WhatsApp' : 'Escribinos por mail'}
+          </a>
+          <a
+            href={`https://instagram.com/${studio.instagram}`}
+            target="_blank"
+            rel="noreferrer"
+            className="eyebrow text-[11px] flex items-center gap-2 px-8 py-3.5 rounded-full border border-foreground text-foreground hover:bg-foreground hover:text-background transition-colors"
+          >
+            <Instagram className="w-4 h-4" />
+            Instagram
+          </a>
+        </div>
 
-            <div className="flex gap-2.5 mt-9">
-              <a
-                href={`https://instagram.com/${studio.instagram}`}
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Instagram"
-                className="w-11 h-11 rounded-xl border border-border flex items-center justify-center text-foreground/60 hover:bg-primary hover:border-primary hover:text-primary-foreground transition-all hover:-translate-y-0.5"
-              >
-                <Instagram className="w-4.5 h-4.5" />
-              </a>
-              {masInfo && (
-                <a
-                  href={masInfo}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="WhatsApp"
-                  className="w-11 h-11 rounded-xl border border-border flex items-center justify-center text-foreground/60 hover:bg-[#25D366] hover:border-[#25D366] hover:text-white transition-all hover:-translate-y-0.5"
-                >
-                  <MessageCircle className="w-4.5 h-4.5" />
-                </a>
-              )}
-            </div>
-          </div>
-        </Reveal>
+        {studio.email && (
+          <a
+            href={`mailto:${studio.email}`}
+            className="eyebrow text-[10px] inline-block mt-8 text-foreground/60 hover:text-foreground transition-colors"
+          >
+            {studio.email}
+          </a>
+        )}
 
-        <Reveal delay={150}>
-          <div className="relative h-full overflow-hidden rounded-3xl bg-primary text-primary-foreground p-8 md:p-10 flex flex-col justify-between shadow-xl shadow-primary/20">
-            <div className="absolute -right-16 -bottom-24 w-72 h-72 rounded-full bg-primary-foreground/10" />
-            <div className="absolute -right-4 -bottom-32 w-72 h-72 rounded-full bg-primary-foreground/5" />
-            <div className="relative">
-              <p className="font-serif italic text-3xl md:text-4xl leading-snug mb-4">
-                ¿Empezamos esta semana?
-              </p>
-              <p className="text-sm text-primary-foreground/80 max-w-sm leading-relaxed">
-                Escribinos, contanos tu punto de partida y te recomendamos por
-                dónde arrancar.
-                {pruebaGratis ? ' La primera clase corre por nuestra cuenta.' : ''}
-              </p>
-            </div>
-            {/* Sin WhatsApp cargado, el mail es el canal: la tarjeta no puede
-                quedar sin acción, es el cierre de la página. */}
-            <a
-              href={empezar ?? `mailto:${studio.email}`}
-              target={empezar ? '_blank' : undefined}
-              rel={empezar ? 'noreferrer' : undefined}
-              className="relative group mt-10 flex items-center justify-center gap-2 py-4 rounded-2xl bg-primary-foreground text-primary text-sm font-bold hover:-translate-y-0.5 transition-transform"
-            >
-              {empezar ? <MessageCircle className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
-              {empezar ? 'Escribinos por WhatsApp' : 'Escribinos por mail'}
-              <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-            </a>
-          </div>
-        </Reveal>
-      </div>
+        {/* Un segundo camino por WhatsApp solo si existe el número. */}
+        {masInfo && !empezar && (
+          <a href={masInfo} target="_blank" rel="noreferrer" className="sr-only">
+            WhatsApp
+          </a>
+        )}
+      </Reveal>
     </section>
   )
 }
 
+/** La acuarela con la que cierra el manual, y abajo el pie. */
 function Footer() {
   const { studio } = useLanding()
   const wa = useWa()
   const saludo = wa('¡Hola!')
   return (
-    <footer className="bg-foreground text-background/80">
-      <div className="max-w-6xl mx-auto px-5 py-14">
-        <div className="flex flex-wrap items-start justify-between gap-10">
-          <div>
-            <div className="flex items-center gap-2.5 mb-3">
-              <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-                <span className="text-primary-foreground font-serif font-bold text-base">{inicial(studio.name)}</span>
-              </div>
-              <span className="font-serif font-semibold text-background text-lg">{studio.name}</span>
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/marca/paisaje.jpg"
+        alt=""
+        aria-hidden
+        className="w-full h-[38vh] min-h-[220px] max-h-[420px] object-cover"
+      />
+      <footer className="bg-foreground text-background/70">
+        <div className="max-w-6xl mx-auto px-5 py-14">
+          <div className="flex flex-wrap items-start justify-between gap-10">
+            <div>
+              <p className="display text-2xl uppercase text-background">{studio.name}</p>
+              <p className="eyebrow text-[9px] text-background/50 mt-2">{MARCA.bajo}</p>
+              <p className="text-xs text-background/45 max-w-xs leading-relaxed mt-5">
+                {studio.address}
+              </p>
             </div>
-            <p className="text-xs text-background/50 max-w-xs leading-relaxed">
-              Estudio de Pilates y movimiento. {studio.address}. {studio.openHours}.
-            </p>
+
+            <nav className="flex gap-12 text-xs">
+              <div className="flex flex-col gap-3">
+                <p className="eyebrow text-[9px] text-background/40">Estudio</p>
+                <a href="#disciplinas" className="hover:text-background transition-colors">Disciplinas</a>
+                <a href="#planes" className="hover:text-background transition-colors">Planes</a>
+                <a href="#horarios" className="hover:text-background transition-colors">Horarios</a>
+              </div>
+              <div className="flex flex-col gap-3">
+                <p className="eyebrow text-[9px] text-background/40">Seguinos</p>
+                <a href={`https://instagram.com/${studio.instagram}`} target="_blank" rel="noreferrer" className="hover:text-background transition-colors">Instagram</a>
+                {saludo && (
+                  <a href={saludo} target="_blank" rel="noreferrer" className="hover:text-background transition-colors">WhatsApp</a>
+                )}
+              </div>
+            </nav>
           </div>
 
-          <nav className="flex gap-10 text-sm">
-            <div className="flex flex-col gap-2.5">
-              <p className="text-xs font-bold uppercase tracking-wider text-background/40 mb-1">Estudio</p>
-              <a href="#disciplinas" className="hover:text-background transition-colors">Disciplinas</a>
-              <a href="#planes" className="hover:text-background transition-colors">Planes</a>
-              <a href="#horarios" className="hover:text-background transition-colors">Horarios</a>
-            </div>
-            <div className="flex flex-col gap-2.5">
-              <p className="text-xs font-bold uppercase tracking-wider text-background/40 mb-1">Seguinos</p>
-              <a href={`https://instagram.com/${studio.instagram}`} target="_blank" rel="noreferrer" className="hover:text-background transition-colors">Instagram</a>
-              {saludo && (
-                <a href={saludo} target="_blank" rel="noreferrer" className="hover:text-background transition-colors">WhatsApp</a>
-              )}
-            </div>
-          </nav>
+          <div className="flex flex-wrap items-center justify-between gap-3 mt-12 pt-6 border-t border-background/10 eyebrow text-[9px] text-background/40">
+            <p>© {new Date().getFullYear()} {studio.name}</p>
+            <Link href="/sistema" className="hover:text-background/70 transition-colors">
+              Acceso al sistema
+            </Link>
+          </div>
         </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-3 mt-12 pt-6 border-t border-background/10 text-xs text-background/40">
-          <p>© {new Date().getFullYear()} {studio.name}. Todos los derechos reservados.</p>
-          <Link href="/sistema" className="hover:text-background/70 transition-colors">
-            Acceso al sistema
-          </Link>
-        </div>
-      </div>
-    </footer>
+      </footer>
+    </>
   )
 }
 
@@ -1205,6 +1205,7 @@ export function LandingPage() {
           instagram: pick('studio_instagram', STUDIO_FALLBACK.instagram),
           email: pick('studio_email', STUDIO_FALLBACK.email),
           openHours: pick('studio_hours', STUDIO_FALLBACK.openHours),
+          parking: pick('studio_parking', STUDIO_FALLBACK.parking),
         },
         disciplines: discRows.length
           ? Object.fromEntries(
@@ -1221,18 +1222,19 @@ export function LandingPage() {
 
   return (
     <LandingCtx.Provider value={landing}>
-    <main className="overflow-x-clip">
-      <Nav />
-      <Hero schedule={schedule} />
-      <Marquee />
-      <Estudio schedule={schedule} />
-      <Disciplinas />
-      <Planes plans={plans} />
-      <Horarios schedule={schedule} />
-      <Quote />
-      <Contacto plans={plans} />
-      <Footer />
-    </main>
+      <main className="overflow-x-clip">
+        <Nav />
+        <Hero />
+        <Bajada />
+        <Estudio schedule={schedule} />
+        <Planes plans={plans} />
+        <OpenStudio />
+        <Disciplinas />
+        <Horarios schedule={schedule} />
+        <Cita />
+        <Contacto plans={plans} />
+        <Footer />
+      </main>
     </LandingCtx.Provider>
   )
 }

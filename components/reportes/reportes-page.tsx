@@ -255,7 +255,7 @@ export function ReportesPage() {
                   className={cn(
                     'px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors',
                     activo === r.key
-                      ? 'border-primary bg-primary/5 text-primary'
+                      ? 'border-primary bg-primary/5 text-primary-fuerte'
                       : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
                   )}
                 >
@@ -310,21 +310,21 @@ export function ReportesPage() {
       </div>
 
       {sinPermiso && (
-        <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex gap-2.5">
-          <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-800">
+        <div className="rounded-xl bg-aviso-suave border border-aviso/40 px-4 py-3 flex gap-2.5">
+          <Info className="w-4 h-4 text-aviso-fuerte shrink-0 mt-0.5" />
+          <p className="text-xs text-aviso-fuerte">
             Tu rol no puede ver esta información, así que el reporte va a salir vacío.
           </p>
         </div>
       )}
 
-      {error && <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-4 py-3">{error}</p>}
+      {error && <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-4 py-3">{error}</p>}
 
       {/* La tabla */}
       <div className="bg-card rounded-2xl border border-border overflow-hidden">
         {cargando ? (
           <div className="py-16 flex justify-center">
-            <Loader2 className="w-5 h-5 animate-spin text-primary" />
+            <Loader2 className="w-5 h-5 animate-spin text-primary-fuerte" />
           </div>
         ) : filas.length === 0 ? (
           <div className="py-16 text-center">

@@ -268,8 +268,10 @@ consume, días de aviso de vencimiento, tope de congelamiento, días para pasar 
 Los cuatro parámetros de la ventana de pago del 1 al 9 se borraron en la 0033,
 cuando el estudio derogó esa regla.
 
-Lo mismo vale para la estética: tipografía, textos y fotos se cargan cuando la
-clienta los tenga, sin frenar la lógica.
+Lo mismo valía para la estética, y se cumplió: el manual llegó el 11/09 y se
+aplicó sin tocar una regla de negocio. Los tres colores y las dos tipografías
+son tokens, así que un cambio de paleta es editar `app/globals.css`, no repintar
+pantallas.
 
 ## 7. Lo que la clienta contestó (06/09/2026)
 
@@ -449,7 +451,13 @@ redonda o corridas · cómo se llama cada clase (el título es obligatorio y se 
 en el portal) · nombre completo, teléfono y email de Ivana y de Leandro · quién
 es la profesora del turno tarde (se puede arrancar con un nombre provisorio:
 `teacher_id` es `NOT NULL`) · el WhatsApp · el link de Google Maps · si la web
-sigue mostrando ciudad y Facebook · logo, paleta, tipografías y fotos.
+sigue mostrando ciudad y Facebook · las preguntas del FAQ, que su propio mockup
+pone en la barra y nadie puede escribir por ella.
+
+El material de diseño —logo, paleta, tipografías y fotos— **llegó el 11/09** y
+está aplicado. De eso queda pendiente el logo en vectorial y saber si tiene
+licencia webfont de Bauer Bodoni: mientras tanto se usa Bodoni Moda, que es un
+revival del mismo Bodoni.
 
 **Decisiones:** las cuatro preguntas de la ronda anterior que quedaron sin
 contestar — congelamiento, los días hasta la lista de contacto

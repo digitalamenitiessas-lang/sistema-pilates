@@ -607,6 +607,67 @@ en el portal y que el push llegue de verdad. Lo verificado es que compila, que l
 campana tolera no tener navegación, que su texto no es del mostrador y que los
 dos tipos de aviso que usa ya están en el CHECK de la `0023`.
 
+### ✅ La identidad de Casa Fé, aplicada (11/09)
+Llegó el material de marca: el manual de diseño (`MOVIMIENTO. PAUSA. BALANCE`),
+las dos tipografías, los tres colores y las fotos del estudio. Hasta ahora la
+paleta era una interpretación nuestra —terracota, arena, salvia— con DM Sans y
+Playfair, y las fotos eran de banco de imágenes.
+- [x] **Las imágenes salieron del PDF a resolución nativa** y quedaron en
+      `public/marca/`: el hero, el tríptico del estudio, las dos disciplinas, la
+      acuarela del pie y la textura de óxido. Recortadas como en el manual
+      —el hero es el mismo encuadre, calculado desde la geometría del PDF—,
+      redimensionadas y comprimidas: de 14 MB a 1,5 MB. `next.config` tiene
+      `images.unoptimized = true`, así que el peso que sale de acá es el que
+      baja la clienta; por eso el hero tiene además una versión de celular que
+      sirve un `<picture>`.
+- [x] **Bodoni Moda en lugar de Bauer Bodoni.** La del manual es comercial y no
+      se puede servir como webfont sin licencia. Bodoni Moda (Google Fonts, OFL)
+      es un revival del mismo Bodoni, y con el eje `opsz` en 96 da la misma
+      hairline fina de los titulares. Montserrat es la del manual tal cual.
+      Como `--font-serif` apunta a la nueva, las 24 pantallas que ya usaban
+      `font-serif` cambiaron de tipografía sin tocar una línea.
+- [x] **Los tres colores como tokens en oklch**, y todo lo demás derivado de
+      ahí. Medido sobre el manual: la Montserrat en mayúsculas va con 0.12em de
+      tracking y la Bodoni con interlínea 0.88.
+- [x] **Los estados dejaron de ser ámbar, celeste y rojo de Tailwind**, que al
+      lado del natural se veían de otra marca. Ahora son cuatro familias de tres
+      tonos —`aviso`, `info`, `exito`, `destructive`— con una regla: **el tono
+      pleno pinta, el `-fuerte` escribe**. Migradas 17 pantallas; el grep de
+      colores crudos de Tailwind da cero.
+- [x] El mismo corte para el marrón de la marca: como texto chico sobre fondo
+      claro da 3,49:1 y no pasa AA, así que se agregó `--primary-fuerte` para
+      texto y el pleno quedó para rellenos y titulares.
+- [x] **Auditoría de contraste real, en el navegador**, resolviendo cada color
+      con canvas —`getComputedStyle` devuelve `lab()` y `oklch()`, no rgb— sobre
+      las diez pantallas del mostrador: de 145 supuestos fallos (el auditor
+      estaba mal) a **cero reales**. Los que aparecieron eran de verdad:
+      `text-destructive-foreground` no existía como token y el "9+" de la
+      campana era invisible; y el color del catálogo de disciplinas se estaba
+      usando como color de texto, que a 10px daba 2,2:1 según qué tono hubiera
+      elegido el estudio. Ahora el color del catálogo pinta el punto y el fondo,
+      y la letra va en negro.
+- [x] **La landing rehecha sobre el mockup**, sección por sección: el logotipo
+      sobre la foto con la textura encima, la bajada de la clienta palabra por
+      palabra, el tríptico, la retícula de planes en verde claro con filete, el
+      bloque OPEN STUDIO, las disciplinas con su foto y la acuarela del cierre.
+      **Todo el cableado de datos quedó igual**: los planes, la grilla, las
+      disciplinas y los datos del estudio siguen saliendo de las vistas
+      públicas, y lo que el estudio no cargó sigue sin dibujarse.
+- [x] **Los íconos de la app salen del logotipo real**, no de una tipografía
+      parecida: se renderizó la región del PDF con las fotos tapadas y se
+      recortó al tinte. `CASA / FE` para los íconos grandes y `FE` solo para el
+      favicon, donde el lockup entero no se lee. Antes eran los del andamio de
+      Vercel. Se borraron once archivos muertos de `public/` (las tres fotos de
+      banco y los placeholders).
+- [x] Los mails también: el hexadecimal va escrito a mano porque en un mail no
+      hay variables CSS, pero son los valores de la marca.
+
+**Decisiones que conviene que la clienta confirme:** el reemplazo de Bauer
+Bodoni por Bodoni Moda (o que mande la licencia webfont si la tiene); el
+monograma del ícono; y que el manual escribe "DICIPLINAS" en la barra —en la
+web dice "Disciplinas". El manual también tiene **FAQ** en la barra y no hay
+sección: hace falta que ella mande las preguntas, no se inventan.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
@@ -628,8 +689,10 @@ dos tipos de aviso que usa ya están en el CHECK de la `0023`.
 - [ ] Decisión sobre factura electrónica (¿desde el sistema o aparte?).
 - [ ] Dominio propio elegido (conectar en Vercel).
 - [ ] Cambiar la contraseña admin de prueba y pasar la lista del equipo real.
-- [ ] El material de diseño: logo en alta, paleta, tipografías y fotos. No
-      frena nada; se adapta sin tocar el funcionamiento.
+- [x] **El material de diseño llegó y está aplicado** (11/09): manual, dos
+      tipografías, tres colores y ocho fotos. **Falta** el logo como archivo
+      vectorial —el que se usa salió recortado del PDF— y saber si tiene
+      licencia webfont de Bauer Bodoni.
 - [ ] Las siete definiciones de
       [`casa-fe-lo-que-falta-preguntar.md`](casa-fe-lo-que-falta-preguntar.md).
       Las dos primeras —el 25% del link de pago y el tope de 3 cuotas— son

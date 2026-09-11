@@ -81,7 +81,7 @@ import type {
   Teacher,
 } from '@/lib/types'
 
-const TEACHER_COLORS = ['#C4735A', '#7D9B76', '#D4A854', '#9B6E8E', '#5E8FA8', '#B8956A']
+const TEACHER_COLORS = ['#847164', '#9AA08C', '#BCBAAE', '#B79B72', '#8792A0', '#A5786C']
 
 const ROLE_LABELS: Record<string, string> = {
   admin: 'Admin',
@@ -181,12 +181,12 @@ function MercadoPagoSection() {
     <SeccionPlegable
       id="mercadopago"
       icono={CreditCard}
-      colorIcono="bg-[#009EE3]/10 text-[#009EE3]"
+      colorIcono="bg-info/10 text-info-fuerte"
       titulo="Mercado Pago"
       ayuda="Links de pago para membresías, con acreditación automática"
       resumen={
         account ? (
-          <span className="flex items-center gap-1.5 text-xs font-semibold text-[#2E6040] bg-[#E8F2EB] px-2.5 py-1 rounded-full">
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-exito-fuerte bg-exito-suave px-2.5 py-1 rounded-full">
             <CheckCircle2 className="w-3.5 h-3.5" />
             Conectado
           </span>
@@ -200,7 +200,7 @@ function MercadoPagoSection() {
     >
       <div className="px-5 py-5 space-y-4">
         {account && (
-          <div className="bg-[#E8F2EB] rounded-xl px-4 py-3 text-sm text-[#2E6040]">
+          <div className="bg-exito-suave rounded-xl px-4 py-3 text-sm text-exito-fuerte">
             Conectado como <strong>{account.nickname || account.email}</strong>
             {account.email && account.nickname ? ` (${account.email})` : ''}
           </div>
@@ -214,7 +214,7 @@ function MercadoPagoSection() {
               href="https://www.mercadopago.com.ar/developers/panel/app"
               target="_blank"
               rel="noreferrer"
-              className="text-primary font-medium hover:underline inline-flex items-center gap-0.5"
+              className="text-primary-fuerte font-medium hover:underline inline-flex items-center gap-0.5"
             >
               Mercado Pago Developers <ExternalLink className="w-3 h-3" />
             </a>{' '}
@@ -268,10 +268,10 @@ function MercadoPagoSection() {
             </div>
 
             {error && (
-              <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
+              <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
             )}
             {savedMsg && (
-              <p className="text-sm text-[#2E6040] bg-[#E8F2EB] rounded-xl px-3 py-2">
+              <p className="text-sm text-exito-fuerte bg-exito-suave rounded-xl px-3 py-2">
                 Configuración guardada. Ya se pueden generar links de pago desde Pagos.
               </p>
             )}
@@ -375,7 +375,7 @@ function TeacherFormModal({ teacher, onClose }: { teacher?: Teacher; onClose: ()
                     className={cn(
                       'px-3 py-1.5 rounded-xl border text-xs font-medium transition-colors',
                       active
-                        ? 'border-primary bg-primary/10 text-primary'
+                        ? 'border-primary bg-primary/10 text-primary-fuerte'
                         : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
                     )}
                   >
@@ -412,7 +412,7 @@ function TeacherFormModal({ teacher, onClose }: { teacher?: Teacher; onClose: ()
               ))}
             </div>
           </div>
-          {error && <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
+          {error && <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
         </div>
 
         <div className="flex gap-3 px-6 py-4 border-t border-border shrink-0">
@@ -529,7 +529,7 @@ function TeachersSection() {
                 </button>
                 <button
                   onClick={() => handleDelete(t)}
-                  className="w-8 h-8 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
+                  className="w-8 h-8 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive-fuerte transition-colors"
                   aria-label={`Dar de baja a ${t.name}`}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -542,7 +542,7 @@ function TeachersSection() {
 
       {canWrite && (
         <div className="px-5 py-3 border-t border-border space-y-1">
-          {errorVinculo && <p className="text-xs text-destructive">{errorVinculo}</p>}
+          {errorVinculo && <p className="text-xs text-destructive-fuerte">{errorVinculo}</p>}
           <p className="text-[11px] text-muted-foreground">
             La cuenta es con la que la profesora entra al sistema. Sin vincularla,
             el sistema no sabe qué clases son suyas y no puede mostrarle solo las
@@ -585,7 +585,7 @@ function RoomsSection() {
     <SeccionPlegable
       id="salas"
       icono={DoorOpen}
-      colorIcono="bg-accent/10 text-accent"
+      colorIcono="bg-primary/10 text-primary-fuerte"
       titulo="Salas"
       ayuda="Espacios disponibles para las clases"
       resumen={<Conteo n={rooms.length} singular="sala" plural="salas" />}
@@ -614,7 +614,7 @@ function RoomsSection() {
                       setEditingId(null)
                     })
                   }
-                  className="w-7 h-7 rounded-lg hover:bg-[#E8F2EB] flex items-center justify-center text-muted-foreground hover:text-[#2E6040]"
+                  className="w-7 h-7 rounded-lg hover:bg-exito-suave flex items-center justify-center text-muted-foreground hover:text-exito-fuerte"
                   aria-label="Guardar nombre"
                 >
                   <Check className="w-3.5 h-3.5" />
@@ -649,7 +649,7 @@ function RoomsSection() {
                           run(() => deactivateRoom(r.id))
                         }
                       }}
-                      className="w-7 h-7 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive"
+                      className="w-7 h-7 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive-fuerte"
                       aria-label={`Dar de baja ${r.name}`}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -683,7 +683,7 @@ function RoomsSection() {
             </button>
           </div>
         )}
-        {error && <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
+        {error && <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
       </div>
     </SeccionPlegable>
   )
@@ -755,7 +755,7 @@ function UserFormModal({ onClose, onCreated }: { onClose: () => void; onCreated:
               <option value="admin">Admin — acceso total y configuración</option>
             </select>
           </div>
-          {error && <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
+          {error && <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
         </div>
 
         <div className="flex gap-3 px-6 py-4 border-t border-border">
@@ -838,7 +838,7 @@ function UsersSection() {
     <SeccionPlegable
       id="usuarios"
       icono={UserPlus}
-      colorIcono="bg-[#5E8FA8]/10 text-[#5E8FA8]"
+      colorIcono="bg-info/10 text-info-fuerte"
       titulo="Usuarios del sistema"
       ayuda="Quiénes pueden ingresar y con qué permisos"
       resumen={<Conteo n={users.filter((u) => u.active).length} singular="cuenta activa" plural="cuentas activas" />}
@@ -853,7 +853,7 @@ function UsersSection() {
       }
     >
       <div className="divide-y divide-border">
-        {loadError && <p className="px-5 py-4 text-sm text-destructive">{loadError}</p>}
+        {loadError && <p className="px-5 py-4 text-sm text-destructive-fuerte">{loadError}</p>}
         {users.map((u) => {
           const isSelf = u.id === profile.id
           return (
@@ -861,7 +861,7 @@ function UsersSection() {
               <div className="flex-1 min-w-40">
                 <p className={cn('text-sm font-semibold truncate', u.active ? 'text-foreground' : 'text-muted-foreground')}>
                   {u.fullName || u.email}
-                  {isSelf && <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">Vos</span>}
+                  {isSelf && <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary-fuerte">Vos</span>}
                   {!u.active && (
                     <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
                       Dado de baja
@@ -890,7 +890,7 @@ function UsersSection() {
                     <button
                       disabled={busyId === u.id}
                       onClick={() => handleDelete(u)}
-                      className="w-8 h-8 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
+                      className="w-8 h-8 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive-fuerte transition-colors disabled:opacity-50"
                       aria-label={`Dar de baja ${u.email}`}
                       title="Dar de baja el acceso"
                     >
@@ -900,7 +900,7 @@ function UsersSection() {
                     <button
                       disabled={busyId === u.id}
                       onClick={() => handleReactivate(u)}
-                      className="w-8 h-8 rounded-lg hover:bg-[#E8F2EB] flex items-center justify-center text-muted-foreground hover:text-[#2E6040] transition-colors disabled:opacity-50"
+                      className="w-8 h-8 rounded-lg hover:bg-exito-suave flex items-center justify-center text-muted-foreground hover:text-exito-fuerte transition-colors disabled:opacity-50"
                       aria-label={`Reactivar ${u.email}`}
                       title="Reactivar el acceso"
                     >
@@ -1001,7 +1001,7 @@ function SettingsSection({ group }: { group: SettingGroup }) {
         // Contraer la sección no descarta lo tipeado, pero sí lo esconde:
         // el cartel es para que nadie se vaya creyendo que guardó.
         dirty ? (
-          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-aviso-suave text-aviso-fuerte">
             Sin guardar
           </span>
         ) : (
@@ -1015,7 +1015,7 @@ function SettingsSection({ group }: { group: SettingGroup }) {
             <label className="flex items-center gap-2 text-xs font-semibold text-foreground mb-1.5">
               {s.label}
               {!s.rige && (
-                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-aviso-suave text-aviso-fuerte">
                   Todavía no rige
                 </span>
               )}
@@ -1035,7 +1035,7 @@ function SettingsSection({ group }: { group: SettingGroup }) {
               >
                 <span
                   className={cn(
-                    'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform',
+                    'absolute top-0.5 w-5 h-5 rounded-full bg-card shadow transition-transform',
                     valueOf(s) === 'true' ? 'translate-x-5' : 'translate-x-0.5'
                   )}
                 />
@@ -1076,7 +1076,7 @@ function SettingsSection({ group }: { group: SettingGroup }) {
 
             {s.help && <p className="text-[11px] text-muted-foreground mt-1">{s.help}</p>}
             {!s.rige && (
-              <p className="text-[11px] text-amber-700 mt-1">
+              <p className="text-[11px] text-aviso-fuerte mt-1">
                 Se puede dejar cargado, pero el sistema todavía no lo tiene en
                 cuenta. Cuando empiece a regir, el cartel desaparece.
               </p>
@@ -1090,7 +1090,7 @@ function SettingsSection({ group }: { group: SettingGroup }) {
           </div>
         ))}
 
-        {error && <p className="text-xs text-destructive">{error}</p>}
+        {error && <p className="text-xs text-destructive-fuerte">{error}</p>}
 
         {canWrite && (
           <div className="flex items-center gap-3 pt-1">
@@ -1103,7 +1103,7 @@ function SettingsSection({ group }: { group: SettingGroup }) {
               Guardar
             </button>
             {saved && !dirty && (
-              <span className="text-xs text-[#2E6040] flex items-center gap-1">
+              <span className="text-xs text-exito-fuerte flex items-center gap-1">
                 <CheckCircle2 className="w-3.5 h-3.5" /> Guardado
               </span>
             )}
@@ -1125,8 +1125,8 @@ function DisciplineFormModal({
   const isEdit = !!discipline
   const [name, setName] = useState(discipline?.name ?? '')
   const [color, setColor] = useState(discipline?.color ?? TEACHER_COLORS[0])
-  const [bgColor, setBgColor] = useState(discipline?.bgColor ?? '#FDEEE8')
-  const [textColor, setTextColor] = useState(discipline?.textColor ?? '#8B3A25')
+  const [bgColor, setBgColor] = useState(discipline?.bgColor ?? '#BCBAAE')
+  const [textColor, setTextColor] = useState(discipline?.textColor ?? '#000000')
   const [blurb, setBlurb] = useState(discipline?.blurb ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -1148,7 +1148,7 @@ function DisciplineFormModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-foreground/40 flex items-center justify-center p-4" onClick={onClose}>
       <div
         className="bg-card rounded-2xl shadow-2xl w-full max-w-sm border border-border max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
@@ -1240,7 +1240,7 @@ function DisciplineFormModal({
             {name || 'Así se va a ver'}
           </div>
 
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          {error && <p className="text-xs text-destructive-fuerte">{error}</p>}
 
           <div className="flex gap-2 pt-1">
             <button
@@ -1288,7 +1288,7 @@ function DisciplinesSection() {
     <SeccionPlegable
       id="disciplinas"
       icono={Shapes}
-      colorIcono="bg-accent/10 text-accent"
+      colorIcono="bg-primary/10 text-primary-fuerte"
       titulo="Disciplinas"
       ayuda="Las que aparecen en la agenda, los planes y la web"
       resumen={<Conteo n={disciplines.length} singular="disciplina" plural="disciplinas" />}
@@ -1299,7 +1299,7 @@ function DisciplinesSection() {
               setEditing(undefined)
               setShowForm(true)
             }}
-            className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 transition-colors"
+            className="w-8 h-8 rounded-xl bg-primary/10 text-primary-fuerte flex items-center justify-center hover:bg-primary/20 transition-colors"
             aria-label="Nueva disciplina"
           >
             <Plus className="w-4 h-4" />
@@ -1337,7 +1337,7 @@ function DisciplinesSection() {
                 <button
                   disabled={busy}
                   onClick={() => remove(d)}
-                  className="w-7 h-7 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive"
+                  className="w-7 h-7 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive-fuerte"
                   aria-label={`Dar de baja ${d.name}`}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -1381,7 +1381,7 @@ function PaymentMethodsSection() {
     <SeccionPlegable
       id="medios-de-pago"
       icono={Wallet}
-      colorIcono="bg-accent/10 text-accent"
+      colorIcono="bg-primary/10 text-primary-fuerte"
       titulo="Medios de pago"
       ayuda="Con los que se puede cobrar, y qué le hace cada uno al precio"
       resumen={
@@ -1421,7 +1421,7 @@ function PaymentMethodsSection() {
                       setEditingCode(null)
                     })
                   }
-                  className="w-7 h-7 rounded-lg hover:bg-[#E8F2EB] flex items-center justify-center text-muted-foreground hover:text-[#2E6040]"
+                  className="w-7 h-7 rounded-lg hover:bg-exito-suave flex items-center justify-center text-muted-foreground hover:text-exito-fuerte"
                   aria-label="Guardar nombre"
                 >
                   <Check className="w-3.5 h-3.5" />
@@ -1512,7 +1512,7 @@ function PaymentMethodsSection() {
                   setNewName('')
                 })
               }
-              className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 disabled:opacity-40"
+              className="w-9 h-9 rounded-xl bg-primary/10 text-primary-fuerte flex items-center justify-center hover:bg-primary/20 disabled:opacity-40"
               aria-label="Agregar medio de pago"
             >
               <Plus className="w-4 h-4" />
@@ -1520,7 +1520,7 @@ function PaymentMethodsSection() {
           </div>
         )}
 
-        {error && <p className="text-xs text-destructive">{error}</p>}
+        {error && <p className="text-xs text-destructive-fuerte">{error}</p>}
       </div>
     </SeccionPlegable>
   )
@@ -1599,7 +1599,7 @@ function PermisosSection() {
         // Que algo esté en sombra es lo que más conviene ver sin abrir:
         // significa que lo que se tilde acá todavía no rige.
         matriz && enSombra > 0 ? (
-          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-aviso-suave text-aviso-fuerte">
             {enSombra === total ? 'En sombra' : `${enSombra} en sombra`}
           </span>
         ) : (
@@ -1608,15 +1608,15 @@ function PermisosSection() {
       }
     >
       {loadError && (
-        <p className="px-5 py-4 text-xs text-destructive">
+        <p className="px-5 py-4 text-xs text-destructive-fuerte">
           {loadError} — si dice que la tabla no existe, falta correr la migración 0012.
         </p>
       )}
 
       {matriz && enSombra > 0 && (
-        <div className="mx-5 mt-4 rounded-xl bg-[#FDF5E6] border border-[#D4A854]/40 px-4 py-3 flex gap-2.5">
-          <Info className="w-4 h-4 text-[#7A5A1A] shrink-0 mt-0.5" />
-          <div className="text-xs text-[#7A5A1A] leading-relaxed">
+        <div className="mx-5 mt-4 rounded-xl bg-aviso-suave border border-aviso/40 px-4 py-3 flex gap-2.5">
+          <Info className="w-4 h-4 text-aviso-fuerte shrink-0 mt-0.5" />
+          <div className="text-xs text-aviso-fuerte leading-relaxed">
             <strong>
               {enSombra === total
                 ? 'Los permisos todavía no están en vigencia.'
@@ -1629,7 +1629,7 @@ function PermisosSection() {
         </div>
       )}
 
-      {error && <p className="px-5 pt-4 text-xs text-destructive">{error}</p>}
+      {error && <p className="px-5 pt-4 text-xs text-destructive-fuerte">{error}</p>}
 
       <div className="px-5 py-4 space-y-5">
         {grupos.map((grupo) => {
