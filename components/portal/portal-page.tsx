@@ -713,7 +713,9 @@ export function PortalPage() {
                     day === i
                       ? 'bg-primary text-primary-foreground shadow-md'
                       : isPast
-                      ? 'bg-muted/50 text-muted-foreground/40'
+                      // Deshabilitado, no invisible: a /40 el número del
+                      // día quedaba en 1,79:1 y no se leía la fecha.
+                      ? 'bg-muted/50 text-muted-foreground/70'
                       : 'bg-card border border-border text-foreground hover:border-primary/40'
                   )}
                 >
