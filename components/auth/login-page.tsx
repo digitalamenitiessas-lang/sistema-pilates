@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Lock, Mail, Loader2, ArrowLeft, IdCard, CheckCircle2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useNombreDelEstudio } from '@/lib/estudio-client'
+import { Logotipo } from '@/components/layout/logotipo'
 
 type Mode = 'login' | 'forgot' | 'register'
 
@@ -108,10 +109,8 @@ export function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center mb-4">
-            <span className="text-primary-foreground font-serif font-bold text-2xl">{estudio.trim().charAt(0)}</span>
-          </div>
-          <h1 className="font-serif text-2xl font-semibold text-foreground">{estudio}</h1>
+          <h1 className="sr-only">{estudio}</h1>
+          <Logotipo nombre={estudio} className="text-4xl text-foreground text-center mb-4" />
           <p className="text-sm text-muted-foreground mt-1">
             {mode === 'register' ? 'Creá tu acceso al portal' : mode === 'forgot' ? 'Recuperar contraseña' : 'Sistema de Gestión'}
           </p>
