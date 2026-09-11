@@ -35,7 +35,7 @@ const PAGE_COMPONENTS: Record<PageKey, React.ComponentType<{ onNavigate: (page: 
 function FullScreenLoader({ message }: { message: string }) {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-3">
-      <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      <Loader2 className="w-8 h-8 text-primary-fuerte animate-spin" />
       <p className="text-sm text-muted-foreground">{message}</p>
     </div>
   )
@@ -84,7 +84,7 @@ function AppShell() {
   if (!data) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4 p-6 text-center">
-        <p className="text-sm text-destructive">No se pudieron cargar los datos: {dataError}</p>
+        <p className="text-sm text-destructive-fuerte">No se pudieron cargar los datos: {dataError}</p>
         <button
           onClick={() => refresh()}
           className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90"
@@ -120,13 +120,13 @@ function AppShell() {
 
         {dataError && (
           <div className="flex items-center justify-between gap-3 px-4 md:px-6 py-2 bg-destructive/10 border-b border-destructive/20 shrink-0">
-            <p className="text-xs text-destructive min-w-0">
+            <p className="text-xs text-destructive-fuerte min-w-0">
               No se pudieron actualizar los datos: {dataError}. Estás viendo la
               última versión que se pudo cargar.
             </p>
             <button
               onClick={() => refresh()}
-              className="shrink-0 text-xs font-semibold text-destructive underline hover:no-underline"
+              className="shrink-0 text-xs font-semibold text-destructive-fuerte underline hover:no-underline"
             >
               Reintentar
             </button>

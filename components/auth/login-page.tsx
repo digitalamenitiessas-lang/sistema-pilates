@@ -152,17 +152,17 @@ export function LoginPage() {
               <button
                 type="button"
                 onClick={() => switchMode('forgot')}
-                className="mt-1.5 text-xs text-primary font-medium hover:underline"
+                className="mt-1.5 text-xs text-primary-fuerte font-medium hover:underline"
               >
                 ¿Olvidaste tu contraseña?
               </button>
             </div>
 
             {info && (
-              <p className="text-sm text-[#2E6040] bg-[#E8F2EB] rounded-xl px-3 py-2">{info}</p>
+              <p className="text-sm text-exito-fuerte bg-exito-suave rounded-xl px-3 py-2">{info}</p>
             )}
             {error && (
-              <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
+              <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
             )}
 
             <button type="submit" disabled={loading} className={buttonClass}>
@@ -175,7 +175,7 @@ export function LoginPage() {
               <button
                 type="button"
                 onClick={() => switchMode('register')}
-                className="text-primary font-semibold hover:underline"
+                className="text-primary-fuerte font-semibold hover:underline"
               >
                 Creá tu acceso
               </button>
@@ -205,12 +205,12 @@ export function LoginPage() {
             </div>
 
             {info && (
-              <p className="text-sm text-[#2E6040] bg-[#E8F2EB] rounded-xl px-3 py-2 flex items-start gap-2">
+              <p className="text-sm text-exito-fuerte bg-exito-suave rounded-xl px-3 py-2 flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" /> <span>{info}</span>
               </p>
             )}
             {error && (
-              <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
+              <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
             )}
 
             <button type="submit" disabled={loading || !!info} className={buttonClass}>
@@ -298,7 +298,7 @@ export function LoginPage() {
             </div>
 
             {error && (
-              <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
+              <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
             )}
 
             <button type="submit" disabled={loading} className={buttonClass}>

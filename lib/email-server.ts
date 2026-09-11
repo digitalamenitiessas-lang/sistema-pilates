@@ -44,21 +44,26 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
  * Plantilla mínima con la estética del estudio. Async porque el nombre lo
  * pone el estudio desde Configuración: la inicial del recuadro y la firma
  * del pie salen de ahí.
+ *
+ * Los colores van en hexadecimal y no como tokens: en un mail no hay hoja
+ * de estilos ni variables CSS, cada cliente de correo lee el `style=` de
+ * cada etiqueta y nada más. Son los mismos valores de la marca —natural
+ * #e1dfdb, marrón #847164, negro— escritos a mano porque acá no hay otra.
  */
 export async function emailLayout(title: string, bodyHtml: string): Promise<string> {
   const nombre = await marca()
   return `<!doctype html>
-<html lang="es"><body style="margin:0;background:#f5ece3;font-family:-apple-system,Segoe UI,Roboto,sans-serif;">
+<html lang="es"><body style="margin:0;background:#e1dfdb;font-family:-apple-system,Segoe UI,Roboto,sans-serif;">
   <div style="max-width:480px;margin:0 auto;padding:32px 16px;">
     <div style="text-align:center;margin-bottom:16px;">
-      <span style="display:inline-block;width:40px;height:40px;line-height:40px;border-radius:12px;background:#A9552F;color:#fff;font-weight:700;font-size:18px;">${nombre.trim().charAt(0).toUpperCase()}</span>
-      <p style="margin:8px 0 0;font-weight:700;color:#3d2c23;">${nombre}</p>
+      <span style="display:inline-block;width:40px;height:40px;line-height:40px;border-radius:12px;background:#847164;color:#fff;font-weight:700;font-size:18px;">${nombre.trim().charAt(0).toUpperCase()}</span>
+      <p style="margin:8px 0 0;font-weight:700;color:#000;">${nombre}</p>
     </div>
-    <div style="background:#fff;border-radius:16px;padding:24px;color:#3d2c23;">
+    <div style="background:#fff;border-radius:16px;padding:24px;color:#000;">
       <h1 style="font-size:18px;margin:0 0 12px;">${title}</h1>
       ${bodyHtml}
     </div>
-    <p style="text-align:center;font-size:11px;color:#8a7a6d;margin-top:16px;">
+    <p style="text-align:center;font-size:11px;color:#615953;margin-top:16px;">
       Este es un aviso automático de ${nombre}.
     </p>
   </div>

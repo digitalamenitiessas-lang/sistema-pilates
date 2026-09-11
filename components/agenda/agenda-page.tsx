@@ -78,7 +78,7 @@ function ClassCard({ cls, onClick }: { cls: WeekClass; onClick: () => void }) {
       )}
       style={{
         backgroundColor: cls.suspended ? undefined : colors.bg,
-        borderLeftColor: cls.suspended ? '#9CA3AF' : colors.dot,
+        borderLeftColor: cls.suspended ? 'var(--muted-foreground)' : colors.dot,
         borderLeftWidth: '3px',
       }}
     >
@@ -88,14 +88,14 @@ function ClassCard({ cls, onClick }: { cls: WeekClass; onClick: () => void }) {
             'text-xs font-semibold leading-tight line-clamp-2',
             cls.suspended && 'line-through'
           )}
-          style={{ color: cls.suspended ? '#6B7280' : colors.text }}
+          style={{ color: cls.suspended ? 'var(--muted-foreground)' : colors.text }}
         >
           {cls.kind === 'especial' && <Sparkles className="w-3 h-3 inline-block mr-1 -mt-0.5" />}
           {cls.substitute && <UserCheck className="w-3 h-3 inline-block mr-1 -mt-0.5" />}
           {cls.title}
         </p>
         {isFull && (
-          <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-destructive/15 text-destructive">
+          <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-destructive/15 text-destructive-fuerte">
             LLENA
           </span>
         )}
@@ -105,21 +105,23 @@ function ClassCard({ cls, onClick }: { cls: WeekClass; onClick: () => void }) {
       </p>
       {/* Occupancy bar */}
       <div className="flex items-center gap-1.5">
-        <div className="flex-1 h-1 rounded-full bg-black/10 overflow-hidden">
+        <div className="flex-1 h-1 rounded-full bg-foreground/10 overflow-hidden">
           <div
             className="h-full rounded-full"
             style={{
               width: `${Math.min(pct, 100)}%`,
-              backgroundColor: pct >= 100 ? '#EF4444' : pct >= 80 ? '#F59E0B' : colors.dot,
+              backgroundColor: pct >= 100 ? 'var(--destructive)' : pct >= 80 ? 'var(--aviso)' : colors.dot,
             }}
           />
         </div>
-        <span className="text-[10px] font-medium" style={{ color: colors.dot }}>
+        {/* El conteo es un dato, no un estado: en el color de la
+            disciplina quedaba en 2.7:1. El color ya lo lleva la barra. */}
+        <span className="text-[10px] font-medium text-muted-foreground">
           {cls.enrolled}/{cls.capacity}
         </span>
       </div>
       {cls.waitlist > 0 && (
-        <p className="text-[9px] text-amber-600 mt-0.5">+{cls.waitlist} en espera</p>
+        <p className="text-[9px] text-aviso-fuerte mt-0.5">+{cls.waitlist} en espera</p>
       )}
     </button>
   )
@@ -406,7 +408,7 @@ function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => v
             >
               <span
                 className={cn(
-                  'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform',
+                  'absolute top-0.5 w-5 h-5 rounded-full bg-card shadow transition-transform',
                   bookable ? 'translate-x-[18px]' : 'translate-x-0.5'
                 )}
               />
@@ -421,7 +423,7 @@ function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => v
             </span>
           </button>
 
-          {error && <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
+          {error && <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
         </div>
 
         <div className="flex gap-3 px-6 py-4 border-t border-border shrink-0">
@@ -624,14 +626,14 @@ function ClassDetailModal({
                 <button
                   onClick={() => onEdit(cls)}
                   title="Editar clase"
-                  className="w-7 h-7 rounded-full hover:bg-black/10 flex items-center justify-center text-muted-foreground"
+                  className="w-7 h-7 rounded-full hover:bg-foreground/10 flex items-center justify-center text-muted-foreground"
                 >
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={handleDelete}
                   title="Eliminar clase"
-                  className="w-7 h-7 rounded-full hover:bg-destructive/15 flex items-center justify-center text-muted-foreground hover:text-destructive"
+                  className="w-7 h-7 rounded-full hover:bg-destructive/15 flex items-center justify-center text-muted-foreground hover:text-destructive-fuerte"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -639,7 +641,7 @@ function ClassDetailModal({
             )}
             <button
               onClick={onClose}
-              className="w-7 h-7 rounded-full hover:bg-black/10 flex items-center justify-center text-muted-foreground"
+              className="w-7 h-7 rounded-full hover:bg-foreground/10 flex items-center justify-center text-muted-foreground"
             >
               <X className="w-4 h-4" />
             </button>
@@ -689,12 +691,12 @@ function ClassDetailModal({
                 className="h-full rounded-full"
                 style={{
                   width: `${Math.min(pct, 100)}%`,
-                  backgroundColor: pct >= 100 ? '#EF4444' : pct >= 80 ? '#F59E0B' : colors.dot,
+                  backgroundColor: pct >= 100 ? 'var(--destructive)' : pct >= 80 ? 'var(--aviso)' : colors.dot,
                 }}
               />
             </div>
             {isFull && cls.waitlist > 0 && (
-              <p className="text-xs text-amber-600 mt-1.5">
+              <p className="text-xs text-aviso-fuerte mt-1.5">
                 {cls.waitlist} persona{cls.waitlist !== 1 ? 's' : ''} en lista de espera
               </p>
             )}
@@ -742,7 +744,7 @@ function ClassDetailModal({
                   <button
                     disabled={dayBusy}
                     onClick={suspender}
-                    className="w-full py-2 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:text-destructive hover:border-destructive/40 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    className="w-full py-2 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:text-destructive-fuerte hover:border-destructive/40 disabled:opacity-50 flex items-center justify-center gap-1.5"
                   >
                     <CalendarOff className="w-3.5 h-3.5" />
                     Suspender este día
@@ -757,14 +759,14 @@ function ClassDetailModal({
                 </p>
               )}
 
-              {dayError && <p className="text-xs text-destructive">{dayError}</p>}
+              {dayError && <p className="text-xs text-destructive-fuerte">{dayError}</p>}
             </div>
           )}
 
           {puedeMarcarAsistencia && !cls.suspended && cls.conLista > 0 && (
             <button
               onClick={() => setTomandoAsistencia(true)}
-              className="w-full py-3 rounded-xl border-2 border-primary text-primary text-sm font-bold flex items-center justify-center gap-2 hover:bg-primary/5 transition-colors"
+              className="w-full py-3 rounded-xl border-2 border-primary text-primary-fuerte text-sm font-bold flex items-center justify-center gap-2 hover:bg-primary/5 transition-colors"
             >
               <ClipboardCheck className="w-4 h-4" />
               Tomar asistencia
@@ -778,9 +780,9 @@ function ClassDetailModal({
           ) : (
             <>
               {anotadas.length > 0 && (
-                <div className="rounded-xl bg-[#E8F2EB] px-3 py-2.5 space-y-1">
+                <div className="rounded-xl bg-exito-suave px-3 py-2.5 space-y-1">
                   {anotadas.map((a, i) => (
-                    <p key={i} className="text-xs font-semibold text-[#2E6040] flex items-center gap-1.5">
+                    <p key={i} className="text-xs font-semibold text-exito-fuerte flex items-center gap-1.5">
                       <Check className="w-3.5 h-3.5 shrink-0" />
                       {a.nombre}
                       {a.espera && <span className="font-normal">· en lista de espera</span>}
@@ -809,7 +811,7 @@ function ClassDetailModal({
               </select>
 
               {error && (
-                <p className="text-xs text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
+                <p className="text-xs text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
               )}
 
               <div className="flex gap-2 pt-1">
@@ -831,7 +833,7 @@ function ClassDetailModal({
                   <button
                     disabled={saving}
                     onClick={() => reserve(true)}
-                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-amber-100 text-amber-700 transition-colors hover:bg-amber-200 flex items-center justify-center gap-2"
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-aviso-suave text-aviso-fuerte transition-colors hover:bg-aviso/30 flex items-center justify-center gap-2"
                   >
                     {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                     Lista de espera
@@ -992,7 +994,7 @@ export function AgendaPage() {
           {weekOffset !== 0 && (
             <button
               onClick={() => setWeekOffset(0)}
-              className="text-xs text-primary font-medium hover:underline"
+              className="text-xs text-primary-fuerte font-medium hover:underline"
             >
               Hoy
             </button>
@@ -1023,12 +1025,12 @@ export function AgendaPage() {
                   isSelected
                     ? 'bg-primary text-primary-foreground border-primary'
                     : isToday
-                    ? 'bg-card text-primary border-primary'
+                    ? 'bg-card text-primary-fuerte border-primary'
                     : 'bg-card text-muted-foreground border-border'
                 )}
               >
                 <span>{day}</span>
-                <span className={cn('text-[10px] font-normal', isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
+                <span className={cn('text-[10px] font-normal', isSelected ? 'text-primary-foreground' : 'text-muted-foreground')}>
                   {dayDate.slice(8, 10)}
                 </span>
               </button>
@@ -1074,12 +1076,12 @@ export function AgendaPage() {
                   <span className="text-xs font-bold text-foreground hidden xl:block">{day}</span>
                   <span className="text-xs font-bold text-foreground xl:hidden">{DAYS_SHORT[i]}</span>
                   {dayCount > 0 && (
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary-fuerte">
                       {dayCount}
                     </span>
                   )}
                 </div>
-                <p className={cn('text-[10px]', isToday ? 'text-primary font-semibold' : 'text-muted-foreground')}>
+                <p className={cn('text-[10px]', isToday ? 'text-primary-fuerte font-semibold' : 'text-muted-foreground')}>
                   {shortDate(dayDate)}
                 </p>
               </div>
@@ -1121,13 +1123,13 @@ export function AgendaPage() {
           reservas confirmadas
         </span>
         <span>
-          <strong className="text-amber-600">
+          <strong className="text-aviso-fuerte">
             {filtered.filter((c) => c.enrolled >= c.capacity).length}
           </strong>{' '}
           clases llenas
         </span>
         <span>
-          <strong className="text-destructive">
+          <strong className="text-destructive-fuerte">
             {filtered.reduce((a, c) => a + c.waitlist, 0)}
           </strong>{' '}
           en listas de espera

@@ -130,7 +130,7 @@ interface SeccionPlegableProps {
   /** Identidad estable: con esto se recuerda si quedó abierta */
   id: string
   icono: React.ComponentType<{ className?: string }>
-  /** Color del chip del ícono, ej: 'bg-accent/10 text-accent' */
+  /** Color del chip del ícono, ej: 'bg-primary/10 text-primary-fuerte' */
   colorIcono?: string
   titulo: string
   ayuda?: string
@@ -149,7 +149,7 @@ interface SeccionPlegableProps {
 export function SeccionPlegable({
   id,
   icono: Icono,
-  colorIcono = 'bg-primary/10 text-primary',
+  colorIcono = 'bg-primary/10 text-primary-fuerte',
   titulo,
   ayuda,
   resumen,

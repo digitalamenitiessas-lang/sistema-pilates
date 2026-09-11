@@ -50,19 +50,19 @@ const GENERICO: EstiloAviso = {
  * estilo — pero ahora olvidarlo cuesta un icono feo, no la campana.
  */
 const ESTILOS: Record<NotificationType, EstiloAviso> = {
-  pago_acreditado:      { Icon: CreditCard,    color: 'bg-[#E8F2EB] text-[#2E6040]', page: 'pagos' },
-  nuevo_alumno:         { Icon: UserPlus,      color: 'bg-primary/10 text-primary',  page: 'alumnos' },
-  membresia_por_vencer: { Icon: CalendarClock, color: 'bg-amber-100 text-amber-700', page: 'alumnos' },
-  membresia_vencida:    { Icon: AlertTriangle, color: 'bg-red-100 text-red-700',     page: 'alumnos' },
-  deuda_vencida:        { Icon: AlertTriangle, color: 'bg-red-100 text-red-700',     page: 'pagos' },
-  membresia_renovada:   { Icon: RefreshCw,     color: 'bg-[#E8F2EB] text-[#2E6040]', page: 'alumnos' },
-  caja_sin_cerrar:      { Icon: Wallet,        color: 'bg-amber-100 text-amber-700', page: 'caja' },
-  caja_diferencia:      { Icon: Scale,         color: 'bg-red-100 text-red-700',     page: 'caja' },
-  saldo_sin_imputar:    { Icon: Coins,         color: 'bg-amber-100 text-amber-700', page: 'caja' },
+  pago_acreditado:      { Icon: CreditCard,    color: 'bg-exito-suave text-exito-fuerte',             page: 'pagos' },
+  nuevo_alumno:         { Icon: UserPlus,      color: 'bg-primary/10 text-primary-fuerte',                   page: 'alumnos' },
+  membresia_por_vencer: { Icon: CalendarClock, color: 'bg-aviso-suave text-aviso-fuerte',             page: 'alumnos' },
+  membresia_vencida:    { Icon: AlertTriangle, color: 'bg-destructive-suave text-destructive-fuerte', page: 'alumnos' },
+  deuda_vencida:        { Icon: AlertTriangle, color: 'bg-destructive-suave text-destructive-fuerte', page: 'pagos' },
+  membresia_renovada:   { Icon: RefreshCw,     color: 'bg-exito-suave text-exito-fuerte',             page: 'alumnos' },
+  caja_sin_cerrar:      { Icon: Wallet,        color: 'bg-aviso-suave text-aviso-fuerte',             page: 'caja' },
+  caja_diferencia:      { Icon: Scale,         color: 'bg-destructive-suave text-destructive-fuerte', page: 'caja' },
+  saldo_sin_imputar:    { Icon: Coins,         color: 'bg-aviso-suave text-aviso-fuerte',             page: 'caja' },
   // El par de RefreshCw: la renovación que no fue. Lleva a Planes y no a
   // Clientes porque lo que hay que arreglar es el plan apagado, no la ficha.
-  // Ámbar y no rojo: no se rompió nada, hay algo mal configurado.
-  renovacion_omitida:   { Icon: RefreshCwOff,  color: 'bg-amber-100 text-amber-700', page: 'planes' },
+  // Aviso y no destructive: no se rompió nada, hay algo mal configurado.
+  renovacion_omitida:   { Icon: RefreshCwOff,  color: 'bg-aviso-suave text-aviso-fuerte',             page: 'planes' },
 }
 
 /**
@@ -290,7 +290,7 @@ export function NotificationsBell({ onNavigate }: { onNavigate?: (page: PageKey)
                   ? 'Desactivar avisos en este dispositivo'
                   : 'Activar avisos en este dispositivo'}
               </button>
-              {pushError && <p className="text-[11px] text-destructive mt-1.5 text-center">{pushError}</p>}
+              {pushError && <p className="text-[11px] text-destructive-fuerte mt-1.5 text-center">{pushError}</p>}
             </div>
           )}
         </div>

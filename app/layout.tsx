@@ -1,16 +1,22 @@
 import type { Metadata, Viewport } from 'next'
 import { nombreDelEstudio } from '@/lib/estudio'
-import { DM_Sans, Playfair_Display } from 'next/font/google'
+import { Bodoni_Moda, Montserrat } from 'next/font/google'
 import './globals.css'
 
-const dmSans = DM_Sans({
+// Las dos de la marca. Montserrat es la de la guía tal cual; Bodoni Moda
+// reemplaza a Bauer Bodoni, que es comercial y no se puede servir como
+// webfont sin licencia — es el mismo Bodoni, mismo didone.
+const montserrat = Montserrat({
   subsets: ['latin'],
-  variable: '--font-dm-sans',
+  variable: '--font-montserrat',
 })
 
-const playfair = Playfair_Display({
+// El eje `opsz` es lo que separa un Bodoni de texto de uno de titular: en 96
+// las astas finas se afinan hasta el pelo, que es el gesto del mockup.
+const bodoni = Bodoni_Moda({
   subsets: ['latin'],
-  variable: '--font-playfair',
+  axes: ['opsz'],
+  variable: '--font-bodoni',
 })
 
 // El título es lo que se ve en la pestaña y lo que aparece cuando alguien
@@ -30,7 +36,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export const viewport: Viewport = {
   colorScheme: 'light',
-  themeColor: '#f5ece3',
+  themeColor: '#e1dfdb',
 }
 
 export default function RootLayout({
@@ -40,7 +46,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className="bg-background">
-      <body className={`${dmSans.className} ${playfair.variable} antialiased`}>
+      <body className={`${montserrat.variable} ${bodoni.variable} font-sans antialiased`}>
         {children}
       </body>
     </html>

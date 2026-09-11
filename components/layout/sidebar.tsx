@@ -152,7 +152,7 @@ export function Sidebar({
         <div className="px-4 py-3">
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/8">
             <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-              <span className="text-primary font-semibold text-xs">{initials(profile.fullName)}</span>
+              <span className="text-primary-fuerte font-semibold text-xs">{initials(profile.fullName)}</span>
             </div>
             <div className="min-w-0">
               <p className="text-xs font-semibold text-foreground truncate">
@@ -207,7 +207,7 @@ export function Sidebar({
         <button
           onClick={() => signOut()}
           className={cn(
-            'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors',
+            'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive-fuerte transition-colors',
             !showLabels && 'justify-center'
           )}
           title={!showLabels ? 'Cerrar sesión' : undefined}

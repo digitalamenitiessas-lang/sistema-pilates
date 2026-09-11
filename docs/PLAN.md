@@ -1,8 +1,15 @@
 # Plan de avance — PilatesStudio
 
 > Documento vivo. Se actualiza con cada bloque de trabajo.
-> Última actualización: **05/09/2026** (cruce del documento de requerimientos de Casa Fé).
+> Última actualización: **10/09/2026** (se entrega el sistema al estudio para que lo use).
 > Para entregarle al estudio:
+> [`Casa-Fe-manual-del-mostrador.pdf`](Casa-Fe-manual-del-mostrador.pdf) — el
+> manual **por tarea**, que es el que sirve para usar el sistema: las 12 cosas
+> de todos los días en pocos pasos, los avisos que manda solo, y qué hacer
+> cuando la base rechaza algo. El script que lo genera es
+> [`manual-del-mostrador.py`](manual-del-mostrador.py): el PDF se regenera
+> corriéndolo, así que se edita el script y no el PDF.
+>
 > [`Casa-Fe-como-se-usa.pdf`](Casa-Fe-como-se-usa.pdf) — el pantalla por
 > pantalla **sin la sección de pendientes**, para que el PDF diga cómo se usa y
 > nada más. La versión completa, con lo que falta, es
@@ -124,12 +131,18 @@ exacto del cobro en huso argentino y reorganización de Configuración.
 
 ## Estado general
 
-Sistema desplegado en Vercel y operativo con datos de ejemplo. Núcleo completo
-(gestión + cobros + landing + autogestión + portal del alumno), ahora también
-usable desde el celular, instalable como app y con notificaciones reales.
-Lo que falta se divide en: trabajo nuestro (renovación automática, huecos del
-portal, mostrador) y cosas bloqueadas por la clienta (cuenta MP, datos reales,
-decisiones de negocio).
+Sistema desplegado en Vercel, **con los datos reales de Casa Fe cargados** y
+entregado al estudio el 10/09/2026 para que lo use. Núcleo completo (gestión +
+cobros + caja + gastos + reportes + landing + portal de la clienta), usable
+desde el celular, instalable como app y con notificaciones reales al mostrador
+y a la clienta.
+
+Del documento de requerimientos queda por construir **dos cosas**: Personal y
+remuneraciones (sección 12) y los días y horarios fijos (Agregado 2). El estado
+por sección está en
+[`REQUERIMIENTOS-CASA-FE.md`](REQUERIMIENTOS-CASA-FE.md) §3.1; lo que sigue
+esperando una definición del estudio, en
+[`casa-fe-lo-que-falta-preguntar.md`](casa-fe-lo-que-falta-preguntar.md).
 
 Desde el 26/08 **sí corre un proceso solo**: el cron diario de Vercel
 (`/api/cron/diario`) genera las notificaciones de membresías por vencer /
@@ -558,6 +571,103 @@ deliberado —emitir la cuota sin poder marcarla como oferta es exactamente el d
 de arriba— pero no puede pasar en silencio, así que el proceso diario avisa al
 mostrador una vez por día mientras dure.
 
+### ✅ La campana en el portal, y el push a la clienta (10/09)
+Con la renovación nueva **el mecanismo es avisarle**: tres recordatorios y el
+link de pago. Pero al revisar por dónde le llegaban, eran **solo mails** — y los
+tres canales estaban cortados a la vez: a la clienta no le llegaba push (existía
+`pushToUser` y no la llamaba nadie), el portal no tenía campana, y los mails no
+salen en producción porque Resend está en sandbox y `sendEmail` devuelve `false`
+en silencio. O sea: el recordatorio de renovar no le llegaba por ningún canal, y
+el sistema no se rompía ni avisaba.
+- [x] El proceso diario emite ahora los avisos con `audience: 'alumno'` para los
+      tres momentos —la cuota emitida, cada recordatorio y el vencimiento— y le
+      manda push a sus dispositivos. Un helper, no cuatro copias del mismo
+      código.
+- [x] **El push sale solo por los avisos que el upsert devolvió como nuevos**,
+      igual que los mails: si no, el cron corriendo dos veces le vibra el
+      teléfono dos veces por la misma noticia.
+- [x] En el recordatorio, la campana y el push van **antes** del corte por
+      email, que es el motivo de todo esto: quien no tiene mail cargado se
+      enteraba de nada. En el aviso de vencimiento van después, con la misma
+      condición que el mail, porque sin la `0041` aplicada ese aviso es falso y
+      decir por tres canales algo que no pasó es peor que no decirlo.
+- [x] **La campana del portal es el mismo componente del mostrador**, montado
+      sin `onNavigate` porque sus destinos son pantallas que el portal no tiene.
+      Y trae adentro el interruptor de avisos en el celular, que es la razón por
+      la que se monta esto y no una lista aparte.
+- [x] El aislamiento no lo hace el componente ni un filtro en la consulta:
+      `fetchNotifications` no filtra por audiencia y **lo decide la política de
+      la `0007`**, que ya existía y ya era correcta.
+- [x] `pushClientas` va separado de `pushSent` en el resumen del proceso diario:
+      si queda en cero corrida tras corrida mientras los avisos crecen, es que
+      nadie tiene el push activado o faltan las claves VAPID.
+
+**Sin verificar todavía, y hace falta la sesión de una clienta:** ver la campana
+en el portal y que el push llegue de verdad. Lo verificado es que compila, que la
+campana tolera no tener navegación, que su texto no es del mostrador y que los
+dos tipos de aviso que usa ya están en el CHECK de la `0023`.
+
+### ✅ La identidad de Casa Fé, aplicada (11/09)
+Llegó el material de marca: el manual de diseño (`MOVIMIENTO. PAUSA. BALANCE`),
+las dos tipografías, los tres colores y las fotos del estudio. Hasta ahora la
+paleta era una interpretación nuestra —terracota, arena, salvia— con DM Sans y
+Playfair, y las fotos eran de banco de imágenes.
+- [x] **Las imágenes salieron del PDF a resolución nativa** y quedaron en
+      `public/marca/`: el hero, el tríptico del estudio, las dos disciplinas, la
+      acuarela del pie y la textura de óxido. Recortadas como en el manual
+      —el hero es el mismo encuadre, calculado desde la geometría del PDF—,
+      redimensionadas y comprimidas: de 14 MB a 1,5 MB. `next.config` tiene
+      `images.unoptimized = true`, así que el peso que sale de acá es el que
+      baja la clienta; por eso el hero tiene además una versión de celular que
+      sirve un `<picture>`.
+- [x] **Bodoni Moda en lugar de Bauer Bodoni.** La del manual es comercial y no
+      se puede servir como webfont sin licencia. Bodoni Moda (Google Fonts, OFL)
+      es un revival del mismo Bodoni, y con el eje `opsz` en 96 da la misma
+      hairline fina de los titulares. Montserrat es la del manual tal cual.
+      Como `--font-serif` apunta a la nueva, las 24 pantallas que ya usaban
+      `font-serif` cambiaron de tipografía sin tocar una línea.
+- [x] **Los tres colores como tokens en oklch**, y todo lo demás derivado de
+      ahí. Medido sobre el manual: la Montserrat en mayúsculas va con 0.12em de
+      tracking y la Bodoni con interlínea 0.88.
+- [x] **Los estados dejaron de ser ámbar, celeste y rojo de Tailwind**, que al
+      lado del natural se veían de otra marca. Ahora son cuatro familias de tres
+      tonos —`aviso`, `info`, `exito`, `destructive`— con una regla: **el tono
+      pleno pinta, el `-fuerte` escribe**. Migradas 17 pantallas; el grep de
+      colores crudos de Tailwind da cero.
+- [x] El mismo corte para el marrón de la marca: como texto chico sobre fondo
+      claro da 3,49:1 y no pasa AA, así que se agregó `--primary-fuerte` para
+      texto y el pleno quedó para rellenos y titulares.
+- [x] **Auditoría de contraste real, en el navegador**, resolviendo cada color
+      con canvas —`getComputedStyle` devuelve `lab()` y `oklch()`, no rgb— sobre
+      las diez pantallas del mostrador: de 145 supuestos fallos (el auditor
+      estaba mal) a **cero reales**. Los que aparecieron eran de verdad:
+      `text-destructive-foreground` no existía como token y el "9+" de la
+      campana era invisible; y el color del catálogo de disciplinas se estaba
+      usando como color de texto, que a 10px daba 2,2:1 según qué tono hubiera
+      elegido el estudio. Ahora el color del catálogo pinta el punto y el fondo,
+      y la letra va en negro.
+- [x] **La landing rehecha sobre el mockup**, sección por sección: el logotipo
+      sobre la foto con la textura encima, la bajada de la clienta palabra por
+      palabra, el tríptico, la retícula de planes en verde claro con filete, el
+      bloque OPEN STUDIO, las disciplinas con su foto y la acuarela del cierre.
+      **Todo el cableado de datos quedó igual**: los planes, la grilla, las
+      disciplinas y los datos del estudio siguen saliendo de las vistas
+      públicas, y lo que el estudio no cargó sigue sin dibujarse.
+- [x] **Los íconos de la app salen del logotipo real**, no de una tipografía
+      parecida: se renderizó la región del PDF con las fotos tapadas y se
+      recortó al tinte. `CASA / FE` para los íconos grandes y `FE` solo para el
+      favicon, donde el lockup entero no se lee. Antes eran los del andamio de
+      Vercel. Se borraron once archivos muertos de `public/` (las tres fotos de
+      banco y los placeholders).
+- [x] Los mails también: el hexadecimal va escrito a mano porque en un mail no
+      hay variables CSS, pero son los valores de la marca.
+
+**Decisiones que conviene que la clienta confirme:** el reemplazo de Bauer
+Bodoni por Bodoni Moda (o que mande la licencia webfont si la tiene); el
+monograma del ícono; y que el manual escribe "DICIPLINAS" en la barra —en la
+web dice "Disciplinas". El manual también tiene **FAQ** en la barra y no hay
+sección: hace falta que ella mande las preguntas, no se inventan.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
@@ -571,11 +681,22 @@ mostrador una vez por día mientras dure.
 ## Bloqueado por la clienta (checklist)
 
 - [ ] Cuenta de Mercado Pago del negocio conectada en Configuración.
-- [ ] Datos reales: planes y precios, grilla de horarios, profesores, salas,
-      dirección, Instagram, fotos propias.
+- [x] **Datos reales cargados** (09/09, migraciones `0033` a `0035`): datos del
+      estudio, los seis planes FE con sus precios, las tres profesoras y la
+      grilla de 64 clases. **Falta** el WhatsApp, el link de Maps, y el nombre
+      completo, teléfono y email de Ivana y de Leandro —sin el mail no se les
+      puede crear la cuenta.
 - [ ] Decisión sobre factura electrónica (¿desde el sistema o aparte?).
 - [ ] Dominio propio elegido (conectar en Vercel).
 - [ ] Cambiar la contraseña admin de prueba y pasar la lista del equipo real.
+- [x] **El material de diseño llegó y está aplicado** (11/09): manual, dos
+      tipografías, tres colores y ocho fotos. **Falta** el logo como archivo
+      vectorial —el que se usa salió recortado del PDF— y saber si tiene
+      licencia webfont de Bauer Bodoni.
+- [ ] Las siete definiciones de
+      [`casa-fe-lo-que-falta-preguntar.md`](casa-fe-lo-que-falta-preguntar.md).
+      Las dos primeras —el 25% del link de pago y el tope de 3 cuotas— son
+      plata que se pierde cada día que pasan sin contestar.
 
 ## Pendiente inmediato
 
@@ -583,9 +704,12 @@ mostrador una vez por día mientras dure.
   agregar `https://<dominio-de-vercel>/sistema/recuperar` y
   `http://localhost:3000/sistema/recuperar` (sin esto, el enlace de
   "olvidé mi contraseña" cae en la home en vez de la pantalla de reset).
-- Vercel → Environment Variables: **todas cargadas** ✅ (verificado
-  05/09/2026): `RESEND_API_KEY`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`,
-  `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` y `CRON_SECRET`.
+- Vercel → Environment Variables: `RESEND_API_KEY`,
+  `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` y
+  `CRON_SECRET` ✅ (verificado 05/09/2026). **`EMAIL_FROM` no está cargada en
+  ningún lado**: sin ella `lib/email-server.ts:30` cae a `onboarding@resend.dev`,
+  que en sandbox solo entrega a la cuenta dueña. Va junto con la verificación
+  del dominio.
 - Resend en sandbox: sin dominio verificado solo entrega a
   `digitalamenitiessas@gmail.com`. Al tener el dominio del estudio:
   Resend → Domains → verificar DNS → `EMAIL_FROM` en Vercel, y los emails
@@ -602,7 +726,7 @@ mostrador una vez por día mientras dure.
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |
 | `SUPABASE_SERVICE_ROLE_KEY` | En `.env.local` ✅ · verificar en Vercel |
-| VAPID / push | Claves generadas en `.env.local` · cargar en Vercel |
+| VAPID / push | Claves generadas en `.env.local` · **cargar en Vercel** (sin ellas el push es un no-op silencioso). Desde el 10/09 el push va también **a la clienta**, no solo al mostrador |
 | Resend | ✅ Activo en sandbox (26/08, email real entregado) · key en `.env.local`, cargar en Vercel · dominio del estudio pendiente para emails a alumnas |
 | Webhook MP | Programado; registrar URL en MP al conectar la cuenta real |
 | Usuarios de prueba | `admin@pilatestudio.com` (cambiar clave) · `camila.portal@…` (demo) |

@@ -124,7 +124,7 @@ export function AsignarPlanModal({ student, onClose }: AsignarPlanModalProps) {
                 <p className="text-sm font-semibold text-foreground">
                   {p.name}
                   {p.isTrial && (
-                    <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-accent/15 text-accent">
+                    <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-secondary text-secondary-foreground">
                       Prueba
                     </span>
                   )}
@@ -148,10 +148,10 @@ export function AsignarPlanModal({ student, onClose }: AsignarPlanModalProps) {
           )}
 
           {error && (
-            <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
+            <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
           )}
           {cambioDePlan && plan && ultima && arranca && (
-            <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+            <p className="text-[11px] text-aviso-fuerte bg-aviso-suave border border-aviso/40 rounded-xl px-3 py-2.5">
               <span className="font-semibold">{plan.name}</span> no es el plan del último período que
               ya tiene asignado ({ultima.planName}), así que esto es un cambio de plan — y el cambio
               de plan también se encola: paga hoy y lo empieza a usar el {fecha(arranca)}. Hasta ese

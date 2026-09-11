@@ -9,12 +9,12 @@ import { FichaAlumno } from './ficha-alumno'
 import { AlumnoFormModal } from './alumno-form-modal'
 
 const STATUS_CONFIG = {
-  activa: { label: 'Activa', class: 'bg-[#E8F2EB] text-[#2E6040]' },
-  'por vencer': { label: 'Por vencer', class: 'bg-amber-100 text-amber-700' },
-  futura: { label: 'Empieza después', class: 'bg-sky-100 text-sky-700' },
-  vencida: { label: 'Vencida', class: 'bg-red-100 text-red-700' },
-  suspendida: { label: 'Suspendida', class: 'bg-gray-100 text-gray-600' },
-  sin_membresia: { label: 'Sin membresía', class: 'bg-gray-100 text-gray-500' },
+  activa: { label: 'Activa', class: 'bg-exito-suave text-exito-fuerte' },
+  'por vencer': { label: 'Por vencer', class: 'bg-aviso-suave text-aviso-fuerte' },
+  futura: { label: 'Empieza después', class: 'bg-info-suave text-info-fuerte' },
+  vencida: { label: 'Vencida', class: 'bg-destructive-suave text-destructive-fuerte' },
+  suspendida: { label: 'Suspendida', class: 'bg-muted text-muted-foreground' },
+  sin_membresia: { label: 'Sin membresía', class: 'bg-muted text-muted-foreground' },
 }
 
 function StudentCard({ student, onClick }: { student: Student; onClick: () => void }) {
@@ -31,18 +31,18 @@ function StudentCard({ student, onClick }: { student: Student; onClick: () => vo
     >
       <div className="flex items-start gap-3 mb-3">
         <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-          <span className="text-primary font-bold text-sm">{student.avatar}</span>
+          <span className="text-primary-fuerte font-bold text-sm">{student.avatar}</span>
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
             <p className="text-sm font-semibold text-foreground truncate">{student.name}</p>
             {hasMedical && (
-              <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" aria-label="Tiene notas médicas" />
+              <AlertCircle className="w-3.5 h-3.5 text-aviso-fuerte shrink-0" aria-label="Tiene notas médicas" />
             )}
           </div>
           <p className="text-xs text-muted-foreground truncate">{student.email}</p>
         </div>
-        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary-fuerte transition-colors shrink-0" />
       </div>
 
       <div className="flex items-center justify-between gap-2 mb-2">
@@ -177,19 +177,19 @@ export function AlumnosPage() {
         </p>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <span>
-            <strong className="text-[#2E6040]">
+            <strong className="text-exito-fuerte">
               {STUDENTS.filter((s) => s.membership?.status === 'activa').length}
             </strong>{' '}
             activos
           </span>
           <span>
-            <strong className="text-amber-600">
+            <strong className="text-aviso-fuerte">
               {STUDENTS.filter((s) => s.membership?.status === 'por vencer').length}
             </strong>{' '}
             por vencer
           </span>
           <span>
-            <strong className="text-destructive">
+            <strong className="text-destructive-fuerte">
               {STUDENTS.filter((s) => s.membership?.status === 'vencida').length}
             </strong>{' '}
             vencidos

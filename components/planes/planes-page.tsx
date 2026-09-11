@@ -21,7 +21,10 @@ import type { Plan, Discipline } from '@/lib/types'
 
 type Tab = 'planes' | 'membresias'
 
-const PLAN_COLORS = ['#C4735A', '#7D9B76', '#D4A854', '#9B6E8E', '#5E8FA8', '#B8956A']
+// Los seis tonos de la familia Casa Fé. Cambiar la lista no repinta lo
+// ya guardado: el color vive en la base y esto es lo que se ofrece de
+// acá en adelante.
+const PLAN_COLORS = ['#847164', '#9AA08C', '#BCBAAE', '#B79B72', '#8792A0', '#A5786C']
 
 function PlanCard({ plan, onEdit, onDelete }: { plan: Plan; onEdit: () => void; onDelete: () => void }) {
   const { canWrite } = useData()
@@ -114,7 +117,9 @@ function PlanCard({ plan, onEdit, onDelete }: { plan: Plan; onEdit: () => void; 
             <span
               key={d}
               className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-              style={{ backgroundColor: `${plan.color}18`, color: plan.color }}
+              // El tinte identifica al plan; el texto va en negro. Con la
+              // letra en el color elegido, un plan de tono claro daba 2.2:1.
+              style={{ backgroundColor: `${plan.color}2e`, color: 'var(--foreground)' }}
             >
               {d}
             </span>
@@ -140,7 +145,7 @@ function PlanCard({ plan, onEdit, onDelete }: { plan: Plan; onEdit: () => void; 
               </button>
               <button
                 onClick={onDelete}
-                className="w-8 h-8 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
+                className="w-8 h-8 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive-fuerte transition-colors"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -353,7 +358,7 @@ function PlanFormModal({ plan, onClose }: { plan?: Plan; onClose: () => void }) 
                     className={cn(
                       'px-3 py-1.5 rounded-xl border text-xs font-medium transition-colors',
                       active
-                        ? 'border-primary bg-primary/10 text-primary'
+                        ? 'border-primary bg-primary/10 text-primary-fuerte'
                         : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
                     )}
                   >
@@ -400,7 +405,7 @@ function PlanFormModal({ plan, onClose }: { plan?: Plan; onClose: () => void }) 
           </label>
 
           {error && (
-            <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
+            <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
           )}
         </div>
 
@@ -522,7 +527,7 @@ export function PlanesPage() {
                   className="bg-card border border-border rounded-2xl p-4 flex items-center gap-4"
                 >
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <span className="text-primary font-bold text-sm">{student?.avatar ?? '?'}</span>
+                    <span className="text-primary-fuerte font-bold text-sm">{student?.avatar ?? '?'}</span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2 mb-1.5">
@@ -532,7 +537,7 @@ export function PlanesPage() {
                       <span
                         className={cn(
                           'text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0',
-                          m.status === 'activa' ? 'bg-[#E8F2EB] text-[#2E6040]' : 'bg-amber-100 text-amber-700'
+                          m.status === 'activa' ? 'bg-exito-suave text-exito-fuerte' : 'bg-aviso-suave text-aviso-fuerte'
                         )}
                       >
                         {m.status === 'activa' ? 'Activa' : 'Por vencer'}
@@ -542,7 +547,7 @@ export function PlanesPage() {
                       <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
                         <div
                           className="h-full rounded-full transition-all"
-                          style={{ width: `${pct}%`, backgroundColor: plan?.color ?? '#C4735A' }}
+                          style={{ width: `${pct}%`, backgroundColor: plan?.color ?? 'var(--primary)' }}
                         />
                       </div>
                       <span className="text-[10px] text-muted-foreground shrink-0">

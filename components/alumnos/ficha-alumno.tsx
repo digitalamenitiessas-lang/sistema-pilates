@@ -44,11 +44,11 @@ const ESTADO_MEMBRESIA: Record<MembershipStatus, string> = {
 
 /** El color de cada estado, para que la vigente y el historial coincidan. */
 const COLOR_ESTADO: Record<MembershipStatus, string> = {
-  activa: 'bg-[#E8F2EB] text-[#2E6040]',
-  'por vencer': 'bg-amber-100 text-amber-700',
-  futura: 'bg-sky-100 text-sky-700',
-  vencida: 'bg-red-100 text-red-700',
-  suspendida: 'bg-gray-100 text-gray-600',
+  activa: 'bg-exito-suave text-exito-fuerte',
+  'por vencer': 'bg-aviso-suave text-aviso-fuerte',
+  futura: 'bg-info-suave text-info-fuerte',
+  vencida: 'bg-destructive-suave text-destructive-fuerte',
+  suspendida: 'bg-muted text-muted-foreground',
 }
 
 /** El `T00:00` evita que un ISO suelto se lea como UTC y muestre el día anterior. */
@@ -107,7 +107,7 @@ function PortalAccessModal({ student, onClose }: { student: Student; onClose: ()
       >
         {done ? (
           <div className="px-6 py-8 text-center">
-            <CheckCircle2 className="w-10 h-10 mx-auto mb-3 text-[#2E6040]" />
+            <CheckCircle2 className="w-10 h-10 mx-auto mb-3 text-exito-fuerte" />
             <h3 className="text-base font-bold text-foreground mb-1">Acceso creado</h3>
             <p className="text-sm text-muted-foreground mb-5">
               Pasale a {student.name.split(' ')[0]} el email y la contraseña. Entra desde el mismo
@@ -151,7 +151,7 @@ function PortalAccessModal({ student, onClose }: { student: Student; onClose: ()
                   Se la compartís al cliente; con ella entra a su portal para reservar y ver sus pagos.
                 </p>
               </div>
-              {error && <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
+              {error && <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
             </div>
             <div className="flex gap-3 px-6 py-4 border-t border-border">
               <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors">
@@ -177,11 +177,11 @@ const TABS = [
 ]
 
 function ReservationStatusIcon({ status }: { status: Reservation['status'] }) {
-  if (status === 'asistió') return <CheckCircle2 className="w-4 h-4 text-accent" />
+  if (status === 'asistió') return <CheckCircle2 className="w-4 h-4 text-exito-fuerte" />
   if (status === 'cancelada') return <XCircle className="w-4 h-4 text-muted-foreground" />
-  if (status === 'lista de espera') return <Clock className="w-4 h-4 text-amber-500" />
-  if (status === 'ausente') return <XCircle className="w-4 h-4 text-destructive" />
-  return <CheckCircle2 className="w-4 h-4 text-primary" />
+  if (status === 'lista de espera') return <Clock className="w-4 h-4 text-aviso-fuerte" />
+  if (status === 'ausente') return <XCircle className="w-4 h-4 text-destructive-fuerte" />
+  return <CheckCircle2 className="w-4 h-4 text-primary-fuerte" />
 }
 
 const RESERVATION_STATUS_LABEL: Record<string, string> = {
@@ -282,7 +282,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
         <div className="bg-card border-b border-border px-4 md:px-6 py-6">
           <div className="flex items-start gap-4">
             <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
-              <span className="text-primary font-bold text-xl">{student.avatar}</span>
+              <span className="text-primary-fuerte font-bold text-xl">{student.avatar}</span>
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2 flex-wrap">
@@ -327,7 +327,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
               <p className="text-[11px] text-muted-foreground mt-0.5">Asistencias</p>
             </div>
             <div className="bg-muted rounded-xl p-3 text-center">
-              <p className="text-2xl font-bold text-primary">{classesLeft}</p>
+              <p className="text-2xl font-bold text-primary-fuerte">{classesLeft}</p>
               <p className="text-[11px] text-muted-foreground mt-0.5">Clases rest.</p>
             </div>
             <div className="bg-muted rounded-xl p-3 text-center">
@@ -343,8 +343,8 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
               los dos avisos se leerían igual y son cosas opuestas: uno
               dice que el mes que viene está cerrado, este que no. */}
           {ofertas.length > 0 && (
-            <div className="mt-4 rounded-xl border border-dashed border-sky-300 bg-card p-3.5">
-              <p className="text-xs font-bold text-sky-900 flex items-center gap-1.5">
+            <div className="mt-4 rounded-xl border border-dashed border-info/40 bg-card p-3.5">
+              <p className="text-xs font-bold text-info-fuerte flex items-center gap-1.5">
                 <RefreshCw className="w-3.5 h-3.5 shrink-0" />
                 {ofertas.length === 1
                   ? 'Le ofrecimos la renovación y todavía no la pagó'
@@ -352,7 +352,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
               </p>
               <div className="mt-1.5 space-y-1">
                 {ofertas.map((p) => (
-                  <p key={p.id} className="text-[11px] text-sky-900/90 leading-relaxed">
+                  <p key={p.id} className="text-[11px] text-info-fuerte/90 leading-relaxed">
                     <span className="font-semibold">{p.planName}</span> · $
                     {p.amount.toLocaleString('es-AR')} ·{' '}
                     {ofertaYaResuelta(p)
@@ -363,7 +363,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                   </p>
                 ))}
               </div>
-              <p className="text-[10px] text-sky-800 mt-1.5">
+              <p className="text-[10px] text-info-fuerte mt-1.5">
                 No es deuda: se cobra desde Pagos y ahí nace el período nuevo. Si no la paga, el
                 sistema anula la oferta y el período no existe.
               </p>
@@ -372,7 +372,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                   registrado con una nota— así que el mes se le cobraría dos
                   veces si además se cobra la cuota del período nuevo. */}
               {ofertas.some(ofertaYaResuelta) && (
-                <p className="text-[10px] font-semibold text-amber-700 mt-1">
+                <p className="text-[10px] font-semibold text-aviso-fuerte mt-1">
                   Con el período ya asignado, la oferta no se cobra: el sistema la anula sola y lo
                   que se cobra es la cuota de ese período.
                 </p>
@@ -384,8 +384,8 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
               evita cobrarle dos veces el mismo mes: si está escondido en una
               pestaña, quien atiende el teléfono no lo va a ver. */}
           {futuras.length > 0 && (
-            <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-3.5">
-              <p className="text-xs font-bold text-sky-900 flex items-center gap-1.5">
+            <div className="mt-4 rounded-xl border border-info/40 bg-info-suave p-3.5">
+              <p className="text-xs font-bold text-info-fuerte flex items-center gap-1.5">
                 <CalendarClock className="w-3.5 h-3.5 shrink-0" />
                 {futuras.length === 1
                   ? 'El próximo período ya está asignado'
@@ -395,7 +395,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                 {futuras.map((m) => {
                   const cuota = payments.find((p) => p.membershipId === m.id && p.status !== 'anulado')
                   return (
-                    <p key={m.id} className="text-[11px] text-sky-900/90 leading-relaxed">
+                    <p key={m.id} className="text-[11px] text-info-fuerte/90 leading-relaxed">
                       <span className="font-semibold">{m.planName}</span> · arranca el{' '}
                       {fecha(m.startDate)} y llega hasta el {fecha(m.endDate)} · {m.classesTotal} clase
                       {m.classesTotal !== 1 ? 's' : ''}
@@ -404,7 +404,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                   )
                 })}
               </div>
-              <p className="text-[10px] text-sky-800 mt-1.5">
+              <p className="text-[10px] text-info-fuerte mt-1.5">
                 Asignar el mismo plan otra vez no reemplaza esto: suma un período más detrás, con su
                 propia cuota.
               </p>
@@ -422,7 +422,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                 className={cn(
                   'flex items-center gap-2 px-3 md:px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap shrink-0',
                   activeTab === key
-                    ? 'border-primary text-primary'
+                    ? 'border-primary text-primary-fuerte'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
                 )}
               >
@@ -441,7 +441,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
               {/* Personal data */}
               <div className="bg-card rounded-2xl border border-border p-5">
                 <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                  <User className="w-4 h-4 text-primary" />
+                  <User className="w-4 h-4 text-primary-fuerte" />
                   Datos personales
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -465,8 +465,8 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
               <div className="bg-card rounded-2xl border border-border p-5">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-accent/10 flex items-center justify-center">
-                      <Smartphone className="w-4.5 h-4.5 text-accent" />
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <Smartphone className="w-4.5 h-4.5 text-primary-fuerte" />
                     </div>
                     <div>
                       <h3 className="text-sm font-semibold text-foreground">Acceso al portal</h3>
@@ -478,7 +478,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                     </div>
                   </div>
                   {student.userId ? (
-                    <span className="flex items-center gap-1.5 text-xs font-semibold text-[#2E6040] bg-[#E8F2EB] px-2.5 py-1 rounded-full">
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-exito-fuerte bg-exito-suave px-2.5 py-1 rounded-full">
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       Activo
                     </span>
@@ -495,12 +495,12 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
 
               {/* Medical notes */}
               {student.medicalNotes && (
-                <div className="bg-amber-50 rounded-2xl border border-amber-200 p-5">
-                  <h3 className="text-sm font-semibold text-amber-800 mb-2 flex items-center gap-2">
+                <div className="bg-aviso-suave rounded-2xl border border-aviso/40 p-5">
+                  <h3 className="text-sm font-semibold text-aviso-fuerte mb-2 flex items-center gap-2">
                     <AlertCircle className="w-4 h-4" />
                     Observaciones médicas
                   </h3>
-                  <p className="text-sm text-amber-700">{student.medicalNotes}</p>
+                  <p className="text-sm text-aviso-fuerte">{student.medicalNotes}</p>
                 </div>
               )}
 
@@ -508,7 +508,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
               {student.observations && (
                 <div className="bg-card rounded-2xl border border-border p-5">
                   <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-                    <ClipboardList className="w-4 h-4 text-primary" />
+                    <ClipboardList className="w-4 h-4 text-primary-fuerte" />
                     Observaciones
                   </h3>
                   <p className="text-sm text-muted-foreground">{student.observations}</p>
@@ -547,11 +547,11 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                       <span
                         className={cn(
                           'text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0',
-                          r.status === 'asistió' && 'bg-[#E8F2EB] text-[#2E6040]',
-                          r.status === 'confirmada' && 'bg-primary/10 text-primary',
+                          r.status === 'asistió' && 'bg-exito-suave text-exito-fuerte',
+                          r.status === 'confirmada' && 'bg-primary/10 text-primary-fuerte',
                           r.status === 'cancelada' && 'bg-muted text-muted-foreground',
-                          r.status === 'lista de espera' && 'bg-amber-100 text-amber-700',
-                          r.status === 'ausente' && 'bg-red-100 text-red-700'
+                          r.status === 'lista de espera' && 'bg-aviso-suave text-aviso-fuerte',
+                          r.status === 'ausente' && 'bg-destructive-suave text-destructive-fuerte'
                         )}
                       >
                         {RESERVATION_STATUS_LABEL[r.status]}
@@ -605,10 +605,10 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                     <div
                       className={cn(
                         'w-2 h-2 rounded-full shrink-0',
-                        p.status === 'pagado' && 'bg-accent',
-                        oferta && 'bg-sky-400',
+                        p.status === 'pagado' && 'bg-exito',
+                        oferta && 'bg-info',
                         anulada && 'bg-muted-foreground/40',
-                        p.status === 'pendiente' && !oferta && 'bg-amber-500',
+                        p.status === 'pendiente' && !oferta && 'bg-aviso',
                         p.status === 'vencido' && 'bg-destructive'
                       )}
                     />
@@ -628,11 +628,11 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                       <span
                         className={cn(
                           'text-[10px] font-semibold',
-                          p.status === 'pagado' && 'text-accent',
-                          oferta && 'text-sky-700',
+                          p.status === 'pagado' && 'text-exito-fuerte',
+                          oferta && 'text-info-fuerte',
                           anulada && 'text-muted-foreground',
-                          p.status === 'pendiente' && !oferta && 'text-amber-600',
-                          p.status === 'vencido' && 'text-destructive'
+                          p.status === 'pendiente' && !oferta && 'text-aviso-fuerte',
+                          p.status === 'vencido' && 'text-destructive-fuerte'
                         )}
                       >
                         {oferta
@@ -697,7 +697,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                         <p className="text-[10px] text-muted-foreground">Total clases</p>
                       </div>
                       <div className="bg-muted rounded-xl p-3 text-center">
-                        <p className="text-xl font-bold text-primary">{classesLeft}</p>
+                        <p className="text-xl font-bold text-primary-fuerte">{classesLeft}</p>
                         <p className="text-[10px] text-muted-foreground">Disponibles</p>
                       </div>
                       <div className="bg-muted rounded-xl p-3 text-center">
@@ -798,7 +798,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
               {misMembresias.length > 0 && (
                 <div className="bg-card rounded-2xl border border-border p-5">
                   <h3 className="text-sm font-semibold text-foreground mb-1 flex items-center gap-2">
-                    <History className="w-4 h-4 text-primary" />
+                    <History className="w-4 h-4 text-primary-fuerte" />
                     Historial de membresías
                   </h3>
                   <p className="text-xs text-muted-foreground mb-2">

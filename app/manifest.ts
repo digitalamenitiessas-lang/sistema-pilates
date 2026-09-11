@@ -11,8 +11,8 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     description: 'Reservá tus clases, mirá tu membresía y tus pagos.',
     start_url: '/sistema',
     display: 'standalone',
-    background_color: '#f5ece3',
-    theme_color: '#f5ece3',
+    background_color: '#e1dfdb',
+    theme_color: '#e1dfdb',
     icons: [
       { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
       { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },

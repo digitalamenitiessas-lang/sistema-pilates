@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createMpCheckoutLink, getMpAccessToken, supabaseAdmin } from '@/lib/mp-server'
-import { pushToStaff } from '@/lib/push-server'
+import { pushToStaff, pushToUser } from '@/lib/push-server'
 import { sendEmail, emailLayout } from '@/lib/email-server'
 import { NOMBRE_POR_DEFECTO } from '@/lib/estudio'
 
@@ -114,7 +114,7 @@ function formatAmount(n: number): string {
 }
 
 const BOTON_PAGAR =
-  'display:inline-block;background:#A9552F;color:#fff;text-decoration:none;padding:10px 20px;border-radius:10px;font-weight:600;'
+  'display:inline-block;background:#847164;color:#fff;text-decoration:none;padding:10px 20px;border-radius:10px;font-weight:600;'
 
 interface NotificationRow {
   type: string
@@ -131,6 +131,9 @@ interface StudentRef {
   name: string
   email: string
   active?: boolean
+  /** La cuenta con la que entra al portal. Null si nunca se le creó acceso:
+   *  sin cuenta no hay dispositivo suscripto y no hay push que mandar. */
+  user_id?: string | null
 }
 
 /**
@@ -182,6 +185,63 @@ export async function GET(request: Request) {
   const today = todayAR()
   const rows: NotificationRow[] = []
   const emails: Array<{ to: string; subject: string; html: string; key: string }> = []
+
+  // Los avisos que van A LA CLIENTA, por los tres canales que tiene.
+  //
+  // Hasta acá el cron le hablaba SOLO por mail, y eso deja la renovación
+  // colgando de un hilo: si el mail no sale —Resend en sandbox entrega solo
+  // al dueño de la cuenta, y `sendEmail` devuelve false sin avisar— el
+  // recordatorio no le llega por ningún lado. Y el recordatorio ES el
+  // mecanismo: sin él, "renová antes del 20" no existe.
+  //
+  // Ahora el mismo aviso va también a la campana del portal —una fila con
+  // `audience: 'alumno'`, que la política de la 0007 ya deja que lea solo
+  // ella— y al push de sus dispositivos. Los tres son independientes: el que
+  // falte no se lleva a los otros.
+  //
+  // El push se junta y se manda al final, después de insertar las filas, por
+  // el mismo motivo que los mails: si el insert de avisos falla, no queremos
+  // haberle vibrado el teléfono por algo que no quedó registrado.
+  // `key` es la clave del aviso que le corresponde: el push sale solo si esa
+  // fila entró como nueva, igual que el mail.
+  const pushClienta: Array<{
+    key: string
+    userId: string
+    title: string
+    body: string
+    url?: string
+  }> = []
+
+  /**
+   * Un aviso para la clienta. La fila de la campana y el push; el mail sigue
+   * armándose aparte porque lleva HTML y asunto propios.
+   *
+   * La clave es la misma del aviso al mostrador con sufijo, así que el dedupe
+   * de la 0007 vale también acá: si el cron corre dos veces el mismo día, ella
+   * no recibe dos.
+   */
+  const avisarCliente = (
+    clave: string,
+    studentId: string,
+    userId: string | null | undefined,
+    title: string,
+    body: string,
+    // La campana saca el ícono y el color del tipo, así que el aviso de que
+    // venció no puede salir con el ícono de "por vencer". Los dos ya están en
+    // el CHECK de la 0023: no se agrega ninguno.
+    type: 'membresia_por_vencer' | 'membresia_vencida' = 'membresia_por_vencer'
+  ) => {
+    rows.push({
+      type,
+      title,
+      body,
+      student_id: studentId,
+      audience: 'alumno',
+      dedupe_key: `cli-${clave}`,
+    })
+    // Sin cuenta no hay dispositivo: nunca se le creó el acceso al portal.
+    if (userId) pushClienta.push({ key: `cli-${clave}`, userId, title, body, url: '/sistema' })
+  }
 
   // Los avisos de renovación omitida van en su propia tanda porque su tipo lo
   // habilita el CHECK de la 0023. Si esa migración todavía no corrió, la base
@@ -275,7 +335,7 @@ export async function GET(request: Request) {
   const { data: porRenovar, error: renewError } = await admin
     .from('memberships')
     .select(
-      'id, student_id, end_date, auto_renew, students(name, email, active), plans(id, name, price, active, is_trial)'
+      'id, student_id, end_date, auto_renew, students(name, email, active, user_id), plans(id, name, price, active, is_trial)'
     )
     .eq('status', 'activa')
     .eq('auto_renew', true)
@@ -470,6 +530,15 @@ export async function GET(request: Request) {
       audience: 'staff',
       dedupe_key: `oferta-${m.id}`,
     })
+
+    avisarCliente(
+      `oferta-${m.id}`,
+      m.student_id,
+      student?.user_id,
+      'Tu renovación ya está lista',
+      `${plan.name} · ${formatAmount(plan.price)}, con plazo hasta el ${formatDate(limite)}. El período nuevo arranca cuando el pago entre.`
+    )
+
     if (student?.email) {
       emails.push({
         to: student.email,
@@ -503,7 +572,7 @@ export async function GET(request: Request) {
   const maxAnticipacion = recordatorios[0] ?? 0
   const { data: porVencer } = await admin
     .from('memberships')
-    .select('id, end_date, student_id, students(name, email, active), plans(name)')
+    .select('id, end_date, student_id, students(name, email, active, user_id), plans(name)')
     .eq('status', 'activa')
     .gte('end_date', today)
     .lte('end_date', addDaysISO(today, maxAnticipacion))
@@ -544,7 +613,23 @@ export async function GET(request: Request) {
     // A quien el estudio dio de baja no se le recuerda que renueve: ya
     // avisó que no sigue. El aviso al mostrador queda igual, que es el que
     // sirve para entender por qué la membresía se apaga.
-    if (!student?.email || student.active === false) continue
+    if (student?.active === false) continue
+
+    // La campana y el push van ANTES del corte por email, y esa es la razón
+    // de todo este cambio: quien no tiene mail cargado —o cuyo mail no sale
+    // porque Resend está en sandbox— igual se enteraba de nada. Ahora se
+    // entera por el portal.
+    avisarCliente(
+      clave,
+      m.student_id,
+      student?.user_id,
+      faltan === 0 ? 'Hoy vence tu membresía' : `Tu membresía vence el ${formatDate(m.end_date)}`,
+      pagable
+        ? `${plan} · la cuota es de ${formatAmount(pagable.amount)} y podés pagarla hasta el ${formatDate(pagable.due_date)}.`
+        : `${plan} · para seguir reservando hay que renovarla.`
+    )
+
+    if (!student?.email) continue
     // Y si la cuota se emitió recién, en esta misma corrida, el mail ya salió
     // arriba: dos mails el mismo día sobre la misma plata es exactamente lo
     // que este bloque viene a dejar de hacer. El aviso ya quedó pusheado, así
@@ -599,7 +684,7 @@ export async function GET(request: Request) {
 
   const { data: expired } = await admin
     .from('memberships')
-    .select('id, end_date, student_id, students(name, email, active), plans(name)')
+    .select('id, end_date, student_id, students(name, email, active, user_id), plans(name)')
     .eq('status', 'activa')
     .lt('end_date', today)
     .gte('end_date', addDaysISO(today, -renewalCatchupDays))
@@ -655,6 +740,27 @@ export async function GET(request: Request) {
     // puesta), y eso es exactamente lo que el sistema hacía antes de este
     // commit: no le mandaba nada.
     if (ofertaError) continue
+
+    // La campana y el push, con la misma condición que el mail: la 0041
+    // aplicada y la clienta activa. Acá no van antes del corte por email como
+    // en el bloque 2, y el motivo es el de arriba — sin la migración este
+    // aviso es falso, y decirle por tres canales algo que no pasó es peor que
+    // no decirlo.
+    avisarCliente(
+      `mvenc-${m.id}-${m.end_date}`,
+      m.student_id,
+      student.user_id,
+      pagable
+        ? ultimoDia
+          ? 'Último día para renovar'
+          : 'Todavía podés renovar'
+        : 'Tu membresía venció',
+      pagable
+        ? `${plan} venció el ${formatDate(m.end_date)}. La cuota de ${formatAmount(pagable.amount)} se puede pagar ${plazo}.`
+        : `${plan} venció el ${formatDate(m.end_date)}. Para volver a anotarte hay que renovarla.`,
+      'membresia_vencida'
+    )
+
     emails.push({
       to: student.email,
       key: `mvenc-${m.id}-${m.end_date}`,
@@ -692,7 +798,7 @@ export async function GET(request: Request) {
   // el bloque se comporta como el de siempre.
   const { data: overdue } = await admin
     .from('payments')
-    .select('*, students(name, email)')
+    .select('*, students(name, email, user_id)')
     .eq('status', 'pendiente')
     .lt('due_date', today)
     .gte('due_date', addDaysISO(today, -30))
@@ -757,6 +863,19 @@ export async function GET(request: Request) {
     if (newKeys.has(e.key) && (await sendEmail(e.to, e.subject, e.html))) emailsSent++
   }
 
+  // El push a la clienta, con el mismo criterio que el mail: solo por los
+  // avisos que el upsert devolvió como NUEVOS. Sin eso, el cron corriendo dos
+  // veces le vibraría el teléfono dos veces por la misma noticia.
+  let pushClientas = 0
+  for (const p of pushClienta) {
+    if (!newKeys.has(p.key)) continue
+    pushClientas += await pushToUser(admin, p.userId, {
+      title: p.title,
+      body: p.body,
+      url: p.url,
+    })
+  }
+
   // Se cuenta por prefijo de la clave y no por tipo: la cuota emitida y el
   // recordatorio comparten el tipo 'membresia_por_vencer' —a propósito, para
   // no tocar el CHECK de la 0023— y para el mostrador son dos noticias
@@ -816,5 +935,11 @@ export async function GET(request: Request) {
     created: created.length,
     emailsSent,
     pushSent,
+    // Separado del push al mostrador a propósito: son las dos mitades que se
+    // miran distinto. Si `pushClientas` queda en cero corrida tras corrida
+    // mientras `nuevas` crece, es que ninguna clienta tiene el push activado
+    // —o que faltan las claves VAPID en el entorno— y el recordatorio está
+    // llegando solo por mail.
+    pushClientas,
   })
 }

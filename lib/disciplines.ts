@@ -21,9 +21,9 @@ export interface DisciplineStyle {
 
 /** Para una disciplina que todavía no está en el catálogo. */
 export const DEFAULT_DISCIPLINE_STYLE: DisciplineStyle = {
-  dot: '#C4735A',
-  bg: '#FDEEE8',
-  text: '#8B3A25',
+  dot: '#847164',
+  bg: '#BCBAAE',
+  text: '#000000',
   blurb: '',
 }
 
