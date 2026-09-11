@@ -1,7 +1,7 @@
 # Plan de avance — PilatesStudio
 
 > Documento vivo. Se actualiza con cada bloque de trabajo.
-> Última actualización: **05/09/2026** (cruce del documento de requerimientos de Casa Fé).
+> Última actualización: **10/09/2026** (se entrega el sistema al estudio para que lo use).
 > Para entregarle al estudio:
 > [`Casa-Fe-manual-del-mostrador.pdf`](Casa-Fe-manual-del-mostrador.pdf) — el
 > manual **por tarea**, que es el que sirve para usar el sistema: las 12 cosas
@@ -131,12 +131,18 @@ exacto del cobro en huso argentino y reorganización de Configuración.
 
 ## Estado general
 
-Sistema desplegado en Vercel y operativo con datos de ejemplo. Núcleo completo
-(gestión + cobros + landing + autogestión + portal del alumno), ahora también
-usable desde el celular, instalable como app y con notificaciones reales.
-Lo que falta se divide en: trabajo nuestro (renovación automática, huecos del
-portal, mostrador) y cosas bloqueadas por la clienta (cuenta MP, datos reales,
-decisiones de negocio).
+Sistema desplegado en Vercel, **con los datos reales de Casa Fe cargados** y
+entregado al estudio el 10/09/2026 para que lo use. Núcleo completo (gestión +
+cobros + caja + gastos + reportes + landing + portal de la clienta), usable
+desde el celular, instalable como app y con notificaciones reales al mostrador
+y a la clienta.
+
+Del documento de requerimientos queda por construir **dos cosas**: Personal y
+remuneraciones (sección 12) y los días y horarios fijos (Agregado 2). El estado
+por sección está en
+[`REQUERIMIENTOS-CASA-FE.md`](REQUERIMIENTOS-CASA-FE.md) §3.1; lo que sigue
+esperando una definición del estudio, en
+[`casa-fe-lo-que-falta-preguntar.md`](casa-fe-lo-que-falta-preguntar.md).
 
 Desde el 26/08 **sí corre un proceso solo**: el cron diario de Vercel
 (`/api/cron/diario`) genera las notificaciones de membresías por vencer /
@@ -614,11 +620,20 @@ dos tipos de aviso que usa ya están en el CHECK de la `0023`.
 ## Bloqueado por la clienta (checklist)
 
 - [ ] Cuenta de Mercado Pago del negocio conectada en Configuración.
-- [ ] Datos reales: planes y precios, grilla de horarios, profesores, salas,
-      dirección, Instagram, fotos propias.
+- [x] **Datos reales cargados** (09/09, migraciones `0033` a `0035`): datos del
+      estudio, los seis planes FE con sus precios, las tres profesoras y la
+      grilla de 64 clases. **Falta** el WhatsApp, el link de Maps, y el nombre
+      completo, teléfono y email de Ivana y de Leandro —sin el mail no se les
+      puede crear la cuenta.
 - [ ] Decisión sobre factura electrónica (¿desde el sistema o aparte?).
 - [ ] Dominio propio elegido (conectar en Vercel).
 - [ ] Cambiar la contraseña admin de prueba y pasar la lista del equipo real.
+- [ ] El material de diseño: logo en alta, paleta, tipografías y fotos. No
+      frena nada; se adapta sin tocar el funcionamiento.
+- [ ] Las siete definiciones de
+      [`casa-fe-lo-que-falta-preguntar.md`](casa-fe-lo-que-falta-preguntar.md).
+      Las dos primeras —el 25% del link de pago y el tope de 3 cuotas— son
+      plata que se pierde cada día que pasan sin contestar.
 
 ## Pendiente inmediato
 
@@ -626,9 +641,12 @@ dos tipos de aviso que usa ya están en el CHECK de la `0023`.
   agregar `https://<dominio-de-vercel>/sistema/recuperar` y
   `http://localhost:3000/sistema/recuperar` (sin esto, el enlace de
   "olvidé mi contraseña" cae en la home en vez de la pantalla de reset).
-- Vercel → Environment Variables: **todas cargadas** ✅ (verificado
-  05/09/2026): `RESEND_API_KEY`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`,
-  `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` y `CRON_SECRET`.
+- Vercel → Environment Variables: `RESEND_API_KEY`,
+  `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` y
+  `CRON_SECRET` ✅ (verificado 05/09/2026). **`EMAIL_FROM` no está cargada en
+  ningún lado**: sin ella `lib/email-server.ts:30` cae a `onboarding@resend.dev`,
+  que en sandbox solo entrega a la cuenta dueña. Va junto con la verificación
+  del dominio.
 - Resend en sandbox: sin dominio verificado solo entrega a
   `digitalamenitiessas@gmail.com`. Al tener el dominio del estudio:
   Resend → Domains → verificar DNS → `EMAIL_FROM` en Vercel, y los emails

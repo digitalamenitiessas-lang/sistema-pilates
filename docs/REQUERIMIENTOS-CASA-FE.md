@@ -1,4 +1,4 @@
-# Casa Fé — qué cubrimos del documento nuevo y cómo arrancamos
+# Casa Fe — qué cubrimos del documento nuevo y cómo arrancamos
 
 > Cruce del PDF **“Requerimientos y ajustes del sistema Casa Fé”** (18 páginas, 17
 > secciones + 4 agregados de último momento) contra el código de este repo.
@@ -34,6 +34,12 @@ clase, cupones).
 
 Esto no es una mala noticia, es la información que faltaba para decidir el alcance
 de la primera versión. La sección §9 propone cómo cortarlo.
+
+> **Leído desde el 10/09/2026:** ese estimado es contra el ERP completo, y el
+> alcance ya se cortó (§7). Con cuatro secciones afuera, **lo que queda por
+> construir de lo que se pidió son dos cosas** —Personal y remuneraciones, y los
+> días y horarios fijos—, y el sistema se entrega al estudio para que lo use.
+> El estado por sección está en **§3.1**.
 
 ## 2. Lo que ya está y conviene mostrarle a la clienta
 
@@ -72,9 +78,14 @@ De las 10 prioridades que la clienta puso en la página 16, las **1, 2, 3, 4, 9 
 
 ## 3. Estado por sección del documento
 
-> Esta tabla es la **foto del análisis inicial**, contra el documento de
-> requerimientos. No se actualiza: sirve de línea de base para medir el avance.
-> El estado vivo, bloque por bloque, está en §9.
+> Las dos columnas del medio son la **foto del análisis inicial** (05/09/2026)
+> contra el documento de requerimientos, y no se actualizan: son la línea de
+> base contra la que se mide el avance. **El estado de hoy está en §3.1.** El
+> detalle bloque por bloque, en §9.
+>
+> Dos filas se editaron sobre la foto —los Agregados 3 y 4— cuando el estudio
+> derogó una y nosotros terminamos la otra. Quedan así: perder esa información
+> para mantener la foto intacta no le sirve a nadie.
 
 | Sección | Estado | Qué hay hoy | Lo grande que falta |
 |---|---|---|---|
@@ -99,6 +110,51 @@ De las 10 prioridades que la clienta puso en la página 16, las **1, 2, 3, 4, 9 
 | **Agregado 2** · Días y horarios fijos | 🔴 | Nada (las reservas son de a una, por fecha) | Elección de horarios fijos del mes, materialización de reservas recurrentes, gestión desde administración |
 | **Agregado 3** · Prioridad por pago del 1 al 9 | ⚫ **derogado** | Nada, y nunca hizo falta | El estudio lo dio de baja el 09/09: *"No existe un período general de pago del 1 al 9"*. La prioridad pasa a colgar de la fecha individual de vencimiento (§8) |
 | **Agregado 4** · Vigencia desde la activación | 🟢 | **Hecho** (`0036` + `0037`): mes de calendario, cálculo en la base y pago anticipado encolado | Queda el día de gracia, que es parte del turno fijo, y la decisión sobre el cambio de plan (§8) |
+
+## 3.1 Dónde está cada sección hoy (10/09/2026)
+
+🟢 hecho · 🟡 parcial · 🔴 sin empezar · ⚫ derogado o fuera del alcance.
+
+Cinco días después del relevamiento, cuatro secciones que la foto marca en
+🔴 están construidas. Esta tabla existe para que el documento deje de
+subdeclarar lo que el sistema hace.
+
+| Sección | Hoy | Qué cambió desde la foto — y qué falta |
+|---|---|---|
+| 1 · Agenda, clases, reservas, asistencias | 🟡 | **Avanzó mucho**: talleres con fecha propia y los cinco campos (`0017`); suspender un día y cambiar la profesora (`0018`); asistencia desde el celular; el consumo de la clase en la base, con la cancelación clasificada dentro o fuera de plazo (`0022`+`0029`, **encendido el 09/09**); no se reserva una clase que ya empezó (`0038`); el plan decide qué disciplina puede reservar (`0040`); volver a anotarse después de cancelar (`0031`); y la grilla real de Casa Fe, 64 clases (`0035`). **Falta**: que la profesora agregue a una clienta que llega sin reserva; el tope de recuperos por mes; la pantalla del cambio de horario por fecha; y quién registró cada reserva (no hay `created_by` en `reservations`) |
+| 2 · Planes, membresías, medios de pago | 🟡 | Los seis planes FE (`0026`); **tres precios por plan** según el medio de pago (`0028`); la vigencia como mes de calendario, calculada en la base, con el pago anticipado encolado (`0036`+`0037`); y la renovación que se cobra primero, sin cuota fantasma (`0041`). **Falta**: congelar la membresía (espera su respuesta) y el historial completo de la membresía |
+| 3 · Cupones de descuento | ⚫ | **Fuera del alcance** que definió Matías (§7) |
+| 4 · Beneficios, regalos y gift cards | ⚫ | **Fuera del alcance** (§7) |
+| 5 · Ficha integral de la clienta | 🟡 | Sin cambios de fondo: la ficha muestra datos, membresía, reservas, pagos y las notas médicas protegidas por rol. **Falta**: datos físicos; la salud en campos separados; el contacto de emergencia editable (la columna existe en `student_private`, no la pantalla); la bitácora con autor y fecha; el bloque de deuda con cobro desde la ficha —hoy se cobra desde Pagos— y los pagos parciales |
+| 6 · Segmentación y seguimiento | 🟡 | Sin cambios. **Falta**: la baja con motivo y fecha (los `students` no tienen esas columnas: la `0015` dio de baja los **accesos**, no las clientas); la lista de las que dejaron de venir (`recovery_after_days` espera su respuesta); y los cumpleaños del mes |
+| 7 · Dashboard principal | 🟡 | **La mitad de plata entró** (`0020`): lo que entró y salió en el mes, el gasto de hoy, el resultado y el saldo cuenta por cuenta, con "Sin acceso" cuando al rol le falta un permiso en vez de un cero que miente. **Falta**: los contadores comerciales —pases de prueba, renovadas, canceladas, cumpleaños |
+| 8 · Caja diaria y cuentas | 🟢 | **Hecho** (`0020`): cuentas con saldo, apertura y cierre con arqueo, movimientos y transferencias internas. El libro se deriva de los cobros: no hay dos verdades para la misma plata |
+| 9 · Gastos y egresos | 🟢 | **Hecho** (`0020`): los catorce campos, los siete filtros y el total del filtro a la vista. **Queda** adjuntar la foto del comprobante, que es el primer uso de Storage |
+| 10 · Productos e inventario | ⚫ | **Fuera del alcance** (§7) |
+| 11 · Personal, roles y permisos | 🟡 | El motor de permisos por rol y por persona, con las políticas de la base preguntándole (`0012`–`0014`); la baja lógica de accesos (`0015`); anular un movimiento con motivo. **Falta**: la ficha laboral y el historial de actividad, que van con la sección 12 |
+| 12 · Horas trabajadas y remuneraciones | 🔴 | **Sin empezar, y está DENTRO del alcance**: es lo único nuevo que Matías aprobó (§7, Paso 10 de §9). `teachers` no tiene una sola columna laboral. Junto con el Agregado 2, es la deuda real del proyecto |
+| 13 · Landing administrable | 🟡 | Los datos del estudio salen de la base y los cargó el estudio (`0011`+`0033`), así que la web ya muestra los reales. **Falta** todo el editor: textos, imágenes, banners, las secciones nuevas, y borrador con vista previa y publicación |
+| 14 · Notificaciones y comunicaciones | 🟡 | **El canal hacia la clienta se abrió hoy (10/09)**: el portal tiene campana y la clienta recibe push en el celular con los avisos de vencimiento y renovación. Antes `pushToUser` estaba escrita y nadie la llamaba. **Falta**: confirmación de reserva y recordatorio de clase; cambio de horario o profesora; clase suspendida; lugar liberado; y el panel para configurar canal, anticipación y texto, con el historial de envíos. **Y falta afuera del código**: verificar el dominio en Resend — hasta entonces el mail solo llega a la cuenta dueña |
+| 15 · Email marketing | ⚫ | **Fuera del alcance** (§7): de lo nuevo entra solo Personal y remuneraciones |
+| 16 · Catálogos y configuración | 🟡 | Siete secciones editables en Configuración —disciplinas, medios de pago, profesoras, salas, usuarios, permisos, Mercado Pago— más los parámetros del negocio, que se arman solos desde la tabla, y los que todavía no rigen lo dicen en pantalla (`0024`). **Falta**: cuentas y categorías de gasto tienen tabla pero no pantalla (las siembra la `0020`); y siguen faltando sedes, etiquetas y plantillas de mensajes |
+| 17 · Reportes y exportación | 🟢 | **Hecho** (`0021`): nueve reportes por rango de fechas, contra la base y no filtrando en memoria, con descarga a Excel y a PDF. Los dos que faltan esperan los módulos que los alimentan: personal y mostrador |
+| **Agregado 1** · Lista de espera con aviso | 🟡 | La clienta se anota y recepción promueve a mano. **Falta** el aviso automático al liberarse el lugar. El parámetro `waitlist_offer_minutes` quedó sin regir a propósito: tal como está redactado contradice su política, que es avisarles a todas a la vez |
+| **Agregado 2** · Días y horarios fijos | 🔴 | **Sin empezar, y es lo que ella pidió explícitamente.** Con el Agregado 4 hecho, el bloqueo ya no es técnico: son tres definiciones suyas (qué es un turno fijo, cómo se cuenta el mes de cinco lunes, y qué pasa con el lugar cuando no renueva) |
+| **Agregado 3** · Prioridad por pago del 1 al 9 | ⚫ | **Derogado** por el estudio el 09/09. La prioridad cuelga de la fecha individual de vencimiento |
+| **Agregado 4** · Vigencia desde la activación | 🟢 | **Hecho** (`0036`+`0037`) |
+
+**El recuento, sobre 17 secciones más 4 agregados:**
+
+- 🟢 **4 terminadas** — Caja, Gastos, Reportes y el Agregado 4.
+- 🟡 **10 parciales, con el núcleo operativo andando** — 1, 2, 5, 6, 7, 11, 13,
+  14, 16 y el Agregado 1. Lo que les falta son funciones sueltas, no cimientos.
+- ⚫ **4 afuera por decisión de Matías** (3, 4, 10 y 15) **+ 1 derogada por el
+  estudio** (Agregado 3).
+- 🔴 **2 de deuda real** — la sección **12** (Personal y remuneraciones, lo único
+  nuevo que entró al alcance) y el **Agregado 2** (los días y horarios fijos).
+
+Es decir: **lo que queda por construir de lo que se pidió son dos cosas**, y
+ninguna de las dos bloquea que el estudio empiece a usar el sistema.
 
 ## 4. Los choques con lo que ya funciona
 
