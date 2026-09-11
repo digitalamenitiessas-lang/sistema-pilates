@@ -450,9 +450,14 @@ valores intactos. Se cambia cuando confirme la tabla nueva.
 redonda o corridas · cómo se llama cada clase (el título es obligatorio y se ve
 en el portal) · nombre completo, teléfono y email de Ivana y de Leandro · quién
 es la profesora del turno tarde (se puede arrancar con un nombre provisorio:
-`teacher_id` es `NOT NULL`) · el WhatsApp · si la web sigue mostrando ciudad y
-Facebook · las preguntas del FAQ, que su propio mockup pone en la barra y nadie
-puede escribir por ella.
+`teacher_id` es `NOT NULL`) · si la web sigue mostrando ciudad y Facebook · las
+preguntas del FAQ, que su propio mockup pone en la barra y nadie puede escribir
+por ella.
+
+El **WhatsApp** salió de esta lista el 11/09 (migración `0045`) y era el que más
+costaba: sin número, el botón del hero **no se dibujaba** y los siete botones de
+contacto de la landing caían al correo. Con el número cargado, la web entera
+pasa a WhatsApp con el mensaje ya escrito, sin tocar una línea de código.
 
 El **link de Google Maps** salió de esta lista el 11/09: sin link cargado la web
 arma la búsqueda con la dirección, así que ya no bloquea nada. Sigue siendo
