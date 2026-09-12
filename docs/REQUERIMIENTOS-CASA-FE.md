@@ -517,14 +517,18 @@ necesita un desarrollo.
   legibilidad ya mejoró sin cambiar de fuente: el problema no era la familia sino
   el eje óptico clavado en el corte de titular.
 - ~~**Los cuatro textos** (punto 4)~~ — **llegaron el 12/09 y están puestos.**
-  Queda en pie lo que se anotó entonces, y ahora con evidencia: **viven en el
-  código**, así que cada ajuste de copy es un deploy. Ella cambió los cuatro de
-  una sentada; si va a seguir puliéndolos —y la landing es su pieza de venta,
-  así que probablemente sí— **conviene moverlos a `studio_settings`** como la
-  dirección y el horario, y que los edite sola desde Configuración. Son unas
-  siete claves. El único que tiene truco es el segundo párrafo de "Bienestar &
-  Movimiento", porque lleva el cupo derivado de la grilla: ahí el dato tendría
-  que aceptar un marcador tipo `{cupo}` en vez de un número escrito.
+
+  Se evaluó moverlos a `studio_settings` —viven en el código, así que cada
+  ajuste de copy es un deploy— y **Matías decidió que no, el 12/09**: la
+  clienta dio la landing por buena y no espera seguir cambiándola. No es una
+  tarea pendiente, es una decisión tomada. **Lo que la haría revisarse** es que
+  pida una segunda ronda de textos: ahí el costo de parametrizar (unas siete
+  claves y una migración) se paga con el primer cambio que no necesite deploy.
+
+  Si ese día llega, el único que tiene truco es el segundo párrafo de
+  "Bienestar & Movimiento", porque lleva el cupo derivado de la grilla: el
+  campo tendría que aceptar un marcador tipo `{cupo}` en vez de que el estudio
+  escriba el número, o se pierde esa garantía.
 
 ### Lo que hay que preguntarle
 
