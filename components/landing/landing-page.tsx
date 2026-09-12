@@ -645,6 +645,15 @@ function Estudio({ schedule }: { schedule: PublicClass[] }) {
     new Set(schedule.map(valor)).size
   const profesoras = cuenta((c) => c.teacher_name)
   const salas = cuenta((c) => c.room)
+  /**
+   * El tamaño del grupo sale de la grilla publicada y no escrito a mano: el
+   * día que el estudio abra clases de otro cupo, la web no queda prometiendo
+   * el número viejo. Solo se afirma cuando TODAS las clases coinciden —con
+   * cupos distintos la frase sería falsa—, y ahí se publica nada más la
+   * mitad de la oración que sigue siendo cierta.
+   */
+  const cupos = new Set(schedule.map((c) => c.capacity))
+  const cupo = cupos.size === 1 ? [...cupos][0] : null
   const stats = [
     { n: schedule.length, label: plural(schedule.length, 'clase por semana', 'clases por semana') },
     { n: disciplineNames.length, label: plural(disciplineNames.length, 'disciplina', 'disciplinas') },
@@ -680,12 +689,15 @@ function Estudio({ schedule }: { schedule: PublicClass[] }) {
           </Titular>
         </Reveal>
         <Reveal delay={120}>
+          {/* Copy de la clienta (12/09). */}
           <p className="text-sm md:text-base text-foreground/75 leading-relaxed mt-8 max-w-2xl mx-auto">
-            No creemos en clases multitudinarias ni en rutinas copiadas. Cada
-            persona entra con una historia distinta — una lesión, un objetivo,
-            unas ganas — y el plan se arma alrededor de eso. Equipamiento
-            completo de Reformer, profesoras certificadas y grupos chicos donde
-            tu nombre se conoce desde el primer día.
+            Cada cuerpo tiene su propio punto de partida. Por eso trabajamos en
+            grupos reducidos, con seguimiento cercano y clases pensadas para
+            acompañar tu evolución.
+          </p>
+          <p className="text-sm md:text-base text-foreground/75 leading-relaxed mt-3 max-w-2xl mx-auto">
+            {cupo !== null && `${cupo} ${plural(cupo, 'alumna', 'alumnas')} por clase. `}
+            Más atención, más precisión, una mejor experiencia.
           </p>
         </Reveal>
 
@@ -747,9 +759,14 @@ function Planes({ plans }: { plans: PublicPlan[] }) {
           <Titular className="text-[9vw] sm:text-5xl md:text-6xl mt-5">
             Elegí tu frecuencia
           </Titular>
-          <p className="text-sm text-foreground/65 max-w-md mx-auto mt-6">
-            Sin matrícula y sin permanencia mínima. Lo que elegís es cuántas
-            veces por semana venís.
+          {/* Copy de la clienta (12/09). Dos renglones a propósito: el
+              primero invita a elegir y el segundo es el dato duro. */}
+          <p className="text-sm text-foreground/65 max-w-lg mx-auto mt-6 leading-relaxed">
+            Definí cuántas veces por semana querés venir y encontrá la
+            frecuencia que mejor se adapta a tu rutina.
+          </p>
+          <p className="text-sm text-foreground/65 max-w-lg mx-auto mt-2.5 leading-relaxed">
+            Sin matrícula. Planes desde 1 hasta 5 veces por semana.
           </p>
         </Reveal>
 
@@ -1117,10 +1134,15 @@ function Cita() {
         <div aria-hidden className="absolute inset-0 bg-foreground/65" />
       </div>
       <Reveal className="relative max-w-3xl mx-auto px-5 text-center">
+        {/* Copy de la clienta (12/09), y es de ella: acá había una cita de
+            Joseph Pilates con su firma debajo. La firma se fue con la cita —
+            dejarla sería atribuirle a él una frase que escribió ella. Las
+            comillas también: sin autor no es una cita, es lo que el estudio
+            dice. Rima con el cierre de su bajada, "el movimiento se convierte
+            en pausa", que es de la misma mano. */}
         <p className="display text-3xl md:text-5xl text-background leading-tight!">
-          “La aptitud física es el primer requisito de la felicidad.”
+          Moverte también puede ser tu pausa.
         </p>
-        <p className="eyebrow text-[10px] text-background/70 mt-7">Joseph Pilates</p>
       </Reveal>
     </section>
   )
@@ -1139,12 +1161,16 @@ function Contacto({ plans }: { plans: PublicPlan[] }) {
     <section id="contacto" className="scroll-mt-24 py-20 md:py-28 px-5">
       <Reveal className="max-w-2xl mx-auto text-center">
         <Rotulo>Contacto</Rotulo>
+        {/* Copy de la clienta (12/09). Sin el punto final que traía su
+            mensaje: ninguno de los otros titulares lo lleva, y en la Bodoni
+            en mayúsculas de 60 px un punto suelto al final se lee como un
+            error de tipeo y no como puntuación. */}
         <Titular className="text-[9vw] sm:text-5xl md:text-6xl mt-5">
-          Vení a conocernos
+          Empezá por una clase
         </Titular>
         <p className="text-sm md:text-base text-foreground/70 mt-7 max-w-lg mx-auto leading-relaxed">
-          Escribinos, contanos tu punto de partida y te recomendamos por dónde
-          arrancar.
+          Contanos qué estás buscando y te ayudamos a elegir la frecuencia
+          ideal para vos.
           {pruebaGratis ? ' La primera clase corre por nuestra cuenta.' : ''}
         </p>
 

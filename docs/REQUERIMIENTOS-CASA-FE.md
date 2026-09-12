@@ -478,7 +478,7 @@ recordatorios y a cuántos días, y la tabla de precios con el redondeo nuevo.
 ## 8.1 La devolución sobre el diseño (11/09/2026)
 
 Con la identidad ya aplicada, la clienta mandó once correcciones sobre la
-landing. **Diez están resueltas; una espera archivos suyos.** El detalle de
+landing. **Las once están resueltas** (las últimas, el 12/09). El detalle de
 cómo se resolvió cada una está en [`PLAN.md`](PLAN.md); acá queda lo que cambia
 el estado del proyecto.
 
@@ -516,11 +516,19 @@ necesita un desarrollo.
 - **Su Bodoni** (punto 3). Dijo que va a intentar pasarla. Mientras tanto la
   legibilidad ya mejoró sin cambiar de fuente: el problema no era la familia sino
   el eje óptico clavado en el corte de titular.
-- **Los cuatro textos** (punto 4): la bajada "Bienestar y movimiento", la
-  descripción de Planes, la frase sobre la foto y el título de Contacto. Los
-  cuatro son copy y no se inventan. Los tres primeros viven hoy en el código
-  (`MARCA`, `BAJADA` y los titulares de sección); si van a seguir cambiando,
-  conviene que pasen a `studio_settings` como el resto.
+- ~~**Los cuatro textos** (punto 4)~~ — **llegaron el 12/09 y están puestos.**
+
+  Se evaluó moverlos a `studio_settings` —viven en el código, así que cada
+  ajuste de copy es un deploy— y **Matías decidió que no, el 12/09**: la
+  clienta dio la landing por buena y no espera seguir cambiándola. No es una
+  tarea pendiente, es una decisión tomada. **Lo que la haría revisarse** es que
+  pida una segunda ronda de textos: ahí el costo de parametrizar (unas siete
+  claves y una migración) se paga con el primer cambio que no necesite deploy.
+
+  Si ese día llega, el único que tiene truco es el segundo párrafo de
+  "Bienestar & Movimiento", porque lleva el cupo derivado de la grilla: el
+  campo tendría que aceptar un marcador tipo `{cupo}` en vez de que el estudio
+  escriba el número, o se pierde esa garantía.
 
 ### Lo que hay que preguntarle
 

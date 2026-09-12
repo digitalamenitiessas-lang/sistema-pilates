@@ -682,13 +682,13 @@ monograma del ícono; y que el manual escribe "DICIPLINAS" en la barra —en la
 web dice "Disciplinas". El manual también tiene **FAQ** en la barra y no hay
 sección: hace falta que ella mande las preguntas, no se inventan.
 
-### ✅ La devolución de la clienta sobre el diseño (11/09) — `0044` corrida y verificada
+### ✅ La devolución de la clienta sobre el diseño (11-12/09) — `0044` corrida y verificada
 *(De paso apareció que la `0043` **también había corrido** y el registro decía que
 no. Es la segunda vez que esa tabla queda atrás de la realidad, y las dos veces se
 notó consultando la base en vez de leer el documento. Vale como método: antes de
 escribir "sin correr", preguntarle a la base.)*
-Once puntos sobre la landing recién aplicada. Diez resueltos; el que queda
-espera textos de ella. Cuatro de los diez no se tocaron en el código sino en la
+Once puntos sobre la landing recién aplicada. **Los once resueltos** — los
+cuatro textos que faltaban llegaron el 12/09. Cuatro de los diez no se tocaron en el código sino en la
 base, que es donde tenían que estar: la dirección, el horario y las dos
 descripciones de disciplina son datos que el estudio edita.
 - [x] **Las tres fotos del tríptico, verticales.** Estaban en `h-[30rem]`, que
@@ -753,9 +753,23 @@ descripciones de disciplina son datos que el estudio edita.
       El logo sigue siendo **de Casa Fe y de nadie más**: si el estudio se
       llama de otra manera —el sistema está hecho para eso— se vuelve a
       dibujar el nombre con la tipografía de la marca.
-- [ ] **Los cuatro textos pendientes**, que va a mandar por separado: la bajada
-      "Bienestar y movimiento", la descripción de Planes, la frase sobre la
-      foto y el título de Contacto.
+- [x] **Los cuatro textos, puestos** (12/09). Llegaron y se reemplazaron:
+      la bajada de "Bienestar & Movimiento", la descripción de Planes, la
+      frase sobre la foto y el título y la bajada de Contacto —que pasó de
+      "Vení a conocernos" a "Empezá por una clase"—. Tres decisiones que se
+      tomaron al escribirlos y conviene que la clienta vea:
+      · **Se fue la firma "Joseph Pilates"** de debajo de la frase sobre la
+        foto. Era de la cita anterior; su frase nueva es de ella, y dejar la
+        firma habría sido atribuirle a él algo que no dijo. Las comillas
+        también: sin autor no es una cita.
+      · **El "8 alumnas por clase" no está escrito a mano**, sale de la
+        grilla publicada (se verificó: las 64 clases tienen cupo 8). Si el
+        estudio abre clases de otro cupo, la web deja de afirmarlo en vez de
+        mentir. Mismo criterio que el bloque de números de esa sección.
+      · Dos arreglos de puntuación sobre el mensaje de ella, por si los
+        quiere de vuelta: "Definí" con mayúscula en Planes, y el título de
+        Contacto sin el punto final —ningún otro titular lo lleva, y en la
+        Bodoni en mayúsculas de 60 px un punto suelto se lee como un error.
 
 **Queda anotado para preguntarle:** la bajada de embarazadas dice "Movimientos
 consciente", en singular, y pidió usarla "exactamente". Se cargó tal cual. Si
