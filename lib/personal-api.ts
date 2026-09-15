@@ -239,3 +239,44 @@ export async function anularLiquidacion(id: string, motivo: string): Promise<voi
   const { error } = await supabase.rpc('anular_liquidacion', { p_id: id, p_motivo: motivo })
   if (error) throw new Error(error.message || 'No se pudo anular')
 }
+
+/**
+ * Dónde terminó el último cierre de cada una (0055).
+ *
+ * Para que la pantalla proponga el período siguiente en vez de que haya
+ * que acordarse. Las que nunca se liquidaron no aparecen: no hay desde
+ * dónde proponer, y adivinar una fecha sería peor que no decir nada.
+ */
+export async function fetchUltimosCierres(): Promise<Map<string, string>> {
+  const { data, error } = await supabase.rpc('ultimos_cierres')
+  if (sinPersonal(error)) return new Map()
+  if (error) throw error
+  return new Map(
+    (data ?? []).map((f: Record<string, unknown>) => [String(f.teacher_id), String(f.hasta)])
+  )
+}
+
+/**
+ * El cierre de mes: todas las del período de una.
+ *
+ * Las que chocan se saltean en vez de cortar el proceso, y se devuelven
+ * para que la pantalla las muestre: que a una le falte corregir algo no
+ * puede impedir cerrarle a las otras.
+ */
+export async function cerrarTodas(
+  desde: string,
+  hasta: string
+): Promise<{ cerradas: number; salteadas: string[] }> {
+  const { data, error } = await supabase.rpc('cerrar_liquidaciones', {
+    p_desde: desde,
+    p_hasta: hasta,
+  })
+  if (sinPersonal(error)) throw new Error('Para cerrar liquidaciones falta correr la migración 0055.')
+  if (error) throw new Error(error.message || 'No se pudieron cerrar')
+
+  const f = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | undefined
+  return {
+    cerradas: Number(f?.cerradas ?? 0),
+    salteadas: (f?.salteadas as string[] | null) ?? [],
+  }
+}

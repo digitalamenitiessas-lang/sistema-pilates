@@ -1291,6 +1291,55 @@ lo rechazó con su motivo), y las horas de la diferencia se cargaron el 25/09
 cuando el período cerrado terminaba el 15 — porque la pantalla cierra hasta HOY,
 no hasta fin de mes.
 
+### ✅ Los períodos no se pisan, y la ficha laboral se carga (15/09) — `0055`
+
+Dos cosas que salieron de preguntas de Matías sobre la `0053` y la `0054`.
+
+**EL AGUJERO DE LOS PERÍODOS.** La `0054` puso un índice único sobre
+`(teacher_id, desde, hasta)`, que impide cerrar dos veces **el mismo** período.
+Pero dos que **se pisan** sin ser idénticos entraban los dos: cerrar 01/09–15/09
+por $10.000 y después 01/09–30/09 por $18.000 daba **$28.000 liquidados donde
+correspondían $18.000**, y nada avisaba. Probado contra la base antes de escribir
+la migración.
+
+Ahora un trigger lo frena y dice **con cuál choca y por cuánto**. Y `anulada` no
+reserva días: si se cerró mal, anularla libera esas fechas.
+
+- [x] **Un trigger y no `exclude using gist`**: la forma canónica necesita la
+      extensión `btree_gist`, y una migración que se corre a mano no es lugar
+      para agregar una extensión. El trigger además puede decir cuál es el
+      período que choca, que es lo que quien cierra necesita leer.
+- [x] **`ultimos_cierres()`** para que la pantalla proponga el período siguiente:
+      el agujero no era solo técnico, nada le decía al mostrador dónde terminó el
+      último cierre.
+- [x] **Cerrar todas las del período de una.** Las que chocan **se saltean** en
+      vez de cortar el proceso: que a una le falte corregir algo no puede impedir
+      cerrarle a las otras nueve. Se devuelven con su motivo.
+- [x] En la tabla, cada fila dice **"liquidada hasta el …"** en vez de ofrecer
+      cerrar. La base lo rechaza igual; esto lo dice antes de apretar.
+
+**Y EL MISMO CABO SUELTO DE SIEMPRE.** Las cuatro columnas laborales que la
+`0053` agregó a `teachers` —fecha de ingreso, fecha de baja, DNI y notas—
+**existían en la base y ningún formulario las escribía**. Es el cuarto caso del
+mismo día: `override_by` y `recovers_reservation_id` (0022), el contacto de
+emergencia (0008), y ahora estas. Se descubrió contestando qué se puede cargar en
+la pantalla de profesoras.
+
+- [x] Los cuatro campos entraron al formulario de Configuración → Profesoras, y
+      lo laboral va **aparte del resto del insert**: si la `0053` no corrió la
+      columna no existe y el alta entera fallaría, así que se reintenta sin ella.
+- [x] **"Quién trabaja y qué horarios tiene"** en Personal. Los horarios estaban
+      en la grilla desde la `0035` pero repartidos entre 64 clases: *"¿qué da
+      Ivana?"* no se podía contestar de un vistazo. Se arman de `classes`, que el
+      paquete del estudio ya trae.
+- [x] Cada ficha avisa lo que le falta para trabajar: **sin condición de pago
+      cargada** y **sin cuenta para entrar al sistema**.
+
+**Verificado el 15/09**: el período que se pisa se rechaza nombrando al otro · el
+que arranca al día siguiente entra · una anulada libera los días · la ficha
+laboral se guarda y **el resto de los datos de la profesora sobreviven** ·
+en pantalla, Ivana con sus 30 clases semanales agrupadas por día. Revertido.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
@@ -1349,7 +1398,7 @@ no hasta fin de mes.
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a **`0054`** ✅. La **`0053` corrió el 15/09**. La **`0052` corrió el 15/09** y se corrigió una redacción; es idempotente. La **`0051` corrió el 15/09** y se corrigió dos veces sobre la marcha —los nombres en castellano y el día en el corte por clase—; es idempotente, todo `create or replace`. La **`0050` corrió el 15/09**, se corrigió la clave foránea del autor y se volvió a correr; es idempotente a propósito. La **`0048` y la `0049` corrieron el 15/09** y se verificaron ejerciéndolas: el cupo rechazó el noveno turno fijo, un pausado quedó fuera de la liberación automática, y el interruptor encendido liberó exactamente uno. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Migraciones aplicadas | `0001` a **`0055`** ✅. La **`0053` corrió el 15/09**. La **`0052` corrió el 15/09** y se corrigió una redacción; es idempotente. La **`0051` corrió el 15/09** y se corrigió dos veces sobre la marcha —los nombres en castellano y el día en el corte por clase—; es idempotente, todo `create or replace`. La **`0050` corrió el 15/09**, se corrigió la clave foránea del autor y se volvió a correr; es idempotente a propósito. La **`0048` y la `0049` corrieron el 15/09** y se verificaron ejerciéndolas: el cupo rechazó el noveno turno fijo, un pausado quedó fuera de la liberación automática, y el interruptor encendido liberó exactamente uno. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
 | Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |

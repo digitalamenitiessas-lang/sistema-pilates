@@ -521,6 +521,14 @@ export async function fetchStudioData(): Promise<StudioData> {
     color: t.color,
     // ?? null mientras la 0012 no haya corrido
     userId: t.user_id ?? null,
+    // La ficha laboral (0053). Llega con el select('*') y queda vacía
+    // mientras la migración no corrió.
+    laboral: {
+      fechaIngreso: t.fecha_ingreso ?? null,
+      fechaBaja: t.fecha_baja ?? null,
+      dni: t.dni ?? '',
+      notasLaborales: t.notas_laborales ?? '',
+    },
   }))
 
   const plans: Plan[] = (plansRes.data ?? []).map((p) => ({
@@ -1699,16 +1707,55 @@ export interface TeacherInput {
   phone: string
   email: string
   color: string
+  /**
+   * Los cuatro de la ficha laboral (0053). Opcionales porque la columna
+   * puede no existir: la migración se corre a mano, y hasta entonces
+   * guardar una profesora tiene que seguir funcionando.
+   */
+  fechaIngreso?: string | null
+  fechaBaja?: string | null
+  dni?: string
+  notasLaborales?: string
+}
+
+/**
+ * Lo laboral va aparte del resto: si la 0053 no corrió, la columna no
+ * existe y el insert entero falla. Se separa para poder reintentar sin
+ * ella en vez de perder el alta.
+ */
+function filaTeacher(input: TeacherInput, conLaboral: boolean) {
+  const base = {
+    name: input.name,
+    disciplines: input.disciplines,
+    phone: input.phone,
+    email: input.email,
+    color: input.color,
+  }
+  if (!conLaboral) return base
+  return {
+    ...base,
+    fecha_ingreso: input.fechaIngreso || null,
+    fecha_baja: input.fechaBaja || null,
+    dni: input.dni ?? '',
+    notas_laborales: input.notasLaborales ?? '',
+  }
 }
 
 export async function createTeacher(input: TeacherInput): Promise<void> {
-  const { error } = await supabase.from('teachers').insert(input)
-  if (error) throw error
+  let { error } = await supabase.from('teachers').insert(filaTeacher(input, true))
+  // 42703 = la 0053 no corrió: se reintenta sin los campos laborales.
+  if (error?.code === '42703') {
+    ;({ error } = await supabase.from('teachers').insert(filaTeacher(input, false)))
+  }
+  if (error) throw errorDeLaBase(error, 'No se pudo guardar la profesora')
 }
 
 export async function updateTeacher(id: string, input: TeacherInput): Promise<void> {
-  const { error } = await supabase.from('teachers').update(input).eq('id', id)
-  if (error) throw error
+  let { error } = await supabase.from('teachers').update(filaTeacher(input, true)).eq('id', id)
+  if (error?.code === '42703') {
+    ;({ error } = await supabase.from('teachers').update(filaTeacher(input, false)).eq('id', id))
+  }
+  if (error) throw errorDeLaBase(error, 'No se pudo guardar la profesora')
 }
 
 export async function deactivateTeacher(id: string): Promise<void> {

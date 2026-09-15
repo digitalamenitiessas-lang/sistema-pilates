@@ -15,8 +15,10 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { Loader2, Plus, Trash2, Users, Clock, Wallet, Lock, AlertTriangle, Check } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import {
+  Loader2, Plus, Trash2, Users, Clock, Wallet, Lock, AlertTriangle, Check, IdCard,
+} from 'lucide-react'
+import { cn, nombreDelDia } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { SeccionPlegable, SeccionesPlegables } from '@/components/ui/seccion-plegable'
 import { hoyISO, addDays } from '@/lib/api'
@@ -31,6 +33,8 @@ import {
   cerrarLiquidacion,
   pagarLiquidacion,
   anularLiquidacion,
+  fetchUltimosCierres,
+  cerrarTodas,
 } from '@/lib/personal-api'
 import { fetchAccounts } from '@/lib/caja-api'
 import type { Account } from '@/lib/types'
@@ -64,12 +68,15 @@ function Liquidacion({
   desde,
   hasta,
   cerradas,
+  ultimos,
   onCerrar,
 }: {
   desde: string
   hasta: string
   /** Las ya cerradas del período, para no ofrecer cerrar dos veces */
   cerradas: LiquidacionCerrada[]
+  /** Hasta cuándo se liquidó por última vez a cada una (0055) */
+  ultimos: Map<string, string>
   onCerrar: () => void
 }) {
   const [filas, setFilas] = useState<FilaLiquidacion[] | null>(null)
@@ -93,6 +100,16 @@ function Liquidacion({
     cerradas.some(
       (c) => c.teacherId === id && c.desde === desde && c.hasta === hasta && c.estado !== 'anulada'
     )
+
+  /**
+   * El período elegido empieza antes de donde terminó el último cierre,
+   * o sea que se pisa. La base lo rechaza igual (0055): esto es para
+   * decirlo ANTES de que el mostrador apriete, no después.
+   */
+  const sePisa = (id: string) => {
+    const ultimo = ultimos.get(id)
+    return !!ultimo && desde <= ultimo
+  }
 
   const cerrar = async (f: FilaLiquidacion) => {
     if (
@@ -163,6 +180,13 @@ function Liquidacion({
                   {yaCerrada(f.teacherId) ? (
                     <span className="text-[10px] font-semibold text-muted-foreground inline-flex items-center gap-1">
                       <Lock className="w-3 h-3" /> cerrada
+                    </span>
+                  ) : sePisa(f.teacherId) ? (
+                    <span
+                      className="text-[10px] font-semibold text-aviso-fuerte"
+                      title={`Ya se le liquidó hasta el ${fecha(ultimos.get(f.teacherId)!)}`}
+                    >
+                      liquidada hasta el {fecha(ultimos.get(f.teacherId)!)}
                     </span>
                   ) : (
                     <button
@@ -676,6 +700,106 @@ function Cerradas({
   )
 }
 
+
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * La ficha de cada profesora: sus horarios y su condición vigente.
+ *
+ * Los horarios están en la grilla desde la 0035, pero repartidos entre 64
+ * clases: "¿qué da Ivana?" no se podía contestar de un vistazo. Acá se
+ * arman desde `classes`, que el paquete del estudio ya trae — no hace
+ * falta consultar nada.
+ *
+ * Es la clase TITULAR de la grilla. Los reemplazos de una fecha puntual
+ * no aparecen acá y sí en la liquidación, que mira quién dio cada clase
+ * ese día. Son dos preguntas distintas: "qué horarios tiene" y "qué
+ * clases dio en el período".
+ */
+function Fichas({ condiciones }: { condiciones: CondicionPago[] }) {
+  const { teachers, classes } = useStudio()
+
+  const vigente = (id: string, modalidad: CondicionPago['modalidad']) =>
+    condiciones
+      .filter((c) => c.teacherId === id && c.modalidad === modalidad && c.desde <= hoyISO())
+      .sort((a, b) => b.desde.localeCompare(a.desde))[0]
+
+  return (
+    <div className="divide-y divide-border">
+      {teachers.map((t) => {
+        const suyas = classes
+          .filter((c) => c.teacherId === t.id)
+          .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.time.localeCompare(b.time))
+
+        // Agrupadas por día: doce renglones "Lunes 08:00" no se leen.
+        const porDia = new Map<number, string[]>()
+        for (const c of suyas) {
+          porDia.set(c.dayOfWeek, [...(porDia.get(c.dayOfWeek) ?? []), c.time])
+        }
+
+        const cond = (['por_clase', 'por_hora', 'mensual'] as const)
+          .map((m) => {
+            const c = vigente(t.id, m)
+            return c ? `${MODALIDAD[m]}: ${plata(c.monto)}` : null
+          })
+          .filter(Boolean)
+
+        return (
+          <div key={t.id} className="py-3 space-y-1">
+            <div className="flex items-baseline gap-2">
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
+              <p className="text-sm font-semibold text-foreground">{t.name}</p>
+              {t.laboral?.fechaIngreso && (
+                <p className="text-[11px] text-muted-foreground">
+                  desde el {fecha(t.laboral.fechaIngreso)}
+                </p>
+              )}
+              {t.laboral?.fechaBaja && (
+                <p className="text-[11px] text-destructive-fuerte font-semibold">
+                  baja el {fecha(t.laboral.fechaBaja)}
+                </p>
+              )}
+            </div>
+
+            {porDia.size === 0 ? (
+              <p className="text-[11px] text-muted-foreground">Sin clases asignadas en la grilla</p>
+            ) : (
+              <div className="space-y-0.5">
+                {[...porDia.entries()].map(([dia, horas]) => (
+                  <p key={dia} className="text-[11px] text-muted-foreground">
+                    <span className="font-semibold text-foreground">{nombreDelDia(dia)}</span>{' '}
+                    {horas.join(' · ')}
+                  </p>
+                ))}
+                <p className="text-[11px] text-muted-foreground pt-0.5">
+                  {suyas.length} {suyas.length === 1 ? 'clase' : 'clases'} por semana en la grilla
+                </p>
+              </div>
+            )}
+
+            {cond.length > 0 ? (
+              <p className="text-[11px] text-foreground">{cond.join(' · ')}</p>
+            ) : (
+              <p className="text-[11px] text-aviso-fuerte">
+                Sin condición de pago cargada: se le cuentan las clases y no se le liquida plata.
+              </p>
+            )}
+
+            {/* Sin cuenta no puede entrar ni tomar asistencia, y es lo
+                que hoy frena que las profesoras usen el sistema. */}
+            {!t.userId && (
+              <p className="text-[11px] text-aviso-fuerte">
+                Sin cuenta para entrar al sistema. Se crea en Configuración → Accesos y se vincula en
+                Profesoras.
+              </p>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────
 
 export function PersonalPage() {
@@ -686,11 +810,41 @@ export function PersonalPage() {
   const veSueldos = can('personal.remuneracion')
 
   const [cerradas, setCerradas] = useState<LiquidacionCerrada[]>([])
+  const [condiciones, setCondiciones] = useState<CondicionPago[]>([])
+  const [ultimos, setUltimos] = useState<Map<string, string>>(new Map())
+  const [cerrandoTodas, setCerrandoTodas] = useState(false)
+  const [avisoCierre, setAvisoCierre] = useState<string | null>(null)
+
   const recargar = useCallback(() => {
     if (!veSueldos) return
     fetchLiquidacionesCerradas(desde, hasta).then(setCerradas).catch(() => setCerradas([]))
+    fetchUltimosCierres().then(setUltimos).catch(() => setUltimos(new Map()))
+    fetchCondiciones().then(setCondiciones).catch(() => setCondiciones([]))
   }, [desde, hasta, veSueldos])
   useEffect(recargar, [recargar])
+
+  // Dónde terminó el último cierre de cualquiera: es el arranque natural
+  // del período siguiente, y evita tener que acordarse.
+  const ultimoCierre = [...ultimos.values()].sort().pop()
+
+  const cerrarElMes = async () => {
+    if (!window.confirm(`Cerrar la liquidación de todos del ${fecha(desde)} al ${fecha(hasta)}?`)) return
+    setCerrandoTodas(true)
+    setAvisoCierre(null)
+    try {
+      const r = await cerrarTodas(desde, hasta)
+      setAvisoCierre(
+        r.salteadas.length === 0
+          ? `Se cerraron ${r.cerradas}.`
+          : `Se cerraron ${r.cerradas}. Quedaron afuera: ${r.salteadas.join(' · ')}`
+      )
+      recargar()
+    } catch (e) {
+      setAvisoCierre(e instanceof Error ? e.message : 'No se pudieron cerrar')
+    } finally {
+      setCerrandoTodas(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
@@ -723,13 +877,54 @@ export function PersonalPage() {
         >
           Mes pasado
         </button>
+        {/* Arranca donde terminó el último cierre. Es lo que evita el
+            error que la 0055 vino a frenar: dos períodos que se pisan. */}
+        {ultimoCierre && (
+          <button
+            onClick={() => {
+              setDesde(addDays(ultimoCierre, 1))
+              setHasta(hoyISO())
+            }}
+            className="px-3 py-2 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:bg-muted"
+            title={`La última liquidación llegó hasta el ${fecha(ultimoCierre)}`}
+          >
+            Desde el último cierre
+          </button>
+        )}
       </div>
+
+      {ultimoCierre && (
+        <p className="text-[11px] text-muted-foreground -mt-3">
+          La última liquidación cerrada llega hasta el{' '}
+          <span className="font-semibold">{fecha(ultimoCierre)}</span>. Un período nuevo no puede
+          pisarla: la base lo rechaza.
+        </p>
+      )}
 
       <SeccionesPlegables memoria="personal">
         {veSueldos && (
           <SeccionPlegable id="liquidacion" titulo="Liquidación del período" icono={Wallet} abiertaPorDefecto>
             <div className="px-1 py-2">
-              <Liquidacion desde={desde} hasta={hasta} cerradas={cerradas} onCerrar={recargar} />
+              <Liquidacion
+                desde={desde}
+                hasta={hasta}
+                cerradas={cerradas}
+                ultimos={ultimos}
+                onCerrar={recargar}
+              />
+              {veSueldos && (
+                <div className="px-4 pt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    disabled={cerrandoTodas}
+                    onClick={cerrarElMes}
+                    className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {cerrandoTodas && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    Cerrar el período de todos
+                  </button>
+                  {avisoCierre && <p className="text-[11px] text-muted-foreground">{avisoCierre}</p>}
+                </div>
+              )}
             </div>
           </SeccionPlegable>
         )}
@@ -750,6 +945,12 @@ export function PersonalPage() {
             </div>
           </SeccionPlegable>
         )}
+
+        <SeccionPlegable id="fichas" titulo="Quién trabaja y qué horarios tiene" icono={IdCard}>
+          <div className="px-5 py-3">
+            <Fichas condiciones={condiciones} />
+          </div>
+        </SeccionPlegable>
 
         <SeccionPlegable id="horas" titulo="Horas trabajadas" icono={Clock}>
           <div className="px-5 py-3">

@@ -316,6 +316,13 @@ function TeacherFormModal({ teacher, onClose }: { teacher?: Teacher; onClose: ()
   const [phone, setPhone] = useState(teacher?.phone ?? '')
   const [email, setEmail] = useState(teacher?.email ?? '')
   const [color, setColor] = useState(teacher?.color ?? TEACHER_COLORS[0])
+  // La ficha laboral (0053). Existía en la base y ningún formulario la
+  // escribía, que es el mismo modo de falla que tuvieron el contacto de
+  // emergencia y las dos columnas de la 0022.
+  const [fechaIngreso, setFechaIngreso] = useState(teacher?.laboral?.fechaIngreso ?? '')
+  const [fechaBaja, setFechaBaja] = useState(teacher?.laboral?.fechaBaja ?? '')
+  const [dni, setDni] = useState(teacher?.laboral?.dni ?? '')
+  const [notasLaborales, setNotasLaborales] = useState(teacher?.laboral?.notasLaborales ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -330,7 +337,10 @@ function TeacherFormModal({ teacher, onClose }: { teacher?: Teacher; onClose: ()
     }
     setSaving(true)
     setError(null)
-    const input: TeacherInput = { name, disciplines, phone, email, color }
+    const input: TeacherInput = {
+      name, disciplines, phone, email, color,
+      fechaIngreso, fechaBaja, dni, notasLaborales,
+    }
     try {
       if (isEdit) await updateTeacher(teacher.id, input)
       else await createTeacher(input)
@@ -412,6 +422,37 @@ function TeacherFormModal({ teacher, onClose }: { teacher?: Teacher; onClose: ()
               ))}
             </div>
           </div>
+          {/* La ficha laboral (0053). Va acá y no en Personal porque es
+              parte de quién es la persona, no de cuánto cobra: lo que
+              cobra está en Personal, bajo su propia clave. */}
+          <div className="pt-1 border-t border-border">
+            <p className={cn(labelClass, 'pt-3')}>Ficha laboral</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] text-muted-foreground block mb-1">Fecha de ingreso</label>
+                <input type="date" value={fechaIngreso ?? ''} onChange={(e) => setFechaIngreso(e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="text-[11px] text-muted-foreground block mb-1">DNI</label>
+                <input value={dni} onChange={(e) => setDni(e.target.value)} className={inputClass} />
+              </div>
+            </div>
+            <div className="mt-3">
+              <label className="text-[11px] text-muted-foreground block mb-1">Fecha de baja</label>
+              <input type="date" value={fechaBaja ?? ''} onChange={(e) => setFechaBaja(e.target.value)} className={inputClass} />
+              {/* Que quede claro que son dos cosas distintas: si se
+                  confunden, una liquidación pasada deja de mostrarla. */}
+              <p className="text-[11px] text-muted-foreground mt-1.5">
+                Cuándo dejó de trabajar. No es lo mismo que darla de baja del catálogo: con la fecha
+                puesta sigue apareciendo en las liquidaciones de los meses que sí trabajó.
+              </p>
+            </div>
+            <div className="mt-3">
+              <label className="text-[11px] text-muted-foreground block mb-1">Notas</label>
+              <textarea rows={2} value={notasLaborales} onChange={(e) => setNotasLaborales(e.target.value)} placeholder="Condiciones de contratación, acuerdos..." className={`${inputClass} resize-none`} />
+            </div>
+          </div>
+
           {error && <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
         </div>
 
