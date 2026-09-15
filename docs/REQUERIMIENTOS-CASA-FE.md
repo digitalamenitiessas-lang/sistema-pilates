@@ -42,7 +42,7 @@ Nada de esto es desarrollo: son datos y decisiones del estudio.
 | **§1** | Que la profesora agregue a una clienta que llega sin reserva | **Es configuración, no código** — ver la tabla de arriba |
 | **§1** | Cambio de horario por fecha | La tabla lo soporta desde la `0018`; falta la pantalla |
 | — | **Los otros 40 lugares donde el mensaje de la base no llega a la pantalla** | Mismo arreglo de una línea que el de la `0046`, pero toca todos los módulos y va con su propia verificación |
-| — | Sección 12: Personal y remuneraciones | Lo único nuevo que entró al alcance (§7). No bloquea nada |
+| ~~—~~ | ~~Sección 12: Personal y remuneraciones~~ | ✅ **Hecha el 15/09** (`0053`). Queda el fichaje, que espera las cuentas de las profesoras |
 | — | Foto del comprobante de gasto (primer uso de Storage) · avisos de caja en el proceso diario | Cola del Bloque 4 |
 
 ### Contra las 10 prioridades que fijó el estudio
@@ -57,14 +57,14 @@ la base el 15/09**, no contra este documento.
 | 3 | Ficha integral de cada clienta | 🟢 | **Cerrada el 15/09** (`0050`): salud en cuatro campos y bitácora con autor y fecha, más el contacto de emergencia y el contacto de emergencia —la columna estaba desde la `0008` y nadie la escribía— y el "¿cuándo vuelve?", que hasta entonces **mentía**: era el contador de reservas confirmadas, y una reserva vieja que nadie marcó sigue en 'confirmada' para siempre |
 | 4 | Dashboard financiero y comercial | 🟢 | La plata está entera (`0020`) y **los cinco contadores comerciales entraron el 15/09** —lugares libres, lista de espera, de prueba, por recuperar y cobrado hoy—, verificados contra la base. **Cerrada el 15/09**: los cinco cortes de ocupación entraron con la `0051`, que además corrigió un divisor que daba cientos por ciento |
 | 5 | Caja diaria, cuentas, ingresos y gastos | 🟢 | Solo la foto del comprobante (primer uso de Storage) |
-| 6 | Personal, horas y remuneraciones | 🔴 | **Sin empezar, y está dentro del alcance.** `teachers` no tiene una sola columna laboral — verificado: sus nueve columnas son las de contacto |
+| 6 | Personal, horas y remuneraciones | 🟢 | **Hecha el 15/09** (`0053`): ficha laboral, horas, condiciones **con historial** y liquidación derivada. Lo caro —qué clases dictó cada una de verdad— ya lo resolvía `sesiones_dictadas()` de la `0051`. **Falta** el fichaje de entrada y salida, que necesita que las profesoras tengan cuenta |
 | 7 | Inventario y venta de productos | ⚫ | **Fuera del alcance** que definió Matías (§7). No existe ninguna tabla — verificado |
 | 8 | Reportes detallados y descargables | 🟢 | Los dos que esperan los módulos que los alimentan: personal y mostrador |
 | 9 | Roles y permisos | 🟢 | 79 claves configurables. Falta **encender los grupos**: siguen en sombra |
 | 10 | Notificaciones operativas | 🟢 | Campana, push y mails andando (25 avisos emitidos). Faltan algunos hacia la clienta y el panel para configurar canal y anticipación |
 
-**Ocho terminadas, una sin empezar (Personal) y una afuera (Inventario).** El
-15/09 pasaron a verde la 3, la 4 y la 10.
+**Nueve terminadas y una afuera** (Inventario, excluida en §7). El 15/09 pasaron
+a verde la 3, la 4, la 6 y la 10.
 
 Y el párrafo del final de su lámina coincide con el corte que ya estaba hecho: la
 landing autoadministrable, el email marketing y las automatizaciones comerciales

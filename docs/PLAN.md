@@ -1189,6 +1189,56 @@ portal NO se le confirme. `stamp_reservation` deriva `source` de `auth.uid()` y
 el service role no tiene sesión, así que toda alta de prueba queda en `'sistema'`.
 La rama solo se ejerce entrando con una cuenta de clienta.
 
+### ✅ Personal, horas y remuneraciones (15/09) — `0053` **corrida y verificada**
+
+La sección 12 y la prioridad 6 del estudio. **Era lo único nuevo que entró al
+alcance** (§7), y la última de las diez que faltaba empezar.
+
+**Lo caro ya estaba, y por accidente.** El documento marcaba como bloqueo que no
+se puede pagar por clase con seguridad, porque no se sabe qué clases se dictaron
+de verdad, con qué profesora y descontando feriados. Eso lo resolvió
+`sesiones_dictadas()` de la `0051`, escrita el mismo día para la ocupación: qué
+horarios potenciar y a quién pagarle cuánto salen del mismo dato.
+
+- [x] **El sueldo en su tabla, no como columna de `teachers`.** RLS filtra filas,
+      no columnas: ahí lo vería cualquiera que pueda leer la grilla. Es el
+      criterio que CLAUDE.md dejó escrito antes de que existieran los sueldos.
+- [x] **Tres claves separadas.** Ver quién trabaja no es ver cuánto gana, y
+      recepción puede cargar horas sin enterarse de un sueldo.
+      `personal.remuneracion` nace **solo para admin**: el permiso que más se le
+      parece, `finanzas.ver`, es de recepción, y esa decisión es del estudio.
+- [x] **Las condiciones llevan historial**, y es lo único que si falla cuesta
+      plata. Cada clase se paga con la tarifa que regía **el día que se dictó**,
+      fila por fila. Con un campo único en la ficha, subirle la tarifa hoy
+      cambiaría la liquidación del mes pasado.
+- [x] **Una condición no se edita**: se carga la que rige desde una fecha. La
+      base tampoco tiene política de update, para que no se pueda ni por atrás.
+- [x] **La liquidación se deriva**, no se guarda. Copiarla sería una segunda
+      verdad sobre la misma plata, que es lo que el libro de la `0020` evita.
+- [x] **Las clases dictadas no se cargan a mano.** Pedirle al mostrador que copie
+      un dato que el sistema ya tiene es abrir la puerta a que los dos números no
+      coincidan.
+- [x] **`fecha_baja` es distinta de `active = false`**, que es la baja del
+      catálogo: quien se fue en marzo tiene que seguir apareciendo en la
+      liquidación de marzo.
+- [x] La pantalla dice **"liquidar no es pagar"**: el pago entra al libro como
+      cualquier gasto de la `0020`.
+
+**Lo que NO hace, y va escrito**: no hay fichaje de entrada y salida, porque
+**ninguna profesora tiene cuenta todavía**. Las clases se derivan solas; las
+horas que no son clase las carga el mostrador. El día que tengan cuenta, el
+fichaje se apoya en `staff_work_logs` sin rehacer nada.
+
+**Verificado el 15/09 contra la base**: `perm_diff()` cero filas · sin
+condiciones cargadas la liquidación **cuenta las clases y no inventa plata** · el
+historial rige — 132 clases de Ivana con $5.000 hasta el 19/09 y $6.000 desde el
+20 dan **$708.000**, ni $792.000 (tarifa de hoy) ni $660.000 (la vieja): son 84
+clases a una y 48 a la otra, justo las que caen de cada lado · una ausencia no
+suma horas ni plata y se cuenta aparte · el mensual se cuenta una vez y no se
+multiplica · quien tiene `fecha_baja` en marzo **no** aparece en septiembre y
+**sí** en marzo. Datos de prueba revertidos, y borrados **por id**: el filtro por
+columna ya había devuelto cero filas sin error más temprano el mismo día.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
@@ -1247,7 +1297,7 @@ La rama solo se ejerce entrando con una cuenta de clienta.
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a **`0052`** ✅. La **`0052` corrió el 15/09** y se corrigió una redacción; es idempotente. La **`0051` corrió el 15/09** y se corrigió dos veces sobre la marcha —los nombres en castellano y el día en el corte por clase—; es idempotente, todo `create or replace`. La **`0050` corrió el 15/09**, se corrigió la clave foránea del autor y se volvió a correr; es idempotente a propósito. La **`0048` y la `0049` corrieron el 15/09** y se verificaron ejerciéndolas: el cupo rechazó el noveno turno fijo, un pausado quedó fuera de la liberación automática, y el interruptor encendido liberó exactamente uno. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Migraciones aplicadas | `0001` a **`0053`** ✅. La **`0053` corrió el 15/09**. La **`0052` corrió el 15/09** y se corrigió una redacción; es idempotente. La **`0051` corrió el 15/09** y se corrigió dos veces sobre la marcha —los nombres en castellano y el día en el corte por clase—; es idempotente, todo `create or replace`. La **`0050` corrió el 15/09**, se corrigió la clave foránea del autor y se volvió a correr; es idempotente a propósito. La **`0048` y la `0049` corrieron el 15/09** y se verificaron ejerciéndolas: el cupo rechazó el noveno turno fijo, un pausado quedó fuera de la liberación automática, y el interruptor encendido liberó exactamente uno. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
 | Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |

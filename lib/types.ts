@@ -116,6 +116,62 @@ export interface Teacher {
    * funcionar por más permiso que se le dé: la base no sabe quién es.
    */
   userId?: string | null
+  /** La ficha laboral (0053). Vacío mientras la migración no corrió. */
+  laboral?: DatosLaborales
+}
+
+/**
+ * La ficha laboral de una profesora (0053). Lo que NO es plata: eso vive
+ * en `teacher_pay`, bajo su propia clave, porque RLS filtra filas y no
+ * columnas.
+ */
+export interface DatosLaborales {
+  fechaIngreso?: string | null
+  /**
+   * Cuándo dejó de trabajar. Distinta de `active = false`, que es la baja
+   * del catálogo: quien se fue en marzo tiene que seguir apareciendo en
+   * la liquidación de marzo.
+   */
+  fechaBaja?: string | null
+  dni?: string
+  notasLaborales?: string
+}
+
+/** Una condición salarial vigente desde una fecha (0053). */
+export interface CondicionPago {
+  id: string
+  teacherId: string
+  modalidad: 'por_clase' | 'por_hora' | 'mensual'
+  monto: number
+  desde: string
+  notas: string
+}
+
+/** Horas que NO son clases: las clases se cuentan solas desde la agenda. */
+export interface HorasTrabajadas {
+  id: string
+  teacherId: string
+  fecha: string
+  tipo: 'trabajo' | 'ausencia' | 'tardanza'
+  horas: number
+  detalle: string
+}
+
+/**
+ * La liquidación de un período. **Se deriva, no se guarda**: cada clase
+ * se paga con la tarifa que regía el día que se dictó.
+ */
+export interface FilaLiquidacion {
+  teacherId: string
+  profesora: string
+  clases: number
+  montoClases: number
+  horas: number
+  montoHoras: number
+  mensual: number
+  ausencias: number
+  tardanzas: number
+  total: number
 }
 
 export interface Plan {

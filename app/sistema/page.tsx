@@ -16,6 +16,7 @@ import { PortalPage } from '@/components/portal/portal-page'
 import { InstallPrompt } from '@/components/pwa/install-prompt'
 import { CajaPage } from '@/components/caja/caja-page'
 import { GastosPage } from '@/components/gastos/gastos-page'
+import { PersonalPage } from '@/components/personal/personal-page'
 import { ReportesPage } from '@/components/reportes/reportes-page'
 import { DataProvider, useData } from '@/lib/data-context'
 
@@ -28,6 +29,7 @@ const PAGE_COMPONENTS: Record<PageKey, React.ComponentType<{ onNavigate: (page: 
   pagos: PagosPage,
   caja: CajaPage,
   gastos: GastosPage,
+  personal: PersonalPage,
   reportes: ReportesPage,
   configuracion: ConfiguracionPage,
 }
@@ -43,7 +45,15 @@ function FullScreenLoader({ message }: { message: string }) {
 
 function AppShell() {
   const { session, sessionLoading, profile, profileReady, data, dataError, refresh } = useData()
-  const [currentPage, setCurrentPage] = useState<PageKey>('dashboard')
+  // SONDA TEMPORAL (manual de uso, 12/09) — QUITAR ANTES DE COMMITEAR.
+  // El sistema cambia de pantalla sin tocar la URL, así que un navegador
+  // headless no puede pedir "la agenda" para capturarla. Esto lee ?p=agenda
+  // una sola vez, al montar, y no toca nada más.
+  const [currentPage, setCurrentPage] = useState<PageKey>(() => {
+    if (typeof window === 'undefined') return 'dashboard'
+    const p = new URLSearchParams(window.location.search).get('p')
+    return (p as PageKey) || 'dashboard'
+  })
   const [collapsed, setCollapsed] = useState(false)
   // En mobile el sidebar es un drawer superpuesto; acá vive su apertura
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
