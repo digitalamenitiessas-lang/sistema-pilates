@@ -2085,6 +2085,12 @@ export async function createSystemUser(input: {
   role: Role
   /** si se pasa, vincula la cuenta creada con esta ficha de alumno */
   studentId?: string
+  /**
+   * si se pasa, vincula la cuenta con esta profesora. Sin el vínculo la
+   * cuenta entra pero el sistema no sabe qué clases son suyas, así que
+   * "ver solo mis clases" no puede funcionar por más permiso que se le dé.
+   */
+  teacherId?: string
 }): Promise<void> {
   await adminApi(input)
 }

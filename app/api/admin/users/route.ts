@@ -49,7 +49,9 @@ export async function POST(request: Request) {
   const auth = await authorize(request, 'usuarios.crear_alumno')
   if (!auth.ok) return auth.response
 
-  const { email, password, fullName, role, studentId } = await request.json().catch(() => ({}))
+  const { email, password, fullName, role, studentId, teacherId } = await request
+    .json()
+    .catch(() => ({}))
   if (!email || !password || !VALID_ROLES.includes(role)) {
     return NextResponse.json({ error: 'Faltan datos: email, contraseña y rol' }, { status: 400 })
   }
@@ -101,6 +103,23 @@ export async function POST(request: Request) {
     if (linkError) {
       return NextResponse.json(
         { error: `Usuario creado pero no se pudo vincular la ficha: ${linkError.message}` },
+        { status: 500 }
+      )
+    }
+  }
+
+  // Y con la ficha de la profesora, que hasta hoy había que vincular a
+  // mano en otra sección. Sin `teachers.user_id`, `my_teacher_ids()` no
+  // encuentra nada y el sistema no sabe qué clases son suyas: la cuenta
+  // existe y no sirve para lo que se creó.
+  if (teacherId && created.user) {
+    const { error: linkError } = await auth.admin
+      .from('teachers')
+      .update({ user_id: created.user.id })
+      .eq('id', teacherId)
+    if (linkError) {
+      return NextResponse.json(
+        { error: `Usuario creado pero no se pudo vincular la profesora: ${linkError.message}` },
         { status: 500 }
       )
     }
