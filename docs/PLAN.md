@@ -495,7 +495,11 @@ fallara al correrse, y encontraron siete cosas. Las que importan:
   lo ejercen acciones de `reservas.editar` y `reservas.asistencia`: con el grupo
   en activo, una profesora con asistencia y sin crear quedaba trabada.
 
-### ✅ El plan dice qué disciplina, y ahora rige (09/09) — `0040`, sin correr
+### ✅ El plan dice qué disciplina, y ahora rige (09/09) — `0040` **corrida**
+*(El encabezado decía "sin correr" hasta el 12/09 y era falso: se verificó contra
+la base —existe `payments.renueva_membresia_id`, que agrega la `0041`, o sea que
+todo lo anterior corrió—. Importa porque con ese dato viejo se le dijo dos veces
+a Matías que la disciplina del plan no rige, y sí rige.)*
 De la respuesta 6c casi todo ya funcionaba sin construir nada: día, hora, cupo y
 profesora son columnas de cada clase, y "grilla separada" se resuelve cargando
 las clases. Lo único que faltaba era **el impedimento**: la `0033` dejó los seis
@@ -525,7 +529,7 @@ ofrece lo que la base va a rechazar. El portal muestra todas las clases del día
 sin mirar el plan del cliente. Con una disciplina es invisible; con dos hay que
 filtrar. El orden correcto es este: primero el freno, después el filtro.
 
-### ✅ La renovación se cobra primero (09/09) — `0041`, sin correr
+### ✅ La renovación se cobra primero (09/09) — `0041` **corrida** (verificado el 12/09: la columna `renueva_membresia_id` existe)
 Hasta acá el proceso diario, al vencer una membresía, **insertaba la nueva** y
 recién después generaba la cuota: quien no pagaba seguía vigente y —con el motor
 de la `0029` encendido— gastando clases de un mes que no compró. Lo contrario de
@@ -816,6 +820,120 @@ dato, que la `0033` había vaciado a propósito porque tenía el de la demo.
       dos abren. Es la única verificación de esta migración que no se puede
       hacer desde la base.
 
+### ✅ El recupero y la excepción autorizada (15/09) — `0046` **corrida y verificada**
+
+Primera entrega sobre la devolución del estudio del 15/09
+(`SISTEMA INTERNO.pdf`, §1 Agenda). De los seis puntos de esa sección, **cuatro
+ya andaban** y no se tocó nada: el plazo de 3 horas (`cancel_hours`, que la
+`0029` compara para clasificar cada cancelación), perder la clase al cancelar
+tarde, registrar el tipo de cancelación, y el no show — que se cumple por un
+camino distinto al que ella imagina: la clase se descuenta **al reservar**, así
+que la que no viene y no avisa ya la perdió, sin que nadie tenga que marcarla.
+
+Lo que faltaba eran dos columnas que la `0022` dejó preparadas y **nadie escribió
+nunca**: `recovers_reservation_id` y `override_by` / `override_reason`.
+
+- [x] **El tope de recuperos es un parámetro**, no un número en el código:
+      `recovery_max = 2`, grupo Reservas, entre la regla de la ausencia y los
+      valores por defecto de la clase. El día que sean 3 es un campo.
+- [x] **Un recupero no vuelve a descontar.** `consumo_contadas` lo excluye: la
+      clase ya se descontó cuando se perdió, y contarla otra vez sería el doble
+      cobro que la `0029` se propuso hacer imposible. Verificado con datos
+      reales: Lourdes fue a tres clases y le contaron dos.
+- [x] **Una clase perdida se repone una sola vez.** El índice de la `0022` sobre
+      esa columna **no era único**, así que dos reservas podían apuntar a la
+      misma clase perdida. Ahora lo es.
+- [x] **Qué se puede recuperar no es configurable, a propósito:** lo que perdió
+      por cancelar tarde o faltar sin avisar. Cancelar en plazo ya le devuelve la
+      clase al contador, así que permitir recuperar eso sería regalarle una. El
+      tope es una preferencia del estudio; esto es una invariante del motor.
+- [x] **El recupero cae dentro del período que pagó esa clase.** Las clases no se
+      acumulan de un mes al otro (respuesta del estudio del 09/09), así que
+      reponerla en el período siguiente sería revivir una vencida.
+- [x] **La excepción autorizada no consume.** Con la clave nueva
+      `reservas.excepcion` y el motivo escrito, entra aunque la membresía esté
+      vencida o sin clases, y **no se sella contra ninguna membresía**. Si
+      consumiera con el plan agotado, la ficha mostraría clases restantes en
+      negativo; así el contador sigue diciendo "usó 4 de 4" y al lado queda la
+      clase de más con quién la autorizó. `override_by` lo pone la base con
+      `auth.uid()`, nunca lo que mande el cliente.
+- [x] **El update pinea las tres columnas nuevas.** La política "alumno cancela"
+      (`0005:75-78`) deja a la clienta escribir sus propias filas sin restringir
+      columnas: sin esto, desde el portal podía mandarse un recupero o una
+      excepción junto con la cancelación. Mismo motivo por el que la `0029`
+      pinea `student_id`, `class_id` y `date`.
+- [x] **Los cuatro estados se distinguen en pantalla** (ficha y Reservas):
+      *Recuperada*, *Excepción autorizada*, *Fuera de plazo · perdió la clase*,
+      *En plazo · se le devolvió*. Dos canceladas se leían igual y no son lo
+      mismo.
+- [x] **La pantalla no ofrece el recupero mientras el tope no rija**, con el
+      criterio de los permisos en sombra: la base lo rechaza igual, y ofrecer un
+      camino que termina en error es peor que no ofrecerlo.
+
+**El bug que apareció probando, y es el de mayor alcance:** Supabase devuelve el
+error como objeto plano, no como instancia de `Error`. Las **41** pantallas lo
+reciben con `err instanceof Error ? err.message : 'No se pudo…'`, así que la rama
+que corre siempre es la del texto genérico: **ningún mensaje que escribe la base
+llegaba nunca al mostrador.** Y son los que más falta hacen — la `0029` los
+redactó uno por uno para quien atiende ("No tiene una membresía vigente para el
+15/09 — asignale un plan antes de reservarle esa clase") y en pantalla se leía
+"No se pudo crear la reserva", que no dice qué hacer. Arreglado en el camino de
+reservas con `errorDeLaBase()`. **Sigue pasando en los otros 40 lugares** (pagos,
+caja, planes, gastos): es el mismo arreglo de una línea, pero toca todos los
+módulos y va con su propia verificación.
+
+**Verificado contra la base el 15/09**, con el sistema andando y sesión real:
+`perm_diff()` cero filas · la excepción quedó con `membership_id` en nulo y
+`override_by` sellado por la base · el recupero no movió `classes_used` (2/8
+antes y después) · la clase repuesta dejó de ofrecerse · el tope rechazó el
+segundo con su motivo. **Los datos de prueba se revirtieron**: 8 reservas, las
+mismas de antes, cero filas con recupero o excepción.
+
+### ✅ Resolver la clienta sin salir de Agenda (15/09) — `0047` **corrida y verificada**
+
+El cierre de §1 del pedido del 15/09, y textual: *"La recepción no debería tener
+que salir de Agenda y recorrer varios módulos para resolver una alumna que está
+físicamente en el estudio."*
+
+**Las cinco cosas que pidió poder hacer ahí ya existían todas** —renovar, cambiar
+plan, registrar pago, actualizar vencimiento y consultar clases disponibles—,
+repartidas entre Alumnos, Planes y Pagos. Faltaba el lugar, no las funciones. Es
+el único pedido del documento que ella **no** había hecho antes.
+
+- [x] **Ficha rápida sobre la clase**: elegido el cliente, el mostrador ve su
+      plan, hasta cuándo, cuántas clases le quedan y si debe — las cuatro cosas
+      que hay que poder contestar con la clienta parada adelante.
+- [x] **No reimplementa nada.** Monta `AsignarPlanModal` y los dos modales de
+      cobro, que se exportaron de Pagos. Un panel con su propia versión del
+      ajuste por medio de pago o del encolado de períodos son dos verdades para
+      la misma regla — y ese bug ya pasó una vez, entre cobrar una deuda y
+      registrar un pago a mano.
+- [x] **La deuda que muestra es deuda de verdad**, no la oferta de renovación:
+      esa cobra un período que todavía no existe (`0041`) y no se puede exigir.
+- [x] **Mover el vencimiento deja rastro** (`0047`). Se podía desde siempre —el
+      trigger de la `0036` es `before insert` y no vuelve a pisar la fecha— pero
+      **no quedaba registro de nada**: `memberships` no tenía una sola columna de
+      autoría, y correr un vencimiento es regalar días de un período que se cobró
+      por un plazo fijo.
+- [x] **El sello mira si `end_date` cambió de verdad.** Un `before update` pelado
+      sellaría la membresía en cada reserva: desde la `0029` `consumo_recalcular`
+      actualiza `classes_used` con cada reserva y corre como el usuario logueado.
+      El registro diría que la recepción editó la membresía cuarenta veces por
+      mes sin haberla tocado, y un registro que miente es peor que ninguno.
+- [x] **La pantalla dice la consecuencia antes de guardar**: "le da 7 días más
+      para usar las clases que le quedan; no suma clases, el plan es el mismo".
+      Y el motivo es obligatorio: un vencimiento corrido sin explicación no se
+      distingue de un error de tipeo. La clienta lo lee desde su portal.
+
+**Verificado el 15/09** con sesión real: el panel mostró plan, vigencia, clases y
+deuda de una clienta; el vencimiento se movió del 04/10 al 11/10 y la base selló
+"Administración" con la fecha; **1 de 12** membresías quedó con sello, o sea que
+reservar no ensucia la auditoría. **Revertido**: 8 reservas, cero sellos, el
+vencimiento de vuelta en su fecha.
+
+Con esto **§1 queda cerrada**: seis de sus pedidos ya andaban, cuatro entraron
+con la `0046` y este es el quinto y último.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
@@ -869,7 +987,7 @@ dato, que la `0033` había vaciado a propósito porque tenía el de la demo.
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a **`0044`** ✅. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Migraciones aplicadas | `0001` a **`0047`** ✅. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
 | Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |

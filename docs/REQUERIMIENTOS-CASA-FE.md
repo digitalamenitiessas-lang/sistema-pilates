@@ -121,7 +121,7 @@ subdeclarar lo que el sistema hace.
 
 | Sección | Hoy | Qué cambió desde la foto — y qué falta |
 |---|---|---|
-| 1 · Agenda, clases, reservas, asistencias | 🟡 | **Avanzó mucho**: talleres con fecha propia y los cinco campos (`0017`); suspender un día y cambiar la profesora (`0018`); asistencia desde el celular; el consumo de la clase en la base, con la cancelación clasificada dentro o fuera de plazo (`0022`+`0029`, **encendido el 09/09**); no se reserva una clase que ya empezó (`0038`); el plan decide qué disciplina puede reservar (`0040`); volver a anotarse después de cancelar (`0031`); y la grilla real de Casa Fe, 64 clases (`0035`). **Falta**: que la profesora agregue a una clienta que llega sin reserva; el tope de recuperos por mes; la pantalla del cambio de horario por fecha; y quién registró cada reserva (no hay `created_by` en `reservations`) |
+| 1 · Agenda, clases, reservas, asistencias | 🟡 | **Avanzó mucho**: talleres con fecha propia y los cinco campos (`0017`); suspender un día y cambiar la profesora (`0018`); asistencia desde el celular; el consumo de la clase en la base, con la cancelación clasificada dentro o fuera de plazo (`0022`+`0029`, **encendido el 09/09**); no se reserva una clase que ya empezó (`0038`); el plan decide qué disciplina puede reservar (`0040`); volver a anotarse después de cancelar (`0031`); y la grilla real de Casa Fe, 64 clases (`0035`). **El 15/09 entraron** (`0046`) el recupero con su tope configurable —y sin volver a descontar la clase—, la excepción autorizada con clave propia, y los cuatro estados distinguidos en pantalla. **Falta**: que la profesora agregue a una clienta que llega sin reserva —que es **configuración, no código**: hay que tildarle `reservas.crear` y `reservas.asistencia` y encender el grupo— y la pantalla del cambio de horario por fecha. *(Dos afirmaciones de esta fila eran falsas y se corrigieron el 15/09 consultando la base: `created_by` **sí existe** en `reservations` y lo sella un trigger de la `0022` —los nulos son las filas sembradas, y la migración decidió a propósito no inventar autoría—, y el tope de recuperos no era "por mes" sino por período de membresía.)* |
 | 2 · Planes, membresías, medios de pago | 🟡 | Los seis planes FE (`0026`); **tres precios por plan** según el medio de pago (`0028`); la vigencia como mes de calendario, calculada en la base, con el pago anticipado encolado (`0036`+`0037`); y la renovación que se cobra primero, sin cuota fantasma (`0041`). **Falta**: congelar la membresía (espera su respuesta) y el historial completo de la membresía |
 | 3 · Cupones de descuento | ⚫ | **Fuera del alcance** que definió Matías (§7) |
 | 4 · Beneficios, regalos y gift cards | ⚫ | **Fuera del alcance** (§7) |
@@ -552,6 +552,95 @@ regla que rija**. Hoy nada valida la disciplina al reservar, ni el trigger de
 consumo ni las políticas. Si la membresía de Reformer no tiene que poder gastar
 una clase de embarazadas, eso es desarrollo aparte — y ahora que hay dos
 disciplinas activas, es la primera vez que la diferencia se puede notar.
+
+## 8.2 La devolución sobre la gestión interna (15/09/2026)
+
+El estudio probó el sistema y mandó `SISTEMA INTERNO.pdf`: cinco secciones,
+**69 pedidos**. Es la primera devolución que sale de usarlo, no de leerlo, y eso
+se nota — varios pedidos son más precisos que el documento original y tres son
+respuestas a preguntas que estaban abiertas.
+
+### El cruce, contra el código y la base (no contra este documento)
+
+| | Pedidos | Qué significa |
+|---|---|---|
+| 🟢 **Hecho** | 32 | Funciona hoy. Se le muestra y listo |
+| 🟡 **Está, falta una parte** | 11 | Retoques, ninguno grande |
+| 🔴 **No está, lo pidió y no lo hicimos** | 20 | Deuda del proyecto. **No se cotiza** |
+| ⚫ **Lo pidió, y quedó fuera del alcance** | 2 | Beneficios y Compras. **Se cotiza, y hay que avisarle** |
+| 🆕 **Nunca lo había pedido** | 4 | El panel de gestión desde Agenda |
+
+**Lo que esto significa para la cotización: de 69 pedidos, solo 6 dan pie a
+cobrar.** Todo lo demás o está, o era deuda. Los turnos fijos —el bloque más
+caro, 12 a 15 días— **entran como deuda**: son el Agregado 2, que ella ya había
+pedido. Conviene tenerlo escrito porque la primera lectura sugiere lo contrario.
+
+### §1 Agenda, reservas y asistencias — ✅ cerrada el 15/09
+
+Cuatro de los seis puntos ya andaban y no se tocó nada: el plazo de 3 horas, la
+pérdida de la clase al cancelar tarde, el registro del tipo de cancelación y el
+no show. Este último se cumple por un camino distinto al que ella imagina —la
+clase se descuenta al reservar, así que la que no viene ya la perdió— y eso hay
+que decírselo, porque va a buscar un botón que no existe.
+
+Los otros dos entraron con la `0046`: el recupero con tope configurable y sin
+doble descuento, y la excepción autorizada. El detalle está en
+[`PLAN.md`](PLAN.md).
+
+**El panel de Agenda entró el mismo día** (`0047`): con el cliente elegido, la
+recepción ve su plan, hasta cuándo, cuántas clases le quedan y si debe, y puede
+renovar, cobrar y mover el vencimiento sin cambiar de pantalla. Era el único
+pedido 🆕 del documento, y resultó ser el más barato: las cinco acciones ya
+existían, faltaba el lugar. Mover el vencimiento fue lo único que necesitó código
+de base — no por la fecha, que siempre se pudo editar, sino porque no quedaba
+registro de quién la había movido.
+
+**§1 queda cerrada, los 21 pedidos.**
+
+### Las tres definiciones que tomamos nosotros, y ella puede corregir
+
+Ninguna frenó el trabajo. Las tres se eligieron con el criterio de la casa —si
+es un número o un texto, se configura— y las tres se pueden dar vuelta:
+
+1. **Se recupera solo lo que perdió** (canceló tarde o faltó sin avisar).
+   Cancelar en plazo ya le devuelve la clase, así que dejar recuperar eso sería
+   regalarle una. Es lo único de esto que **no** se configura.
+2. **El recupero cae dentro del período que pagó esa clase**, porque las clases
+   no se acumulan — regla que ella misma fijó el 09/09.
+3. **La recepción carga el recupero, no la clienta desde el portal**: el tope es
+   una regla del estudio.
+
+### Lo que hay que preguntarle, y es una sola cosa
+
+**El mes con cinco martes.** En un período 20/09–19/10 uno o dos días de la
+semana caen cinco veces y el plan trae cuatro clases por semana. Con turnos
+fijos: ¿la quinta se pierde, se cobra, o el turno no genera reserva? Sin esa
+respuesta el turno fijo no se puede escribir — el trigger de consumo lanza
+excepción cuando no quedan clases.
+
+Lo demás que parecía pregunta se resolvió parametrizando: las 3 horas, los 2
+recuperos, el −5% y el +25%, la anticipación de los avisos. Todo eso lo mueve
+ella desde Configuración.
+
+### Lo que contestó sin que se le preguntara
+
+- **La prioridad del turno fijo cuelga de su fecha de vencimiento**, y se libera
+  al día siguiente. Cierra dos de las tres definiciones que faltaban del
+  Agregado 2 (§8).
+- **Los tres precios por medio de pago** confirman lo que la `0028` ya hace:
+  transferencia base, efectivo −5%, tarjeta +25%. Están cargados y andando.
+- **Ocupación es "la métrica fundamental"**, y dice para qué la quiere: decidir
+  qué horarios potenciar, reducir o promocionar. Eso ordena el reporte, que hasta
+  ahora era una tabla más.
+
+### Lo que hay que decirle, y no es cómodo
+
+Las pestañas **Beneficios** y **Compras** que pide en la ficha (§3) no son
+pestañas: son las secciones 4 y 10 del documento original —gift cards y
+productos/inventario—, que quedaron **explícitamente fuera del alcance** (§7). No
+hay una sola tabla ni una línea de código de ninguna de las dos. Sumarlas en
+silencio sería regalar dos módulos; ignorarlas, dejar la ficha a medias de lo que
+pidió. Va dicho de frente, con su costo al lado.
 
 ## 9. Cómo arrancamos
 

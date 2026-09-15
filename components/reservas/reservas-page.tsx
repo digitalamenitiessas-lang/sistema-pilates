@@ -19,7 +19,7 @@ import { useData, useStudio } from '@/lib/data-context'
 import { SeccionPlegable, SeccionesPlegables } from '@/components/ui/seccion-plegable'
 import { TomarAsistencia } from '@/components/asistencia/tomar-asistencia'
 import { disciplineStyle } from '@/lib/disciplines'
-import { addDays, hoyISO, updateReservationStatus } from '@/lib/api'
+import { addDays, hoyISO, updateReservationStatus, formaDeLaReserva } from '@/lib/api'
 import type {
   Discipline,
   DisciplineItem,
@@ -169,6 +169,25 @@ function TablaDeReservas({
                     <StatusIcon className="w-3 h-3" />
                     {cfg.label}
                   </span>
+                  {/* El estado solo no distingue una cancelación que le
+                      devolvió la clase de una que se la hizo perder, ni una
+                      clase recuperada de una común (0046). */}
+                  {(() => {
+                    const forma = formaDeLaReserva(r)
+                    if (!forma) return null
+                    return (
+                      <p
+                        className={cn(
+                          'text-[10px] font-semibold mt-1',
+                          forma.tono === 'info' && 'text-info-fuerte',
+                          forma.tono === 'aviso' && 'text-aviso-fuerte',
+                          forma.tono === 'neutro' && 'text-muted-foreground'
+                        )}
+                      >
+                        {forma.texto}
+                      </p>
+                    )
+                  })()}
                 </td>
                 {/* Fija a la derecha: si la tabla no entra y hay que
                     scrollear, marcar asistencia es justo lo que no puede

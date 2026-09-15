@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { disciplineStyle } from '@/lib/disciplines'
 import { TomarAsistencia } from '@/components/asistencia/tomar-asistencia'
+import { PanelDelCliente } from '@/components/agenda/panel-del-cliente'
 import {
   addDays,
   mondayOf,
@@ -35,6 +36,7 @@ import {
   suspendClassDate,
   updateClassSession,
   deactivateClassSession,
+  clasesRecuperables,
   type ClassInput,
 } from '@/lib/api'
 import type { ClassSession, Discipline } from '@/lib/types'
@@ -458,7 +460,8 @@ function ClassDetailModal({
   onEdit: (cls: ClassSession) => void
 }) {
   const { refresh, canWrite, can } = useData()
-  const { students, disciplines, teachers, reservations } = useStudio()
+  const { students, disciplines, teachers, reservations, memberships, settings, settingsMeta } =
+    useStudio()
   const colors = disciplineStyle(disciplines, cls.discipline)
   const isFull = cls.enrolled >= cls.capacity
   const [dayBusy, setDayBusy] = useState(false)
@@ -520,9 +523,50 @@ function ClassDetailModal({
   // Quiénes se anotaron sin cerrar el panel. Antes esto era un cartel que
   // reemplazaba el formulario, así que llenar una clase de seis eran seis
   // aperturas del modal: la fricción número uno del mostrador.
-  const [anotadas, setAnotadas] = useState<{ nombre: string; espera: boolean }[]>([])
+  const [anotadas, setAnotadas] = useState<
+    { nombre: string; espera: boolean; recupero: boolean; excepcion: boolean }[]
+  >([])
+  // Qué clase perdida repone esta reserva, si repone alguna (0046).
+  const [recuperaId, setRecuperaId] = useState('')
+  // La excepción autorizada no se ofrece de entrada: aparece recién
+  // cuando la base rechaza por falta de plan. Pedirle el motivo antes
+  // sería invitar a saltear la regla en el caso normal, que es el 99%.
+  const [ofreceExcepcion, setOfreceExcepcion] = useState(false)
+  const [motivo, setMotivo] = useState('')
 
-  const reserve = async (waitlist: boolean) => {
+  const puedeAutorizar = can('reservas.excepcion')
+  const clienteElegido = studentId ? students.find((s) => s.id === studentId) : undefined
+
+  // Las que perdió y todavía puede reponer en esta fecha. Se recalcula al
+  // cambiar de cliente; con la 0046 sin correr la lista da vacía sola,
+  // porque ninguna reserva trae cancelKind ni membershipId.
+  const recuperables = useMemo(
+    () =>
+      studentId
+        ? clasesRecuperables(reservations, memberships, studentId, cls.date, settings, settingsMeta)
+        : [],
+    [reservations, memberships, studentId, cls.date, settings, settingsMeta]
+  )
+
+  const elegirCliente = (id: string) => {
+    setStudentId(id)
+    setRecuperaId('')
+    setOfreceExcepcion(false)
+    setMotivo('')
+    setError(null)
+  }
+
+  /**
+   * Los dos rechazos que una excepción puede levantar, tal como los
+   * escribe `consumir_clase` (0029 + 0046). Se buscan por su parte
+   * estable: el resto del mensaje lleva la fecha o el número de clases.
+   * Si algún día cambia la redacción, el botón deja de ofrecerse y el
+   * mostrador ve el error — no se rompe nada en silencio.
+   */
+  const levantableConExcepcion = (msg: string) =>
+    msg.includes('membresía vigente') || msg.includes('clases de su plan')
+
+  const reserve = async (waitlist: boolean, motivoExcepcion?: string) => {
     if (!studentId) {
       setError('Seleccioná un cliente primero')
       return
@@ -530,13 +574,29 @@ function ClassDetailModal({
     setSaving(true)
     setError(null)
     try {
-      await createReservation(studentId, cls.id, cls.date, waitlist ? 'lista de espera' : 'confirmada')
+      await createReservation(
+        studentId,
+        cls.id,
+        cls.date,
+        waitlist ? 'lista de espera' : 'confirmada',
+        {
+          ...(recuperaId ? { recovers: recuperaId } : {}),
+          ...(motivoExcepcion ? { overrideReason: motivoExcepcion } : {}),
+        }
+      )
       const nombre = students.find((s) => s.id === studentId)?.name ?? ''
       await refresh()
-      setAnotadas((prev) => [...prev, { nombre, espera: waitlist }])
-      setStudentId('')
+      setAnotadas((prev) => [
+        ...prev,
+        { nombre, espera: waitlist, recupero: !!recuperaId, excepcion: !!motivoExcepcion },
+      ])
+      elegirCliente('')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo crear la reserva')
+      const msg = err instanceof Error ? err.message : 'No se pudo crear la reserva'
+      setError(msg)
+      if (!motivoExcepcion && puedeAutorizar && levantableConExcepcion(msg)) {
+        setOfreceExcepcion(true)
+      }
     } finally {
       setSaving(false)
     }
@@ -786,6 +846,8 @@ function ClassDetailModal({
                       <Check className="w-3.5 h-3.5 shrink-0" />
                       {a.nombre}
                       {a.espera && <span className="font-normal">· en lista de espera</span>}
+                      {a.recupero && <span className="font-normal">· recupera una clase perdida</span>}
+                      {a.excepcion && <span className="font-normal">· excepción autorizada</span>}
                     </p>
                   ))}
                 </div>
@@ -793,7 +855,7 @@ function ClassDetailModal({
 
               <select
                 value={studentId}
-                onChange={(e) => setStudentId(e.target.value)}
+                onChange={(e) => elegirCliente(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary transition-colors"
               >
                 <option value="">
@@ -810,8 +872,85 @@ function ClassDetailModal({
                   ))}
               </select>
 
+              {/* La ficha rápida (§1 del pedido del 15/09): con el cliente
+                  elegido, el mostrador ve su plan, hasta cuándo, cuántas le
+                  quedan y si debe, y puede renovar, cobrar y mover el
+                  vencimiento sin salir de acá. */}
+              {clienteElegido && <PanelDelCliente student={clienteElegido} />}
+
+              {/* El recupero (0046). Solo aparece si tiene alguna clase
+                  perdida en este período: para la reserva de todos los días
+                  el mostrador no ve nada nuevo. */}
+              {recuperables.length > 0 && (
+                <div className="rounded-xl border border-info/40 bg-info-suave/40 px-3 py-2.5 space-y-1.5">
+                  <label className="text-[11px] font-bold text-info-fuerte flex items-center gap-1.5">
+                    <UserCheck className="w-3.5 h-3.5 shrink-0" />
+                    Tiene {recuperables.length === 1 ? 'una clase perdida' : `${recuperables.length} clases perdidas`} en este período
+                  </label>
+                  <select
+                    value={recuperaId}
+                    onChange={(e) => setRecuperaId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary transition-colors"
+                  >
+                    <option value="">Anotarla normal, descontando una clase</option>
+                    {recuperables.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        Recuperar la del {new Date(`${r.date}T00:00`).toLocaleDateString('es-AR')}
+                        {r.time ? ` ${r.time}` : ''} · {r.status === 'ausente' ? 'faltó sin avisar' : 'canceló tarde'}
+                      </option>
+                    ))}
+                  </select>
+                  {recuperaId && (
+                    <p className="text-[10px] text-info-fuerte">
+                      No se le descuenta otra clase: esa ya la pagó.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {error && (
                 <p className="text-xs text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
+              )}
+
+              {/* La excepción autorizada (0046). Aparece recién cuando la
+                  base rechazó por falta de plan y quien está adelante tiene
+                  la clave. El motivo es obligatorio y lo lee la clienta
+                  desde su portal, así que se avisa acá. */}
+              {ofreceExcepcion && (
+                <div className="rounded-xl border border-aviso/50 bg-aviso-suave px-3 py-2.5 space-y-2">
+                  <p className="text-[11px] font-bold text-aviso-fuerte">
+                    Anotarla igual, como excepción
+                  </p>
+                  <p className="text-[10px] text-aviso-fuerte/90 leading-relaxed">
+                    Esta clase no se descuenta de ningún plan y queda tu nombre como quien la
+                    autorizó. El cliente ve el motivo desde su portal.
+                  </p>
+                  <input
+                    value={motivo}
+                    onChange={(e) => setMotivo(e.target.value)}
+                    placeholder="Motivo (ej: renueva mañana)"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary transition-colors"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      disabled={saving || !motivo.trim()}
+                      onClick={() => reserve(isFull, motivo.trim())}
+                      className="flex-1 py-2 rounded-lg text-xs font-semibold bg-aviso-fuerte text-background disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      Autorizar y anotar
+                    </button>
+                    <button
+                      onClick={() => {
+                        setOfreceExcepcion(false)
+                        setMotivo('')
+                      }}
+                      className="px-3 py-2 rounded-lg text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
               )}
 
               <div className="flex gap-2 pt-1">

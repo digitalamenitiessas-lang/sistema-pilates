@@ -495,6 +495,9 @@ export async function fetchStudioData(): Promise<StudioData> {
     status: deriveMembershipStatus(m.status, m.end_date, warningDays, m.start_date),
     price: Number(m.price),
     autoRenew: m.auto_renew ?? true,
+    // Llega solo con el select('*'), y queda en undefined mientras la
+    // 0047 no haya corrido.
+    endDateMotivo: m.end_date_motivo ?? null,
   }))
 
   // A cada cliente se le adjunta LA QUE CUBRE HOY, y si ninguna la cubre,
@@ -570,6 +573,12 @@ export async function fetchStudioData(): Promise<StudioData> {
       status: r.status,
       discipline: (cls?.discipline ?? 'Pilates Reformer') as Discipline,
       teacherName: cls?.teachers?.name ?? '—',
+      // Las tres salen del select('*') de arriba, así que llegan solas
+      // cuando la migración corre y quedan en undefined mientras no.
+      cancelKind: r.cancel_kind ?? null,
+      membershipId: r.membership_id ?? null,
+      recoversReservationId: r.recovers_reservation_id ?? null,
+      overrideReason: r.override_reason ?? null,
     }
   })
 
@@ -1074,17 +1083,214 @@ export async function deactivatePlan(id: string): Promise<void> {
   if (error) throw error
 }
 
+/**
+ * Qué membresía paga una clase de ese día.
+ *
+ * Espeja `membresia_para` de la 0029: la del día de la CLASE y no la de
+ * hoy, y si hay más de una, la que vence antes — se usa primero la que
+ * primero se pierde. Acá es solo para que la pantalla ofrezca lo mismo
+ * que la base va a aceptar; quien decide sigue siendo la base.
+ */
+export function membresiaQueCubre(
+  memberships: Membership[],
+  studentId: string,
+  date: string
+): Membership | undefined {
+  return memberships
+    .filter(
+      (m) =>
+        m.studentId === studentId &&
+        m.status === 'activa' &&
+        date >= m.startDate &&
+        date <= m.endDate
+    )
+    .sort((a, b) => a.endDate.localeCompare(b.endDate))[0]
+}
+
+/**
+ * Las clases que perdió y puede reponer en la fecha pedida (0046).
+ *
+ * Espeja `recupero_elegible`: se recupera lo que consumió y no usó —
+ * canceló fuera de plazo, o faltó sin avisar cuando la ausencia
+ * consume—, una sola vez, y dentro del mismo período que la pagó.
+ *
+ * Lo único que la pantalla no puede comprobar es si el estudio suspendió
+ * ese día: las excepciones por fecha no viajan en la reserva. Esa la
+ * descarta la base, que es la que manda; acá sobraría un candidato que
+ * el mostrador va a ver rechazado con su motivo.
+ */
+export function clasesRecuperables(
+  reservations: Reservation[],
+  memberships: Membership[],
+  studentId: string,
+  date: string,
+  settings: Settings,
+  settingsMeta: StudioSetting[]
+): Reservation[] {
+  // Mientras el tope no rija, la base rechaza el recupero con su motivo
+  // (`recupero_rige`, 0046). Ofrecerlo igual sería mostrar un camino que
+  // termina en un error: la pantalla esconde lo que la base va a
+  // rechazar, que es la misma regla de los permisos en sombra.
+  const tope = settingsMeta.find((s) => s.key === 'recovery_max')
+  if (!tope?.rige) return []
+
+  const mem = membresiaQueCubre(memberships, studentId, date)
+  if (!mem) return []
+
+  const laAusenciaConsume = settingBool(settings, 'absence_consumes_class', true)
+  const yaRepuestas = new Set(
+    reservations.map((r) => r.recoversReservationId).filter(Boolean) as string[]
+  )
+
+  return reservations
+    .filter(
+      (r) =>
+        r.studentId === studentId &&
+        r.membershipId === mem.id &&
+        !r.recoversReservationId &&
+        !yaRepuestas.has(r.id) &&
+        ((r.status === 'cancelada' && r.cancelKind === 'fuera de plazo') ||
+          (r.status === 'ausente' && laAusenciaConsume))
+    )
+    .sort((a, b) => b.date.localeCompare(a.date))
+}
+
+/**
+ * Mover el vencimiento de un período (0047).
+ *
+ * Se puede porque el trigger de la 0036 calcula la vigencia al crear el
+ * período y no la vuelve a pisar. La base sella quién lo movió y cuándo,
+ * y rechaza un vencimiento anterior al inicio.
+ *
+ * El motivo es obligatorio de este lado: la columna lo admite en nulo
+ * —hay filas viejas sin él— pero un vencimiento corrido sin explicación
+ * no se distingue de un error de tipeo, y la clienta lo lee en su portal.
+ */
+export async function moverVencimiento(
+  membershipId: string,
+  endDate: string,
+  motivo: string
+): Promise<void> {
+  const texto = motivo.trim()
+  if (!texto) throw new Error('Escribí por qué se mueve el vencimiento')
+
+  const { error } = await supabase
+    .from('memberships')
+    .update({ end_date: endDate, end_date_motivo: texto })
+    .eq('id', membershipId)
+
+  if (error?.code === '42703') {
+    throw new Error('Para mover el vencimiento falta correr la migración 0047.')
+  }
+  if (error) throw errorDeLaBase(error, 'No se pudo mover el vencimiento')
+}
+
+/**
+ * El error de la base, convertido en uno que la pantalla sepa leer.
+ *
+ * Supabase devuelve un objeto plano —`{ message, code, details, hint }`—
+ * y no una instancia de `Error`. Las pantallas lo reciben con
+ * `err instanceof Error ? err.message : 'No se pudo…'`, así que la rama
+ * que corre siempre es la del texto genérico: **ningún mensaje que
+ * escribe la base llega nunca al mostrador.**
+ *
+ * Y son los mensajes que más falta hacen. La 0029 los redactó uno por
+ * uno para quien está atendiendo — "No tiene una membresía vigente para
+ * el 15/09 — asignale un plan antes de reservarle esa clase" — y en
+ * pantalla se lee "No se pudo crear la reserva", que no dice qué hacer.
+ *
+ * Descubierto al probar la reserva de un cliente sin membresía (15/09).
+ */
+function errorDeLaBase(error: { message?: string } | null, sino: string): Error {
+  const msg = error?.message?.trim()
+  return new Error(msg && msg.length > 0 ? msg : sino)
+}
+
+/**
+ * Cómo se apartó esta reserva de la común, en una etiqueta.
+ *
+ * El estudio pidió distinguir "claramente" la clase habitual de la
+ * recuperada, la cancelada y el no show. El estado solo no alcanza:
+ * dos reservas canceladas se leen igual en pantalla y una perdió la
+ * clase y la otra no. Esto es lo que va al lado del estado.
+ *
+ * Devuelve null para la reserva de todos los días, que es la mayoría y
+ * no necesita que le expliquen nada.
+ */
+export function formaDeLaReserva(
+  r: Reservation
+): { texto: string; tono: 'info' | 'aviso' | 'neutro' } | null {
+  if (r.recoversReservationId) return { texto: 'Recuperada', tono: 'info' }
+  if (r.overrideReason) return { texto: 'Excepción autorizada', tono: 'aviso' }
+  if (r.status === 'cancelada' && r.cancelKind === 'fuera de plazo')
+    return { texto: 'Fuera de plazo · perdió la clase', tono: 'aviso' }
+  if (r.status === 'cancelada' && r.cancelKind === 'en plazo')
+    return { texto: 'En plazo · se le devolvió', tono: 'neutro' }
+  return null
+}
+
+/**
+ * Cómo entra esta reserva, cuando no es la de todos los días (0046).
+ *
+ * Las dos son excluyentes y la base lo hace cumplir: un recupero repone
+ * una clase ya cobrada y una excepción entra sin plan, así que pedir las
+ * dos juntas no quiere decir nada.
+ */
+export interface ReservationOptions {
+  /** La clase perdida que esta reserva repone. Pide `reservas.crear`. */
+  recovers?: string
+  /**
+   * El motivo por el que se la anota igual con la membresía vencida o
+   * sin clases. Pide `reservas.excepcion`, y la clienta lo lee desde su
+   * portal: se escribe pensando en eso.
+   */
+  overrideReason?: string
+}
+
 export async function createReservation(
   studentId: string,
   classId: string,
   date: string,
-  status: 'confirmada' | 'lista de espera' = 'confirmada'
+  status: 'confirmada' | 'lista de espera' = 'confirmada',
+  opts: ReservationOptions = {}
 ): Promise<void> {
-  const { error } = await supabase
-    .from('reservations')
-    .insert({ student_id: studentId, class_id: classId, date, status })
+  const { error } = await supabase.from('reservations').insert({
+    student_id: studentId,
+    class_id: classId,
+    date,
+    status,
+    // Van solo si vienen: mandar la columna en null contra una base sin
+    // la 0046 corrida da error de columna inexistente, y el resto del
+    // sistema tiene que seguir andando igual hasta que se aplique.
+    ...(opts.recovers ? { recovers_reservation_id: opts.recovers } : {}),
+    ...(opts.overrideReason ? { override_reason: opts.overrideReason } : {}),
+  })
   if (!error) return
-  if (error.code !== '23505') throw error
+
+  // La 0046 todavía no corrió y alguien pidió un recupero o una
+  // excepción. Se dice qué pasa en vez de dejar el error crudo de
+  // Postgres, que habla de una columna que nadie escribió a mano.
+  if (error.code === '42703' && (opts.recovers || opts.overrideReason)) {
+    throw new Error(
+      opts.recovers
+        ? 'Para registrar una recuperación falta correr la migración 0046.'
+        : 'Para autorizar una excepción falta correr la migración 0046.'
+    )
+  }
+  // Acá viven los rechazos del trigger de consumo (0029 + 0046): sin
+  // membresía vigente, sin clases, sin permiso para la excepción. Van
+  // con su texto, que es el que le dice al mostrador qué hacer.
+  if (error.code !== '23505') throw errorDeLaBase(error, 'No se pudo crear la reserva')
+
+  // Un recupero o una excepción sobre una clase donde ya tiene una
+  // reserva cancelada no se resuelve reactivando: reactivar_reserva solo
+  // cambia el estado y perdería en silencio el motivo o el puntero a la
+  // clase perdida, que es justo lo que la hace distinta.
+  if (opts.recovers || opts.overrideReason) {
+    throw new Error(
+      'Ya tiene una reserva en esa clase. Elegí otro horario para la recuperación.'
+    )
+  }
 
   // La restricción única de (cliente, clase, fecha) no mira el estado, así
   // que una reserva cancelada bloquea anotarse de nuevo en esa misma
@@ -1110,7 +1316,7 @@ export async function createReservation(
         'Ya tiene una reserva cancelada en esa clase. Para reactivarla falta correr la migración 0031.'
       )
     }
-    if (reError) throw reError
+    if (reError) throw errorDeLaBase(reError, 'No se pudo reactivar la reserva')
     return
   }
 
@@ -1122,7 +1328,10 @@ export async function updateReservationStatus(
   status: Reservation['status']
 ): Promise<void> {
   const { error } = await supabase.from('reservations').update({ status }).eq('id', reservationId)
-  if (error) throw error
+  // Cancelar dispara la clasificación en plazo / fuera de plazo (0029) y
+  // marcar asistencia toca el consumo: los dos pueden rechazar con un
+  // texto propio, y ese texto es el que tiene que ver el mostrador.
+  if (error) throw errorDeLaBase(error, 'No se pudo cambiar el estado de la reserva')
 }
 
 /**

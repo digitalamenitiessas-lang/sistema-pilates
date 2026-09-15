@@ -161,6 +161,12 @@ export interface Membership {
    * dispara nada.
    */
   autoRenew: boolean
+  /**
+   * Por qué se movió el vencimiento (0047). Vacío en la enorme mayoría:
+   * solo lo tienen los períodos que alguien corrió a mano. Lo lee la
+   * clienta desde su portal, así que se escribe pensando en eso.
+   */
+  endDateMotivo?: string | null
 }
 
 export interface Student {
@@ -222,6 +228,31 @@ export interface Reservation {
   status: ReservationStatus
   discipline: Discipline
   teacherName: string
+  /**
+   * Si canceló dentro o fuera del plazo de `cancel_hours` (0022, la
+   * escribe el trigger de la 0029). En plazo la clase vuelve al
+   * contador; fuera de plazo la perdió, y es lo único que se puede
+   * recuperar. Nulo si no está cancelada, o si el estudio suspendió.
+   */
+  cancelKind?: 'en plazo' | 'fuera de plazo' | null
+  /**
+   * A qué membresía se le cobró esta clase (0029). La sella la base al
+   * reservar y no se mueve más: es lo que hace que renovar en el medio
+   * no le devuelva la clase al período equivocado. Nulo en las reservas
+   * anteriores a la 0029 y en las que entraron por excepción.
+   */
+  membershipId?: string | null
+  /**
+   * La clase perdida que esta reserva repone (0046). Una reserva con
+   * esto no descuenta: la clase ya se descontó cuando se perdió.
+   */
+  recoversReservationId?: string | null
+  /**
+   * El motivo de la excepción autorizada (0046). Con esto cargado la
+   * reserva entró aunque la membresía estuviera vencida o sin clases, y
+   * no se descuenta de ningún plan. Lo lee la clienta desde su portal.
+   */
+  overrideReason?: string | null
 }
 
 export interface Payment {
