@@ -15,7 +15,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { Loader2, Plus, Trash2, Users, Clock, Wallet } from 'lucide-react'
+import { Loader2, Plus, Trash2, Users, Clock, Wallet, Lock, AlertTriangle, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { SeccionPlegable, SeccionesPlegables } from '@/components/ui/seccion-plegable'
@@ -27,8 +27,19 @@ import {
   cargarHoras,
   borrarHoras,
   fetchLiquidacion,
+  fetchLiquidacionesCerradas,
+  cerrarLiquidacion,
+  pagarLiquidacion,
+  anularLiquidacion,
 } from '@/lib/personal-api'
-import type { CondicionPago, HorasTrabajadas, FilaLiquidacion } from '@/lib/types'
+import { fetchAccounts } from '@/lib/caja-api'
+import type { Account } from '@/lib/types'
+import type {
+  CondicionPago,
+  HorasTrabajadas,
+  FilaLiquidacion,
+  LiquidacionCerrada,
+} from '@/lib/types'
 
 const plata = (n: number) => `$${Math.round(n).toLocaleString('es-AR')}`
 const fecha = (iso: string) => new Date(`${iso}T00:00`).toLocaleDateString('es-AR')
@@ -49,9 +60,21 @@ function inicioDeMes(): string {
 
 // ─────────────────────────────────────────────────────────────────────
 
-function Liquidacion({ desde, hasta }: { desde: string; hasta: string }) {
+function Liquidacion({
+  desde,
+  hasta,
+  cerradas,
+  onCerrar,
+}: {
+  desde: string
+  hasta: string
+  /** Las ya cerradas del período, para no ofrecer cerrar dos veces */
+  cerradas: LiquidacionCerrada[]
+  onCerrar: () => void
+}) {
   const [filas, setFilas] = useState<FilaLiquidacion[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [cerrando, setCerrando] = useState<string | null>(null)
 
   useEffect(() => {
     setFilas(null)
@@ -63,6 +86,34 @@ function Liquidacion({ desde, hasta }: { desde: string; hasta: string }) {
         setError(e instanceof Error ? e.message : 'No se pudo calcular la liquidación')
       })
   }, [desde, hasta])
+
+  // Ya cerrada para ESTE período exacto. Cerrar el mismo mes dos veces lo
+  // rechaza la base igual; esto es para no ofrecerlo.
+  const yaCerrada = (id: string) =>
+    cerradas.some(
+      (c) => c.teacherId === id && c.desde === desde && c.hasta === hasta && c.estado !== 'anulada'
+    )
+
+  const cerrar = async (f: FilaLiquidacion) => {
+    if (
+      !window.confirm(
+        `Cerrar la liquidación de ${f.profesora} por ${plata(f.total)}?\n\n` +
+          'El número queda fijo: si después se carga una clase o cambia una tarifa, ' +
+          'este total no se mueve.'
+      )
+    )
+      return
+    setCerrando(f.teacherId)
+    setError(null)
+    try {
+      await cerrarLiquidacion(f.teacherId, desde, hasta)
+      onCerrar()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo cerrar')
+    } finally {
+      setCerrando(null)
+    }
+  }
 
   if (error) {
     return <p className="text-xs text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
@@ -86,6 +137,7 @@ function Liquidacion({ desde, hasta }: { desde: string; hasta: string }) {
               <th className="text-right px-4 py-3 font-semibold hidden md:table-cell">Por horas</th>
               <th className="text-right px-4 py-3 font-semibold hidden lg:table-cell">Mensual</th>
               <th className="text-right px-4 py-3 font-semibold">Total</th>
+              <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -107,6 +159,21 @@ function Liquidacion({ desde, hasta }: { desde: string; hasta: string }) {
                 <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">{plata(f.montoHoras)}</td>
                 <td className="px-4 py-3 text-right tabular-nums hidden lg:table-cell">{plata(f.mensual)}</td>
                 <td className="px-4 py-3 text-right tabular-nums font-bold text-foreground">{plata(f.total)}</td>
+                <td className="px-4 py-3 text-right">
+                  {yaCerrada(f.teacherId) ? (
+                    <span className="text-[10px] font-semibold text-muted-foreground inline-flex items-center gap-1">
+                      <Lock className="w-3 h-3" /> cerrada
+                    </span>
+                  ) : (
+                    <button
+                      disabled={cerrando === f.teacherId || f.total <= 0}
+                      onClick={() => cerrar(f)}
+                      className="px-2.5 py-1 rounded-lg bg-primary/10 text-primary-fuerte text-[10px] font-semibold hover:bg-primary/20 disabled:opacity-40 whitespace-nowrap"
+                    >
+                      {cerrando === f.teacherId ? '…' : 'Cerrar'}
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -415,6 +482,200 @@ function Horas({ desde, hasta }: { desde: string; hasta: string }) {
   )
 }
 
+
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Las liquidaciones ya cerradas del período, y el pago.
+ *
+ * Muestra **las dos cifras**: la congelada al cerrar y la que daría hoy.
+ * Es el antídoto del congelado — si alguien carga una clase atrasada
+ * después de cerrar, la diferencia aparece en vez de perderse. El
+ * sistema no elige por el estudio: le muestra las dos.
+ */
+function Cerradas({
+  filas,
+  onCambio,
+}: {
+  filas: LiquidacionCerrada[]
+  onCambio: () => void
+}) {
+  const { paymentMethods } = useStudio()
+  const [cuentas, setCuentas] = useState<Account[]>([])
+  const [pagando, setPagando] = useState<LiquidacionCerrada | null>(null)
+  const [metodo, setMetodo] = useState('')
+  const [cuenta, setCuenta] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetchAccounts().then(setCuentas).catch(() => setCuentas([]))
+  }, [])
+
+  const pagar = async () => {
+    if (!pagando) return
+    setBusy(true)
+    setError(null)
+    try {
+      await pagarLiquidacion(pagando.id, metodo, cuenta)
+      setPagando(null)
+      onCambio()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo pagar')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const anular = async (c: LiquidacionCerrada) => {
+    const motivo = window.prompt('¿Por qué se anula esta liquidación?')
+    if (motivo === null) return
+    setError(null)
+    try {
+      await anularLiquidacion(c.id, motivo)
+      onCambio()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo anular')
+    }
+  }
+
+  if (filas.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground py-4 text-center">
+        Sin liquidaciones cerradas en el período. Cerrá una desde la tabla de arriba.
+      </p>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      {error && (
+        <p className="text-xs text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
+      )}
+
+      <div className="divide-y divide-border">
+        {filas.map((c) => {
+          const dif = c.totalHoy - c.total
+          return (
+            <div key={c.id} className="py-3 space-y-1.5">
+              <div className="flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {c.profesora}
+                    {c.estado === 'pagada' && (
+                      <span className="ml-2 text-[10px] font-semibold text-exito-fuerte inline-flex items-center gap-1">
+                        <Check className="w-3 h-3" /> pagada
+                      </span>
+                    )}
+                    {c.estado === 'anulada' && (
+                      <span className="ml-2 text-[10px] font-semibold text-muted-foreground">anulada</span>
+                    )}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {fecha(c.desde)} al {fecha(c.hasta)} · {c.clases} clases · {c.horas} h
+                    {c.voidReason ? ` · ${c.voidReason}` : ''}
+                  </p>
+                </div>
+                <p className="text-sm font-bold text-foreground tabular-nums shrink-0">{plata(c.total)}</p>
+              </div>
+
+              {/* La diferencia, que es el motivo por el que se guardan las
+                  dos cifras. Solo si la hay y si no está anulada. */}
+              {c.estado !== 'anulada' && Math.abs(dif) >= 1 && (
+                <p className="text-[11px] text-aviso-fuerte bg-aviso-suave rounded-lg px-2.5 py-1.5 flex items-start gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
+                  <span>
+                    Se cargó algo después de cerrar: hoy el período daría{' '}
+                    <span className="font-semibold">{plata(c.totalHoy)}</span>, {dif > 0 ? 'o sea' : 'o sea'}{' '}
+                    {plata(Math.abs(dif))} {dif > 0 ? 'de más' : 'de menos'}. El total cerrado no se
+                    toca: si corresponde, cerrale un ajuste aparte.
+                  </span>
+                </p>
+              )}
+
+              {c.estado === 'cerrada' && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setPagando(c)
+                      setMetodo(paymentMethods[0]?.code ?? '')
+                      setCuenta(cuentas[0]?.id ?? '')
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-[11px] font-semibold"
+                  >
+                    Registrar el pago
+                  </button>
+                  <button
+                    onClick={() => anular(c)}
+                    className="px-3 py-1.5 rounded-lg text-[11px] font-semibold text-muted-foreground hover:bg-muted"
+                  >
+                    Anular
+                  </button>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {pagando && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/20 backdrop-blur-sm"
+          onClick={() => setPagando(null)}
+        >
+          <div
+            className="bg-card rounded-2xl shadow-2xl w-full max-w-sm border border-border p-5 space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div>
+              <h3 className="text-base font-bold text-foreground">Pagar la liquidación</h3>
+              <p className="text-xs text-muted-foreground">
+                {pagando.profesora} · {plata(pagando.total)}
+              </p>
+            </div>
+
+            <select value={metodo} onChange={(e) => setMetodo(e.target.value)} className={cn(input, 'w-full')}>
+              {paymentMethods.map((m) => (
+                <option key={m.code} value={m.code}>{m.name}</option>
+              ))}
+            </select>
+            <select value={cuenta} onChange={(e) => setCuenta(e.target.value)} className={cn(input, 'w-full')}>
+              {cuentas.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+
+            {/* Que quede dicho antes de apretar: esto mueve plata de verdad. */}
+            <p className="text-[11px] text-muted-foreground">
+              Se carga como gasto en <span className="font-semibold">Sueldos y honorarios</span> y baja
+              del saldo de esa cuenta. Para deshacerlo hay que anular el gasto desde Gastos.
+            </p>
+
+            {error && <p className="text-xs text-destructive-fuerte">{error}</p>}
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPagando(null)}
+                className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted"
+              >
+                Cancelar
+              </button>
+              <button
+                disabled={busy || !metodo || !cuenta}
+                onClick={pagar}
+                className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {busy && <Loader2 className="w-4 h-4 animate-spin" />}
+                Pagar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────
 
 export function PersonalPage() {
@@ -423,6 +684,13 @@ export function PersonalPage() {
   const [hasta, setHasta] = useState(hoyISO())
 
   const veSueldos = can('personal.remuneracion')
+
+  const [cerradas, setCerradas] = useState<LiquidacionCerrada[]>([])
+  const recargar = useCallback(() => {
+    if (!veSueldos) return
+    fetchLiquidacionesCerradas(desde, hasta).then(setCerradas).catch(() => setCerradas([]))
+  }, [desde, hasta, veSueldos])
+  useEffect(recargar, [recargar])
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
@@ -461,7 +729,24 @@ export function PersonalPage() {
         {veSueldos && (
           <SeccionPlegable id="liquidacion" titulo="Liquidación del período" icono={Wallet} abiertaPorDefecto>
             <div className="px-1 py-2">
-              <Liquidacion desde={desde} hasta={hasta} />
+              <Liquidacion desde={desde} hasta={hasta} cerradas={cerradas} onCerrar={recargar} />
+            </div>
+          </SeccionPlegable>
+        )}
+
+        {veSueldos && (
+          <SeccionPlegable
+            id="cerradas"
+            titulo="Liquidaciones cerradas"
+            icono={Lock}
+            resumen={
+              cerradas.filter((c) => c.estado === 'cerrada').length > 0
+                ? `${cerradas.filter((c) => c.estado === 'cerrada').length} sin pagar`
+                : undefined
+            }
+          >
+            <div className="px-5 py-3">
+              <Cerradas filas={cerradas} onCambio={recargar} />
             </div>
           </SeccionPlegable>
         )}

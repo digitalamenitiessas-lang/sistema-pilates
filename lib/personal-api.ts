@@ -11,7 +11,12 @@
  */
 
 import { supabase } from './supabase'
-import type { CondicionPago, HorasTrabajadas, FilaLiquidacion } from './types'
+import type {
+  CondicionPago,
+  HorasTrabajadas,
+  FilaLiquidacion,
+  LiquidacionCerrada,
+} from './types'
 
 /** La 0053 todavía no corrió. */
 function sinPersonal(error: { code?: string } | null): boolean {
@@ -152,4 +157,85 @@ export async function fetchLiquidacion(
     tardanzas: Number(f.tardanzas ?? 0),
     total: Number(f.total ?? 0),
   }))
+}
+
+// ── Cerrar y saldar (0054) ──────────────────────────────────────────
+//
+// El cálculo se deriva; el cierre se guarda. No se contradicen: mientras
+// el período está abierto el total tiene que moverse solo, y el día que
+// se cierra se congela, porque la plata que ya salió no puede cambiar
+// para atrás.
+
+export async function fetchLiquidacionesCerradas(
+  desde: string,
+  hasta: string
+): Promise<LiquidacionCerrada[]> {
+  const { data, error } = await supabase.rpc('liquidaciones_cerradas', {
+    p_desde: desde,
+    p_hasta: hasta,
+  })
+  // Sin la 0054 no hay cierres, y la pantalla tiene que abrir igual.
+  if (sinPersonal(error)) return []
+  if (error) throw error
+
+  return (data ?? []).map((f: Record<string, unknown>) => ({
+    id: String(f.id),
+    teacherId: String(f.teacher_id),
+    profesora: String(f.profesora ?? '—'),
+    desde: String(f.desde),
+    hasta: String(f.hasta),
+    clases: Number(f.clases ?? 0),
+    horas: Number(f.horas ?? 0),
+    total: Number(f.total ?? 0),
+    totalHoy: Number(f.total_hoy ?? 0),
+    estado: f.estado as LiquidacionCerrada['estado'],
+    expenseId: (f.expense_id as string | null) ?? null,
+    notas: String(f.notas ?? ''),
+    voidReason: (f.void_reason as string | null) ?? null,
+    createdAt: String(f.created_at),
+  }))
+}
+
+export async function cerrarLiquidacion(
+  teacherId: string,
+  desde: string,
+  hasta: string,
+  notas = ''
+): Promise<void> {
+  // El total NO viaja desde acá: lo calcula la base con la misma función
+  // que muestra la pantalla. Mandarlo sería dejar cerrar por el número
+  // que uno quiera.
+  const { error } = await supabase.rpc('cerrar_liquidacion', {
+    p_teacher: teacherId,
+    p_desde: desde,
+    p_hasta: hasta,
+    p_notas: notas,
+  })
+  if (sinPersonal(error)) throw new Error('Para cerrar liquidaciones falta correr la migración 0054.')
+  if (error?.code === '23505') {
+    throw new Error('Ese período ya está cerrado para esa persona.')
+  }
+  if (error) throw new Error(error.message || 'No se pudo cerrar la liquidación')
+}
+
+/** Crea el gasto y marca la liquidación: las dos cosas o ninguna. */
+export async function pagarLiquidacion(
+  id: string,
+  method: string,
+  accountId: string,
+  fecha?: string
+): Promise<void> {
+  const { error } = await supabase.rpc('pagar_liquidacion', {
+    p_id: id,
+    p_method: method,
+    p_account: accountId,
+    p_fecha: fecha ?? null,
+  })
+  if (sinPersonal(error)) throw new Error('Para pagar liquidaciones falta correr la migración 0054.')
+  if (error) throw new Error(error.message || 'No se pudo pagar la liquidación')
+}
+
+export async function anularLiquidacion(id: string, motivo: string): Promise<void> {
+  const { error } = await supabase.rpc('anular_liquidacion', { p_id: id, p_motivo: motivo })
+  if (error) throw new Error(error.message || 'No se pudo anular')
 }

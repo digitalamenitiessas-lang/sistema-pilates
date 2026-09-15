@@ -174,6 +174,35 @@ export interface FilaLiquidacion {
   total: number
 }
 
+/**
+ * Una liquidación **cerrada** (0054). Distinta de `FilaLiquidacion`, que
+ * es el cálculo vivo: esta es la foto del día que se cerró, y no se
+ * recalcula. Un total que cambia para atrás no es un registro.
+ */
+export interface LiquidacionCerrada {
+  id: string
+  teacherId: string
+  profesora: string
+  desde: string
+  hasta: string
+  clases: number
+  horas: number
+  /** El congelado al cerrar: lo que se le liquidó */
+  total: number
+  /**
+   * Lo que daría hoy el mismo período. Si difiere del congelado, es que
+   * se cargó algo después de cerrar — y eso hay que mostrarlo, no
+   * elegir por el estudio cuál de los dos vale.
+   */
+  totalHoy: number
+  estado: 'cerrada' | 'pagada' | 'anulada'
+  /** El gasto que la saldó; sin esto, "pagada" no movería un peso */
+  expenseId?: string | null
+  notas: string
+  voidReason?: string | null
+  createdAt: string
+}
+
 export interface Plan {
   id: string
   name: string
