@@ -934,6 +934,154 @@ vencimiento de vuelta en su fecha.
 Con esto **§1 queda cerrada**: seis de sus pedidos ya andaban, cuatro entraron
 con la `0046` y este es el quinto y último.
 
+### ✅ El turno fijo (15/09) — `0048` y `0049` **corridas y verificadas**
+
+§2 de la devolución del estudio, y lo primero que dice es lo que importa:
+*"Los turnos fijos deben funcionar como una funcionalidad propia y no simplemente
+como una reserva repetida."* Tiene razón, y por eso hasta hoy no se podía hacer
+nada de lo que pide: una reserva es una fila por (cliente, clase, FECHA), así que
+existe el martes 15 pero no existe "los martes a las 18". No había sujeto.
+
+**LA DECISIÓN QUE ORDENA TODO: el turno fijo no materializa reservas.**
+
+Es un derecho sobre un día y hora mientras mantenga la prioridad. Nada más. La
+versión que crea el mes de reservas por adelantado arrastra tres problemas que
+esta no tiene:
+
+- **el mes de cinco martes.** Con 4 clases por semana y 5 martes, el
+  materializador genera una reserva que `consumir_clase` rechaza y el proceso se
+  corta a la mitad del mes de alguien.
+- **la escala.** `fetchStudioData` trae `reservations` entera, sin filtro de
+  fecha y sin límite, en cada ingreso.
+- **liberar.** Si liberar fuera cancelar reservas ya creadas, la clienta entra al
+  portal, toca la clase de siempre y **se la lleva de vuelta**:
+  `reactivar_reserva` es `security definer` y solo valida que la fila esté
+  cancelada.
+
+Sin materializar, los tres desaparecen: no hay fila que sobre, no hay fila que
+pese, y liberar es cambiar un estado de una tabla que la clienta no puede
+escribir. **Ocho de los diez pedidos de §2 se resuelven así**, y bajó el bloque de
+12-15 días a dos tardes.
+
+**La prioridad no se guarda, se deriva** (`prioridad_hasta`). El estudio la
+definió con un ejemplo —*"vence el 20/10, hasta el 20/10 conserva prioridad,
+desde el 21/10 se libera"*— o sea que cuelga del vencimiento de la membresía más
+un día de gracia, configurable. Guardarla sería copiar un dato que cambia solo
+cada vez que renueva: al segundo mes dirían cosas distintas. Mismo criterio del
+libro de caja de la `0020` y del recupero de la `0046`.
+
+- [x] **Tabla `fixed_slots`** que apunta a la clase de la grilla y no a un día y
+      hora sueltos: si el estudio mueve esa clase de las 18 a las 18:30, el turno
+      se mueve con ella y no queda apuntando a un horario que no se dicta.
+- [x] **El cupo lo hace cumplir la base.** Ocho reformers son ocho lugares fijos.
+      Si se pudieran asignar nueve, el noveno se entera la primera vez que viene.
+- [x] **Estado `pausado`**, que el estudio no pidió: conserva el lugar sin
+      ocuparlo (viaje, lesión). Sin esto, a quien vuelve en tres semanas hay que
+      liberarle el horario igual. **La liberación automática no lo toca**, y la
+      pantalla lo dice con esas palabras.
+- [x] **Cambiar de horario libera el viejo y asigna el nuevo**, dos filas y no un
+      `update` del `class_id`: "quién ocupaba este horario antes" es justo lo que
+      explica por qué hoy está libre, y un update esa respuesta la borra.
+- [x] **Liberación automática** (`0049`) en el proceso diario, **apagada de
+      fábrica**. El aviso va siempre y la acción solo si el estudio la enciende:
+      saber a quién se le venció el derecho es información que el mostrador
+      necesita igual —para llamarlo antes de soltarle el lugar— y soltarlo es una
+      decisión que puede querer tomar a mano.
+- [x] **Libera todo lo que ya venció, no lo que venció hoy.** Si el cron no corre
+      un día, al siguiente se pone al día solo. Mismo criterio que
+      `renewal_catchup_days` de la `0041`.
+- [x] **El permiso lo exige la función, no el cron.** El proceso entra con el
+      service role, que no pasa por las políticas: escrito del lado del cron, el
+      chequeo no se verificaría nunca. `null` de actor es la única excepción, y
+      está escrita.
+
+**Verificado el 15/09 contra la base, con sesión real:** `perm_diff()` cero filas ·
+la prioridad da `end_date + 1` para los cinco clientes mirados · **el noveno turno
+fijo en una sala de ocho lo rechaza la base**, con su mensaje · un pausado
+desaparece de la lista de liberables y deja entrar a otro en su lugar · con el
+interruptor apagado `liberar_turnos_vencidos()` devuelve 0, y encendido liberó
+**exactamente 1** —la única sin prioridad que no estaba pausada— con el motivo
+escrito · en pantalla, "7 de 8 lugares con dueño" y la fecha de prioridad de cada
+uno. **Revertido**: cero turnos, 8 reservas, el interruptor apagado.
+
+**Falta de §2**: que las reservas de cada semana se creen solas. Ya no depende de
+ninguna respuesta —Matías definió el 15/09 que manda la cantidad de clases del
+plan— y se apoya entero en esto.
+
+**Lo que no se pudo verificar acá**: que la clienta vea solo sus turnos desde el
+portal. La política está escrita (`can('turnos.ver')` o `my_student_ids()`) y el
+anónimo queda afuera, pero ejercerla pide entrar con una cuenta de clienta. Es el
+mismo pendiente que arrastra el Bloque 0.
+
+### ✅ El tablero comercial y la ficha (15/09) — `0050` **corrida y verificada**
+
+Lo amarillo de las prioridades del estudio: la #3 (ficha integral) y la mitad de
+la #4 (tablero comercial). Va en dos tandas porque **los contadores no
+necesitaron ninguna migración**: los cinco se derivan del paquete que el tablero
+ya tenía en el navegador.
+
+**Los contadores (sin migración).** Lugares libres hoy, en lista de espera, de
+prueba, por recuperar y cobrado hoy. Verificados contra la base uno por uno: 12
+clases × 8 − 2 reservas = 94 libres; dos clientes con FE FIRST; Belén, que venció
+el 26/08 contra un corte del 31/08. **`recovery_after_days` pasó de declarado sin
+código a leído** — era uno de los once parámetros que la `0024` marcó como que no
+rigen.
+
+**"¿Cuándo vuelve?" mentía.** Era el contador de reservas en estado
+'confirmada', y una reserva vieja que nadie marcó como asistida o ausente sigue
+en 'confirmada' para siempre: el número crecía con el descuido del mostrador en
+vez de con las clases que vienen. Ahora es la fecha de la próxima.
+
+**El contacto de emergencia existía desde la `0008` y nadie lo escribía.** Se
+leía en `fetchStudioData` y ahí moría: ni formulario ni pantalla. Es el dato que
+hace falta el día que alguien se descompone en clase, y no estaba cargado para
+nadie. De paso `saveMedicalNotes` pasó a `savePrivateData` y **escribe solo lo
+que recibe**: guardar el contacto ya no puede pisar las notas médicas, que es
+exactamente lo que la `0008` hizo una vez.
+
+**La salud, en cuatro campos** (`0050`): lesiones, embarazo, cirugías y
+medicación, en `student_private` —RLS filtra filas, no columnas— bajo las claves
+`salud.ver` y `salud.editar` que ya existían. **El texto viejo NO se repartió
+solo**: separar "Embarazo - 6 MESES" por palabras clave acierta en los casos
+fáciles y escribe datos falsos en los difíciles, justo en el campo donde un dato
+falso importa. Lo pasa el mostrador.
+
+**La bitácora** (`student_notes`): filas con autor y fecha en vez de un texto que
+se pisa. Es **lo único que la profesora puede escribir en todo el sistema**, y
+por eso la clave es propia: se le puede dar sin darle la ficha. Las notas
+internas del mostrador no las ve, y eso lo decide `alumnos.editar` en vez de una
+clave nueva. La clienta no lee la bitácora — no hay política que se lo permita, a
+diferencia de `student_private`.
+
+**EL BUG QUE APARECIÓ PROBANDO, y es el caro.** `author_id` salió apuntando a
+`auth.users`. PostgREST resuelve el nombre del autor por la clave foránea y
+contra ese esquema **no puede** —no está expuesto—, así que la consulta fallaba
+con `PGRST200`… y el `.catch(() => setNotas([]))` de la pantalla la convertía en
+**"Sin notas todavía"**. Las dos notas de prueba estaban guardadas, con su autor
+sellado, y la ficha decía que no había ninguna.
+
+Es el mismo modo de falla que la `0008` tuvo con las notas médicas, y el que este
+repo persigue desde entonces: el dato está y nadie lo sabe. Se arregló de las dos
+puntas — la clave foránea apunta a `profiles`, con el porqué escrito para que
+nadie lo "corrija" de vuelta, y **la pantalla ya no se traga el error**. Y la
+migración se hizo idempotente (las políticas se sueltan antes de crearse) para
+poder re-pegarla entera.
+
+**La hora de la nota va fija al huso del estudio**, no al del navegador: misma
+decisión que la `0016` tomó para la plata. Si el mostrador abre desde una tablet
+mal configurada, la nota sigue diciendo la hora a la que se escribió acá.
+
+**Verificado el 15/09:** `perm_diff()` cero filas · los cinco contadores cuadran
+con la base · "Vuelve · 15 sept 16:00 (+1)" contra las dos reservas reales de esa
+clienta · el contacto de emergencia se guarda **y las notas médicas sobreviven** ·
+los cuatro campos de salud nacen vacíos y el texto viejo sigue entero · la nota
+se guarda con `author_id` puesto por la base y se lee con el nombre resuelto.
+**Revertido**: cero notas, cero turnos, 8 reservas, salud vacía.
+
+**No se pudo verificar acá**: que la profesora no vea las notas internas. La
+política está escrita; ejercerla pide entrar con una cuenta de profesora, y
+ninguna de las tres tiene.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
@@ -966,6 +1114,11 @@ con la `0046` y este es el quinto y último.
 
 ## Pendiente inmediato
 
+> **Lo que falta del producto no está acá**: está en la §0 de
+> [`REQUERIMIENTOS-CASA-FE.md`](REQUERIMIENTOS-CASA-FE.md), que es la única lista
+> al día. Este bloque es solo la infraestructura —variables de entorno, DNS,
+> paneles de terceros— que no se resuelve escribiendo código.
+
 - **Supabase → Authentication → URL Configuration → Redirect URLs**:
   agregar `https://<dominio-de-vercel>/sistema/recuperar` y
   `http://localhost:3000/sistema/recuperar` (sin esto, el enlace de
@@ -987,7 +1140,7 @@ con la `0046` y este es el quinto y último.
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a **`0047`** ✅. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Migraciones aplicadas | `0001` a **`0050`** ✅. La **`0050` corrió el 15/09**, se corrigió la clave foránea del autor y se volvió a correr; es idempotente a propósito. La **`0048` y la `0049` corrieron el 15/09** y se verificaron ejerciéndolas: el cupo rechazó el noveno turno fijo, un pausado quedó fuera de la liberación automática, y el interruptor encendido liberó exactamente uno. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
 | Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |

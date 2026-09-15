@@ -4,6 +4,101 @@
 > secciones + 4 agregados de último momento) contra el código de este repo.
 > Fecha del análisis: **05/09/2026**. Detalle ítem por ítem: [`requerimientos-casa-fe-detalle.md`](requerimientos-casa-fe-detalle.md).
 > Estado de nuestro trabajo hasta acá: [`PLAN.md`](PLAN.md).
+>
+> **¿Buscás qué falta? Está en la §0, acá abajo.** Es la única lista al día; el
+> resto del documento es el análisis y la historia.
+
+## 0. LO QUE FALTA — la lista viva  ·  al 15/09/2026
+
+> **Esta es la única lista al día.** Las secciones de abajo son el análisis y la
+> historia de cómo se llegó acá, y varias quedaron viejas a propósito: son la
+> línea de base contra la que se mide el avance. Si algo de acá y algo de allá se
+> contradicen, **manda esta sección** — y si una fila de acá dice algo que la base
+> desmiente, manda la base.
+>
+> **Actualizar esta lista es parte de terminar algo, no un extra.**
+
+### Lo que bloquea que el estudio empiece a usarlo
+
+Nada de esto es desarrollo: son datos y decisiones del estudio.
+
+| | Qué falta | Por qué frena |
+|---|---|---|
+| 🔴 | **Email de Ivana y de Leandro** | Sin mail no se les puede crear la cuenta, y sin cuenta **la profesora no puede tomar asistencia**: hoy la toma solo admin o recepción. Ninguna de las tres profesoras tiene cuenta (`teachers.user_id` en nulo) |
+| 🔴 | **Encender el grupo Reservas del motor de permisos** | 65 de 78 claves siguen en `sombra`: tildarle `reservas.asistencia` a la profesora no hace nada hasta encender el grupo. Y hay que tildarle **las dos**, `asistencia` y `editar`, o queda trabada |
+| 🟡 | Cuenta de Mercado Pago del negocio | Se carga desde Configuración, sin técnico |
+| 🟡 | Verificar el dominio en Resend + `EMAIL_FROM` en Vercel | Hasta entonces el mail a las clientas **solo llega a la casilla dueña de la cuenta** |
+| 🟡 | Probar el portal desde una cuenta de clienta | Es lo único que ejercita el aislamiento por cliente. No se puede verificar desde adentro del sistema |
+
+### Lo que falta construir
+
+| | Qué | Estado |
+|---|---|---|
+| **§2** | **Que las reservas de cada semana se creen solas** desde el turno fijo | Lo último de §2. Ya no depende de ninguna respuesta (Matías definió el 15/09 que manda la cantidad de clases del plan). Se apoya entero en la `0048` |
+| **§2** | **Ventana de fechas en `fetchStudioData`** | Va en el mismo paso, no después. Hoy trae **todas** las reservas sin filtro ni límite en cada ingreso: con 8 filas no se nota, con turnos fijos reservando cada semana son miles en meses |
+| ~~**§3**~~ | ~~Ficha: salud en campos separados y bitácora~~ | ✅ **Hecho el 15/09** (`0050`), junto con el contacto de emergencia y "cuándo vuelve" |
+| ~~**§5**~~ | ~~Dashboard: lugares disponibles, lista de espera, cobrado hoy, de prueba, por recuperar~~ | ✅ **Hecho el 15/09**, sin migración: los cinco se derivan del paquete que el tablero ya tenía. `recovery_after_days` pasó de declarado a leído |
+| **§5** | Ocupación por mes, día, franja horaria y profesora | Hoy solo por clase. Necesita una vista SQL. **Ojo**: si una fecha suspendida cuenta como 0% de ocupación, el promedio miente |
+| **§1** | Que la profesora agregue a una clienta que llega sin reserva | **Es configuración, no código** — ver la tabla de arriba |
+| **§1** | Cambio de horario por fecha | La tabla lo soporta desde la `0018`; falta la pantalla |
+| — | **Los otros 40 lugares donde el mensaje de la base no llega a la pantalla** | Mismo arreglo de una línea que el de la `0046`, pero toca todos los módulos y va con su propia verificación |
+| — | Sección 12: Personal y remuneraciones | Lo único nuevo que entró al alcance (§7). No bloquea nada |
+| — | Foto del comprobante de gasto (primer uso de Storage) · avisos de caja en el proceso diario | Cola del Bloque 4 |
+
+### Contra las 10 prioridades que fijó el estudio
+
+Su propia lista de qué es esencial para la primera versión. **Verificado contra
+la base el 15/09**, no contra este documento.
+
+| # | Prioridad | | Qué falta |
+|---|---|---|---|
+| 1 | Agenda, reservas y asistencias | 🟢 | Que la **profesora** pueda tomar asistencia: es dato y configuración, no código (ver arriba). Y el cambio de horario por fecha |
+| 2 | Planes, membresías y cobros | 🟢 | Congelar la membresía (espera su respuesta) y el historial de la membresía |
+| 3 | Ficha integral de cada clienta | 🟢 | **Cerrada el 15/09** (`0050`): salud en cuatro campos y bitácora con autor y fecha, más el contacto de emergencia y el contacto de emergencia —la columna estaba desde la `0008` y nadie la escribía— y el "¿cuándo vuelve?", que hasta entonces **mentía**: era el contador de reservas confirmadas, y una reserva vieja que nadie marcó sigue en 'confirmada' para siempre |
+| 4 | Dashboard financiero y comercial | 🟡 | La plata está entera (`0020`) y **los cinco contadores comerciales entraron el 15/09** —lugares libres, lista de espera, de prueba, por recuperar y cobrado hoy—, verificados contra la base. **Falta solo la ocupación** por mes, día, franja y profesora, que necesita una vista SQL |
+| 5 | Caja diaria, cuentas, ingresos y gastos | 🟢 | Solo la foto del comprobante (primer uso de Storage) |
+| 6 | Personal, horas y remuneraciones | 🔴 | **Sin empezar, y está dentro del alcance.** `teachers` no tiene una sola columna laboral — verificado: sus nueve columnas son las de contacto |
+| 7 | Inventario y venta de productos | ⚫ | **Fuera del alcance** que definió Matías (§7). No existe ninguna tabla — verificado |
+| 8 | Reportes detallados y descargables | 🟢 | Los dos que esperan los módulos que los alimentan: personal y mostrador |
+| 9 | Roles y permisos | 🟢 | 79 claves configurables. Falta **encender los grupos**: siguen en sombra |
+| 10 | Notificaciones operativas | 🟡 | Campana, push y mails andando (25 avisos emitidos). Faltan algunos hacia la clienta y el panel para configurar canal y anticipación |
+
+**Cinco terminadas, tres con el núcleo andando, una sin empezar y una afuera.**
+
+Y el párrafo del final de su lámina coincide con el corte que ya estaba hecho: la
+landing autoadministrable, el email marketing y las automatizaciones comerciales
+como segunda etapa. Dos de esas tres ya estaban fuera del alcance (§7).
+
+### Lo que se cotiza aparte
+
+| | Días | Por qué |
+|---|---|---|
+| Pestaña **Beneficios** de la ficha (§3) | 10-12 | Sección 4 del documento original, **excluida por Matías** (§7). No hay una sola tabla |
+| Pestaña **Compras** de la ficha (§3) | 15-20 | Sección 10 (inventario/POS), **excluida** (§7) |
+
+De los 69 pedidos de la devolución del 15/09, **solo estos dos dan pie a cobrar**.
+Todo lo demás o funciona, o era deuda del proyecto. Los turnos fijos entran como
+deuda: son el Agregado 2, que ella ya había pedido.
+
+### Lo que hay que preguntarle al estudio
+
+Ninguna frena nada hoy. Todas se pueden dejar andando con un valor por defecto y
+que ella lo ajuste desde Configuración.
+
+- **Mercado Pago**: si el link se paga con tarjeta, ¿lleva el +25%? Hoy está en 0%. Y el tope de cuotas, que no está puesto en ningún lado.
+- **Congelamiento** de membresía: `freeze_max_days` existe y no rige.
+- **`recovery_after_days`**: a los cuántos días sin renovar entra a la lista de contacto.
+- **El redondeo**: contestó "al próximo múltiplo de $1.000", que cambia 8 de los 12 precios que ella publicó. `price_rounding` quedó en `cincuenta`, que los deja intactos.
+- Si **3ra Edad** combina con Reformer.
+- Las preguntas del FAQ de la web, que su propio mockup pone en la barra.
+
+### Contestadas, para no volver a preguntarlas
+
+- **El mes de cinco martes** (15/09): manda la cantidad de clases del plan. Ver §8.2.
+- **La vigencia** (09/09): mes de calendario desde la fecha individual. Hecho, `0036`+`0037`.
+- **El ciclo de pago del 1 al 9**: derogado por el estudio el 09/09.
+- **El plazo de cancelación**: 3 horas. Ya rige.
+- **Los tres precios por medio de pago**: −5% / base / +25%. Cargados y andando.
 
 ## 1. El titular
 
@@ -610,13 +705,34 @@ es un número o un texto, se configura— y las tres se pueden dar vuelta:
 3. **La recepción carga el recupero, no la clienta desde el portal**: el tope es
    una regla del estudio.
 
-### Lo que hay que preguntarle, y es una sola cosa
+### El mes con cinco martes — contestado (Matías, 15/09)
 
-**El mes con cinco martes.** En un período 20/09–19/10 uno o dos días de la
-semana caen cinco veces y el plan trae cuatro clases por semana. Con turnos
-fijos: ¿la quinta se pierde, se cobra, o el turno no genera reserva? Sin esa
-respuesta el turno fijo no se puede escribir — el trigger de consumo lanza
-excepción cuando no quedan clases.
+Era la única pregunta que frenaba §2. **La respuesta es que manda la cantidad de
+clases del plan**: si ya hizo las cuatro que pagó, el quinto martes del mes no lo
+cubre la membresía.
+
+Y es lo que la base ya hace: `consumir_clase` rechaza cuando no quedan clases. No
+hubo nada que construir. Lo que sí hay que saber es la consecuencia, porque el
+mostrador la va a ver todos los meses:
+
+| Plan | Clases | Por semana | Cubre | Un mes entero pide | Falta |
+|---|---|---|---|---|---|
+| FE START | 4 | 1 | 4 semanas | 4 | — |
+| FE FLOW | 8 | 2 | 4 semanas | 9 | 1 |
+| FE BALANCE | 12 | 3 | 4 semanas | 13 | 1 |
+| FE STRONG | 16 | 4 | 4 semanas | 17 | 1 |
+| FE FULL | 20 | 5 | 4 semanas | 22 | 2 |
+
+Los planes traen **cuatro semanas** de clases y el período es un **mes de
+calendario**, que tiene 4,35. Así que todos menos FE START quedan una o dos
+clases cortos de asistir a todos sus turnos fijos del mes. No es un mes raro de
+cinco martes: pasa casi todos los meses.
+
+**Con el turno fijo sin materializar, eso no le cuesta el horario.** El turno es
+el derecho al lugar y no las reservas de cada fecha, así que se queda sin clases
+las últimas semanas del período pero su martes a las 18 sigue siendo suyo. Si el
+estudio quiere cubrir el mes entero, es subir `class_count` del plan desde la
+pantalla — un campo, no un desarrollo.
 
 Lo demás que parecía pregunta se resolvió parametrizando: las 3 horas, los 2
 recuperos, el −5% y el +25%, la anticipación de los avisos. Todo eso lo mueve
@@ -642,7 +758,11 @@ hay una sola tabla ni una línea de código de ninguna de las dos. Sumarlas en
 silencio sería regalar dos módulos; ignorarlas, dejar la ficha a medias de lo que
 pidió. Va dicho de frente, con su costo al lado.
 
-## 9. Cómo arrancamos
+## 9. Cómo arrancamos — **histórico**
+
+> El plan por bloques con el que se arrancó. Se deja entero porque explica por
+> qué las cosas se hicieron en ese orden, pero **no es la lista de pendientes**:
+> esa es la §0. Varias cosas de acá ya están hechas.
 
 Propuesta de orden. Respeta las prioridades de la clienta, pero corregida por
 dependencias técnicas: hay cosas que si no van primero, obligan a rehacer lo que

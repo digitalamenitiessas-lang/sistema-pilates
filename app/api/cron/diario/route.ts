@@ -109,6 +109,12 @@ function formatDate(iso: string): string {
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('es-AR', { timeZone: 'UTC' })
 }
 
+/**
+ * Los días de la grilla. Índice 0 = lunes, como `class_sessions.day_of_week`
+ * desde la 0001 — no como el `getDay()` de JavaScript, que arranca en domingo.
+ */
+const DIAS_GRILLA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+
 function formatAmount(n: number): string {
   return `$${Number(n).toLocaleString('es-AR')}`
 }
@@ -907,8 +913,79 @@ export async function GET(request: Request) {
     })
   }
 
+  // ------------------------------------------------------------
+  // Turnos fijos que perdieron la prioridad (0048 + 0049)
+  //
+  // El estudio lo pidió con estas palabras: "liberar automáticamente el
+  // turno cuando no renueva dentro de su fecha correspondiente". Su
+  // regla es que la prioridad cuelga del vencimiento de la membresía más
+  // los días de gracia, y eso lo resuelve `prioridad_hasta()`.
+  //
+  // El aviso va SIEMPRE y la liberación solo si el estudio la encendió.
+  // Son dos cosas distintas a propósito: saber a quién se le venció el
+  // derecho al horario es información que el mostrador necesita igual —
+  // para llamarlo antes de soltarle el lugar—, y soltarlo es una
+  // decisión que el estudio puede querer tomar a mano.
+  //
+  // Si la 0048 no corrió, la función no existe y esto no hace nada: el
+  // resto del proceso sigue igual, como con las ofertas de la 0041.
+  // ------------------------------------------------------------
+  let turnosVencidos = 0
+  let turnosLiberados = 0
+  let turnosError: string | undefined
+
+  {
+    const { data: sinPrioridad, error } = await admin.rpc('turnos_sin_prioridad')
+    if (error) {
+      // 42883 = la función no existe todavía. Se dice cuál falta en vez de
+      // dejar el error crudo, que habla de una firma que nadie escribió.
+      turnosError =
+        error.code === '42883' || /turnos_sin_prioridad/.test(error.message)
+          ? 'migración 0048/0049 pendiente'
+          : error.message
+    } else {
+      const lista = (sinPrioridad ?? []) as Array<{
+        slot_id: string
+        student_id: string
+        student_name: string
+        class_title: string
+        day_of_week: number
+        start_time: string
+        prioridad_hasta: string | null
+      }>
+      turnosVencidos = lista.length
+
+      for (const t of lista) {
+        const cuando = `${DIAS_GRILLA[t.day_of_week] ?? '—'} ${String(t.start_time).slice(0, 5)}`
+        rows.push({
+          type: 'turno_liberado',
+          title: 'Turno fijo sin prioridad',
+          body: `${t.student_name} perdió la prioridad sobre ${cuando}${
+            t.prioridad_hasta ? ` el ${formatDate(t.prioridad_hasta)}` : ' (no tiene membresía)'
+          }`,
+          student_id: t.student_id,
+          audience: 'staff',
+          // Por turno y no por día: el aviso es "este horario quedó sin
+          // dueño", y repetirlo cada mañana hasta que alguien lo resuelva
+          // sería ruido. Vuelve a emitirse si el turno se reasigna y se
+          // vence de nuevo, porque entonces es otro `slot_id`.
+          dedupe_key: `turno-sin-prioridad-${t.slot_id}`,
+        })
+      }
+
+      // La función mira el interruptor por su cuenta y devuelve 0 si está
+      // apagado: el permiso y la regla viven en la base, no acá.
+      const { data: liberados, error: libError } = await admin.rpc('liberar_turnos_vencidos')
+      if (libError) turnosError = libError.message
+      else turnosLiberados = (liberados as number | null) ?? 0
+    }
+  }
+
   return NextResponse.json({
     date: today,
+    turnosVencidos,
+    turnosLiberados,
+    turnosSalteados: turnosError,
     ofertasEmitidas,
     ofertasYaEstaban,
     ofertasFallidas: ofertasFallidas.length > 0 ? ofertasFallidas : undefined,

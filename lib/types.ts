@@ -169,6 +169,40 @@ export interface Membership {
   endDateMotivo?: string | null
 }
 
+/**
+ * Un turno fijo: el derecho de un cliente sobre un día y hora de la
+ * grilla mientras mantenga la prioridad (0048).
+ *
+ * No es una reserva ni un montón de reservas. Las reservas de cada
+ * fecha, cuando existan, se apoyan en esto — no al revés.
+ */
+export interface FixedSlot {
+  id: string
+  studentId: string
+  studentName: string
+  classId: string
+  classTitle: string
+  discipline: Discipline
+  dayOfWeek: number
+  /** "18:00" */
+  time: string
+  capacity: number
+  room: string
+  estado: 'activo' | 'liberado' | 'pausado'
+  desde: string
+  /** Por qué se liberó o se pausó. Lo lee el cliente desde su portal. */
+  motivo?: string | null
+  /**
+   * Hasta cuándo conserva el lugar. Sale del vencimiento de su membresía
+   * más los días de gracia, y **no se guarda**: si se copiara, al segundo
+   * mes diría una cosa distinta que la membresía. Nulo = sin membresía,
+   * o sea sin prioridad sobre nada.
+   */
+  prioridadHasta?: string | null
+  /** Si el lugar sigue siendo suyo hoy. Lo resuelve la base. */
+  conPrioridad: boolean
+}
+
 export interface Student {
   id: string
   name: string
@@ -181,8 +215,18 @@ export interface Student {
   role: Role
   membership?: Membership
   observations?: string
+  /** Lo de salud que no entra en ninguno de los cuatro campos (0050) */
   medicalNotes?: string
   emergencyContact?: string
+  /**
+   * Los cuatro campos de salud (0050). Viven en `student_private`, así
+   * que los gobiernan `salud.ver` y `salud.editar` — y la clienta los
+   * lee desde su portal, como el resto de esa tabla.
+   */
+  lesiones?: string
+  embarazo?: string
+  cirugias?: string
+  medicacion?: string
   /** id del usuario de Auth vinculado (acceso al portal), si tiene */
   userId?: string | null
 }
@@ -326,6 +370,22 @@ export type NotificationType =
   | 'caja_diferencia'
   | 'saldo_sin_imputar'
   | 'renovacion_omitida'
+  /** Turnos fijos que perdieron la prioridad (0049) */
+  | 'turno_liberado'
+
+/**
+ * Una entrada de la bitácora del cliente (0050). No se edita: si algo
+ * cambió, se agrega otra. La clienta no las lee.
+ */
+export interface StudentNote {
+  id: string
+  studentId: string
+  /** 'profesora' la ve todo el equipo; 'interna' no la ve la profesora */
+  kind: 'profesora' | 'interna'
+  body: string
+  authorName: string
+  createdAt: string
+}
 
 /** Notificación persistida (tabla notifications, migración 0007). */
 export interface AppNotification {

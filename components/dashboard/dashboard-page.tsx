@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { TomarAsistencia } from '@/components/asistencia/tomar-asistencia'
 import { fetchResumenPlata, type ResumenPlata } from '@/lib/caja-api'
-import { esOferta, hoyISO, settingBool, settingText, todayDayIndex } from '@/lib/api'
+import { esOferta, hoyISO, settingBool, settingNum, settingText, todayDayIndex } from '@/lib/api'
 import { paymentReminderLink } from '../pagos/pagos-page'
 import type { PageKey } from '../layout/sidebar'
 
@@ -112,7 +112,8 @@ function StatCard({
 
 export function DashboardPage({ onNavigate }: DashboardPageProps) {
   const { canWrite, can } = useData()
-  const { students, payments, alerts, monthlyRevenue, classes, denied, settings } = useStudio()
+  const { students, payments, alerts, monthlyRevenue, classes, denied, settings, memberships, plans } =
+    useStudio()
   const sinFinanzas = denied.includes('payments')
   // Tomar asistencia desde "Clases de hoy": es el atajo que usa la
   // profesora cuando entra al sistema con la clase por empezar.
@@ -159,6 +160,57 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
     : '0.0'
   const maxRevenue = Math.max(1, ...monthlyRevenue.map((m) => m.amount))
 
+  // ── Los contadores que pidió el estudio el 15/09, §5 ─────────────────
+  //
+  // Los cinco se derivan del paquete que el tablero ya tiene en el
+  // navegador: ninguno necesita una consulta nueva. Se calculan acá y no
+  // en la base por eso, y porque son de HOY — un reporte con rango de
+  // fechas sí tendría que ir a una vista, como los de la 0021.
+
+  const hoy = hoyISO()
+
+  // "Lugares disponibles" y "lista de espera": los dos salen de las clases
+  // de hoy. Estaban dentro de la barra de ocupación de cada clase, que
+  // sirve para mirar una — no para saber cuánto lugar queda en el día.
+  const lugaresHoy = TODAY_CLASSES.reduce((a, c) => a + Math.max(0, c.capacity - c.enrolled), 0)
+  const esperaHoy = TODAY_CLASSES.reduce((a, c) => a + c.waitlist, 0)
+
+  // "Cobrado hoy". El del mes ya estaba; este es el que mira el mostrador
+  // al cerrar. `date` es `paid_date`, o sea el día que entró la plata.
+  const cobradoHoy = payments
+    .filter((p) => p.status === 'pagado' && p.date === hoy)
+    .reduce((a, p) => a + p.amount, 0)
+
+  // "Clientas de prueba": las que hoy están con un plan marcado de prueba.
+  // `plans` trae solo los activos, así que un plan dado de baja no cuenta
+  // como prueba aunque lo fuera — y es lo correcto: lo que se quiere saber
+  // es a quiénes hay que convertir, no la historia.
+  const planesPrueba = new Set(plans.filter((p) => p.isTrial).map((p) => p.id))
+  const enPrueba = students.filter(
+    (s) => s.membership && planesPrueba.has(s.membership.planId) && s.membership.status !== 'vencida'
+  ).length
+
+  // "Clientas por recuperar": se les venció hace N días y no volvieron a
+  // comprar. El N es el parámetro que el estudio dejó declarado sin código
+  // (`recovery_after_days`) — este es el código.
+  //
+  // Es un contador para llamar por teléfono, no el módulo de seguimiento
+  // con estado de contacto que pide la sección 6: ese necesita su propia
+  // tabla. Lo que falta está escrito, no insinuado.
+  const diasRecupero = settingNum(settings, 'recovery_after_days', 15)
+  const limiteRecupero = new Date(`${hoy}T00:00`)
+  limiteRecupero.setDate(limiteRecupero.getDate() - diasRecupero)
+  const cortePorRecuperar = limiteRecupero.toISOString().slice(0, 10)
+
+  const porRecuperar = students.filter((s) => {
+    const suyas = memberships.filter((m) => m.studentId === s.id)
+    if (suyas.length === 0) return false
+    // La última que tuvo, por fecha de fin. Si esa ya venció hace más de N
+    // días, no hay ninguna posterior: por eso alcanza con mirar el máximo.
+    const ultima = suyas.reduce((max, m) => (m.endDate > max.endDate ? m : max))
+    return ultima.endDate < cortePorRecuperar
+  }).length
+
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
       {/* Stats row */}
@@ -197,6 +249,79 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
             sinAcceso={sinFinanzas}
           />
         )}
+      </div>
+
+      {/* Los tres bloques que pidió el estudio el 15/09 (§5): Hoy,
+          Comercial y Dinero. El de Dinero ya existía entero abajo; estos
+          dos son la mitad que faltaba, y van juntos porque se leen de un
+          vistazo — no son cuatro tarjetas más arriba. */}
+      <div className="bg-card rounded-2xl border border-border overflow-hidden">
+        <div className="grid grid-cols-2 lg:grid-cols-5 divide-x divide-y lg:divide-y-0 divide-border">
+          <div className="px-5 py-4">
+            <p className="text-xs text-muted-foreground">Lugares libres hoy</p>
+            <p className="text-xl font-bold text-foreground tabular-nums mt-1">{lugaresHoy}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {TODAY_CLASSES.length === 0
+                ? 'sin clases hoy'
+                : `en ${TODAY_CLASSES.length} clase${TODAY_CLASSES.length === 1 ? '' : 's'}`}
+            </p>
+          </div>
+          <div className="px-5 py-4">
+            <p className="text-xs text-muted-foreground">En lista de espera</p>
+            <p
+              className={cn(
+                'text-xl font-bold tabular-nums mt-1',
+                esperaHoy > 0 ? 'text-aviso-fuerte' : 'text-foreground'
+              )}
+            >
+              {esperaHoy}
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {esperaHoy > 0 ? 'esperando un lugar hoy' : 'nadie esperando'}
+            </p>
+          </div>
+          <div className="px-5 py-4">
+            <p className="text-xs text-muted-foreground">De prueba</p>
+            <p className="text-xl font-bold text-foreground tabular-nums mt-1">{enPrueba}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {enPrueba > 0 ? 'para convertir a plan' : 'ninguna en prueba'}
+            </p>
+          </div>
+          <div className="px-5 py-4">
+            <p className="text-xs text-muted-foreground">Por recuperar</p>
+            <p
+              className={cn(
+                'text-xl font-bold tabular-nums mt-1',
+                porRecuperar > 0 ? 'text-aviso-fuerte' : 'text-foreground'
+              )}
+            >
+              {porRecuperar}
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              sin renovar hace {diasRecupero} días
+            </p>
+          </div>
+          {/* Cobrado hoy va acá y no en el bloque de plata de abajo, que es
+              del mes: el mostrador lo mira al cerrar el día. Con su
+              permiso, como todo lo financiero. */}
+          {(canWrite || sinFinanzas) && (
+            <div className="px-5 py-4">
+              <p className="text-xs text-muted-foreground">Cobrado hoy</p>
+              {sinFinanzas ? (
+                <p className="text-sm font-semibold text-muted-foreground mt-1">Sin acceso</p>
+              ) : (
+                <>
+                  <p className="text-xl font-bold text-exito-fuerte tabular-nums mt-1">
+                    ${Math.round(cobradoHoy).toLocaleString('es-AR')}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {cobradoHoy > 0 ? 'entró hoy' : 'todavía nada'}
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Bloque de plata: egresos, resultado y dónde está el dinero */}

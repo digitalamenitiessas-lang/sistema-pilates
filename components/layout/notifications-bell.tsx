@@ -63,6 +63,9 @@ const ESTILOS: Record<NotificationType, EstiloAviso> = {
   // Clientes porque lo que hay que arreglar es el plan apagado, no la ficha.
   // Aviso y no destructive: no se rompió nada, hay algo mal configurado.
   renovacion_omitida:   { Icon: RefreshCwOff,  color: 'bg-aviso-suave text-aviso-fuerte',             page: 'planes' },
+  // Lleva a Agenda y no a Clientes: lo que hay que hacer con un turno
+  // liberado es decidir a quién dárselo, y eso se ve sobre la grilla.
+  turno_liberado:       { Icon: CalendarClock, color: 'bg-aviso-suave text-aviso-fuerte',             page: 'agenda' },
 }
 
 /**

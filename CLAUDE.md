@@ -8,7 +8,9 @@ Router) + React 19 + Tailwind 4, Supabase (Postgres con RLS) y Mercado Pago.
 
 El documento de la clienta manda: **[`docs/REQUERIMIENTOS-CASA-FE.md`](docs/REQUERIMIENTOS-CASA-FE.md)**
 tiene el estado por sección, los choques con lo que ya funciona, las
-decisiones tomadas y el plan por bloques. El anexo
+decisiones tomadas y el plan por bloques. **Su §0 es la única lista de
+pendientes al día**; el resto del documento es el análisis y la historia, y
+varias secciones quedaron viejas a propósito. El anexo
 [`docs/requerimientos-casa-fe-detalle.md`](docs/requerimientos-casa-fe-detalle.md)
 tiene los 178 requerimientos uno por uno.
 [`docs/PLAN.md`](docs/PLAN.md) es el registro de lo construido.

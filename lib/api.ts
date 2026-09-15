@@ -22,6 +22,8 @@ import type {
   PermissionKey,
   PermissionMatrix,
   UserPermission,
+  FixedSlot,
+  StudentNote,
 } from './types'
 
 // ---------------------------------------------------------------
@@ -311,6 +313,12 @@ export interface StudioData {
   settingsMeta: StudioSetting[]
   /** true si el estudio ya cargó credenciales de Mercado Pago */
   mpConfigured: boolean
+  /**
+   * Los turnos fijos vivos (0048). Vacío mientras la migración no corrió,
+   * y también para el rol que no tiene `turnos.ver` — ahí la política
+   * devuelve cero filas, como todas.
+   */
+  turnosFijos: FixedSlot[]
 }
 
 export async function fetchStudioData(): Promise<StudioData> {
@@ -348,12 +356,28 @@ export async function fetchStudioData(): Promise<StudioData> {
   // Datos sensibles de la ficha (tabla aparte desde 0008; RLS: staff y la
   // propia alumna). Para el profesor viene vacío; si la migración no corrió
   // todavía, los campos siguen llegando en students.
-  const privateMap = new Map<string, { medicalNotes?: string; emergencyContact?: string }>()
+  const privateMap = new Map<
+    string,
+    {
+      medicalNotes?: string
+      emergencyContact?: string
+      lesiones?: string
+      embarazo?: string
+      cirugias?: string
+      medicacion?: string
+    }
+  >()
   const privRes = await supabase.from('student_private').select('*')
   for (const p of privRes.data ?? []) {
     privateMap.set(p.student_id, {
       medicalNotes: p.medical_notes || undefined,
       emergencyContact: p.emergency_contact || undefined,
+      // Los cuatro de la 0050. Llegan con el select('*') y quedan en
+      // undefined mientras la migración no haya corrido.
+      lesiones: p.lesiones || undefined,
+      embarazo: p.embarazo || undefined,
+      cirugias: p.cirugias || undefined,
+      medicacion: p.medicacion || undefined,
     })
   }
 
@@ -366,6 +390,7 @@ export async function fetchStudioData(): Promise<StudioData> {
   let settingsMeta: StudioSetting[] = []
   let permisos: string[] = []
   let occurrences: ClassOccurrence[] = []
+  let turnosFijos: FixedSlot[] = []
   try {
     const [discRes, methodRes, settingsRes, permisosRes] = await Promise.all([
       supabase.from('disciplines').select('*').eq('active', true).order('sort_order').order('name'),
@@ -374,6 +399,37 @@ export async function fetchStudioData(): Promise<StudioData> {
       supabase.rpc('mis_permisos'),
     ])
     permisos = (permisosRes.data as string[] | null) ?? []
+
+    // Los turnos fijos van en su propia consulta y en su propio try: la
+    // vista no existe hasta que la 0048 corra, y el sistema entero tiene
+    // que seguir andando igual hasta entonces.
+    try {
+      const { data } = await supabase
+        .from('turnos_fijos')
+        .select('*')
+        .neq('estado', 'liberado')
+        .order('day_of_week')
+        .order('start_time')
+      turnosFijos = (data ?? []).map((t) => ({
+        id: t.id,
+        studentId: t.student_id,
+        studentName: t.student_name ?? '—',
+        classId: t.class_id,
+        classTitle: t.class_title ?? '—',
+        discipline: (t.discipline ?? '') as Discipline,
+        dayOfWeek: t.day_of_week,
+        time: t.start_time?.slice(0, 5) ?? '',
+        capacity: t.capacity ?? 0,
+        room: t.room ?? '',
+        estado: t.estado,
+        desde: t.desde,
+        motivo: t.motivo ?? null,
+        prioridadHasta: t.prioridad_hasta ?? null,
+        conPrioridad: !!t.con_prioridad,
+      }))
+    } catch {
+      // sin la 0048: el sistema anda igual, sin turnos fijos
+    }
 
     // Solo las de un rango corto alrededor de hoy: son excepciones, no
     // hace falta traerse el historial entero.
@@ -549,6 +605,10 @@ export async function fetchStudioData(): Promise<StudioData> {
     membership: latestMembership.get(s.id),
     observations: s.observations ?? undefined,
     medicalNotes: privateMap.get(s.id)?.medicalNotes,
+    lesiones: privateMap.get(s.id)?.lesiones,
+    embarazo: privateMap.get(s.id)?.embarazo,
+    cirugias: privateMap.get(s.id)?.cirugias,
+    medicacion: privateMap.get(s.id)?.medicacion,
     emergencyContact: privateMap.get(s.id)?.emergencyContact,
     userId: s.user_id ?? null,
   }))
@@ -690,7 +750,7 @@ export async function fetchStudioData(): Promise<StudioData> {
 
   return {
     teachers, plans, students, memberships, classes, reservations, payments,
-    monthlyRevenue, alerts, rooms, occurrences, disciplines, paymentMethods, permisos, denied, settings, settingsMeta,
+    monthlyRevenue, alerts, rooms, occurrences, disciplines, paymentMethods, permisos, denied, settings, settingsMeta, turnosFijos,
     mpConfigured,
   }
 }
@@ -773,6 +833,19 @@ export interface NewStudentInput {
   birthdate?: string
   observations?: string
   medicalNotes?: string
+  /**
+   * Quién avisar si le pasa algo en clase. La columna existe desde la
+   * 0008 y hasta el 15/09 **nadie la escribía ni la mostraba**: se leía
+   * en `fetchStudioData` y ahí moría. Vive en `student_private` con las
+   * notas médicas, así que el profesor no la ve — que es una decisión a
+   * revisar, porque en una emergencia el profesor es quien está.
+   */
+  emergencyContact?: string
+  /** Los cuatro campos de salud de la 0050 */
+  lesiones?: string
+  embarazo?: string
+  cirugias?: string
+  medicacion?: string
   planId?: string
 }
 
@@ -783,11 +856,45 @@ export interface NewStudentInput {
  * migración 0008 eliminó, así que el fallback fallaba en silencio y la
  * nota se perdía sin avisar.
  */
-async function saveMedicalNotes(studentId: string, medicalNotes: string): Promise<void> {
-  const { error } = await supabase
-    .from('student_private')
-    .upsert({ student_id: studentId, medical_notes: medicalNotes, updated_at: new Date().toISOString() })
-  if (error) throw error
+async function savePrivateData(
+  studentId: string,
+  datos: {
+    medicalNotes?: string
+    emergencyContact?: string
+    lesiones?: string
+    embarazo?: string
+    cirugias?: string
+    medicacion?: string
+  }
+): Promise<void> {
+  // Solo lo que vino. Un `upsert` con la columna ausente no la pisa, así
+  // que editar la ficha sin traer las notas médicas ya no las borra — el
+  // modo de falla que la 0008 tuvo y que costó notas reales.
+  const fila: Record<string, unknown> = {
+    student_id: studentId,
+    updated_at: new Date().toISOString(),
+  }
+  if (datos.medicalNotes !== undefined) fila.medical_notes = datos.medicalNotes
+  if (datos.emergencyContact !== undefined) fila.emergency_contact = datos.emergencyContact
+  if (datos.lesiones !== undefined) fila.lesiones = datos.lesiones
+  if (datos.embarazo !== undefined) fila.embarazo = datos.embarazo
+  if (datos.cirugias !== undefined) fila.cirugias = datos.cirugias
+  if (datos.medicacion !== undefined) fila.medicacion = datos.medicacion
+  if (Object.keys(fila).length === 2) return
+
+  const { error } = await supabase.from('student_private').upsert(fila)
+
+  // 42703 = la 0050 no corrió. Se reintenta sin los cuatro campos nuevos
+  // en vez de perder la edición entera: guardar las notas médicas no
+  // puede depender de una migración que agrega otra cosa.
+  if (error?.code === '42703') {
+    for (const c of ['lesiones', 'embarazo', 'cirugias', 'medicacion']) delete fila[c]
+    if (Object.keys(fila).length === 2) return
+    const { error: e2 } = await supabase.from('student_private').upsert(fila)
+    if (e2) throw errorDeLaBase(e2, 'No se pudieron guardar los datos reservados')
+    return
+  }
+  if (error) throw errorDeLaBase(error, 'No se pudieron guardar los datos reservados')
 }
 
 const PAYMENT_GRACE_DAYS = 5
@@ -811,7 +918,14 @@ export async function createStudent(
     .single()
   if (error) throw error
 
-  if (input.medicalNotes) await saveMedicalNotes(student.id, input.medicalNotes)
+  await savePrivateData(student.id, {
+    medicalNotes: input.medicalNotes || undefined,
+    emergencyContact: input.emergencyContact || undefined,
+    lesiones: input.lesiones || undefined,
+    embarazo: input.embarazo || undefined,
+    cirugias: input.cirugias || undefined,
+    medicacion: input.medicacion || undefined,
+  })
 
   if (input.planId) {
     await assignMembership(student.id, input.planId, plans, settings)
@@ -834,7 +948,14 @@ export async function updateStudent(id: string, input: Omit<NewStudentInput, 'pl
   // Solo se toca si el formulario la trajo. Con permisos por rol, quien
   // edite una ficha sin poder ver lo médico manda undefined y la nota
   // queda intacta en vez de guardarse vacía.
-  if (input.medicalNotes !== undefined) await saveMedicalNotes(id, input.medicalNotes)
+  await savePrivateData(id, {
+    medicalNotes: input.medicalNotes,
+    emergencyContact: input.emergencyContact,
+    lesiones: input.lesiones,
+    embarazo: input.embarazo,
+    cirugias: input.cirugias,
+    medicacion: input.medicacion,
+  })
 }
 
 /** Prende o apaga la renovación automática de una membresía. */
@@ -1153,6 +1274,153 @@ export function clasesRecuperables(
           (r.status === 'ausente' && laAusenciaConsume))
     )
     .sort((a, b) => b.date.localeCompare(a.date))
+}
+
+// ---------------------------------------------------------------
+// La bitácora del cliente (0050)
+//
+// No viaja en `fetchStudioData`: se lee al abrir la ficha. Es historia
+// que crece sin techo y que solo mira quien está parado en esa ficha —
+// traerla entera en cada ingreso es el error que la 0021 vino a corregir
+// para los reportes.
+// ---------------------------------------------------------------
+
+export async function fetchStudentNotes(studentId: string): Promise<StudentNote[]> {
+  const { data, error } = await supabase
+    .from('student_notes')
+    .select('*, profiles:author_id(full_name)')
+    .eq('student_id', studentId)
+    .order('created_at', { ascending: false })
+
+  // Sin la 0050 no hay bitácora, y la ficha tiene que abrir igual.
+  if (error?.code === '42P01' || error?.code === 'PGRST205') return []
+  if (error) throw errorDeLaBase(error, 'No se pudo leer la bitácora')
+
+  return (data ?? []).map((n) => ({
+    id: n.id,
+    studentId: n.student_id,
+    kind: n.kind,
+    body: n.body,
+    // Un autor sin perfil es una cuenta dada de baja: se dice, no se
+    // inventa un nombre ni se deja el renglón vacío.
+    authorName: (n.profiles as { full_name: string } | null)?.full_name ?? 'Cuenta dada de baja',
+    createdAt: n.created_at,
+  }))
+}
+
+export async function addStudentNote(
+  studentId: string,
+  body: string,
+  kind: StudentNote['kind'] = 'profesora'
+): Promise<void> {
+  const texto = body.trim()
+  if (!texto) throw new Error('Escribí la nota antes de guardarla')
+
+  // `author_id` no se manda: lo sella la base. Mandarlo desde acá sería
+  // dejar elegir quién firma, que es lo contrario de una bitácora.
+  const { error } = await supabase
+    .from('student_notes')
+    .insert({ student_id: studentId, body: texto, kind })
+
+  if (error?.code === '42P01' || error?.code === 'PGRST205') {
+    throw new Error('Para usar la bitácora falta correr la migración 0050.')
+  }
+  if (error) throw errorDeLaBase(error, 'No se pudo guardar la nota')
+}
+
+export async function deleteStudentNote(id: string): Promise<void> {
+  // Un delete que la política rechaza devuelve `error: null` y no borra
+  // nada, así que se cuenta lo que volvió en vez de confiar en el error.
+  const { data, error } = await supabase
+    .from('student_notes')
+    .delete()
+    .eq('id', id)
+    .select('id')
+  if (error) throw errorDeLaBase(error, 'No se pudo borrar la nota')
+  if (!data || data.length === 0) {
+    throw new Error('No tenés permiso para borrar notas de la bitácora.')
+  }
+}
+
+// ---------------------------------------------------------------
+// Turnos fijos (0048)
+//
+// Un turno fijo es el derecho de un cliente sobre un día y hora de la
+// grilla, no una reserva ni un conjunto de reservas. Por eso acá no se
+// crea ni se cancela nada de `reservations`: se escribe una fila de
+// `fixed_slots` y listo.
+// ---------------------------------------------------------------
+
+/** El aviso de que la 0048 todavía no corrió, dicho una sola vez. */
+function sinTurnosFijos(error: { code?: string } | null): boolean {
+  // 42P01 = la tabla no existe. PGRST205 = PostgREST no la conoce todavía.
+  return error?.code === '42P01' || error?.code === 'PGRST205'
+}
+
+export async function asignarTurnoFijo(studentId: string, classId: string): Promise<void> {
+  const { error } = await supabase
+    .from('fixed_slots')
+    .insert({ student_id: studentId, class_id: classId })
+
+  if (sinTurnosFijos(error)) {
+    throw new Error('Para usar los turnos fijos falta correr la migración 0048.')
+  }
+  // El índice parcial: ya tiene un turno vivo en esa clase.
+  if (error?.code === '23505') {
+    throw new Error('Ese cliente ya tiene un turno fijo en esa clase.')
+  }
+  if (error) throw errorDeLaBase(error, 'No se pudo asignar el turno fijo')
+}
+
+/**
+ * Cambiarle el horario sin perder el historial: se libera el que tenía y
+ * se le da el nuevo. Dos filas y no un `update` del `class_id`, porque
+ * "quién ocupaba este horario antes" es justamente lo que explica por qué
+ * hoy está libre — y con un update esa respuesta se pierde.
+ *
+ * Si el turno nuevo no entra por cupo, el viejo ya quedó liberado. Es el
+ * orden correcto igual: al revés, mover a alguien dentro de una clase
+ * llena fallaría siempre contra su propio lugar.
+ */
+export async function moverTurnoFijo(
+  slotId: string,
+  studentId: string,
+  nuevaClaseId: string
+): Promise<void> {
+  await liberarTurnoFijo(slotId, 'Cambio de horario')
+  await asignarTurnoFijo(studentId, nuevaClaseId)
+}
+
+export async function liberarTurnoFijo(slotId: string, motivo: string): Promise<void> {
+  const texto = motivo.trim()
+  if (!texto) throw new Error('Escribí por qué se libera el turno')
+
+  const { error } = await supabase
+    .from('fixed_slots')
+    .update({ estado: 'liberado', motivo: texto })
+    .eq('id', slotId)
+
+  if (sinTurnosFijos(error)) {
+    throw new Error('Para usar los turnos fijos falta correr la migración 0048.')
+  }
+  if (error) throw errorDeLaBase(error, 'No se pudo liberar el turno')
+}
+
+/** Lo conserva sin usarlo: nadie más se lo puede tomar, pero no ocupa cupo. */
+export async function pausarTurnoFijo(slotId: string, motivo: string): Promise<void> {
+  const { error } = await supabase
+    .from('fixed_slots')
+    .update({ estado: 'pausado', motivo: motivo.trim() || null })
+    .eq('id', slotId)
+  if (error) throw errorDeLaBase(error, 'No se pudo pausar el turno')
+}
+
+export async function reactivarTurnoFijo(slotId: string): Promise<void> {
+  const { error } = await supabase
+    .from('fixed_slots')
+    .update({ estado: 'activo', motivo: null })
+    .eq('id', slotId)
+  if (error) throw errorDeLaBase(error, 'No se pudo reactivar el turno')
 }
 
 /**
