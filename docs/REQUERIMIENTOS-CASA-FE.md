@@ -8,7 +8,7 @@
 > **¿Buscás qué falta? Está en la §0, acá abajo.** Es la única lista al día; el
 > resto del documento es el análisis y la historia.
 
-## 0. LO QUE FALTA — la lista viva  ·  al 15/09/2026
+## 0. LO QUE FALTA — la lista viva  ·  al 15/09/2026, cerrando el día
 
 > **Esta es la única lista al día.** Las secciones de abajo son el análisis y la
 > historia de cómo se llegó acá, y varias quedaron viejas a propósito: son la
@@ -18,57 +18,39 @@
 >
 > **Actualizar esta lista es parte de terminar algo, no un extra.**
 
-### Lo que bloquea que el estudio empiece a usarlo
+### Dónde quedó todo, contra las 10 prioridades del estudio
 
-Nada de esto es desarrollo: son datos y decisiones del estudio.
-
-| | Qué falta | Por qué frena |
-|---|---|---|
-| 🔴 | **Email de Ivana y de Leandro** | Sin mail no se les puede crear la cuenta, y sin cuenta **la profesora no puede tomar asistencia**: hoy la toma solo admin o recepción. Ninguna de las tres profesoras tiene cuenta (`teachers.user_id` en nulo) |
-| 🔴 | **Encender el grupo Reservas del motor de permisos** | 65 de 78 claves siguen en `sombra`: tildarle `reservas.asistencia` a la profesora no hace nada hasta encender el grupo. Y hay que tildarle **las dos**, `asistencia` y `editar`, o queda trabada |
-| 🟡 | Cuenta de Mercado Pago del negocio | Se carga desde Configuración, sin técnico |
-| 🟡 | Verificar el dominio en Resend + `EMAIL_FROM` en Vercel | Hasta entonces el mail a las clientas **solo llega a la casilla dueña de la cuenta** |
-| 🟡 | Probar el portal desde una cuenta de clienta | Es lo único que ejercita el aislamiento por cliente. No se puede verificar desde adentro del sistema |
+**Nueve en verde.** La única afuera es Inventario, que Matías excluyó (§7).
+El 15/09 entraron diez migraciones —`0046` a `0055`— y pasaron a verde la 3
+(ficha), la 4 (tablero), la 6 (personal) y la 10 (notificaciones).
 
 ### Lo que falta construir
 
-| | Qué | Estado |
+| | Qué | Tamaño |
 |---|---|---|
-| **§2** | **Que las reservas de cada semana se creen solas** desde el turno fijo | Lo último de §2. Ya no depende de ninguna respuesta (Matías definió el 15/09 que manda la cantidad de clases del plan). Se apoya entero en la `0048` |
-| **§2** | **Ventana de fechas en `fetchStudioData`** | Va en el mismo paso, no después. Hoy trae **todas** las reservas sin filtro ni límite en cada ingreso: con 8 filas no se nota, con turnos fijos reservando cada semana son miles en meses |
-| ~~**§3**~~ | ~~Ficha: salud en campos separados y bitácora~~ | ✅ **Hecho el 15/09** (`0050`), junto con el contacto de emergencia y "cuándo vuelve" |
-| ~~**§5**~~ | ~~Dashboard: lugares disponibles, lista de espera, cobrado hoy, de prueba, por recuperar~~ | ✅ **Hecho el 15/09**, sin migración: los cinco se derivan del paquete que el tablero ya tenía. `recovery_after_days` pasó de declarado a leído |
-| ~~**§5**~~ | ~~Ocupación por mes, día, franja y profesora~~ | ✅ **Hecha el 15/09** (`0051`), con los cinco cortes. De paso se arregló que el reporte viejo daba **400%** en rangos de más de una semana |
-| **§1** | Que la profesora agregue a una clienta que llega sin reserva | **Es configuración, no código** — ver la tabla de arriba |
-| **§1** | Cambio de horario por fecha | La tabla lo soporta desde la `0018`; falta la pantalla |
-| — | **Los otros 40 lugares donde el mensaje de la base no llega a la pantalla** | Mismo arreglo de una línea que el de la `0046`, pero toca todos los módulos y va con su propia verificación |
-| ~~—~~ | ~~Sección 12: Personal y remuneraciones~~ | ✅ **Hecha el 15/09** (`0053`). Queda el fichaje, que espera las cuentas de las profesoras |
-| — | Foto del comprobante de gasto (primer uso de Storage) · avisos de caja en el proceso diario | Cola del Bloque 4 |
+| **§2** | **Que las reservas del turno fijo se creen solas cada semana.** Es lo último de §2. Ya no depende de ninguna respuesta: Matías definió el 15/09 que manda la cantidad de clases del plan | chico |
+| **§2** | **Ventana de fechas en `fetchStudioData`.** Va en el mismo paso, no después: hoy trae **todas** las reservas sin filtro ni límite en cada ingreso. Con 8 filas no se nota; con turnos fijos reservando cada semana son miles en meses | chico |
+| — | **Los otros 40 lugares donde el mensaje de la base no llega a la pantalla.** El mismo arreglo de una línea que el de la `0046`, pero toca todos los módulos y va con su propia verificación | mediano |
+| **§1** | Cambio de horario por fecha. La tabla lo soporta desde la `0018`; falta la pantalla | chico |
+| — | Foto del comprobante de gasto (primer uso de Storage) · avisos de caja en el proceso diario | chico |
+| — | **Fichaje de entrada y salida** de las profesoras. Se apoya en `staff_work_logs` sin rehacer nada, pero necesita que tengan cuenta | chico |
+| — | Congelar la membresía (`freeze_max_days` existe y no rige) · baja de clienta con motivo · cumpleaños del mes | mediano |
 
-### Contra las 10 prioridades que fijó el estudio
+### Lo que falta encender, y no es desarrollo
 
-Su propia lista de qué es esencial para la primera versión. **Verificado contra
-la base el 15/09**, no contra este documento.
+| | |
+|---|---|
+| **Tomar asistencia la profesora** | Faltan `reservas.asistencia` **y** `reservas.editar`, y **encender el grupo Reservas** — son 8 claves y afecta a todos los roles, así que conviene mirar antes qué cambia |
+| **19 de 22 grupos siguen en sombra** | Rigen Caja, Gastos, Reportes y Datos sensibles. El resto responde el legado: tildar un permiso ahí **no hace nada** hasta encender su grupo |
 
-| # | Prioridad | | Qué falta |
-|---|---|---|---|
-| 1 | Agenda, reservas y asistencias | 🟢 | Que la **profesora** pueda tomar asistencia: es dato y configuración, no código (ver arriba). Y el cambio de horario por fecha |
-| 2 | Planes, membresías y cobros | 🟢 | Congelar la membresía (espera su respuesta) y el historial de la membresía |
-| 3 | Ficha integral de cada clienta | 🟢 | **Cerrada el 15/09** (`0050`): salud en cuatro campos y bitácora con autor y fecha, más el contacto de emergencia y el contacto de emergencia —la columna estaba desde la `0008` y nadie la escribía— y el "¿cuándo vuelve?", que hasta entonces **mentía**: era el contador de reservas confirmadas, y una reserva vieja que nadie marcó sigue en 'confirmada' para siempre |
-| 4 | Dashboard financiero y comercial | 🟢 | La plata está entera (`0020`) y **los cinco contadores comerciales entraron el 15/09** —lugares libres, lista de espera, de prueba, por recuperar y cobrado hoy—, verificados contra la base. **Cerrada el 15/09**: los cinco cortes de ocupación entraron con la `0051`, que además corrigió un divisor que daba cientos por ciento |
-| 5 | Caja diaria, cuentas, ingresos y gastos | 🟢 | Solo la foto del comprobante (primer uso de Storage) |
-| 6 | Personal, horas y remuneraciones | 🟢 | **Hecha el 15/09** (`0053`): ficha laboral, horas, condiciones **con historial** y liquidación derivada. Lo caro —qué clases dictó cada una de verdad— ya lo resolvía `sesiones_dictadas()` de la `0051`. El 15/09 se sumó además **cerrar y saldar** (`0054`): el cierre congela el número, el pago crea el gasto en Sueldos y entra al libro, y la pantalla avisa si se cargó algo después de cerrar. **Falta** el fichaje de entrada y salida, que necesita que las profesoras tengan cuenta |
-| 7 | Inventario y venta de productos | ⚫ | **Fuera del alcance** que definió Matías (§7). No existe ninguna tabla — verificado |
-| 8 | Reportes detallados y descargables | 🟢 | Los dos que esperan los módulos que los alimentan: personal y mostrador |
-| 9 | Roles y permisos | 🟢 | 79 claves configurables. Falta **encender los grupos**: siguen en sombra |
-| 10 | Notificaciones operativas | 🟢 | Campana, push y mails andando (25 avisos emitidos). Faltan algunos hacia la clienta y el panel para configurar canal y anticipación |
+### Lo que espera al estudio
 
-**Nueve terminadas y una afuera** (Inventario, excluida en §7). El 15/09 pasaron
-a verde la 3, la 4, la 6 y la 10.
-
-Y el párrafo del final de su lámina coincide con el corte que ya estaba hecho: la
-landing autoadministrable, el email marketing y las automatizaciones comerciales
-como segunda etapa. Dos de esas tres ya estaban fuera del alcance (§7).
+| | |
+|---|---|
+| 🔴 | **Nombre y mail de la profesora del turno tarde.** Ivana y Leandro ya tienen cuenta; ella sigue con nombre provisorio |
+| 🟡 | Conectar la cuenta de **Mercado Pago** (verificado: sin conectar) |
+| 🟡 | Verificar el **dominio en Resend** + `EMAIL_FROM` en Vercel. Hasta entonces el mail a las clientas **solo llega a la casilla dueña** |
+| 🟡 | Probar el portal desde una **cuenta de clienta**: es lo único que ejercita el aislamiento por cliente, y no se puede verificar desde adentro del sistema |
 
 ### Lo que se cotiza aparte
 
@@ -78,26 +60,23 @@ como segunda etapa. Dos de esas tres ya estaban fuera del alcance (§7).
 | Pestaña **Compras** de la ficha (§3) | 15-20 | Sección 10 (inventario/POS), **excluida** (§7) |
 
 De los 69 pedidos de la devolución del 15/09, **solo estos dos dan pie a cobrar**.
-Todo lo demás o funciona, o era deuda del proyecto. Los turnos fijos entran como
-deuda: son el Agregado 2, que ella ya había pedido.
+Todo lo demás o funciona, o era deuda del proyecto.
 
-### Lo que hay que preguntarle al estudio
+### Preguntas al estudio — ninguna frena nada
 
-Ninguna frena nada hoy. Todas se pueden dejar andando con un valor por defecto y
-que ella lo ajuste desde Configuración.
+Todas tienen un valor por defecto andando y se ajustan desde Configuración.
 
 - **Mercado Pago**: si el link se paga con tarjeta, ¿lleva el +25%? Hoy está en 0%. Y el tope de cuotas, que no está puesto en ningún lado.
 - **Congelamiento** de membresía: `freeze_max_days` existe y no rige.
-- **`recovery_after_days`**: a los cuántos días sin renovar entra a la lista de contacto.
 - **El redondeo**: contestó "al próximo múltiplo de $1.000", que cambia 8 de los 12 precios que ella publicó. `price_rounding` quedó en `cincuenta`, que los deja intactos.
-- Si **3ra Edad** combina con Reformer.
-- Las preguntas del FAQ de la web, que su propio mockup pone en la barra.
+- Si **3ra Edad** combina con Reformer · las preguntas del FAQ de la web.
 
 ### Contestadas, para no volver a preguntarlas
 
 - **El mes de cinco martes** (15/09): manda la cantidad de clases del plan. Ver §8.2.
-- **La vigencia** (09/09): mes de calendario desde la fecha individual. Hecho, `0036`+`0037`.
-- **El ciclo de pago del 1 al 9**: derogado por el estudio el 09/09.
+- **La profesora ve la ficha de salud** (15/09): sí — en una emergencia en clase es quien está. Se resolvió tildando `salud.ver`, sin migración.
+- **La vigencia** (09/09): mes de calendario desde la fecha individual. Hecho.
+- **El ciclo de pago del 1 al 9**: derogado el 09/09.
 - **El plazo de cancelación**: 3 horas. Ya rige.
 - **Los tres precios por medio de pago**: −5% / base / +25%. Cargados y andando.
 
