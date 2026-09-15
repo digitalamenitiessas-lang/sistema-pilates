@@ -63,7 +63,15 @@ hay que saber para no romperlo:
   del motor, y mientras está en `enforce_mode = 'sombra'` responde eso. Por
   eso migrar políticas a `can()` es un cambio sin efecto, verificable.
 - **`select * from public.perm_diff()` tiene que dar cero filas.** Cualquier
-  fila ahí es un permiso que cambió sin que nadie lo pidiera.
+  fila ahí es un permiso que cambió sin que nadie lo pidiera. Ojo con qué
+  mira: desde la `0020` compara **solo las claves en sombra**, porque
+  compararlas todas contra el legado convertía el primer cambio legítimo
+  en un falso positivo eterno. O sea que **un grupo encendido sale de esa
+  red**: lo que protege es lo que todavía no rige.
+- Cambios deliberados ya hechos sobre la matriz, para que nadie los lea
+  como un error: **`profesor` tiene `salud.ver`** desde el 15/09 —la
+  profesora es quien está en la clase si alguien se descompone— y por eso
+  el grupo `Datos sensibles` está en `activo`.
 - El encendido va grupo por grupo: `update permission_keys set
   enforce_mode = 'activo' where grupo = '...'`, y se revierte igual. Ojo
   que ese grupo va por su tercer nombre: `Alumnos` (0012) → `Clientas`

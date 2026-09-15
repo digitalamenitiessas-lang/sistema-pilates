@@ -1340,6 +1340,42 @@ que arranca al día siguiente entra · una anulada libera los días · la ficha
 laboral se guarda y **el resto de los datos de la profesora sobreviven** ·
 en pantalla, Ivana con sus 30 clases semanales agrupadas por día. Revertido.
 
+### ✅ La profesora ve la ficha de salud (15/09) — **decisión del estudio, sin migración**
+
+Matías lo pidió con el argumento que el propio relevamiento había dejado planteado
+y sin contestar: *"¿La profesora debe poder ver el contacto de emergencia? En una
+emergencia en clase es quien está."*
+
+La `0008` había decidido que no —"profesora en modo consulta sin dinero ni datos
+médicos"— y se revierte a propósito. **No hizo falta ninguna migración**: es
+tildar una clave y encender su grupo, que es exactamente para lo que el motor de
+la `0012` existe.
+
+  update role_permissions: profesor → salud.ver
+  update permission_keys set enforce_mode = 'activo' where grupo = 'Datos sensibles'
+
+**Ver sí, cargar no**, y no por una decisión sino por cómo está armado: el botón
+Editar de la ficha está detrás de `canWrite`, así que darle `salud.editar` sería
+inerte — no podría llegar al formulario. Y lo que una profesora observa en clase
+pertenece a la **bitácora**, que ya puede escribir y que guarda autor y fecha; un
+campo de salud se pisa, una nota se suma.
+
+**Verificado con la sesión real de Leandro**: ve "Embarazo - 6 MESES" en la
+pestaña Salud, la ficha **sigue sin pestaña Pagos**, y el tablero sigue sin
+mostrar un peso.
+
+**Y una corrección sobre el invariante.** Al encender el grupo, `perm_diff()`
+siguió dando cero y lo leí como un bug del motor. No lo es: la `0020` la redefinió
+a propósito para mirar **solo las claves que siguen en sombra**, con el
+razonamiento escrito ahí mismo — comparar contra el legado para siempre convierte
+el primer cambio legítimo en un falso positivo eterno. La consecuencia que sí
+conviene tener presente: **una vez encendido un grupo, sus claves salen de esa red
+de seguridad.** Lo que protege es lo que todavía no rige.
+
+**Para volver atrás**, si el estudio cambia de opinión:
+
+  delete from role_permissions where role = 'profesor' and clave = 'salud.ver';
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
