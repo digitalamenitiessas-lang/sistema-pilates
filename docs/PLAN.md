@@ -1082,6 +1082,56 @@ se guarda con `author_id` puesto por la base y se lee con el nombre resuelto.
 política está escrita; ejercerla pide entrar con una cuenta de profesora, y
 ninguna de las tres tiene.
 
+### ✅ La ocupación, bien contada (15/09) — `0051` **corrida y verificada**
+
+El estudio la llamó *"la métrica fundamental"* y dijo para qué la quiere: *"definir
+qué horarios potenciar, reducir o promocionar"*. Pidió mirarla por **mes, día,
+franja horaria, clase y profesora**.
+
+**EL REPORTE QUE HABÍA DABA MAL.** `reporteOcupacion` dividía las reservas de
+TODO el rango por el cupo de UNA sesión. Una clase de 8 lugares dictada cuatro
+veces en el mes y llena siempre daba **400%**. Solo acertaba si el rango era de
+una semana, que es justo lo que un reporte por rango de fechas no es. **Nadie lo
+había visto porque el sistema todavía no tiene un mes de historia** — habría
+aparecido el primer día que el estudio abriera un reporte mensual.
+
+El divisor correcto es **cupo × veces que se dictó**. Y para saber cuántas veces
+se dictó hay que generar las fechas: la grilla es semanal, así que una clase de
+los martes no tiene filas propias por fecha. Eso no se puede resolver filtrando
+en memoria el paquete del estudio, y por eso va a la base.
+
+- [x] **Una fecha suspendida no es una clase vacía.** Si el estudio no dictó el
+      lunes feriado, contarlo como 0% hunde el promedio de ese horario y lleva a
+      cerrar un turno que andaba bien. **Verificado**: suspender tres fechas bajó
+      las sesiones de 22 a 19 y **subió** la ocupación de 1,1% a 1,3%.
+- [x] **El cupo de esa fecha**, no el de la clase (`class_occurrences`, 0018).
+- [x] **La profesora de ese día.** Con reemplazo, una ocupación "por profesora"
+      que mire la titular le imputa clases que no dio.
+- [x] **Las franjas las define el estudio** (`franjas_horarias`), con las que
+      quiera: "mañana" no termina a la misma hora en todos lados.
+- [x] Los cinco cortes salen de **una sola función**. Escribirlos como cinco
+      sería cinco lugares donde arreglar el divisor la próxima vez.
+
+**Los dos errores que aparecieron probando, y son del mismo tipo:** suponer algo
+que el estudio no dijo.
+
+1. Los días salían **"Monday"** y los meses **" September 2026"** con el relleno
+   de Postgres adentro: `to_char(..., 'TMDay')` usa el locale de la BASE, que es
+   inglés. Los nombres pasaron a estar escritos en el SQL.
+2. El corte por clase **juntaba el lunes con el martes**. Las 64 clases de la
+   grilla se llaman todas "Pilates Reformer", así que agrupar por título y hora
+   mezclaba los días: el reporte decía "22 veces" de una clase que en el mes se
+   dictó cuatro. Una clase de la grilla es un día **y** una hora.
+
+**Verificado el 15/09**: 64 filas en el corte por clase, cada una dictada 4 o 5
+veces, que es lo que tiene un mes · ninguna fila por encima de 100% en los cinco
+cortes sobre todo 2026 · los días en castellano y en orden de semana · las
+franjas salen de Configuración (09:00 → Mañana, 15:00 → Tarde, 20:00 → Noche) ·
+la prueba de la suspensión revertida exacto.
+
+`reporteOcupacion` queda marcada `@deprecated` y sin llamadores: se borra cuando
+la `0051` esté en producción.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
@@ -1140,7 +1190,7 @@ ninguna de las tres tiene.
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a **`0050`** ✅. La **`0050` corrió el 15/09**, se corrigió la clave foránea del autor y se volvió a correr; es idempotente a propósito. La **`0048` y la `0049` corrieron el 15/09** y se verificaron ejerciéndolas: el cupo rechazó el noveno turno fijo, un pausado quedó fuera de la liberación automática, y el interruptor encendido liberó exactamente uno. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Migraciones aplicadas | `0001` a **`0051`** ✅. La **`0051` corrió el 15/09** y se corrigió dos veces sobre la marcha —los nombres en castellano y el día en el corte por clase—; es idempotente, todo `create or replace`. La **`0050` corrió el 15/09**, se corrigió la clave foránea del autor y se volvió a correr; es idempotente a propósito. La **`0048` y la `0049` corrieron el 15/09** y se verificaron ejerciéndolas: el cupo rechazó el noveno turno fijo, un pausado quedó fuera de la liberación automática, y el interruptor encendido liberó exactamente uno. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
 | Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |

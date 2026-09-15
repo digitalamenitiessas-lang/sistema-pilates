@@ -38,7 +38,7 @@ Nada de esto es desarrollo: son datos y decisiones del estudio.
 | **§2** | **Ventana de fechas en `fetchStudioData`** | Va en el mismo paso, no después. Hoy trae **todas** las reservas sin filtro ni límite en cada ingreso: con 8 filas no se nota, con turnos fijos reservando cada semana son miles en meses |
 | ~~**§3**~~ | ~~Ficha: salud en campos separados y bitácora~~ | ✅ **Hecho el 15/09** (`0050`), junto con el contacto de emergencia y "cuándo vuelve" |
 | ~~**§5**~~ | ~~Dashboard: lugares disponibles, lista de espera, cobrado hoy, de prueba, por recuperar~~ | ✅ **Hecho el 15/09**, sin migración: los cinco se derivan del paquete que el tablero ya tenía. `recovery_after_days` pasó de declarado a leído |
-| **§5** | Ocupación por mes, día, franja horaria y profesora | Hoy solo por clase. Necesita una vista SQL. **Ojo**: si una fecha suspendida cuenta como 0% de ocupación, el promedio miente |
+| ~~**§5**~~ | ~~Ocupación por mes, día, franja y profesora~~ | ✅ **Hecha el 15/09** (`0051`), con los cinco cortes. De paso se arregló que el reporte viejo daba **400%** en rangos de más de una semana |
 | **§1** | Que la profesora agregue a una clienta que llega sin reserva | **Es configuración, no código** — ver la tabla de arriba |
 | **§1** | Cambio de horario por fecha | La tabla lo soporta desde la `0018`; falta la pantalla |
 | — | **Los otros 40 lugares donde el mensaje de la base no llega a la pantalla** | Mismo arreglo de una línea que el de la `0046`, pero toca todos los módulos y va con su propia verificación |
@@ -55,7 +55,7 @@ la base el 15/09**, no contra este documento.
 | 1 | Agenda, reservas y asistencias | 🟢 | Que la **profesora** pueda tomar asistencia: es dato y configuración, no código (ver arriba). Y el cambio de horario por fecha |
 | 2 | Planes, membresías y cobros | 🟢 | Congelar la membresía (espera su respuesta) y el historial de la membresía |
 | 3 | Ficha integral de cada clienta | 🟢 | **Cerrada el 15/09** (`0050`): salud en cuatro campos y bitácora con autor y fecha, más el contacto de emergencia y el contacto de emergencia —la columna estaba desde la `0008` y nadie la escribía— y el "¿cuándo vuelve?", que hasta entonces **mentía**: era el contador de reservas confirmadas, y una reserva vieja que nadie marcó sigue en 'confirmada' para siempre |
-| 4 | Dashboard financiero y comercial | 🟡 | La plata está entera (`0020`) y **los cinco contadores comerciales entraron el 15/09** —lugares libres, lista de espera, de prueba, por recuperar y cobrado hoy—, verificados contra la base. **Falta solo la ocupación** por mes, día, franja y profesora, que necesita una vista SQL |
+| 4 | Dashboard financiero y comercial | 🟢 | La plata está entera (`0020`) y **los cinco contadores comerciales entraron el 15/09** —lugares libres, lista de espera, de prueba, por recuperar y cobrado hoy—, verificados contra la base. **Cerrada el 15/09**: los cinco cortes de ocupación entraron con la `0051`, que además corrigió un divisor que daba cientos por ciento |
 | 5 | Caja diaria, cuentas, ingresos y gastos | 🟢 | Solo la foto del comprobante (primer uso de Storage) |
 | 6 | Personal, horas y remuneraciones | 🔴 | **Sin empezar, y está dentro del alcance.** `teachers` no tiene una sola columna laboral — verificado: sus nueve columnas son las de contacto |
 | 7 | Inventario y venta de productos | ⚫ | **Fuera del alcance** que definió Matías (§7). No existe ninguna tabla — verificado |

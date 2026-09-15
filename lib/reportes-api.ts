@@ -302,6 +302,58 @@ export async function reporteAsistencias(r: Rango): Promise<FilaAsistencia[]> {
   })
 }
 
+/**
+ * La ocupación, contada bien (0051).
+ *
+ * El divisor es **cupo × veces que se dictó**, no el cupo de una sesión:
+ * una clase de 8 lugares dictada cuatro veces en el mes ofreció 32
+ * lugares, no 8. La versión de abajo dividía por 8 y devolvía 400%.
+ *
+ * Y la cuenta vive en la base porque necesita generar las fechas en las
+ * que cada clase se dictó —la grilla es semanal, no hay una fila por
+ * fecha— y descontar las suspendidas. Eso no se puede filtrar en memoria
+ * sobre el paquete del estudio.
+ */
+export interface FilaOcupacionPorCorte {
+  etiqueta: string
+  sesiones: number
+  lugares: number
+  reservas: number
+  asistencias: number
+  ausencias: number
+  ocupacion: number
+}
+
+export type CorteOcupacion = 'mes' | 'dia' | 'franja' | 'clase' | 'profesora'
+
+export async function reporteOcupacionPor(
+  r: Rango,
+  corte: CorteOcupacion
+): Promise<FilaOcupacionPorCorte[]> {
+  const { data, error } = await supabase.rpc('reporte_ocupacion', {
+    p_desde: r.desde,
+    p_hasta: r.hasta,
+    p_corte: corte,
+  })
+
+  // PGRST202 = la 0051 no corrió. Se dice cuál falta en vez de dejar el
+  // error crudo, que habla de una firma que nadie escribió a mano.
+  if (error?.code === 'PGRST202') {
+    throw new Error('Para este reporte falta correr la migración 0051.')
+  }
+  if (error) throw error
+
+  return (data ?? []).map((f: Record<string, unknown>) => ({
+    etiqueta: String(f.etiqueta ?? '—'),
+    sesiones: Number(f.sesiones ?? 0),
+    lugares: Number(f.lugares ?? 0),
+    reservas: Number(f.reservas ?? 0),
+    asistencias: Number(f.asistencias ?? 0),
+    ausencias: Number(f.ausencias ?? 0),
+    ocupacion: Number(f.ocupacion ?? 0),
+  }))
+}
+
 export interface FilaOcupacion {
   clase: string
   profesora: string
@@ -312,7 +364,13 @@ export interface FilaOcupacion {
   ocupacion: number
 }
 
-/** Cuánto se llena cada clase y cuánta gente efectivamente va. */
+/**
+ * @deprecated Lo reemplaza `reporteOcupacionPor` (0051). Este divide las
+ * reservas de todo el rango por el cupo de UNA sesión, así que pasa del
+ * 100% en cuanto el rango es de más de una semana. Se deja porque la
+ * pantalla lo sigue ofreciendo hasta que la 0051 esté corrida en
+ * producción; el día que lo esté, se borra.
+ */
 export async function reporteOcupacion(r: Rango): Promise<FilaOcupacion[]> {
   const [reservas, clases] = await Promise.all([
     supabase
