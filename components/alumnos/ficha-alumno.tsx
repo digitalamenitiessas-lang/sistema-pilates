@@ -356,7 +356,10 @@ interface FichaAlumnoProps {
 }
 
 export function FichaAlumno({ student, reservations, payments, onBack }: FichaAlumnoProps) {
-  const { canWrite, refresh, data } = useData()
+  const { canWrite, refresh, data, can } = useData()
+  // Lo pregunta al motor y no al dato: sin la clave, `student_private`
+  // llega vacío y "no hay" se confunde con "no podés ver".
+  const veSalud = can('salud.ver')
   const [activeTab, setActiveTab] = useState('resumen')
   const [showEdit, setShowEdit] = useState(false)
   const [showAssignPlan, setShowAssignPlan] = useState(false)
@@ -851,7 +854,26 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
               {/* Los cuatro campos de la 0050 más el texto libre de antes.
                   Si no hay nada cargado se dice, en vez de mostrar cinco
                   renglones vacíos que parecen un error de la pantalla. */}
-              {!student.lesiones &&
+              {/* "No tenés acceso" y "no hay nada cargado" se ven iguales:
+                  `student_private` devuelve CERO FILAS cuando falta
+                  `salud.ver`, no un error. Y acá confundirlas tiene
+                  consecuencia física — una profesora que lee "sin datos de
+                  salud" da la clase creyendo que esa clienta no tiene
+                  lesiones ni está embarazada. Se pregunta por el permiso,
+                  nunca por el resultado vacío. */}
+              {!veSalud ? (
+                <div className="rounded-2xl border border-aviso/40 bg-aviso-suave p-5">
+                  <h3 className="text-sm font-semibold text-aviso-fuerte mb-1 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    Tu rol no ve los datos de salud
+                  </h3>
+                  <p className="text-sm text-aviso-fuerte/90">
+                    Puede haber lesiones, embarazo, cirugías o medicación cargadas y esta pantalla no
+                    te las muestra. <span className="font-semibold">No quiere decir que no haya.</span>{' '}
+                    Si necesitás saberlo antes de una clase, preguntale a administración.
+                  </p>
+                </div>
+              ) : !student.lesiones &&
               !student.embarazo &&
               !student.cirugias &&
               !student.medicacion &&
@@ -877,10 +899,12 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                   <CampoSalud label="Otras observaciones" value={student.medicalNotes} />
                 </div>
               )}
-              <p className="text-[11px] text-muted-foreground">
-                Estos datos los protege la base: el rol sin acceso a salud no los recibe. El cliente
-                los ve desde su portal.
-              </p>
+              {veSalud && (
+                <p className="text-[11px] text-muted-foreground">
+                  Estos datos los protege la base: el rol sin acceso a salud no los recibe. El
+                  cliente los ve desde su portal.
+                </p>
+              )}
             </div>
           )}
 

@@ -123,6 +123,21 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
   // El bloque de plata: se consulta aparte porque sale de las vistas de
   // caja, no del paquete que trae el resto del tablero.
   const veCaja = can('caja.ver') || can('gastos.ver')
+
+  /**
+   * El rol no ve NADA de plata: ni cobros, ni caja, ni gastos.
+   *
+   * La diferencia con `sinFinanzas` decide qué se muestra, y la regla es
+   * ésta: "Sin acceso" está bien cuando el rol podría esperar ver algo —
+   * a recepción se le sacó un permiso, o un total quedó incompleto
+   * porque falta una parte. Ahí el número no se puede confiar y hay que
+   * decirlo, que es lo que la 0013 vino a resolver.
+   *
+   * Pero cuando el módulo entero no es suyo, media pantalla de "Sin
+   * acceso" es ruido sobre cosas que no le importan. Una profesora nunca
+   * va a ver plata: no tiene por qué leerlo seis veces.
+   */
+  const sinPlataDelTodo = sinFinanzas && !veCaja
   const [plata, setPlata] = useState<ResumenPlata | null>(null)
   const baseNeto = settingText(settings, 'tablero_resultado_base', 'cobrado') as
     | 'cobrado'
@@ -229,7 +244,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
           sub={`${todayTotal} reservas confirmadas`}
           accent="var(--exito)"
         />
-        {(canWrite || sinFinanzas) && (
+        {(canWrite || sinFinanzas) && !sinPlataDelTodo && (
           <StatCard
             icon={TrendingUp}
             label={sinFinanzas ? 'Ingresos del mes' : `Ingresos ${currentMonth?.month ?? ''}`}
@@ -239,7 +254,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
             sinAcceso={sinFinanzas}
           />
         )}
-        {(canWrite || sinFinanzas) && (
+        {(canWrite || sinFinanzas) && !sinPlataDelTodo && (
           <StatCard
             icon={AlertTriangle}
             label="Pagos pendientes"
@@ -304,7 +319,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
           {/* Cobrado hoy va acá y no en el bloque de plata de abajo, que es
               del mes: el mostrador lo mira al cerrar el día. Con su
               permiso, como todo lo financiero. */}
-          {(canWrite || sinFinanzas) && (
+          {(canWrite || sinFinanzas) && !sinPlataDelTodo && (
             <div className="px-5 py-4">
               <p className="text-xs text-muted-foreground">Cobrado hoy</p>
               {sinFinanzas ? (
@@ -580,7 +595,11 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
         </div>
       </div>
 
-      {/* Revenue chart & pending payments */}
+      {/* Los dos de abajo mostraban $0 a quien no ve pagos: la política
+          devuelve cero filas y el gráfico los sumaba en cero. Un total
+          adeudado de $0 en la pantalla de una profesora no es un dato
+          faltante, es una afirmación falsa. */}
+      {!sinPlataDelTodo && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Revenue bar chart */}
         <div className="bg-card rounded-2xl border border-border p-5">
@@ -697,6 +716,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
           </div>
         </div>
       </div>
+      )}
       {asistenciaDe && (
         <TomarAsistencia
           classId={asistenciaDe.id}
