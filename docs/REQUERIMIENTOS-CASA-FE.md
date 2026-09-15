@@ -61,9 +61,10 @@ la base el 15/09**, no contra este documento.
 | 7 | Inventario y venta de productos | ⚫ | **Fuera del alcance** que definió Matías (§7). No existe ninguna tabla — verificado |
 | 8 | Reportes detallados y descargables | 🟢 | Los dos que esperan los módulos que los alimentan: personal y mostrador |
 | 9 | Roles y permisos | 🟢 | 79 claves configurables. Falta **encender los grupos**: siguen en sombra |
-| 10 | Notificaciones operativas | 🟡 | Campana, push y mails andando (25 avisos emitidos). Faltan algunos hacia la clienta y el panel para configurar canal y anticipación |
+| 10 | Notificaciones operativas | 🟢 | Campana, push y mails andando (25 avisos emitidos). Faltan algunos hacia la clienta y el panel para configurar canal y anticipación |
 
-**Cinco terminadas, tres con el núcleo andando, una sin empezar y una afuera.**
+**Ocho terminadas, una sin empezar (Personal) y una afuera (Inventario).** El
+15/09 pasaron a verde la 3, la 4 y la 10.
 
 Y el párrafo del final de su lámina coincide con el corte que ya estaba hecho: la
 landing autoadministrable, el email marketing y las automatizaciones comerciales

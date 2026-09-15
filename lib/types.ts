@@ -372,6 +372,14 @@ export type NotificationType =
   | 'renovacion_omitida'
   /** Turnos fijos que perdieron la prioridad (0049) */
   | 'turno_liberado'
+  // Los cinco que van A LA CLIENTA (0052). Los escribe la base con un
+  // trigger, así que salen igual desde la agenda, el portal, la pantalla
+  // de asistencia o cualquier camino que venga después.
+  | 'reserva_confirmada'
+  | 'clase_recordatorio'
+  | 'clase_suspendida'
+  | 'clase_cambio_profesora'
+  | 'lugar_liberado'
 
 /**
  * Una entrada de la bitácora del cliente (0050). No se edita: si algo

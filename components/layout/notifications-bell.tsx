@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Bell, BellRing, BellOff, CreditCard, UserPlus, CalendarClock, AlertTriangle,
   Loader2, Smartphone, RefreshCw, RefreshCwOff, Wallet, Scale, Coins,
+  CalendarCheck, CalendarOff, UserCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
@@ -66,6 +67,14 @@ const ESTILOS: Record<NotificationType, EstiloAviso> = {
   // Lleva a Agenda y no a Clientes: lo que hay que hacer con un turno
   // liberado es decidir a quién dárselo, y eso se ve sobre la grilla.
   turno_liberado:       { Icon: CalendarClock, color: 'bg-aviso-suave text-aviso-fuerte',             page: 'agenda' },
+  // Los cinco de la clienta (0052). El `page` casi no se usa: los lee
+  // desde el portal, donde la campana va sin `onNavigate` porque sus
+  // destinos son pantallas del sistema que el portal no tiene.
+  reserva_confirmada:     { Icon: CalendarCheck, color: 'bg-exito-suave text-exito-fuerte',     page: 'reservas' },
+  clase_recordatorio:     { Icon: CalendarClock, color: 'bg-primary/10 text-primary-fuerte',    page: 'reservas' },
+  clase_suspendida:       { Icon: CalendarOff,   color: 'bg-destructive-suave text-destructive-fuerte', page: 'agenda' },
+  clase_cambio_profesora: { Icon: UserCheck,     color: 'bg-info-suave text-info-fuerte',       page: 'agenda' },
+  lugar_liberado:         { Icon: CalendarCheck, color: 'bg-aviso-suave text-aviso-fuerte',     page: 'reservas' },
 }
 
 /**

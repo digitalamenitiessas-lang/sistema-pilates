@@ -1132,6 +1132,63 @@ la prueba de la suspensión revertida exacto.
 `reporteOcupacion` queda marcada `@deprecated` y sin llamadores: se borra cuando
 la `0051` esté en producción.
 
+### ✅ Los avisos a la clienta (15/09) — `0052` **corrida y verificada**
+
+Los cinco de la sección 14 que el estudio volvió a marcar: confirmación de
+reserva, recordatorio de clase, clase suspendida, cambio de profesora y lugar
+liberado. Con esto **se cierra lo amarillo de sus diez prioridades**.
+
+**Los escribe la base, no el navegador**, porque el mismo hecho pasa desde cuatro
+lados: una reserva nace desde la agenda, desde el portal, desde la pantalla de
+asistencia y desde cualquier proceso que venga después. Escrito en cada pantalla,
+el aviso sale cuatro veces —y falta la quinta, cuando alguien agregue un camino
+nuevo y no se acuerde—. Mismo motivo por el que la `0022` puso el sellado de la
+reserva en la base.
+
+**No hizo falta cañería nueva.** La `0007` ya deja que la clienta lea sus propios
+avisos y el portal monta la misma campana que el mostrador, con realtime: una
+fila insertada por el trigger **le aparece en el momento**.
+
+- [x] Cuatro son triggers. El quinto —el recordatorio— **no puede serlo**: no lo
+      dispara nada que alguien escriba, lo dispara que llegue el día. Lo llama el
+      proceso diario, y es idempotente por reserva.
+- [x] **No se le confirma la reserva que se hizo ella misma** desde el portal.
+      Confirmarle lo que acaba de tocar es ruido; el aviso existe para cuando la
+      anota el mostrador.
+- [x] **Al liberarse un lugar se le avisa a TODA la lista de espera**, no a la
+      primera. Es la política que el estudio dejó dicha, y el motivo por el que
+      `waitlist_offer_minutes` sigue sin regir: describe una oferta por turno,
+      que es lo contrario.
+- [x] **El cambio de profesora avisa solo si cambió de verdad.** El trigger corre
+      también al tocar el cupo o el horario, y avisar "la da Ivana" cuando ya la
+      daba Ivana es el tipo de aviso que hace que dejen de leerlos.
+- [x] La suspensión avisa a las confirmadas **y a la lista de espera**; el cambio
+      de profesora, solo a las confirmadas. A quien espera no le cambió quién da
+      una clase que todavía no tiene.
+- [x] **Cómo se nombra una clase está escrito una sola vez**
+      (`texto_de_la_clase`): los cinco avisos la nombran igual, y si cada uno
+      armara su frase habría cinco lugares donde cambiarla.
+
+**Lo que esto NO hace, y va escrito en la migración**: el push al celular y el
+mail salen del servidor, no de un trigger. El aviso **existe y llega al portal**;
+que además le suene el teléfono queda para cuando se decida cuáles lo merecen.
+"Le avisamos" y "le sonó el teléfono" no son lo mismo, y prometer lo segundo sin
+hacerlo es lo peor de los dos.
+
+**Verificado el 15/09 contra la base**: anotar desde el mostrador avisa · liberar
+un lugar avisa a quien espera · cambiar la profesora avisa a las dos confirmadas
+y **volver a guardar sin cambiarla no vuelve a avisar** · suspender avisa a las
+tres (confirmadas y lista de espera) y **suspender de nuevo no repite** · el
+recordatorio corrido dos veces devuelve 0 la segunda. **Revertido**: 8 reservas,
+cero instancias, y los 10 avisos de prueba borrados uno por uno —el `delete` con
+`type=in.(…)` devolvió cero filas sin error, que es exactamente contra lo que
+avisa el criterio de la casa.
+
+**Lo que no se pudo verificar acá**: que a la clienta que se anota desde el
+portal NO se le confirme. `stamp_reservation` deriva `source` de `auth.uid()` y
+el service role no tiene sesión, así que toda alta de prueba queda en `'sistema'`.
+La rama solo se ejerce entrando con una cuenta de clienta.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
@@ -1190,7 +1247,7 @@ la `0051` esté en producción.
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a **`0051`** ✅. La **`0051` corrió el 15/09** y se corrigió dos veces sobre la marcha —los nombres en castellano y el día en el corte por clase—; es idempotente, todo `create or replace`. La **`0050` corrió el 15/09**, se corrigió la clave foránea del autor y se volvió a correr; es idempotente a propósito. La **`0048` y la `0049` corrieron el 15/09** y se verificaron ejerciéndolas: el cupo rechazó el noveno turno fijo, un pausado quedó fuera de la liberación automática, y el interruptor encendido liberó exactamente uno. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Migraciones aplicadas | `0001` a **`0052`** ✅. La **`0052` corrió el 15/09** y se corrigió una redacción; es idempotente. La **`0051` corrió el 15/09** y se corrigió dos veces sobre la marcha —los nombres en castellano y el día en el corte por clase—; es idempotente, todo `create or replace`. La **`0050` corrió el 15/09**, se corrigió la clave foránea del autor y se volvió a correr; es idempotente a propósito. La **`0048` y la `0049` corrieron el 15/09** y se verificaron ejerciéndolas: el cupo rechazó el noveno turno fijo, un pausado quedó fuera de la liberación automática, y el interruptor encendido liberó exactamente uno. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
 | Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |

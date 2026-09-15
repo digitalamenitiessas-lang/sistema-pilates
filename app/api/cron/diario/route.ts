@@ -981,8 +981,34 @@ export async function GET(request: Request) {
     }
   }
 
+  // ------------------------------------------------------------
+  // El recordatorio de la clase de hoy (0052)
+  //
+  // Es el único de los cinco avisos a la clienta que no puede ser un
+  // trigger: no lo dispara nada que alguien escriba, lo dispara que
+  // llegue el día. Los otros cuatro los emite la base sola.
+  //
+  // La función es idempotente —dedupe por reserva—, así que dos corridas
+  // el mismo día no le avisan dos veces.
+  // ------------------------------------------------------------
+  let recordatoriosDeClase = 0
+  let recordatorioError: string | undefined
+  {
+    const { data, error } = await admin.rpc('recordar_clases_de_hoy')
+    if (error) {
+      recordatorioError =
+        error.code === '42883' || /recordar_clases_de_hoy/.test(error.message)
+          ? 'migración 0052 pendiente'
+          : error.message
+    } else {
+      recordatoriosDeClase = (data as number | null) ?? 0
+    }
+  }
+
   return NextResponse.json({
     date: today,
+    recordatoriosDeClase,
+    recordatorioSalteado: recordatorioError,
     turnosVencidos,
     turnosLiberados,
     turnosSalteados: turnosError,
