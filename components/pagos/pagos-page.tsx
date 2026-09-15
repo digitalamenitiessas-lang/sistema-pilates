@@ -24,7 +24,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { registerPayment, collectPayment, createMpLink, syncMpPayments, voidPayment, precioConAjuste, settingText, esOferta, hoyISO } from '@/lib/api'
-import type { Payment } from '@/lib/types'
+import type { Payment, Student } from '@/lib/types'
 
 type FilterStatus = 'todos' | 'pagado' | 'pendiente' | 'renovacion' | 'vencido'
 type Method = 'efectivo' | 'transferencia' | 'tarjeta'
@@ -179,13 +179,32 @@ function ReceiptSuccess({ receiptNumber, onClose }: { receiptNumber: number; onC
   )
 }
 
-function RegistrarPagoModal({ onClose }: { onClose: () => void }) {
+/**
+ * Exportados para que Agenda los use tal cual (§1 del pedido del 15/09):
+ * resolver una clienta sin salir de Agenda no puede significar una
+ * segunda implementación del cobro. El ajuste por medio de pago y el
+ * redondeo viven acá una sola vez — si se copiaran, el mismo acto
+ * comercial daría dos números según por qué pantalla se entrara, que es
+ * exactamente el bug que estos dos modales ya tuvieron una vez.
+ */
+export function RegistrarPagoModal({
+  onClose,
+  student: preseleccionado,
+}: {
+  onClose: () => void
+  /** Desde Agenda ya se sabe quién es: preseleccionarlo ahorra el paso. */
+  student?: Student
+}) {
   const { refresh } = useData()
   const { students, plans, paymentMethods, settings } = useStudio()
 
-  const [studentId, setStudentId] = useState('')
-  const [concept, setConcept] = useState('')
-  const [amount, setAmount] = useState('')
+  const [studentId, setStudentId] = useState(preseleccionado?.id ?? '')
+  // Con el cliente ya elegido se arranca con su plan cargado, que es lo
+  // mismo que hace `applyPlanDefaults` cuando se lo elige a mano.
+  const [concept, setConcept] = useState(preseleccionado?.membership?.planName ?? '')
+  const [amount, setAmount] = useState(
+    preseleccionado?.membership ? String(preseleccionado.membership.price) : ''
+  )
   const [method, setMethod] = useState<Method | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -360,7 +379,7 @@ function RegistrarPagoModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-function CobrarModal({ payment, onClose }: { payment: Payment; onClose: () => void }) {
+export function CobrarModal({ payment, onClose }: { payment: Payment; onClose: () => void }) {
   const { refresh } = useData()
   const { paymentMethods, settings } = useStudio()
   const [method, setMethod] = useState<Method | null>(null)

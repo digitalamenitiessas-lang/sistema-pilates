@@ -24,7 +24,13 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData } from '@/lib/data-context'
-import { createSystemUser, setMembershipAutoRenew, esOferta, hoyISO } from '@/lib/api'
+import {
+  createSystemUser,
+  setMembershipAutoRenew,
+  esOferta,
+  hoyISO,
+  formaDeLaReserva,
+} from '@/lib/api'
 import type { Membership, MembershipStatus, Student, Reservation, Payment } from '@/lib/types'
 import { AlumnoFormModal } from './alumno-form-modal'
 import { AsignarPlanModal } from './asignar-plan-modal'
@@ -539,6 +545,27 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                         <p className="text-xs text-muted-foreground">
                           {r.discipline} · {r.teacherName}
                         </p>
+                        {/* Por qué esta reserva no es como las demás (0046):
+                            si repuso una perdida, si entró por excepción, o
+                            si al cancelar se quedó sin la clase. Dos
+                            canceladas se leen igual y no son lo mismo. */}
+                        {(() => {
+                          const forma = formaDeLaReserva(r)
+                          if (!forma) return null
+                          return (
+                            <p
+                              className={cn(
+                                'text-[10px] font-semibold mt-0.5',
+                                forma.tono === 'info' && 'text-info-fuerte',
+                                forma.tono === 'aviso' && 'text-aviso-fuerte',
+                                forma.tono === 'neutro' && 'text-muted-foreground'
+                              )}
+                            >
+                              {forma.texto}
+                              {r.overrideReason ? ` · ${r.overrideReason}` : ''}
+                            </p>
+                          )
+                        })()}
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-xs font-medium text-foreground">{r.date}</p>
