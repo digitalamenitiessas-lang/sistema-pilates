@@ -94,6 +94,9 @@ resultado contra la base — no contra la pantalla.
 - Para probar algo que la interfaz no expone, se agrega una sonda temporal
   en `lib/data-context.tsx` (`window.__loquesea`, solo en desarrollo), se
   usa, y **se quita antes de commitear**.
+- Para entrar directo a una pantalla: `/sistema?p=agenda`. **Ya no es una
+  sonda** — desde el 15/09 es una función, valida contra `PAGE_COMPONENTS`
+  y una pantalla nueva se vuelve enlazable sola.
 - Al sacar la sonda, cuidado con no llevarse el bloque de `permisos` /
   `can` que está pegado abajo. Ya pasó dos veces.
 - Los datos de prueba se revierten: si se crea una reserva, se borra; si se

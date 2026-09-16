@@ -45,14 +45,31 @@ function FullScreenLoader({ message }: { message: string }) {
 
 function AppShell() {
   const { session, sessionLoading, profile, profileReady, data, dataError, refresh } = useData()
-  // SONDA TEMPORAL (manual de uso, 12/09) — QUITAR ANTES DE COMMITEAR.
-  // El sistema cambia de pantalla sin tocar la URL, así que un navegador
-  // headless no puede pedir "la agenda" para capturarla. Esto lee ?p=agenda
-  // una sola vez, al montar, y no toca nada más.
+  /**
+   * Con qué pantalla abre: `?p=agenda` entra directo a la agenda.
+   *
+   * El sistema navega sin tocar la URL —siempre dice `/sistema`—, que
+   * para una persona está bien y para todo lo demás no: un link a
+   * Reservas no se puede mandar, y un navegador sin manos no puede pedir
+   * "la agenda" para capturarla. De ahí nació esto, el 12/09, para las
+   * capturas del manual, y quedó marcado como temporal.
+   *
+   * Deja de serlo el 15/09: abrir una pantalla por su dirección es una
+   * función normal de cualquier sistema web, y la usan tanto el script
+   * del manual como cualquiera que quiera compartir un link.
+   *
+   * Se valida contra `PAGE_COMPONENTS` y no contra una lista escrita
+   * acá: un `?p=` inventado dejaba la pantalla en blanco, y una lista
+   * aparte se desincroniza el día que se agregue un módulo. Así, la
+   * pantalla nueva se vuelve enlazable sola.
+   *
+   * Solo al montar, a propósito: después manda el menú, y releer la URL
+   * en cada render pelearía con él.
+   */
   const [currentPage, setCurrentPage] = useState<PageKey>(() => {
     if (typeof window === 'undefined') return 'dashboard'
     const p = new URLSearchParams(window.location.search).get('p')
-    return (p as PageKey) || 'dashboard'
+    return p && p in PAGE_COMPONENTS ? (p as PageKey) : 'dashboard'
   })
   const [collapsed, setCollapsed] = useState(false)
   // En mobile el sidebar es un drawer superpuesto; acá vive su apertura
