@@ -16,6 +16,7 @@ import { PortalPage } from '@/components/portal/portal-page'
 import { InstallPrompt } from '@/components/pwa/install-prompt'
 import { CajaPage } from '@/components/caja/caja-page'
 import { GastosPage } from '@/components/gastos/gastos-page'
+import { PersonalPage } from '@/components/personal/personal-page'
 import { ReportesPage } from '@/components/reportes/reportes-page'
 import { DataProvider, useData } from '@/lib/data-context'
 
@@ -28,6 +29,7 @@ const PAGE_COMPONENTS: Record<PageKey, React.ComponentType<{ onNavigate: (page: 
   pagos: PagosPage,
   caja: CajaPage,
   gastos: GastosPage,
+  personal: PersonalPage,
   reportes: ReportesPage,
   configuracion: ConfiguracionPage,
 }
@@ -43,7 +45,32 @@ function FullScreenLoader({ message }: { message: string }) {
 
 function AppShell() {
   const { session, sessionLoading, profile, profileReady, data, dataError, refresh } = useData()
-  const [currentPage, setCurrentPage] = useState<PageKey>('dashboard')
+  /**
+   * Con qué pantalla abre: `?p=agenda` entra directo a la agenda.
+   *
+   * El sistema navega sin tocar la URL —siempre dice `/sistema`—, que
+   * para una persona está bien y para todo lo demás no: un link a
+   * Reservas no se puede mandar, y un navegador sin manos no puede pedir
+   * "la agenda" para capturarla. De ahí nació esto, el 12/09, para las
+   * capturas del manual, y quedó marcado como temporal.
+   *
+   * Deja de serlo el 15/09: abrir una pantalla por su dirección es una
+   * función normal de cualquier sistema web, y la usan tanto el script
+   * del manual como cualquiera que quiera compartir un link.
+   *
+   * Se valida contra `PAGE_COMPONENTS` y no contra una lista escrita
+   * acá: un `?p=` inventado dejaba la pantalla en blanco, y una lista
+   * aparte se desincroniza el día que se agregue un módulo. Así, la
+   * pantalla nueva se vuelve enlazable sola.
+   *
+   * Solo al montar, a propósito: después manda el menú, y releer la URL
+   * en cada render pelearía con él.
+   */
+  const [currentPage, setCurrentPage] = useState<PageKey>(() => {
+    if (typeof window === 'undefined') return 'dashboard'
+    const p = new URLSearchParams(window.location.search).get('p')
+    return p && p in PAGE_COMPONENTS ? (p as PageKey) : 'dashboard'
+  })
   const [collapsed, setCollapsed] = useState(false)
   // En mobile el sidebar es un drawer superpuesto; acá vive su apertura
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)

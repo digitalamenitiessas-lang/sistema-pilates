@@ -307,6 +307,115 @@ function MercadoPagoSection() {
   )
 }
 
+/**
+ * Crear la cuenta de una profesora desde su propia fila.
+ *
+ * Hasta hoy eran dos pasos en dos secciones: crear el usuario en Accesos
+ * y después venir acá a vincularlo, en ese orden y sin que nada lo
+ * dijera. Una cuenta creada y no vinculada entra al sistema pero
+ * `my_teacher_ids()` no la encuentra, así que el sistema no sabe qué
+ * clases son suyas — existe y no sirve para lo que se creó.
+ *
+ * Es el mismo modal que la ficha de la clienta usa para su portal, con
+ * el rol y el vínculo que le corresponden.
+ */
+function TeacherAccessModal({ teacher, onClose }: { teacher: Teacher; onClose: () => void }) {
+  const { refresh } = useData()
+  const [email, setEmail] = useState(teacher.email ?? '')
+  const [password, setPassword] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    setError(null)
+    try {
+      await createSystemUser({
+        email,
+        password,
+        fullName: teacher.name,
+        role: 'profesor',
+        teacherId: teacher.id,
+      })
+      await refresh()
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo crear la cuenta')
+      setSaving(false)
+    }
+  }
+
+  const inputClass =
+    'w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors'
+  const labelClass =
+    'text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/20 backdrop-blur-sm" onClick={onClose}>
+      <form
+        onSubmit={handleSubmit}
+        className="bg-card rounded-2xl shadow-2xl w-full max-w-md border border-border overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-6 py-4 border-b border-border">
+          <h2 className="text-base font-bold text-foreground">Cuenta para entrar al sistema</h2>
+          <p className="text-xs text-muted-foreground">{teacher.name}</p>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          <div>
+            <label className={labelClass}>Email de acceso *</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputClass} />
+            {/* El alta la crea confirmada, así que un dominio que el
+                estudio no tenga sirve para entrar. Lo que no va a andar
+                es recuperar la contraseña: ese mail no llega a ningún
+                lado. Se dice acá y no después. */}
+            <p className="text-[11px] text-muted-foreground mt-1.5">
+              Si el dominio no es del estudio, la cuenta entra igual — pero "olvidé mi contraseña" no
+              le va a llegar.
+            </p>
+          </div>
+          <div>
+            <label className={labelClass}>Contraseña inicial *</label>
+            <input
+              type="text"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
+              placeholder="Mínimo 6 caracteres"
+              className={inputClass}
+            />
+            <p className="text-[11px] text-muted-foreground mt-1.5">
+              Se la pasás y con eso entra. Conviene que la cambie: con su cuenta se ven los datos de
+              las clientas.
+            </p>
+          </div>
+
+          <p className="text-[11px] text-muted-foreground bg-muted rounded-xl px-3 py-2.5">
+            La cuenta queda vinculada a esta ficha sola. Para que además pueda{' '}
+            <span className="font-semibold">tomar asistencia</span> hacen falta los permisos de
+            Reservas, y que ese grupo esté encendido.
+          </p>
+
+          {error && <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
+        </div>
+
+        <div className="flex gap-3 px-6 py-4 border-t border-border">
+          <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors">
+            Cancelar
+          </button>
+          <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2">
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            Crear la cuenta
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
 function TeacherFormModal({ teacher, onClose }: { teacher?: Teacher; onClose: () => void }) {
   const { refresh } = useData()
   const { disciplines: catalog } = useStudio()
@@ -316,6 +425,13 @@ function TeacherFormModal({ teacher, onClose }: { teacher?: Teacher; onClose: ()
   const [phone, setPhone] = useState(teacher?.phone ?? '')
   const [email, setEmail] = useState(teacher?.email ?? '')
   const [color, setColor] = useState(teacher?.color ?? TEACHER_COLORS[0])
+  // La ficha laboral (0053). Existía en la base y ningún formulario la
+  // escribía, que es el mismo modo de falla que tuvieron el contacto de
+  // emergencia y las dos columnas de la 0022.
+  const [fechaIngreso, setFechaIngreso] = useState(teacher?.laboral?.fechaIngreso ?? '')
+  const [fechaBaja, setFechaBaja] = useState(teacher?.laboral?.fechaBaja ?? '')
+  const [dni, setDni] = useState(teacher?.laboral?.dni ?? '')
+  const [notasLaborales, setNotasLaborales] = useState(teacher?.laboral?.notasLaborales ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -330,7 +446,10 @@ function TeacherFormModal({ teacher, onClose }: { teacher?: Teacher; onClose: ()
     }
     setSaving(true)
     setError(null)
-    const input: TeacherInput = { name, disciplines, phone, email, color }
+    const input: TeacherInput = {
+      name, disciplines, phone, email, color,
+      fechaIngreso, fechaBaja, dni, notasLaborales,
+    }
     try {
       if (isEdit) await updateTeacher(teacher.id, input)
       else await createTeacher(input)
@@ -412,6 +531,37 @@ function TeacherFormModal({ teacher, onClose }: { teacher?: Teacher; onClose: ()
               ))}
             </div>
           </div>
+          {/* La ficha laboral (0053). Va acá y no en Personal porque es
+              parte de quién es la persona, no de cuánto cobra: lo que
+              cobra está en Personal, bajo su propia clave. */}
+          <div className="pt-1 border-t border-border">
+            <p className={cn(labelClass, 'pt-3')}>Ficha laboral</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] text-muted-foreground block mb-1">Fecha de ingreso</label>
+                <input type="date" value={fechaIngreso ?? ''} onChange={(e) => setFechaIngreso(e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="text-[11px] text-muted-foreground block mb-1">DNI</label>
+                <input value={dni} onChange={(e) => setDni(e.target.value)} className={inputClass} />
+              </div>
+            </div>
+            <div className="mt-3">
+              <label className="text-[11px] text-muted-foreground block mb-1">Fecha de baja</label>
+              <input type="date" value={fechaBaja ?? ''} onChange={(e) => setFechaBaja(e.target.value)} className={inputClass} />
+              {/* Que quede claro que son dos cosas distintas: si se
+                  confunden, una liquidación pasada deja de mostrarla. */}
+              <p className="text-[11px] text-muted-foreground mt-1.5">
+                Cuándo dejó de trabajar. No es lo mismo que darla de baja del catálogo: con la fecha
+                puesta sigue apareciendo en las liquidaciones de los meses que sí trabajó.
+              </p>
+            </div>
+            <div className="mt-3">
+              <label className="text-[11px] text-muted-foreground block mb-1">Notas</label>
+              <textarea rows={2} value={notasLaborales} onChange={(e) => setNotasLaborales(e.target.value)} placeholder="Condiciones de contratación, acuerdos..." className={`${inputClass} resize-none`} />
+            </div>
+          </div>
+
           {error && <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
         </div>
 
@@ -434,6 +584,7 @@ function TeachersSection() {
   const { teachers } = useStudio()
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<Teacher | undefined>(undefined)
+  const [creandoCuenta, setCreandoCuenta] = useState<Teacher | undefined>(undefined)
   // Las cuentas con rol profesor, para poder vincularlas con su ficha.
   const [cuentas, setCuentas] = useState<Profile[]>([])
   const [vinculando, setVinculando] = useState<string | null>(null)
@@ -515,6 +666,17 @@ function TeachersSection() {
                 ))}
               </select>
             )}
+            {/* Crear la cuenta desde acá, que es donde aparece la falta.
+                Antes había que ir a Accesos, crearla, volver y
+                vincularla — en ese orden y sin que nada lo dijera. */}
+            {canWrite && !t.userId && (
+              <button
+                onClick={() => setCreandoCuenta(t)}
+                className="px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary-fuerte text-[11px] font-semibold hover:bg-primary/20 transition-colors whitespace-nowrap shrink-0"
+              >
+                Crear cuenta
+              </button>
+            )}
             {canWrite && (
               <>
                 <button
@@ -546,15 +708,18 @@ function TeachersSection() {
           <p className="text-[11px] text-muted-foreground">
             La cuenta es con la que la profesora entra al sistema. Sin vincularla,
             el sistema no sabe qué clases son suyas y no puede mostrarle solo las
-            de ella.
+            de ella. Con «Crear cuenta» se hacen las dos cosas de una.{' '}
             {cuentas.length === 0 &&
-              ' Todavía no hay ninguna cuenta con rol profesor: creala en Accesos.'}
+              'Todavía no hay ninguna cuenta con rol profesor.'}
           </p>
         </div>
       )}
     </SeccionPlegable>
 
     {showForm && <TeacherFormModal teacher={editing} onClose={() => setShowForm(false)} />}
+    {creandoCuenta && (
+      <TeacherAccessModal teacher={creandoCuenta} onClose={() => setCreandoCuenta(undefined)} />
+    )}
     </>
   )
 }

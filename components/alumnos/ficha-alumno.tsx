@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ArrowLeft,
   Phone,
@@ -20,9 +20,10 @@ import {
   Smartphone,
   Loader2,
   RefreshCw,
+  HeartPulse,
   X,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, nombreDelDia } from '@/lib/utils'
 import { useData } from '@/lib/data-context'
 import {
   createSystemUser,
@@ -30,8 +31,17 @@ import {
   esOferta,
   hoyISO,
   formaDeLaReserva,
+  fetchStudentNotes,
+  addStudentNote,
 } from '@/lib/api'
-import type { Membership, MembershipStatus, Student, Reservation, Payment } from '@/lib/types'
+import type {
+  Membership,
+  MembershipStatus,
+  Student,
+  StudentNote,
+  Reservation,
+  Payment,
+} from '@/lib/types'
 import { AlumnoFormModal } from './alumno-form-modal'
 import { AsignarPlanModal } from './asignar-plan-modal'
 
@@ -178,9 +188,149 @@ function PortalAccessModal({ student, onClose }: { student: Student; onClose: ()
 const TABS = [
   { key: 'resumen', label: 'Resumen', icon: User },
   { key: 'reservas', label: 'Reservas', icon: CalendarDays },
+  // Las dos de la 0050. 'Salud' separa lo que hasta ahora era un párrafo
+  // suelto; 'Notas' es la bitácora, lo único que la profesora escribe.
+  { key: 'salud', label: 'Salud', icon: HeartPulse },
+  { key: 'notas', label: 'Notas', icon: ClipboardList },
   { key: 'pagos', label: 'Pagos', icon: CreditCard },
   { key: 'membresia', label: 'Membresía', icon: BookOpen },
 ]
+
+/** Un campo de salud, o nada si está vacío: la ficha no lista renglones vacíos. */
+function CampoSalud({ label, value }: { label: string; value?: string }) {
+  if (!value?.trim()) return null
+  return (
+    <div>
+      <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium mb-0.5">
+        {label}
+      </p>
+      <p className="text-sm text-foreground whitespace-pre-line">{value}</p>
+    </div>
+  )
+}
+
+/**
+ * La bitácora. Se lee al abrir la pestaña y no con el paquete del
+ * estudio: es historia que crece sin techo y que solo mira quien está
+ * parado en esta ficha.
+ */
+function Bitacora({ student }: { student: Student }) {
+  const { can } = useData()
+  const [notas, setNotas] = useState<StudentNote[] | null>(null)
+  const [texto, setTexto] = useState('')
+  const [kind, setKind] = useState<StudentNote['kind']>('profesora')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const puedeEscribir = can('notas.escribir')
+  const puedeInterna = can('alumnos.editar')
+
+  const cargar = useCallback(() => {
+    // El error NO se traga. Antes esto era `.catch(() => setNotas([]))` y
+    // la pantalla decía "sin notas todavía" con las notas guardadas en la
+    // base: el modo de falla más caro que tiene este sistema, porque el
+    // dato está y nadie lo sabe. Se descubrió probando la 0050.
+    setNotas(null)
+    setError(null)
+    fetchStudentNotes(student.id)
+      .then(setNotas)
+      .catch((err) => {
+        setNotas([])
+        setError(err instanceof Error ? err.message : 'No se pudo leer la bitácora')
+      })
+  }, [student.id])
+
+  useEffect(cargar, [cargar])
+
+  const guardar = async () => {
+    setSaving(true)
+    setError(null)
+    try {
+      await addStudentNote(student.id, texto, kind)
+      setTexto('')
+      cargar()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar la nota')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="max-w-2xl space-y-4">
+      {puedeEscribir && (
+        <div className="bg-card rounded-2xl border border-border p-4 space-y-2">
+          <textarea
+            rows={3}
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            placeholder="Qué se observó hoy…"
+            className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary resize-none"
+          />
+          <div className="flex items-center gap-2">
+            {puedeInterna && (
+              <select
+                value={kind}
+                onChange={(e) => setKind(e.target.value as StudentNote['kind'])}
+                className="px-3 py-2 rounded-xl border border-border bg-background text-xs text-foreground outline-none focus:border-primary"
+              >
+                <option value="profesora">La ve todo el equipo</option>
+                <option value="interna">Solo mostrador</option>
+              </select>
+            )}
+            <button
+              disabled={saving || !texto.trim()}
+              onClick={guardar}
+              className="ml-auto px-5 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50 flex items-center gap-2"
+            >
+              {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              Agregar
+            </button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Queda tu nombre y la fecha. Una nota no se edita: si algo cambió, se agrega otra.
+          </p>
+          {error && <p className="text-xs text-destructive-fuerte">{error}</p>}
+        </div>
+      )}
+
+      {error && !saving && (
+        <p className="text-xs text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">
+          {error}
+        </p>
+      )}
+
+      {notas === null ? (
+        <p className="text-sm text-muted-foreground py-6 text-center">Cargando…</p>
+      ) : notas.length === 0 && !error ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <ClipboardList className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          <p className="text-sm">Sin notas todavía</p>
+        </div>
+      ) : (
+        notas.map((n) => (
+          <div key={n.id} className="bg-card rounded-xl border border-border p-4">
+            <p className="text-sm text-foreground whitespace-pre-line">{n.body}</p>
+            <p className="text-[11px] text-muted-foreground mt-2">
+              {n.authorName} ·{' '}
+              {/* Fijo al huso del estudio y no al del navegador. Es la
+                  misma decisión de la 0016 para la plata: si el mostrador
+                  abre desde una tablet mal configurada, la nota tiene que
+                  seguir diciendo la hora a la que se escribió en el
+                  estudio, no la que cree ese aparato. */}
+              {new Date(n.createdAt).toLocaleString('es-AR', {
+                timeZone: 'America/Argentina/Buenos_Aires',
+              })}
+              {n.kind === 'interna' && (
+                <span className="ml-2 font-semibold text-aviso-fuerte">solo mostrador</span>
+              )}
+            </p>
+          </div>
+        ))
+      )}
+    </div>
+  )
+}
 
 function ReservationStatusIcon({ status }: { status: Reservation['status'] }) {
   if (status === 'asistió') return <CheckCircle2 className="w-4 h-4 text-exito-fuerte" />
@@ -206,13 +356,23 @@ interface FichaAlumnoProps {
 }
 
 export function FichaAlumno({ student, reservations, payments, onBack }: FichaAlumnoProps) {
-  const { canWrite, refresh, data } = useData()
+  const { canWrite, refresh, data, can } = useData()
+  // Lo pregunta al motor y no al dato: sin la clave, `student_private`
+  // llega vacío y "no hay" se confunde con "no podés ver".
+  const veSalud = can('salud.ver')
   const [activeTab, setActiveTab] = useState('resumen')
   const [showEdit, setShowEdit] = useState(false)
   const [showAssignPlan, setShowAssignPlan] = useState(false)
   const [showPortalAccess, setShowPortalAccess] = useState(false)
   const [savingAutoRenew, setSavingAutoRenew] = useState(false)
   const ms = student.membership
+
+  // Sus turnos fijos (0048), ordenados como los lee el mostrador: por día
+  // y hora, no por cuándo se los asignaron. Vacío mientras la migración
+  // no corrió, y también si al rol le falta `turnos.ver`.
+  const turnos = (data?.turnosFijos ?? [])
+    .filter((t) => t.studentId === student.id)
+    .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.time.localeCompare(b.time))
 
   // `student.membership` es la que cubre hoy —lib/api.ts elige con el mismo
   // criterio que membresia_para— y solo si ninguna cubre hoy cae, como
@@ -268,7 +428,20 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
   }
   const classesLeft = ms ? ms.classesTotal - ms.classesUsed : 0
   const attended = reservations.filter((r) => r.status === 'asistió').length
-  const upcoming = reservations.filter((r) => r.status === 'confirmada').length
+  /**
+   * "¿Cuándo vuelve?" — una de las seis preguntas que el estudio pidió
+   * que la ficha conteste de un vistazo (§3 del 15/09).
+   *
+   * Hasta hoy esto era el CONTADOR de reservas confirmadas, y mentía:
+   * una reserva vieja que nadie marcó como asistida o ausente sigue en
+   * 'confirmada' para siempre, así que el número crecía con el descuido
+   * del mostrador en vez de con las clases que vienen. Ahora se filtra
+   * por fecha y lo que se muestra es la próxima, que es la pregunta.
+   */
+  const proximas = reservations
+    .filter((r) => r.status === 'confirmada' && r.date >= hoyISO())
+    .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
+  const proxima = proximas[0]
 
   return (
     <div className="flex flex-col h-full">
@@ -337,10 +510,65 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
               <p className="text-[11px] text-muted-foreground mt-0.5">Clases rest.</p>
             </div>
             <div className="bg-muted rounded-xl p-3 text-center">
-              <p className="text-2xl font-bold text-foreground">{upcoming}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Próximas</p>
+              {proxima ? (
+                <>
+                  <p className="text-2xl font-bold text-foreground leading-none">
+                    {new Date(`${proxima.date}T00:00`).toLocaleDateString('es-AR', {
+                      day: 'numeric',
+                      month: 'short',
+                    })}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Vuelve · {proxima.time}
+                    {proximas.length > 1 ? ` (+${proximas.length - 1})` : ''}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-2xl font-bold text-muted-foreground leading-none">—</p>
+                  <p className="text-[11px] text-muted-foreground mt-1">Sin reservas</p>
+                </>
+              )}
             </div>
           </div>
+
+          {/* Los turnos fijos (0048). Es un pedido textual del estudio y
+              está en su §3: la ficha tiene que contestar "¿qué turnos
+              fijos tiene?" sin entrar a ningún lado. La prioridad no sale
+              de acá: la deriva la base del vencimiento de su membresía. */}
+          {turnos.length > 0 && (
+            <div className="mt-4 rounded-xl border border-border bg-muted/40 p-3.5">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium mb-1.5">
+                Turnos fijos
+              </p>
+              <div className="space-y-0.5">
+                {turnos.map((t) => (
+                  <p key={t.id} className="text-sm text-foreground">
+                    {nombreDelDia(t.dayOfWeek)} {t.time}
+                    {t.estado === 'pausado' && (
+                      <span className="ml-2 text-[10px] font-semibold text-muted-foreground">
+                        en pausa{t.motivo ? ` · ${t.motivo}` : ''}
+                      </span>
+                    )}
+                  </p>
+                ))}
+              </div>
+              {/* La fecha sola no dice nada si ya pasó: el mostrador tiene
+                  que ver de un vistazo si el lugar sigue siendo suyo. */}
+              <p
+                className={cn(
+                  'text-xs mt-2',
+                  turnos[0].conPrioridad ? 'text-muted-foreground' : 'text-destructive-fuerte font-semibold'
+                )}
+              >
+                {turnos[0].prioridadHasta
+                  ? turnos[0].conPrioridad
+                    ? `Prioridad hasta: ${fecha(turnos[0].prioridadHasta)}`
+                    : `Perdió la prioridad el ${fecha(turnos[0].prioridadHasta)} — sus horarios se pueden liberar`
+                  : 'Sin membresía: no conserva la prioridad sobre estos horarios'}
+              </p>
+            </div>
+          )}
 
           {/* Lo que le ofrecimos y todavía no pagó. Va antes del bloque de
               abajo porque es el estado anterior —y el único de los dos que
@@ -510,6 +738,35 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                 </div>
               )}
 
+              {/* El contacto de emergencia (15/09). Va con el teléfono en
+                  vivo: si hay que usarlo es porque alguien está buscando a
+                  quién llamar, y en ese momento un dato que hay que
+                  transcribir no sirve. */}
+              {student.emergencyContact && (
+                <div className="bg-card rounded-2xl border border-border p-5">
+                  <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-destructive-fuerte" />
+                    Contacto de emergencia
+                  </h3>
+                  <p className="text-sm text-foreground">{student.emergencyContact}</p>
+                  {(() => {
+                    // El primer número largo del texto. El campo es libre
+                    // —"Mamá, Ana, 381 555 1234"— así que se busca en vez
+                    // de suponer un formato que nadie prometió.
+                    const tel = student.emergencyContact.replace(/[^0-9+]/g, '')
+                    if (tel.replace(/\D/g, '').length < 8) return null
+                    return (
+                      <a
+                        href={`tel:${tel}`}
+                        className="text-xs font-semibold text-primary-fuerte hover:underline mt-1.5 inline-block"
+                      >
+                        Llamar
+                      </a>
+                    )
+                  })()}
+                </div>
+              )}
+
               {/* Observations */}
               {student.observations && (
                 <div className="bg-card rounded-2xl border border-border p-5">
@@ -592,6 +849,67 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
           )}
 
           {/* Pagos */}
+          {activeTab === 'salud' && (
+            <div className="max-w-2xl space-y-4">
+              {/* Los cuatro campos de la 0050 más el texto libre de antes.
+                  Si no hay nada cargado se dice, en vez de mostrar cinco
+                  renglones vacíos que parecen un error de la pantalla. */}
+              {/* "No tenés acceso" y "no hay nada cargado" se ven iguales:
+                  `student_private` devuelve CERO FILAS cuando falta
+                  `salud.ver`, no un error. Y acá confundirlas tiene
+                  consecuencia física — una profesora que lee "sin datos de
+                  salud" da la clase creyendo que esa clienta no tiene
+                  lesiones ni está embarazada. Se pregunta por el permiso,
+                  nunca por el resultado vacío. */}
+              {!veSalud ? (
+                <div className="rounded-2xl border border-aviso/40 bg-aviso-suave p-5">
+                  <h3 className="text-sm font-semibold text-aviso-fuerte mb-1 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    Tu rol no ve los datos de salud
+                  </h3>
+                  <p className="text-sm text-aviso-fuerte/90">
+                    Puede haber lesiones, embarazo, cirugías o medicación cargadas y esta pantalla no
+                    te las muestra. <span className="font-semibold">No quiere decir que no haya.</span>{' '}
+                    Si necesitás saberlo antes de una clase, preguntale a administración.
+                  </p>
+                </div>
+              ) : !student.lesiones &&
+              !student.embarazo &&
+              !student.cirugias &&
+              !student.medicacion &&
+              !student.medicalNotes ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <HeartPulse className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">Sin datos de salud cargados</p>
+                  {canWrite && (
+                    <button
+                      onClick={() => setShowEdit(true)}
+                      className="text-xs font-semibold text-primary-fuerte hover:underline mt-2"
+                    >
+                      Cargarlos ahora
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-card rounded-2xl border border-border p-5 space-y-4">
+                  <CampoSalud label="Lesiones" value={student.lesiones} />
+                  <CampoSalud label="Embarazo" value={student.embarazo} />
+                  <CampoSalud label="Cirugías" value={student.cirugias} />
+                  <CampoSalud label="Medicación" value={student.medicacion} />
+                  <CampoSalud label="Otras observaciones" value={student.medicalNotes} />
+                </div>
+              )}
+              {veSalud && (
+                <p className="text-[11px] text-muted-foreground">
+                  Estos datos los protege la base: el rol sin acceso a salud no los recibe. El
+                  cliente los ve desde su portal.
+                </p>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'notas' && <Bitacora student={student} />}
+
           {activeTab === 'pagos' && (
             <div className="max-w-2xl space-y-2">
               {payments.length === 0 ? (

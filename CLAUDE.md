@@ -8,7 +8,9 @@ Router) + React 19 + Tailwind 4, Supabase (Postgres con RLS) y Mercado Pago.
 
 El documento de la clienta manda: **[`docs/REQUERIMIENTOS-CASA-FE.md`](docs/REQUERIMIENTOS-CASA-FE.md)**
 tiene el estado por sección, los choques con lo que ya funciona, las
-decisiones tomadas y el plan por bloques. El anexo
+decisiones tomadas y el plan por bloques. **Su §0 es la única lista de
+pendientes al día**; el resto del documento es el análisis y la historia, y
+varias secciones quedaron viejas a propósito. El anexo
 [`docs/requerimientos-casa-fe-detalle.md`](docs/requerimientos-casa-fe-detalle.md)
 tiene los 178 requerimientos uno por uno.
 [`docs/PLAN.md`](docs/PLAN.md) es el registro de lo construido.
@@ -61,7 +63,15 @@ hay que saber para no romperlo:
   del motor, y mientras está en `enforce_mode = 'sombra'` responde eso. Por
   eso migrar políticas a `can()` es un cambio sin efecto, verificable.
 - **`select * from public.perm_diff()` tiene que dar cero filas.** Cualquier
-  fila ahí es un permiso que cambió sin que nadie lo pidiera.
+  fila ahí es un permiso que cambió sin que nadie lo pidiera. Ojo con qué
+  mira: desde la `0020` compara **solo las claves en sombra**, porque
+  compararlas todas contra el legado convertía el primer cambio legítimo
+  en un falso positivo eterno. O sea que **un grupo encendido sale de esa
+  red**: lo que protege es lo que todavía no rige.
+- Cambios deliberados ya hechos sobre la matriz, para que nadie los lea
+  como un error: **`profesor` tiene `salud.ver`** desde el 15/09 —la
+  profesora es quien está en la clase si alguien se descompone— y por eso
+  el grupo `Datos sensibles` está en `activo`.
 - El encendido va grupo por grupo: `update permission_keys set
   enforce_mode = 'activo' where grupo = '...'`, y se revierte igual. Ojo
   que ese grupo va por su tercer nombre: `Alumnos` (0012) → `Clientas`
@@ -84,6 +94,9 @@ resultado contra la base — no contra la pantalla.
 - Para probar algo que la interfaz no expone, se agrega una sonda temporal
   en `lib/data-context.tsx` (`window.__loquesea`, solo en desarrollo), se
   usa, y **se quita antes de commitear**.
+- Para entrar directo a una pantalla: `/sistema?p=agenda`. **Ya no es una
+  sonda** — desde el 15/09 es una función, valida contra `PAGE_COMPONENTS`
+  y una pantalla nueva se vuelve enlazable sola.
 - Al sacar la sonda, cuidado con no llevarse el bloque de `permisos` /
   `can` que está pegado abajo. Ya pasó dos veces.
 - Los datos de prueba se revierten: si se crea una reserva, se borra; si se

@@ -13,9 +13,10 @@ import {
   reporteDeudas,
   reporteEgresos,
   reporteMembresias,
-  reporteOcupacion,
+  reporteOcupacionPor,
   reportePorMedio,
   reporteResultado,
+  type Rango,
 } from '@/lib/reportes-api'
 
 const plata = (n: number) => `$${Math.round(n).toLocaleString('es-AR')}`
@@ -183,21 +184,109 @@ const REPORTES: Array<Reporte<any>> = [
     },
   },
   {
-    key: 'ocupacion',
+    key: 'ocupacion-clase',
     nombre: 'Ocupación por clase',
     grupo: 'Clases',
-    descripcion: 'Cuánto se llena cada clase y cuánta gente va de verdad',
-    cargar: reporteOcupacion,
+    descripcion: 'Qué horarios se llenan y cuáles no',
+    cargar: (r: Rango) => reporteOcupacionPor(r, 'clase'),
     columnas: [
-      { titulo: 'Clase', valor: (f) => f.clase },
-      { titulo: 'Profesora', valor: (f) => f.profesora },
-      { titulo: 'Cupo', valor: (f) => f.cupo, numero: true, alinearDerecha: true, render: (f) => String(f.cupo) },
+      { titulo: 'Clase', valor: (f) => f.etiqueta },
+      { titulo: 'Se dictó', valor: (f) => f.sesiones, numero: true, alinearDerecha: true, render: (f) => `${f.sesiones} ${f.sesiones === 1 ? 'vez' : 'veces'}` },
+      { titulo: 'Lugares', valor: (f) => f.lugares, numero: true, alinearDerecha: true, render: (f) => String(f.lugares) },
       { titulo: 'Reservas', valor: (f) => f.reservas, numero: true, alinearDerecha: true, render: (f) => String(f.reservas) },
       { titulo: 'Asistieron', valor: (f) => f.asistencias, numero: true, alinearDerecha: true, render: (f) => String(f.asistencias) },
       { titulo: 'Faltaron', valor: (f) => f.ausencias, numero: true, alinearDerecha: true, render: (f) => String(f.ausencias) },
       { titulo: 'Ocupación', valor: (f) => f.ocupacion, numero: true, alinearDerecha: true, render: (f) => `${f.ocupacion}%` },
     ],
-    totalizar: (filas) => `${filas.reduce((a, f) => a + f.reservas, 0)} reservas`,
+    totalizar: (filas) => {
+      const lugares = filas.reduce((a, f) => a + f.lugares, 0)
+      const reservas = filas.reduce((a, f) => a + f.reservas, 0)
+      return lugares ? `${Math.round((reservas / lugares) * 1000) / 10}% sobre ${lugares} lugares` : 'sin clases en el período'
+    },
+  },
+  {
+    key: 'ocupacion-franja',
+    nombre: 'Ocupación por franja horaria',
+    grupo: 'Clases',
+    descripcion: 'Mañana, tarde y noche. Las franjas se definen en Configuración',
+    cargar: (r: Rango) => reporteOcupacionPor(r, 'franja'),
+    columnas: [
+      { titulo: 'Franja', valor: (f) => f.etiqueta },
+      { titulo: 'Se dictó', valor: (f) => f.sesiones, numero: true, alinearDerecha: true, render: (f) => `${f.sesiones} ${f.sesiones === 1 ? 'vez' : 'veces'}` },
+      { titulo: 'Lugares', valor: (f) => f.lugares, numero: true, alinearDerecha: true, render: (f) => String(f.lugares) },
+      { titulo: 'Reservas', valor: (f) => f.reservas, numero: true, alinearDerecha: true, render: (f) => String(f.reservas) },
+      { titulo: 'Asistieron', valor: (f) => f.asistencias, numero: true, alinearDerecha: true, render: (f) => String(f.asistencias) },
+      { titulo: 'Faltaron', valor: (f) => f.ausencias, numero: true, alinearDerecha: true, render: (f) => String(f.ausencias) },
+      { titulo: 'Ocupación', valor: (f) => f.ocupacion, numero: true, alinearDerecha: true, render: (f) => `${f.ocupacion}%` },
+    ],
+    totalizar: (filas) => {
+      const lugares = filas.reduce((a, f) => a + f.lugares, 0)
+      const reservas = filas.reduce((a, f) => a + f.reservas, 0)
+      return lugares ? `${Math.round((reservas / lugares) * 1000) / 10}% sobre ${lugares} lugares` : 'sin clases en el período'
+    },
+  },
+  {
+    key: 'ocupacion-dia',
+    nombre: 'Ocupación por día',
+    grupo: 'Clases',
+    descripcion: 'Qué día de la semana tira más',
+    cargar: (r: Rango) => reporteOcupacionPor(r, 'dia'),
+    columnas: [
+      { titulo: 'Día', valor: (f) => f.etiqueta },
+      { titulo: 'Se dictó', valor: (f) => f.sesiones, numero: true, alinearDerecha: true, render: (f) => `${f.sesiones} ${f.sesiones === 1 ? 'vez' : 'veces'}` },
+      { titulo: 'Lugares', valor: (f) => f.lugares, numero: true, alinearDerecha: true, render: (f) => String(f.lugares) },
+      { titulo: 'Reservas', valor: (f) => f.reservas, numero: true, alinearDerecha: true, render: (f) => String(f.reservas) },
+      { titulo: 'Asistieron', valor: (f) => f.asistencias, numero: true, alinearDerecha: true, render: (f) => String(f.asistencias) },
+      { titulo: 'Faltaron', valor: (f) => f.ausencias, numero: true, alinearDerecha: true, render: (f) => String(f.ausencias) },
+      { titulo: 'Ocupación', valor: (f) => f.ocupacion, numero: true, alinearDerecha: true, render: (f) => `${f.ocupacion}%` },
+    ],
+    totalizar: (filas) => {
+      const lugares = filas.reduce((a, f) => a + f.lugares, 0)
+      const reservas = filas.reduce((a, f) => a + f.reservas, 0)
+      return lugares ? `${Math.round((reservas / lugares) * 1000) / 10}% sobre ${lugares} lugares` : 'sin clases en el período'
+    },
+  },
+  {
+    key: 'ocupacion-mes',
+    nombre: 'Ocupación por mes',
+    grupo: 'Clases',
+    descripcion: 'Cómo viene la ocupación mes a mes',
+    cargar: (r: Rango) => reporteOcupacionPor(r, 'mes'),
+    columnas: [
+      { titulo: 'Mes', valor: (f) => f.etiqueta },
+      { titulo: 'Se dictó', valor: (f) => f.sesiones, numero: true, alinearDerecha: true, render: (f) => `${f.sesiones} ${f.sesiones === 1 ? 'vez' : 'veces'}` },
+      { titulo: 'Lugares', valor: (f) => f.lugares, numero: true, alinearDerecha: true, render: (f) => String(f.lugares) },
+      { titulo: 'Reservas', valor: (f) => f.reservas, numero: true, alinearDerecha: true, render: (f) => String(f.reservas) },
+      { titulo: 'Asistieron', valor: (f) => f.asistencias, numero: true, alinearDerecha: true, render: (f) => String(f.asistencias) },
+      { titulo: 'Faltaron', valor: (f) => f.ausencias, numero: true, alinearDerecha: true, render: (f) => String(f.ausencias) },
+      { titulo: 'Ocupación', valor: (f) => f.ocupacion, numero: true, alinearDerecha: true, render: (f) => `${f.ocupacion}%` },
+    ],
+    totalizar: (filas) => {
+      const lugares = filas.reduce((a, f) => a + f.lugares, 0)
+      const reservas = filas.reduce((a, f) => a + f.reservas, 0)
+      return lugares ? `${Math.round((reservas / lugares) * 1000) / 10}% sobre ${lugares} lugares` : 'sin clases en el período'
+    },
+  },
+  {
+    key: 'ocupacion-profesora',
+    nombre: 'Ocupación por profesora',
+    grupo: 'Clases',
+    descripcion: 'Con la profesora que dio cada clase, no la titular',
+    cargar: (r: Rango) => reporteOcupacionPor(r, 'profesora'),
+    columnas: [
+      { titulo: 'Profesora', valor: (f) => f.etiqueta },
+      { titulo: 'Se dictó', valor: (f) => f.sesiones, numero: true, alinearDerecha: true, render: (f) => `${f.sesiones} ${f.sesiones === 1 ? 'vez' : 'veces'}` },
+      { titulo: 'Lugares', valor: (f) => f.lugares, numero: true, alinearDerecha: true, render: (f) => String(f.lugares) },
+      { titulo: 'Reservas', valor: (f) => f.reservas, numero: true, alinearDerecha: true, render: (f) => String(f.reservas) },
+      { titulo: 'Asistieron', valor: (f) => f.asistencias, numero: true, alinearDerecha: true, render: (f) => String(f.asistencias) },
+      { titulo: 'Faltaron', valor: (f) => f.ausencias, numero: true, alinearDerecha: true, render: (f) => String(f.ausencias) },
+      { titulo: 'Ocupación', valor: (f) => f.ocupacion, numero: true, alinearDerecha: true, render: (f) => `${f.ocupacion}%` },
+    ],
+    totalizar: (filas) => {
+      const lugares = filas.reduce((a, f) => a + f.lugares, 0)
+      const reservas = filas.reduce((a, f) => a + f.reservas, 0)
+      return lugares ? `${Math.round((reservas / lugares) * 1000) / 10}% sobre ${lugares} lugares` : 'sin clases en el período'
+    },
   },
 ]
 

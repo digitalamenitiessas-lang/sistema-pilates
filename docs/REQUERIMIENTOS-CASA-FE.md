@@ -4,6 +4,95 @@
 > secciones + 4 agregados de último momento) contra el código de este repo.
 > Fecha del análisis: **05/09/2026**. Detalle ítem por ítem: [`requerimientos-casa-fe-detalle.md`](requerimientos-casa-fe-detalle.md).
 > Estado de nuestro trabajo hasta acá: [`PLAN.md`](PLAN.md).
+>
+> **¿Buscás qué falta? Está en la §0, acá abajo.** Es la única lista al día; el
+> resto del documento es el análisis y la historia.
+
+## 0. LO QUE FALTA — la lista viva  ·  al 15/09/2026, cerrando el día
+
+> **Esta es la única lista al día.** Las secciones de abajo son el análisis y la
+> historia de cómo se llegó acá, y varias quedaron viejas a propósito: son la
+> línea de base contra la que se mide el avance. Si algo de acá y algo de allá se
+> contradicen, **manda esta sección** — y si una fila de acá dice algo que la base
+> desmiente, manda la base.
+>
+> **Actualizar esta lista es parte de terminar algo, no un extra.**
+
+### Dónde quedó todo, contra las 10 prioridades del estudio
+
+**Nueve en verde.** La única afuera es Inventario, que Matías excluyó (§7).
+El 15/09 entraron diez migraciones —`0046` a `0055`— y pasaron a verde la 3
+(ficha), la 4 (tablero), la 6 (personal) y la 10 (notificaciones).
+
+### Lo que falta construir
+
+| | Qué | Tamaño |
+|---|---|---|
+| **§2** | **Que las reservas del turno fijo se creen solas cada semana.** Es lo último de §2. Ya no depende de ninguna respuesta: Matías definió el 15/09 que manda la cantidad de clases del plan | chico |
+| **§2** | **Ventana de fechas en `fetchStudioData`.** Va en el mismo paso, no después: hoy trae **todas** las reservas sin filtro ni límite en cada ingreso. Con 8 filas no se nota; con turnos fijos reservando cada semana son miles en meses | chico |
+| — | **Los otros 40 lugares donde el mensaje de la base no llega a la pantalla.** El mismo arreglo de una línea que el de la `0046`, pero toca todos los módulos y va con su propia verificación | mediano |
+| **§1** | Cambio de horario por fecha. La tabla lo soporta desde la `0018`; falta la pantalla | chico |
+| — | Foto del comprobante de gasto (primer uso de Storage) · avisos de caja en el proceso diario | chico |
+| — | **Fichaje de entrada y salida** de las profesoras. Se apoya en `staff_work_logs` sin rehacer nada, pero necesita que tengan cuenta | chico |
+| — | Congelar la membresía (`freeze_max_days` existe y no rige) · baja de clienta con motivo · cumpleaños del mes | mediano |
+
+### Lo que falta encender, y no es desarrollo
+
+| | |
+|---|---|
+| **Tomar asistencia la profesora** | Faltan `reservas.asistencia` **y** `reservas.editar`, y **encender el grupo Reservas** — son 8 claves y afecta a todos los roles, así que conviene mirar antes qué cambia |
+| **19 de 22 grupos siguen en sombra** | Rigen Caja, Gastos, Reportes y Datos sensibles. El resto responde el legado: tildar un permiso ahí **no hace nada** hasta encender su grupo |
+
+### Los documentos, y para quién es cada uno
+
+| | Para | Qué dice |
+|---|---|---|
+| `Casa-Fe-que-hace-el-sistema.pdf` | **el estudio** | Todo lo que funciona, y al final **lo que todavía no**. Se generó el 15/09 con `que-hace-el-sistema.py`. Es el que se manda antes de que empiecen |
+| `Casa-Fe-manual-del-mostrador.pdf` | **el estudio** | Las tareas del día a día, paso por paso. **Del 10/09: no tiene nada de las diez migraciones del 15/09** — recuperos, excepción, turnos fijos, la ficha rápida, Personal, la bitácora |
+| `Casa-Fe-manual-de-uso.pdf` | **el estudio** | El manual con capturas. Del 12/09, **igual de viejo**. Se regenera con `manual-de-uso.py`, que necesita la sonda `?p=agenda` |
+| **Esta §0** | **nosotros** | Lo que falta. Es la lista de trabajo, no un instructivo |
+| `PLAN.md` | **nosotros** | Lo construido, migración por migración, con lo verificado |
+
+**Los dos manuales del estudio quedaron viejos el 15/09** y hay que regenerarlos
+cuando la semana de prueba decante: lo de ese día cambia cómo se trabaja en
+Agenda, que es donde el mostrador pasa el día.
+
+### Lo que espera al estudio
+
+| | |
+|---|---|
+| 🔴 | **Nombre y mail de la profesora del turno tarde.** Ivana y Leandro ya tienen cuenta; ella sigue con nombre provisorio |
+| 🟡 | Conectar la cuenta de **Mercado Pago** (verificado: sin conectar) |
+| 🟡 | Verificar el **dominio en Resend** + `EMAIL_FROM` en Vercel. Hasta entonces el mail a las clientas **solo llega a la casilla dueña** |
+| 🟡 | Probar el portal desde una **cuenta de clienta**: es lo único que ejercita el aislamiento por cliente, y no se puede verificar desde adentro del sistema |
+
+### Lo que se cotiza aparte
+
+| | Días | Por qué |
+|---|---|---|
+| Pestaña **Beneficios** de la ficha (§3) | 10-12 | Sección 4 del documento original, **excluida por Matías** (§7). No hay una sola tabla |
+| Pestaña **Compras** de la ficha (§3) | 15-20 | Sección 10 (inventario/POS), **excluida** (§7) |
+
+De los 69 pedidos de la devolución del 15/09, **solo estos dos dan pie a cobrar**.
+Todo lo demás o funciona, o era deuda del proyecto.
+
+### Preguntas al estudio — ninguna frena nada
+
+Todas tienen un valor por defecto andando y se ajustan desde Configuración.
+
+- **Mercado Pago**: si el link se paga con tarjeta, ¿lleva el +25%? Hoy está en 0%. Y el tope de cuotas, que no está puesto en ningún lado.
+- **Congelamiento** de membresía: `freeze_max_days` existe y no rige.
+- **El redondeo**: contestó "al próximo múltiplo de $1.000", que cambia 8 de los 12 precios que ella publicó. `price_rounding` quedó en `cincuenta`, que los deja intactos.
+- Si **3ra Edad** combina con Reformer · las preguntas del FAQ de la web.
+
+### Contestadas, para no volver a preguntarlas
+
+- **El mes de cinco martes** (15/09): manda la cantidad de clases del plan. Ver §8.2.
+- **La profesora ve la ficha de salud** (15/09): sí — en una emergencia en clase es quien está. Se resolvió tildando `salud.ver`, sin migración.
+- **La vigencia** (09/09): mes de calendario desde la fecha individual. Hecho.
+- **El ciclo de pago del 1 al 9**: derogado el 09/09.
+- **El plazo de cancelación**: 3 horas. Ya rige.
+- **Los tres precios por medio de pago**: −5% / base / +25%. Cargados y andando.
 
 ## 1. El titular
 
@@ -610,13 +699,34 @@ es un número o un texto, se configura— y las tres se pueden dar vuelta:
 3. **La recepción carga el recupero, no la clienta desde el portal**: el tope es
    una regla del estudio.
 
-### Lo que hay que preguntarle, y es una sola cosa
+### El mes con cinco martes — contestado (Matías, 15/09)
 
-**El mes con cinco martes.** En un período 20/09–19/10 uno o dos días de la
-semana caen cinco veces y el plan trae cuatro clases por semana. Con turnos
-fijos: ¿la quinta se pierde, se cobra, o el turno no genera reserva? Sin esa
-respuesta el turno fijo no se puede escribir — el trigger de consumo lanza
-excepción cuando no quedan clases.
+Era la única pregunta que frenaba §2. **La respuesta es que manda la cantidad de
+clases del plan**: si ya hizo las cuatro que pagó, el quinto martes del mes no lo
+cubre la membresía.
+
+Y es lo que la base ya hace: `consumir_clase` rechaza cuando no quedan clases. No
+hubo nada que construir. Lo que sí hay que saber es la consecuencia, porque el
+mostrador la va a ver todos los meses:
+
+| Plan | Clases | Por semana | Cubre | Un mes entero pide | Falta |
+|---|---|---|---|---|---|
+| FE START | 4 | 1 | 4 semanas | 4 | — |
+| FE FLOW | 8 | 2 | 4 semanas | 9 | 1 |
+| FE BALANCE | 12 | 3 | 4 semanas | 13 | 1 |
+| FE STRONG | 16 | 4 | 4 semanas | 17 | 1 |
+| FE FULL | 20 | 5 | 4 semanas | 22 | 2 |
+
+Los planes traen **cuatro semanas** de clases y el período es un **mes de
+calendario**, que tiene 4,35. Así que todos menos FE START quedan una o dos
+clases cortos de asistir a todos sus turnos fijos del mes. No es un mes raro de
+cinco martes: pasa casi todos los meses.
+
+**Con el turno fijo sin materializar, eso no le cuesta el horario.** El turno es
+el derecho al lugar y no las reservas de cada fecha, así que se queda sin clases
+las últimas semanas del período pero su martes a las 18 sigue siendo suyo. Si el
+estudio quiere cubrir el mes entero, es subir `class_count` del plan desde la
+pantalla — un campo, no un desarrollo.
 
 Lo demás que parecía pregunta se resolvió parametrizando: las 3 horas, los 2
 recuperos, el −5% y el +25%, la anticipación de los avisos. Todo eso lo mueve
@@ -642,7 +752,11 @@ hay una sola tabla ni una línea de código de ninguna de las dos. Sumarlas en
 silencio sería regalar dos módulos; ignorarlas, dejar la ficha a medias de lo que
 pidió. Va dicho de frente, con su costo al lado.
 
-## 9. Cómo arrancamos
+## 9. Cómo arrancamos — **histórico**
+
+> El plan por bloques con el que se arrancó. Se deja entero porque explica por
+> qué las cosas se hicieron en ese orden, pero **no es la lista de pendientes**:
+> esa es la §0. Varias cosas de acá ya están hechas.
 
 Propuesta de orden. Respeta las prioridades de la clienta, pero corregida por
 dependencias técnicas: hay cosas que si no van primero, obligan a rehacer lo que

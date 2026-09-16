@@ -116,6 +116,91 @@ export interface Teacher {
    * funcionar por más permiso que se le dé: la base no sabe quién es.
    */
   userId?: string | null
+  /** La ficha laboral (0053). Vacío mientras la migración no corrió. */
+  laboral?: DatosLaborales
+}
+
+/**
+ * La ficha laboral de una profesora (0053). Lo que NO es plata: eso vive
+ * en `teacher_pay`, bajo su propia clave, porque RLS filtra filas y no
+ * columnas.
+ */
+export interface DatosLaborales {
+  fechaIngreso?: string | null
+  /**
+   * Cuándo dejó de trabajar. Distinta de `active = false`, que es la baja
+   * del catálogo: quien se fue en marzo tiene que seguir apareciendo en
+   * la liquidación de marzo.
+   */
+  fechaBaja?: string | null
+  dni?: string
+  notasLaborales?: string
+}
+
+/** Una condición salarial vigente desde una fecha (0053). */
+export interface CondicionPago {
+  id: string
+  teacherId: string
+  modalidad: 'por_clase' | 'por_hora' | 'mensual'
+  monto: number
+  desde: string
+  notas: string
+}
+
+/** Horas que NO son clases: las clases se cuentan solas desde la agenda. */
+export interface HorasTrabajadas {
+  id: string
+  teacherId: string
+  fecha: string
+  tipo: 'trabajo' | 'ausencia' | 'tardanza'
+  horas: number
+  detalle: string
+}
+
+/**
+ * La liquidación de un período. **Se deriva, no se guarda**: cada clase
+ * se paga con la tarifa que regía el día que se dictó.
+ */
+export interface FilaLiquidacion {
+  teacherId: string
+  profesora: string
+  clases: number
+  montoClases: number
+  horas: number
+  montoHoras: number
+  mensual: number
+  ausencias: number
+  tardanzas: number
+  total: number
+}
+
+/**
+ * Una liquidación **cerrada** (0054). Distinta de `FilaLiquidacion`, que
+ * es el cálculo vivo: esta es la foto del día que se cerró, y no se
+ * recalcula. Un total que cambia para atrás no es un registro.
+ */
+export interface LiquidacionCerrada {
+  id: string
+  teacherId: string
+  profesora: string
+  desde: string
+  hasta: string
+  clases: number
+  horas: number
+  /** El congelado al cerrar: lo que se le liquidó */
+  total: number
+  /**
+   * Lo que daría hoy el mismo período. Si difiere del congelado, es que
+   * se cargó algo después de cerrar — y eso hay que mostrarlo, no
+   * elegir por el estudio cuál de los dos vale.
+   */
+  totalHoy: number
+  estado: 'cerrada' | 'pagada' | 'anulada'
+  /** El gasto que la saldó; sin esto, "pagada" no movería un peso */
+  expenseId?: string | null
+  notas: string
+  voidReason?: string | null
+  createdAt: string
 }
 
 export interface Plan {
@@ -169,6 +254,40 @@ export interface Membership {
   endDateMotivo?: string | null
 }
 
+/**
+ * Un turno fijo: el derecho de un cliente sobre un día y hora de la
+ * grilla mientras mantenga la prioridad (0048).
+ *
+ * No es una reserva ni un montón de reservas. Las reservas de cada
+ * fecha, cuando existan, se apoyan en esto — no al revés.
+ */
+export interface FixedSlot {
+  id: string
+  studentId: string
+  studentName: string
+  classId: string
+  classTitle: string
+  discipline: Discipline
+  dayOfWeek: number
+  /** "18:00" */
+  time: string
+  capacity: number
+  room: string
+  estado: 'activo' | 'liberado' | 'pausado'
+  desde: string
+  /** Por qué se liberó o se pausó. Lo lee el cliente desde su portal. */
+  motivo?: string | null
+  /**
+   * Hasta cuándo conserva el lugar. Sale del vencimiento de su membresía
+   * más los días de gracia, y **no se guarda**: si se copiara, al segundo
+   * mes diría una cosa distinta que la membresía. Nulo = sin membresía,
+   * o sea sin prioridad sobre nada.
+   */
+  prioridadHasta?: string | null
+  /** Si el lugar sigue siendo suyo hoy. Lo resuelve la base. */
+  conPrioridad: boolean
+}
+
 export interface Student {
   id: string
   name: string
@@ -181,8 +300,18 @@ export interface Student {
   role: Role
   membership?: Membership
   observations?: string
+  /** Lo de salud que no entra en ninguno de los cuatro campos (0050) */
   medicalNotes?: string
   emergencyContact?: string
+  /**
+   * Los cuatro campos de salud (0050). Viven en `student_private`, así
+   * que los gobiernan `salud.ver` y `salud.editar` — y la clienta los
+   * lee desde su portal, como el resto de esa tabla.
+   */
+  lesiones?: string
+  embarazo?: string
+  cirugias?: string
+  medicacion?: string
   /** id del usuario de Auth vinculado (acceso al portal), si tiene */
   userId?: string | null
 }
@@ -326,6 +455,30 @@ export type NotificationType =
   | 'caja_diferencia'
   | 'saldo_sin_imputar'
   | 'renovacion_omitida'
+  /** Turnos fijos que perdieron la prioridad (0049) */
+  | 'turno_liberado'
+  // Los cinco que van A LA CLIENTA (0052). Los escribe la base con un
+  // trigger, así que salen igual desde la agenda, el portal, la pantalla
+  // de asistencia o cualquier camino que venga después.
+  | 'reserva_confirmada'
+  | 'clase_recordatorio'
+  | 'clase_suspendida'
+  | 'clase_cambio_profesora'
+  | 'lugar_liberado'
+
+/**
+ * Una entrada de la bitácora del cliente (0050). No se edita: si algo
+ * cambió, se agrega otra. La clienta no las lee.
+ */
+export interface StudentNote {
+  id: string
+  studentId: string
+  /** 'profesora' la ve todo el equipo; 'interna' no la ve la profesora */
+  kind: 'profesora' | 'interna'
+  body: string
+  authorName: string
+  createdAt: string
+}
 
 /** Notificación persistida (tabla notifications, migración 0007). */
 export interface AppNotification {

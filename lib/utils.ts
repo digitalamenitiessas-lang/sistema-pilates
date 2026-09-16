@@ -30,3 +30,15 @@ export function cuantoDura(plan: Pick<Plan, 'durationDays' | 'durationMonths'>):
   }
   return plan.durationDays === 1 ? '1 día' : `${plan.durationDays} días`
 }
+
+/**
+ * Los días de la grilla. El estudio no dicta domingo, así que el índice
+ * 0 es lunes y no domingo como en JavaScript — es la misma convención de
+ * `class_sessions.day_of_week` desde la 0001, y mezclarlas corre la
+ * grilla un día entero.
+ */
+export const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+
+export function nombreDelDia(n: number): string {
+  return DIAS[n] ?? '—'
+}

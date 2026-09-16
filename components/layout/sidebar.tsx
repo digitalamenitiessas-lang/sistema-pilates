@@ -15,6 +15,7 @@ import {
   Wallet,
   Receipt,
   BarChart3,
+  BriefcaseBusiness,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Logotipo, Sello } from '@/components/layout/logotipo'
@@ -38,6 +39,7 @@ export type PageKey =
   | 'pagos'
   | 'caja'
   | 'gastos'
+  | 'personal'
   | 'reportes'
   | 'configuracion'
 
@@ -56,6 +58,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'pagos', label: 'Pagos', icon: CreditCard },
   { key: 'caja', label: 'Caja', icon: Wallet },
   { key: 'gastos', label: 'Gastos', icon: Receipt },
+  { key: 'personal', label: 'Personal', icon: BriefcaseBusiness },
   { key: 'reportes', label: 'Reportes', icon: BarChart3 },
 ]
 
@@ -89,6 +92,10 @@ export function Sidebar({
     if (item.key === 'pagos') return canWrite
     if (item.key === 'caja') return can('caja.ver') || canWrite
     if (item.key === 'gastos') return can('gastos.ver') || canWrite
+    // Sin el `|| canWrite` de los otros: la clave la crea la 0053, así
+    // que hasta que la migración corra `can()` dice que no y el módulo
+    // no aparece. No se ofrece una pantalla que la base no sabe servir.
+    if (item.key === 'personal') return can('personal.ver')
     if (item.key === 'reportes') return can('reportes.ver') || canWrite
     return true
   })

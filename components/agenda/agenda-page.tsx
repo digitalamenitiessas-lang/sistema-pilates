@@ -24,6 +24,7 @@ import { useData, useStudio } from '@/lib/data-context'
 import { disciplineStyle } from '@/lib/disciplines'
 import { TomarAsistencia } from '@/components/asistencia/tomar-asistencia'
 import { PanelDelCliente } from '@/components/agenda/panel-del-cliente'
+import { TurnosDeLaClase } from '@/components/agenda/turnos-de-la-clase'
 import {
   addDays,
   mondayOf,
@@ -871,6 +872,11 @@ function ClassDetailModal({
                     </option>
                   ))}
               </select>
+
+              {/* Quién ocupa permanentemente este horario (§2, 0048). Va
+                  antes de la ficha del cliente porque es una propiedad de
+                  la clase y no de quien se esté anotando. */}
+              <TurnosDeLaClase classId={cls.id} capacity={cls.capacity} cliente={clienteElegido} />
 
               {/* La ficha rápida (§1 del pedido del 15/09): con el cliente
                   elegido, el mostrador ve su plan, hasta cuándo, cuántas le

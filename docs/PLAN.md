@@ -934,6 +934,448 @@ vencimiento de vuelta en su fecha.
 Con esto **§1 queda cerrada**: seis de sus pedidos ya andaban, cuatro entraron
 con la `0046` y este es el quinto y último.
 
+### ✅ El turno fijo (15/09) — `0048` y `0049` **corridas y verificadas**
+
+§2 de la devolución del estudio, y lo primero que dice es lo que importa:
+*"Los turnos fijos deben funcionar como una funcionalidad propia y no simplemente
+como una reserva repetida."* Tiene razón, y por eso hasta hoy no se podía hacer
+nada de lo que pide: una reserva es una fila por (cliente, clase, FECHA), así que
+existe el martes 15 pero no existe "los martes a las 18". No había sujeto.
+
+**LA DECISIÓN QUE ORDENA TODO: el turno fijo no materializa reservas.**
+
+Es un derecho sobre un día y hora mientras mantenga la prioridad. Nada más. La
+versión que crea el mes de reservas por adelantado arrastra tres problemas que
+esta no tiene:
+
+- **el mes de cinco martes.** Con 4 clases por semana y 5 martes, el
+  materializador genera una reserva que `consumir_clase` rechaza y el proceso se
+  corta a la mitad del mes de alguien.
+- **la escala.** `fetchStudioData` trae `reservations` entera, sin filtro de
+  fecha y sin límite, en cada ingreso.
+- **liberar.** Si liberar fuera cancelar reservas ya creadas, la clienta entra al
+  portal, toca la clase de siempre y **se la lleva de vuelta**:
+  `reactivar_reserva` es `security definer` y solo valida que la fila esté
+  cancelada.
+
+Sin materializar, los tres desaparecen: no hay fila que sobre, no hay fila que
+pese, y liberar es cambiar un estado de una tabla que la clienta no puede
+escribir. **Ocho de los diez pedidos de §2 se resuelven así**, y bajó el bloque de
+12-15 días a dos tardes.
+
+**La prioridad no se guarda, se deriva** (`prioridad_hasta`). El estudio la
+definió con un ejemplo —*"vence el 20/10, hasta el 20/10 conserva prioridad,
+desde el 21/10 se libera"*— o sea que cuelga del vencimiento de la membresía más
+un día de gracia, configurable. Guardarla sería copiar un dato que cambia solo
+cada vez que renueva: al segundo mes dirían cosas distintas. Mismo criterio del
+libro de caja de la `0020` y del recupero de la `0046`.
+
+- [x] **Tabla `fixed_slots`** que apunta a la clase de la grilla y no a un día y
+      hora sueltos: si el estudio mueve esa clase de las 18 a las 18:30, el turno
+      se mueve con ella y no queda apuntando a un horario que no se dicta.
+- [x] **El cupo lo hace cumplir la base.** Ocho reformers son ocho lugares fijos.
+      Si se pudieran asignar nueve, el noveno se entera la primera vez que viene.
+- [x] **Estado `pausado`**, que el estudio no pidió: conserva el lugar sin
+      ocuparlo (viaje, lesión). Sin esto, a quien vuelve en tres semanas hay que
+      liberarle el horario igual. **La liberación automática no lo toca**, y la
+      pantalla lo dice con esas palabras.
+- [x] **Cambiar de horario libera el viejo y asigna el nuevo**, dos filas y no un
+      `update` del `class_id`: "quién ocupaba este horario antes" es justo lo que
+      explica por qué hoy está libre, y un update esa respuesta la borra.
+- [x] **Liberación automática** (`0049`) en el proceso diario, **apagada de
+      fábrica**. El aviso va siempre y la acción solo si el estudio la enciende:
+      saber a quién se le venció el derecho es información que el mostrador
+      necesita igual —para llamarlo antes de soltarle el lugar— y soltarlo es una
+      decisión que puede querer tomar a mano.
+- [x] **Libera todo lo que ya venció, no lo que venció hoy.** Si el cron no corre
+      un día, al siguiente se pone al día solo. Mismo criterio que
+      `renewal_catchup_days` de la `0041`.
+- [x] **El permiso lo exige la función, no el cron.** El proceso entra con el
+      service role, que no pasa por las políticas: escrito del lado del cron, el
+      chequeo no se verificaría nunca. `null` de actor es la única excepción, y
+      está escrita.
+
+**Verificado el 15/09 contra la base, con sesión real:** `perm_diff()` cero filas ·
+la prioridad da `end_date + 1` para los cinco clientes mirados · **el noveno turno
+fijo en una sala de ocho lo rechaza la base**, con su mensaje · un pausado
+desaparece de la lista de liberables y deja entrar a otro en su lugar · con el
+interruptor apagado `liberar_turnos_vencidos()` devuelve 0, y encendido liberó
+**exactamente 1** —la única sin prioridad que no estaba pausada— con el motivo
+escrito · en pantalla, "7 de 8 lugares con dueño" y la fecha de prioridad de cada
+uno. **Revertido**: cero turnos, 8 reservas, el interruptor apagado.
+
+**Falta de §2**: que las reservas de cada semana se creen solas. Ya no depende de
+ninguna respuesta —Matías definió el 15/09 que manda la cantidad de clases del
+plan— y se apoya entero en esto.
+
+**Lo que no se pudo verificar acá**: que la clienta vea solo sus turnos desde el
+portal. La política está escrita (`can('turnos.ver')` o `my_student_ids()`) y el
+anónimo queda afuera, pero ejercerla pide entrar con una cuenta de clienta. Es el
+mismo pendiente que arrastra el Bloque 0.
+
+### ✅ El tablero comercial y la ficha (15/09) — `0050` **corrida y verificada**
+
+Lo amarillo de las prioridades del estudio: la #3 (ficha integral) y la mitad de
+la #4 (tablero comercial). Va en dos tandas porque **los contadores no
+necesitaron ninguna migración**: los cinco se derivan del paquete que el tablero
+ya tenía en el navegador.
+
+**Los contadores (sin migración).** Lugares libres hoy, en lista de espera, de
+prueba, por recuperar y cobrado hoy. Verificados contra la base uno por uno: 12
+clases × 8 − 2 reservas = 94 libres; dos clientes con FE FIRST; Belén, que venció
+el 26/08 contra un corte del 31/08. **`recovery_after_days` pasó de declarado sin
+código a leído** — era uno de los once parámetros que la `0024` marcó como que no
+rigen.
+
+**"¿Cuándo vuelve?" mentía.** Era el contador de reservas en estado
+'confirmada', y una reserva vieja que nadie marcó como asistida o ausente sigue
+en 'confirmada' para siempre: el número crecía con el descuido del mostrador en
+vez de con las clases que vienen. Ahora es la fecha de la próxima.
+
+**El contacto de emergencia existía desde la `0008` y nadie lo escribía.** Se
+leía en `fetchStudioData` y ahí moría: ni formulario ni pantalla. Es el dato que
+hace falta el día que alguien se descompone en clase, y no estaba cargado para
+nadie. De paso `saveMedicalNotes` pasó a `savePrivateData` y **escribe solo lo
+que recibe**: guardar el contacto ya no puede pisar las notas médicas, que es
+exactamente lo que la `0008` hizo una vez.
+
+**La salud, en cuatro campos** (`0050`): lesiones, embarazo, cirugías y
+medicación, en `student_private` —RLS filtra filas, no columnas— bajo las claves
+`salud.ver` y `salud.editar` que ya existían. **El texto viejo NO se repartió
+solo**: separar "Embarazo - 6 MESES" por palabras clave acierta en los casos
+fáciles y escribe datos falsos en los difíciles, justo en el campo donde un dato
+falso importa. Lo pasa el mostrador.
+
+**La bitácora** (`student_notes`): filas con autor y fecha en vez de un texto que
+se pisa. Es **lo único que la profesora puede escribir en todo el sistema**, y
+por eso la clave es propia: se le puede dar sin darle la ficha. Las notas
+internas del mostrador no las ve, y eso lo decide `alumnos.editar` en vez de una
+clave nueva. La clienta no lee la bitácora — no hay política que se lo permita, a
+diferencia de `student_private`.
+
+**EL BUG QUE APARECIÓ PROBANDO, y es el caro.** `author_id` salió apuntando a
+`auth.users`. PostgREST resuelve el nombre del autor por la clave foránea y
+contra ese esquema **no puede** —no está expuesto—, así que la consulta fallaba
+con `PGRST200`… y el `.catch(() => setNotas([]))` de la pantalla la convertía en
+**"Sin notas todavía"**. Las dos notas de prueba estaban guardadas, con su autor
+sellado, y la ficha decía que no había ninguna.
+
+Es el mismo modo de falla que la `0008` tuvo con las notas médicas, y el que este
+repo persigue desde entonces: el dato está y nadie lo sabe. Se arregló de las dos
+puntas — la clave foránea apunta a `profiles`, con el porqué escrito para que
+nadie lo "corrija" de vuelta, y **la pantalla ya no se traga el error**. Y la
+migración se hizo idempotente (las políticas se sueltan antes de crearse) para
+poder re-pegarla entera.
+
+**La hora de la nota va fija al huso del estudio**, no al del navegador: misma
+decisión que la `0016` tomó para la plata. Si el mostrador abre desde una tablet
+mal configurada, la nota sigue diciendo la hora a la que se escribió acá.
+
+**Verificado el 15/09:** `perm_diff()` cero filas · los cinco contadores cuadran
+con la base · "Vuelve · 15 sept 16:00 (+1)" contra las dos reservas reales de esa
+clienta · el contacto de emergencia se guarda **y las notas médicas sobreviven** ·
+los cuatro campos de salud nacen vacíos y el texto viejo sigue entero · la nota
+se guarda con `author_id` puesto por la base y se lee con el nombre resuelto.
+**Revertido**: cero notas, cero turnos, 8 reservas, salud vacía.
+
+**No se pudo verificar acá**: que la profesora no vea las notas internas. La
+política está escrita; ejercerla pide entrar con una cuenta de profesora, y
+ninguna de las tres tiene.
+
+### ✅ La ocupación, bien contada (15/09) — `0051` **corrida y verificada**
+
+El estudio la llamó *"la métrica fundamental"* y dijo para qué la quiere: *"definir
+qué horarios potenciar, reducir o promocionar"*. Pidió mirarla por **mes, día,
+franja horaria, clase y profesora**.
+
+**EL REPORTE QUE HABÍA DABA MAL.** `reporteOcupacion` dividía las reservas de
+TODO el rango por el cupo de UNA sesión. Una clase de 8 lugares dictada cuatro
+veces en el mes y llena siempre daba **400%**. Solo acertaba si el rango era de
+una semana, que es justo lo que un reporte por rango de fechas no es. **Nadie lo
+había visto porque el sistema todavía no tiene un mes de historia** — habría
+aparecido el primer día que el estudio abriera un reporte mensual.
+
+El divisor correcto es **cupo × veces que se dictó**. Y para saber cuántas veces
+se dictó hay que generar las fechas: la grilla es semanal, así que una clase de
+los martes no tiene filas propias por fecha. Eso no se puede resolver filtrando
+en memoria el paquete del estudio, y por eso va a la base.
+
+- [x] **Una fecha suspendida no es una clase vacía.** Si el estudio no dictó el
+      lunes feriado, contarlo como 0% hunde el promedio de ese horario y lleva a
+      cerrar un turno que andaba bien. **Verificado**: suspender tres fechas bajó
+      las sesiones de 22 a 19 y **subió** la ocupación de 1,1% a 1,3%.
+- [x] **El cupo de esa fecha**, no el de la clase (`class_occurrences`, 0018).
+- [x] **La profesora de ese día.** Con reemplazo, una ocupación "por profesora"
+      que mire la titular le imputa clases que no dio.
+- [x] **Las franjas las define el estudio** (`franjas_horarias`), con las que
+      quiera: "mañana" no termina a la misma hora en todos lados.
+- [x] Los cinco cortes salen de **una sola función**. Escribirlos como cinco
+      sería cinco lugares donde arreglar el divisor la próxima vez.
+
+**Los dos errores que aparecieron probando, y son del mismo tipo:** suponer algo
+que el estudio no dijo.
+
+1. Los días salían **"Monday"** y los meses **" September 2026"** con el relleno
+   de Postgres adentro: `to_char(..., 'TMDay')` usa el locale de la BASE, que es
+   inglés. Los nombres pasaron a estar escritos en el SQL.
+2. El corte por clase **juntaba el lunes con el martes**. Las 64 clases de la
+   grilla se llaman todas "Pilates Reformer", así que agrupar por título y hora
+   mezclaba los días: el reporte decía "22 veces" de una clase que en el mes se
+   dictó cuatro. Una clase de la grilla es un día **y** una hora.
+
+**Verificado el 15/09**: 64 filas en el corte por clase, cada una dictada 4 o 5
+veces, que es lo que tiene un mes · ninguna fila por encima de 100% en los cinco
+cortes sobre todo 2026 · los días en castellano y en orden de semana · las
+franjas salen de Configuración (09:00 → Mañana, 15:00 → Tarde, 20:00 → Noche) ·
+la prueba de la suspensión revertida exacto.
+
+`reporteOcupacion` queda marcada `@deprecated` y sin llamadores: se borra cuando
+la `0051` esté en producción.
+
+### ✅ Los avisos a la clienta (15/09) — `0052` **corrida y verificada**
+
+Los cinco de la sección 14 que el estudio volvió a marcar: confirmación de
+reserva, recordatorio de clase, clase suspendida, cambio de profesora y lugar
+liberado. Con esto **se cierra lo amarillo de sus diez prioridades**.
+
+**Los escribe la base, no el navegador**, porque el mismo hecho pasa desde cuatro
+lados: una reserva nace desde la agenda, desde el portal, desde la pantalla de
+asistencia y desde cualquier proceso que venga después. Escrito en cada pantalla,
+el aviso sale cuatro veces —y falta la quinta, cuando alguien agregue un camino
+nuevo y no se acuerde—. Mismo motivo por el que la `0022` puso el sellado de la
+reserva en la base.
+
+**No hizo falta cañería nueva.** La `0007` ya deja que la clienta lea sus propios
+avisos y el portal monta la misma campana que el mostrador, con realtime: una
+fila insertada por el trigger **le aparece en el momento**.
+
+- [x] Cuatro son triggers. El quinto —el recordatorio— **no puede serlo**: no lo
+      dispara nada que alguien escriba, lo dispara que llegue el día. Lo llama el
+      proceso diario, y es idempotente por reserva.
+- [x] **No se le confirma la reserva que se hizo ella misma** desde el portal.
+      Confirmarle lo que acaba de tocar es ruido; el aviso existe para cuando la
+      anota el mostrador.
+- [x] **Al liberarse un lugar se le avisa a TODA la lista de espera**, no a la
+      primera. Es la política que el estudio dejó dicha, y el motivo por el que
+      `waitlist_offer_minutes` sigue sin regir: describe una oferta por turno,
+      que es lo contrario.
+- [x] **El cambio de profesora avisa solo si cambió de verdad.** El trigger corre
+      también al tocar el cupo o el horario, y avisar "la da Ivana" cuando ya la
+      daba Ivana es el tipo de aviso que hace que dejen de leerlos.
+- [x] La suspensión avisa a las confirmadas **y a la lista de espera**; el cambio
+      de profesora, solo a las confirmadas. A quien espera no le cambió quién da
+      una clase que todavía no tiene.
+- [x] **Cómo se nombra una clase está escrito una sola vez**
+      (`texto_de_la_clase`): los cinco avisos la nombran igual, y si cada uno
+      armara su frase habría cinco lugares donde cambiarla.
+
+**Lo que esto NO hace, y va escrito en la migración**: el push al celular y el
+mail salen del servidor, no de un trigger. El aviso **existe y llega al portal**;
+que además le suene el teléfono queda para cuando se decida cuáles lo merecen.
+"Le avisamos" y "le sonó el teléfono" no son lo mismo, y prometer lo segundo sin
+hacerlo es lo peor de los dos.
+
+**Verificado el 15/09 contra la base**: anotar desde el mostrador avisa · liberar
+un lugar avisa a quien espera · cambiar la profesora avisa a las dos confirmadas
+y **volver a guardar sin cambiarla no vuelve a avisar** · suspender avisa a las
+tres (confirmadas y lista de espera) y **suspender de nuevo no repite** · el
+recordatorio corrido dos veces devuelve 0 la segunda. **Revertido**: 8 reservas,
+cero instancias, y los 10 avisos de prueba borrados uno por uno —el `delete` con
+`type=in.(…)` devolvió cero filas sin error, que es exactamente contra lo que
+avisa el criterio de la casa.
+
+**Lo que no se pudo verificar acá**: que a la clienta que se anota desde el
+portal NO se le confirme. `stamp_reservation` deriva `source` de `auth.uid()` y
+el service role no tiene sesión, así que toda alta de prueba queda en `'sistema'`.
+La rama solo se ejerce entrando con una cuenta de clienta.
+
+### ✅ Personal, horas y remuneraciones (15/09) — `0053` **corrida y verificada**
+
+La sección 12 y la prioridad 6 del estudio. **Era lo único nuevo que entró al
+alcance** (§7), y la última de las diez que faltaba empezar.
+
+**Lo caro ya estaba, y por accidente.** El documento marcaba como bloqueo que no
+se puede pagar por clase con seguridad, porque no se sabe qué clases se dictaron
+de verdad, con qué profesora y descontando feriados. Eso lo resolvió
+`sesiones_dictadas()` de la `0051`, escrita el mismo día para la ocupación: qué
+horarios potenciar y a quién pagarle cuánto salen del mismo dato.
+
+- [x] **El sueldo en su tabla, no como columna de `teachers`.** RLS filtra filas,
+      no columnas: ahí lo vería cualquiera que pueda leer la grilla. Es el
+      criterio que CLAUDE.md dejó escrito antes de que existieran los sueldos.
+- [x] **Tres claves separadas.** Ver quién trabaja no es ver cuánto gana, y
+      recepción puede cargar horas sin enterarse de un sueldo.
+      `personal.remuneracion` nace **solo para admin**: el permiso que más se le
+      parece, `finanzas.ver`, es de recepción, y esa decisión es del estudio.
+- [x] **Las condiciones llevan historial**, y es lo único que si falla cuesta
+      plata. Cada clase se paga con la tarifa que regía **el día que se dictó**,
+      fila por fila. Con un campo único en la ficha, subirle la tarifa hoy
+      cambiaría la liquidación del mes pasado.
+- [x] **Una condición no se edita**: se carga la que rige desde una fecha. La
+      base tampoco tiene política de update, para que no se pueda ni por atrás.
+- [x] **La liquidación se deriva**, no se guarda. Copiarla sería una segunda
+      verdad sobre la misma plata, que es lo que el libro de la `0020` evita.
+- [x] **Las clases dictadas no se cargan a mano.** Pedirle al mostrador que copie
+      un dato que el sistema ya tiene es abrir la puerta a que los dos números no
+      coincidan.
+- [x] **`fecha_baja` es distinta de `active = false`**, que es la baja del
+      catálogo: quien se fue en marzo tiene que seguir apareciendo en la
+      liquidación de marzo.
+- [x] La pantalla dice **"liquidar no es pagar"**: el pago entra al libro como
+      cualquier gasto de la `0020`.
+
+**Lo que NO hace, y va escrito**: no hay fichaje de entrada y salida, porque
+**ninguna profesora tiene cuenta todavía**. Las clases se derivan solas; las
+horas que no son clase las carga el mostrador. El día que tengan cuenta, el
+fichaje se apoya en `staff_work_logs` sin rehacer nada.
+
+**Verificado el 15/09 contra la base**: `perm_diff()` cero filas · sin
+condiciones cargadas la liquidación **cuenta las clases y no inventa plata** · el
+historial rige — 132 clases de Ivana con $5.000 hasta el 19/09 y $6.000 desde el
+20 dan **$708.000**, ni $792.000 (tarifa de hoy) ni $660.000 (la vieja): son 84
+clases a una y 48 a la otra, justo las que caen de cada lado · una ausencia no
+suma horas ni plata y se cuenta aparte · el mensual se cuenta una vez y no se
+multiplica · quien tiene `fecha_baja` en marzo **no** aparece en septiembre y
+**sí** en marzo. Datos de prueba revertidos, y borrados **por id**: el filtro por
+columna ya había devuelto cero filas sin error más temprano el mismo día.
+
+### ✅ Cerrar y saldar la liquidación (15/09) — `0054` **corrida y verificada**
+
+Lo que le faltaba a la `0053`, y lo marcó Matías: el cálculo estaba, pero
+**cerrar un período y saldarlo es otra cosa**.
+
+**El cálculo se deriva y el cierre se guarda, y no se contradicen.** Mientras el
+período está abierto el total tiene que moverse solo: si el lunes se carga una
+clase que faltaba, la liquidación la refleja sin que nadie recalcule. El día que
+se cierra, **el número se congela** — si después alguien carga algo o corrige una
+tarifa, la plata que ya se pagó no puede cambiar sola. Un total que se recalcula
+para atrás no es un registro.
+
+**Y como se congela, hay que avisar cuando se separan.** El riesgo del congelado
+es el opuesto: que se cargue algo después de cerrar y nadie se entere. Por eso la
+vista devuelve **las dos cifras** —la congelada y la que daría hoy— y la pantalla
+muestra la diferencia. El sistema no elige por el estudio.
+
+**Pagar es un gasto y entra por la misma puerta.** Saldar crea un gasto en
+"Sueldos y honorarios" —la categoría la siembra la `0020`—, así que baja del
+saldo de la cuenta, entra al libro y aparece en el resultado del mes. Un módulo
+de personal con su propia caja sería una segunda verdad sobre la misma plata.
+
+- [x] **El pago y el cambio de estado van en una sola función.** Una liquidación
+      marcada "pagada" sin su gasto es plata que salió del estudio y no está en
+      ningún lado.
+- [x] **El total no lo manda el navegador**: lo calcula la base con la misma
+      función que muestra la pantalla. Si lo mandara el cliente, cerrar sería
+      escribir el número que uno quiera.
+- [x] **Pide las dos claves para pagar**: la de remuneraciones porque toca un
+      sueldo, y la de gastos porque mueve el saldo de una cuenta.
+- [x] **La tabla es de solo lectura desde el cliente.** Sin políticas de
+      escritura no hay forma de marcar algo como pagado sin que salga el gasto.
+- [x] **Una pagada no se anula desde acá**: el mensaje manda a Gastos, que es
+      donde vive la plata y donde la `0020` ya dejó el camino con su motivo.
+- [x] **La categoría se busca por nombre** y no por un id escrito en el SQL: la
+      siembra la `0020` y el estudio puede renombrarla. Si no la encuentra, no se
+      inventa una — se avisa.
+
+**Verificado el 15/09, por el camino real y con sesión de admin** (el service
+role no puede: `can('personal.remuneracion')` lo rechaza, que es el permiso
+funcionando): se cerró un período de $10.000 · se cargaron 4 horas **dentro** de
+ese período después de cerrar y el congelado quedó en $10.000 mientras el vivo
+subió a $18.000, con el aviso de los $8.000 de diferencia en pantalla · el pago
+creó el gasto en "Sueldos y honorarios", lo enlazó, y **entró al libro como
+egreso** · una pagada deja de ofrecer Anular y Pagar. Todo revertido.
+
+**Dos veces la prueba estuvo mal y el código bien**, y las dos quedan anotadas
+porque son la misma trampa: el 17/09 era jueves y la clase es de martes (la base
+lo rechazó con su motivo), y las horas de la diferencia se cargaron el 25/09
+cuando el período cerrado terminaba el 15 — porque la pantalla cierra hasta HOY,
+no hasta fin de mes.
+
+### ✅ Los períodos no se pisan, y la ficha laboral se carga (15/09) — `0055`
+
+Dos cosas que salieron de preguntas de Matías sobre la `0053` y la `0054`.
+
+**EL AGUJERO DE LOS PERÍODOS.** La `0054` puso un índice único sobre
+`(teacher_id, desde, hasta)`, que impide cerrar dos veces **el mismo** período.
+Pero dos que **se pisan** sin ser idénticos entraban los dos: cerrar 01/09–15/09
+por $10.000 y después 01/09–30/09 por $18.000 daba **$28.000 liquidados donde
+correspondían $18.000**, y nada avisaba. Probado contra la base antes de escribir
+la migración.
+
+Ahora un trigger lo frena y dice **con cuál choca y por cuánto**. Y `anulada` no
+reserva días: si se cerró mal, anularla libera esas fechas.
+
+- [x] **Un trigger y no `exclude using gist`**: la forma canónica necesita la
+      extensión `btree_gist`, y una migración que se corre a mano no es lugar
+      para agregar una extensión. El trigger además puede decir cuál es el
+      período que choca, que es lo que quien cierra necesita leer.
+- [x] **`ultimos_cierres()`** para que la pantalla proponga el período siguiente:
+      el agujero no era solo técnico, nada le decía al mostrador dónde terminó el
+      último cierre.
+- [x] **Cerrar todas las del período de una.** Las que chocan **se saltean** en
+      vez de cortar el proceso: que a una le falte corregir algo no puede impedir
+      cerrarle a las otras nueve. Se devuelven con su motivo.
+- [x] En la tabla, cada fila dice **"liquidada hasta el …"** en vez de ofrecer
+      cerrar. La base lo rechaza igual; esto lo dice antes de apretar.
+
+**Y EL MISMO CABO SUELTO DE SIEMPRE.** Las cuatro columnas laborales que la
+`0053` agregó a `teachers` —fecha de ingreso, fecha de baja, DNI y notas—
+**existían en la base y ningún formulario las escribía**. Es el cuarto caso del
+mismo día: `override_by` y `recovers_reservation_id` (0022), el contacto de
+emergencia (0008), y ahora estas. Se descubrió contestando qué se puede cargar en
+la pantalla de profesoras.
+
+- [x] Los cuatro campos entraron al formulario de Configuración → Profesoras, y
+      lo laboral va **aparte del resto del insert**: si la `0053` no corrió la
+      columna no existe y el alta entera fallaría, así que se reintenta sin ella.
+- [x] **"Quién trabaja y qué horarios tiene"** en Personal. Los horarios estaban
+      en la grilla desde la `0035` pero repartidos entre 64 clases: *"¿qué da
+      Ivana?"* no se podía contestar de un vistazo. Se arman de `classes`, que el
+      paquete del estudio ya trae.
+- [x] Cada ficha avisa lo que le falta para trabajar: **sin condición de pago
+      cargada** y **sin cuenta para entrar al sistema**.
+
+**Verificado el 15/09**: el período que se pisa se rechaza nombrando al otro · el
+que arranca al día siguiente entra · una anulada libera los días · la ficha
+laboral se guarda y **el resto de los datos de la profesora sobreviven** ·
+en pantalla, Ivana con sus 30 clases semanales agrupadas por día. Revertido.
+
+### ✅ La profesora ve la ficha de salud (15/09) — **decisión del estudio, sin migración**
+
+Matías lo pidió con el argumento que el propio relevamiento había dejado planteado
+y sin contestar: *"¿La profesora debe poder ver el contacto de emergencia? En una
+emergencia en clase es quien está."*
+
+La `0008` había decidido que no —"profesora en modo consulta sin dinero ni datos
+médicos"— y se revierte a propósito. **No hizo falta ninguna migración**: es
+tildar una clave y encender su grupo, que es exactamente para lo que el motor de
+la `0012` existe.
+
+  update role_permissions: profesor → salud.ver
+  update permission_keys set enforce_mode = 'activo' where grupo = 'Datos sensibles'
+
+**Ver sí, cargar no**, y no por una decisión sino por cómo está armado: el botón
+Editar de la ficha está detrás de `canWrite`, así que darle `salud.editar` sería
+inerte — no podría llegar al formulario. Y lo que una profesora observa en clase
+pertenece a la **bitácora**, que ya puede escribir y que guarda autor y fecha; un
+campo de salud se pisa, una nota se suma.
+
+**Verificado con la sesión real de Leandro**: ve "Embarazo - 6 MESES" en la
+pestaña Salud, la ficha **sigue sin pestaña Pagos**, y el tablero sigue sin
+mostrar un peso.
+
+**Y una corrección sobre el invariante.** Al encender el grupo, `perm_diff()`
+siguió dando cero y lo leí como un bug del motor. No lo es: la `0020` la redefinió
+a propósito para mirar **solo las claves que siguen en sombra**, con el
+razonamiento escrito ahí mismo — comparar contra el legado para siempre convierte
+el primer cambio legítimo en un falso positivo eterno. La consecuencia que sí
+conviene tener presente: **una vez encendido un grupo, sus claves salen de esa red
+de seguridad.** Lo que protege es lo que todavía no rige.
+
+**Para volver atrás**, si el estudio cambia de opinión:
+
+  delete from role_permissions where role = 'profesor' and clave = 'salud.ver';
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
@@ -966,6 +1408,11 @@ con la `0046` y este es el quinto y último.
 
 ## Pendiente inmediato
 
+> **Lo que falta del producto no está acá**: está en la §0 de
+> [`REQUERIMIENTOS-CASA-FE.md`](REQUERIMIENTOS-CASA-FE.md), que es la única lista
+> al día. Este bloque es solo la infraestructura —variables de entorno, DNS,
+> paneles de terceros— que no se resuelve escribiendo código.
+
 - **Supabase → Authentication → URL Configuration → Redirect URLs**:
   agregar `https://<dominio-de-vercel>/sistema/recuperar` y
   `http://localhost:3000/sistema/recuperar` (sin esto, el enlace de
@@ -987,7 +1434,7 @@ con la `0046` y este es el quinto y último.
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a **`0047`** ✅. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Migraciones aplicadas | `0001` a **`0055`** ✅. La **`0053` corrió el 15/09**. La **`0052` corrió el 15/09** y se corrigió una redacción; es idempotente. La **`0051` corrió el 15/09** y se corrigió dos veces sobre la marcha —los nombres en castellano y el día en el corte por clase—; es idempotente, todo `create or replace`. La **`0050` corrió el 15/09**, se corrigió la clave foránea del autor y se volvió a correr; es idempotente a propósito. La **`0048` y la `0049` corrieron el 15/09** y se verificaron ejerciéndolas: el cupo rechazó el noveno turno fijo, un pausado quedó fuera de la liberación automática, y el interruptor encendido liberó exactamente uno. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
 | Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |

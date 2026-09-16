@@ -23,6 +23,12 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
   const [birthdate, setBirthdate] = useState(student?.birthdate ?? '')
   const [observations, setObservations] = useState(student?.observations ?? '')
   const [medicalNotes, setMedicalNotes] = useState(student?.medicalNotes ?? '')
+  const [emergencyContact, setEmergencyContact] = useState(student?.emergencyContact ?? '')
+  // Los cuatro campos de salud (0050). Antes era todo un párrafo suelto.
+  const [lesiones, setLesiones] = useState(student?.lesiones ?? '')
+  const [embarazo, setEmbarazo] = useState(student?.embarazo ?? '')
+  const [cirugias, setCirugias] = useState(student?.cirugias ?? '')
+  const [medicacion, setMedicacion] = useState(student?.medicacion ?? '')
   const [planId, setPlanId] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,7 +40,11 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
     setSaving(true)
     setError(null)
     try {
-      const input = { name, email, phone, dni, birthdate, observations, medicalNotes }
+      const input = {
+        name, email, phone, dni, birthdate, observations,
+        medicalNotes, emergencyContact,
+        lesiones, embarazo, cirugias, medicacion,
+      }
       if (isEdit) {
         await updateStudent(student.id, input)
       } else {
@@ -105,9 +115,47 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
             <textarea rows={2} value={observations} onChange={(e) => setObservations(e.target.value)} placeholder="Preferencias, horarios..." className={`${inputClass} resize-none`} />
           </div>
 
+          {/* Salud, en campos propios (0050). Puestos así se pueden
+              filtrar y se encuentran rápido en una clase; en un párrafo
+              suelto no se puede ninguna de las dos cosas. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>Lesiones</label>
+              <input value={lesiones} onChange={(e) => setLesiones(e.target.value)} placeholder="Hernia lumbar, hombro derecho..." className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Embarazo</label>
+              <input value={embarazo} onChange={(e) => setEmbarazo(e.target.value)} placeholder="6 meses, o vacío" className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Cirugías</label>
+              <input value={cirugias} onChange={(e) => setCirugias(e.target.value)} placeholder="Cesárea 2024..." className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Medicación</label>
+              <input value={medicacion} onChange={(e) => setMedicacion(e.target.value)} placeholder="Anticoagulantes..." className={inputClass} />
+            </div>
+          </div>
+
           <div>
-            <label className={labelClass}>Notas médicas</label>
-            <textarea rows={2} value={medicalNotes} onChange={(e) => setMedicalNotes(e.target.value)} placeholder="Lesiones, indicaciones médicas..." className={`${inputClass} resize-none`} />
+            <label className={labelClass}>Otras observaciones de salud</label>
+            <textarea rows={2} value={medicalNotes} onChange={(e) => setMedicalNotes(e.target.value)} placeholder="Lo que no entra en los campos de arriba..." className={`${inputClass} resize-none`} />
+          </div>
+
+          {/* Existía en la base desde la 0008 y no había forma de cargarlo.
+              Va con las notas médicas porque comparte su protección: las
+              dos viven en `student_private`. */}
+          <div>
+            <label className={labelClass}>Contacto de emergencia</label>
+            <input
+              value={emergencyContact}
+              onChange={(e) => setEmergencyContact(e.target.value)}
+              placeholder="Nombre, vínculo y teléfono"
+              className={inputClass}
+            />
+            <p className="text-[11px] text-muted-foreground mt-1.5">
+              A quién llamar si le pasa algo en clase. Queda protegido como las notas médicas.
+            </p>
           </div>
 
           {!isEdit && (
