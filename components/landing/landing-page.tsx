@@ -788,10 +788,16 @@ function Planes({ plans }: { plans: PublicPlan[] }) {
                 en blanco pleno y no atenuado. */}
             <div className="rounded-3xl bg-primary text-primary-foreground px-8 py-9 md:px-12 mb-10 flex flex-wrap items-center justify-between gap-6">
               <div>
+                {/* El título es fijo y el precio se suma solo si hay
+                    precio (16/09, pedido del estudio). Antes el título
+                    entero cambiaba según el precio —"Tu primera clase es
+                    gratis" contra "Clase de prueba — $20.000"—, así que el
+                    copy que el estudio escribe abajo no podía hablar del
+                    costo sin arriesgarse a contradecir el de arriba.
+                    Ahora el precio aparece una sola vez y en un solo lugar. */}
                 <p className="display text-2xl md:text-3xl uppercase">
-                  {trial.price === 0
-                    ? 'Tu primera clase es gratis'
-                    : `Clase de prueba — $${trial.price.toLocaleString('es-AR')}`}
+                  Clase de Prueba
+                  {trial.price > 0 && ` — $${trial.price.toLocaleString('es-AR')}`}
                 </p>
                 <p className="text-sm text-primary-foreground max-w-md mt-3">
                   {trial.description || 'Vení a conocer el estudio y probá una clase, sin compromiso.'}
