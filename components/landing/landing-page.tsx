@@ -1150,14 +1150,41 @@ function Cita() {
         />
         <div aria-hidden className="absolute inset-0 bg-foreground/65" />
       </div>
-      <Reveal className="relative max-w-3xl mx-auto px-5 text-center">
+      <Reveal className="relative max-w-4xl mx-auto px-5 text-center">
         {/* Copy de la clienta (12/09), y es de ella: acá había una cita de
             Joseph Pilates con su firma debajo. La firma se fue con la cita —
             dejarla sería atribuirle a él una frase que escribió ella. Las
             comillas también: sin autor no es una cita, es lo que el estudio
             dice. Rima con el cierre de su bajada, "el movimiento se convierte
             en pausa", que es de la misma mano. */}
-        <p className="display text-3xl md:text-5xl text-background leading-tight!">
+        {/* La frase va en UNA línea, y ese es el pedido del estudio (16/09):
+            partida en dos quedaba mal en el teléfono.
+
+            El tamaño está medido, no elegido. La frase pide 16,49 px de ancho
+            por cada px de tipografía (Bodoni, 35 caracteres, con el tracking
+            de `.display`). O sea que el tamaño máximo que entra en una línea
+            es el ancho disponible dividido 16,49, y por eso acá el tamaño
+            sigue al viewport en vez de ser un escalón fijo: en un teléfono de
+            375 el máximo es 20 px y en uno de 430 es 24, y un solo valor para
+            los dos entra en uno y parte al otro.
+
+            `5vw` con un 6% de margen sale del ancho más chico que
+            sostenemos (320 px, donde el máximo es 17), porque es el que
+            manda: cuanto más angosta la pantalla, más pesan los 40 px de
+            `px-5` sobre el ancho que queda. De 832 en adelante el techo de
+            2,6rem lo frena, y recién en `lg` —cuando el contenedor ya llegó
+            a su máximo y sobra lugar— pasa a los 48 px de siempre.
+
+            El contenedor creció a `max-w-4xl` por lo mismo: en `max-w-3xl`
+            esos 48 px pedían 791 px y tenían 728, así que en escritorio
+            también venía partida. Con 4xl quedan 856 y entra con aire.
+
+            SI CAMBIA EL TEXTO HAY QUE MEDIRLO DE NUEVO. El 16,49 es de esta
+            frase; una más larga vuelve a partirse —que es como está hoy, no
+            es que se rompa— y una más corta deja lugar sin usar. Se mide con
+            un `<span>` de clase `display` a 100 px, `white-space: nowrap`,
+            y se divide el ancho por 100. */}
+        <p className="display text-[clamp(1rem,5vw,2.6rem)] lg:text-5xl text-background leading-tight!">
           Moverte también puede ser tu pausa.
         </p>
       </Reveal>
