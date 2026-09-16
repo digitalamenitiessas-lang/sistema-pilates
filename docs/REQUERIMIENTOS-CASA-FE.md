@@ -43,6 +43,20 @@ El 15/09 entraron diez migraciones —`0046` a `0055`— y pasaron a verde la 3
 | **Tomar asistencia la profesora** | Faltan `reservas.asistencia` **y** `reservas.editar`, y **encender el grupo Reservas** — son 8 claves y afecta a todos los roles, así que conviene mirar antes qué cambia |
 | **19 de 22 grupos siguen en sombra** | Rigen Caja, Gastos, Reportes y Datos sensibles. El resto responde el legado: tildar un permiso ahí **no hace nada** hasta encender su grupo |
 
+### Los documentos, y para quién es cada uno
+
+| | Para | Qué dice |
+|---|---|---|
+| `Casa-Fe-que-hace-el-sistema.pdf` | **el estudio** | Todo lo que funciona, y al final **lo que todavía no**. Se generó el 15/09 con `que-hace-el-sistema.py`. Es el que se manda antes de que empiecen |
+| `Casa-Fe-manual-del-mostrador.pdf` | **el estudio** | Las tareas del día a día, paso por paso. **Del 10/09: no tiene nada de las diez migraciones del 15/09** — recuperos, excepción, turnos fijos, la ficha rápida, Personal, la bitácora |
+| `Casa-Fe-manual-de-uso.pdf` | **el estudio** | El manual con capturas. Del 12/09, **igual de viejo**. Se regenera con `manual-de-uso.py`, que necesita la sonda `?p=agenda` |
+| **Esta §0** | **nosotros** | Lo que falta. Es la lista de trabajo, no un instructivo |
+| `PLAN.md` | **nosotros** | Lo construido, migración por migración, con lo verificado |
+
+**Los dos manuales del estudio quedaron viejos el 15/09** y hay que regenerarlos
+cuando la semana de prueba decante: lo de ese día cambia cómo se trabaja en
+Agenda, que es donde el mostrador pasa el día.
+
 ### Lo que espera al estudio
 
 | | |
