@@ -478,12 +478,23 @@ function Nav() {
         </nav>
 
         <div className="flex items-center gap-2.5 ml-auto">
+          {/* ESCONDIDO HASTA NUEVO AVISO (16/09) — el estudio quiere mostrar
+              la web antes de abrir, y un botón "Ingresar" en la barra invita
+              a entrar a un sistema que todavía no está en uso.
+
+              El equipo entra por /admin, que lleva al mismo lugar. No es
+              una protección —quien escriba /sistema entra igual, y para eso
+              está el login— sino no ofrecer una puerta que no toca todavía.
+
+              Para devolverlo: descomentar esto. El de /admin puede quedar
+              igual, no molesta.
           <Link
             href="/sistema"
             className="eyebrow text-[11px] lg:text-xs px-5 py-2.5 rounded-full border border-foreground text-foreground hover:bg-foreground hover:text-background transition-colors"
           >
             Ingresar
           </Link>
+          */}
           <button
             onClick={() => setMenuOpen((o) => !o)}
             aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}
@@ -1282,9 +1293,12 @@ function Footer() {
 
           <div className="flex flex-wrap items-center justify-between gap-3 mt-12 pt-6 border-t border-foreground/15 eyebrow text-[9px] text-foreground/65">
             <p>© {new Date().getFullYear()} {studio.name}</p>
+            {/* ESCONDIDO HASTA NUEVO AVISO (16/09), por lo mismo que el de
+                la barra. Se descomentan los dos juntos.
             <Link href="/sistema" className="hover:text-foreground transition-colors">
               Acceso al sistema
             </Link>
+            */}
           </div>
         </div>
       </footer>
