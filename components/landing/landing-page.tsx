@@ -1126,11 +1126,12 @@ function Horarios({ schedule }: { schedule: PublicClass[] }) {
           )}
         </div>
 
-        <Reveal delay={120}>
-          <p className="eyebrow text-center text-[10px] text-foreground/50 mt-8">
-            Los cupos se reservan por orden de llegada
-          </p>
-        </Reveal>
+        {/* Debajo de la grilla no va nada: el estudio pidió sacar de acá
+            "Los cupos se reservan por orden de llegada" (16/09). Era una
+            regla de reserva escrita a mano, y las reservas las va a manejar
+            el sistema. Si algún día hay que volver a decir algo sobre los
+            cupos, el lugar es el copy del plan o la sección de contacto,
+            que el estudio edita solo. */}
       </div>
     </section>
   )
