@@ -1582,6 +1582,91 @@ registro nulo y leerle un campo da nulo, sin error.
 **De paso**: el nombre de Giuliana tenía un espacio al final y eso salía en el
 aviso que lee la clienta ("la da Giuliana ."). Se corrigió el dato.
 
+### ✅ El acceso de la clienta, de punta a punta (17/09) — `0061` a `0068`
+
+El bloque más largo del día y el primero que se ejerció **en producción y no
+en desarrollo**, que es lo que lo hizo valer: cuatro de los cinco problemas
+sólo existían ahí.
+
+**Las migraciones.** `0061` sacó el DNI y las notas laborales de `teachers` a
+la satélite `teacher_private` —la deuda 🔴 que la §0 arrastraba desde la
+`0053`—. `0062` (`ultimos_cierres`) para que Personal proponga el período
+siguiente. `0063` borró las 10 clientas de prueba y con ellas $365.000 de
+plata fantasma. `0064` prorrateó el sueldo mensual, que se pagaba entero en
+cada cierre: dos cierres en un mes eran dos sueldos. `0065` sumó los ajustes
+manuales con motivo exigido por la base. `0066` arregló que **un cierre de
+caja correcto se denunciara a sí mismo para siempre** —el ajuste del arqueo
+cae dentro del turno que lo creó, así que había que comparar contra lo
+contado y no contra lo esperado—. `0067` le dio a cada clienta su número de
+credencial. `0068` sacó la dirección del portal del pedido HTTP.
+
+**Y tres errores que sólo se ven en producción.**
+
+1. *El mail que no salía sin decir por qué.* `sendEmail` devolvía `false` y
+   tiraba a la basura la respuesta de Resend. Las cuatro causas posibles
+   —falta la API key, remitente inválido, dominio sin verificar,
+   destinatario suprimido— se arreglan en lugares distintos, así que había
+   que adivinar una y redeployar para probar la siguiente. Ahora el motivo
+   llega a la pantalla y el cuerpo entero a los logs. La causa concreta de
+   ese día fue **`EMAIL_FROM` con las comillas de `.env.local` pegadas
+   literales en Vercel**: en el archivo TIENEN que estar —si no, bash lee el
+   `<` como redirección— y Next las saca al parsear; Vercel no parsea nada.
+   Resend responde 422. El remitente ahora se normaliza, así que el mismo
+   valor pegado en los dos lugares funciona.
+
+2. *No había forma de reintentar.* La ficha con cuenta sólo mostraba
+   "Activo": si el mail no salía, la única salida era borrar la cuenta y
+   crearla de nuevo. Se sumó "Reenviar el mail de acceso", que **se niega si
+   la clienta ya eligió su contraseña** —el mail promete que la clave es su
+   documento, y sobre una clave propia sería mentira, además de que para
+   hacerlo verdad habría que pisarle la que eligió—.
+
+3. *El link del mail apuntaba a `localhost:3000`.* Los cuatro mails que se
+   habían mandado ese día lo tenían, uno a una clienta real. Se armaba con
+   `new URL(request.url).origin`, que coincide con la dirección pública sólo
+   por casualidad. Y al arreglarlo apareció el error de abajo, que es el más
+   interesante de los tres.
+
+**El respaldo que tapaba una falla.** Después de cargar `portal_url` y
+desplegar, el mail siguió saliendo con el dominio de Vercel. La cronología no
+dejaba dudas —el valor 10 minutos antes, el deploy 5 minutos antes—, así que
+el parámetro no se estaba leyendo. La causa: **`lib/estudio.ts` era el único
+archivo del proyecto que leía `NEXT_PUBLIC_SUPABASE_ANON_KEY`**, y todo el
+resto usa `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. En `.env.local` están las
+dos, así que en desarrollo andaba; en Vercel está sólo la que usa el resto.
+Esa lectura devolvía vacío **siempre** en producción. Y no se notaba porque
+el otro valor que lee es el nombre del estudio, cuyo respaldo escrito en el
+código es `'Casa Fe'` — exactamente lo que dice la base. O sea que el nombre
+de los mails, del manifest y de la metadata venía del código desde que esa
+función existe, y se iba a descubrir el día que lo cambiaran desde
+Configuración y los mails siguieran diciendo lo de antes.
+
+**Qué quedó verificado en producción**, contra Resend y contra la base, no
+contra la pantalla: el alta crea la cuenta y manda el mail en 1 segundo; el
+link sale con el dominio que el estudio cargó (sin `www`, que es la señal de
+que el parámetro se lee); el ingreso con el documento y el cambio obligatorio
+de contraseña; la credencial `CF-0002` en la lista, en la ficha y en la
+búsqueda —que encuentra por `42` y por `CF-0042`—; el reenvío aceptado sobre
+una cuenta que nunca entró y rechazado sobre una que ya eligió su clave, con
+`updated_at` sin moverse para probar que el rechazo corta antes de escribir.
+
+**Lo que NO se verificó**: el header del portal con la credencial, porque esa
+pantalla sólo existe con sesión de alumna.
+
+**Un barrido que dejó tarea.** Buscando los otros lugares con esta misma
+forma —una falla que se vuelve un booleano y nadie puede saber por qué—
+salieron **28, once graves**. Los dos peores: el proceso diario inserta la
+notificación **antes** de mandar el mail y sólo cuenta los que salieron, así
+que la campana dice "cuota emitida" y la clienta no recibió nada; y el
+webhook de Mercado Pago responde `ok: true` aunque no haya acreditado, así
+que MP no reintenta y el pago queda pendiente sin que nadie se entere. Están
+en la §0.
+
+**Un bug de verdad, encontrado de paso**: en `app/api/cron/diario/route.ts`
+los avisos `turno_liberado` se arman en la línea 1002, **después** del único
+insert (línea 898), se cuentan en `evaluated` y se tiran. El aviso "Turno
+fijo sin prioridad" nunca llegó a la campana, ni una vez.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
@@ -1624,11 +1709,21 @@ aviso que lee la clienta ("la da Giuliana ."). Se corrigió el dato.
   `http://localhost:3000/sistema/recuperar` (sin esto, el enlace de
   "olvidé mi contraseña" cae en la home en vez de la pantalla de reset).
 - Vercel → Environment Variables: `RESEND_API_KEY`,
-  `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` y
-  `CRON_SECRET` ✅ (verificado 05/09/2026). **`EMAIL_FROM` no está cargada en
-  ningún lado**: sin ella `lib/email-server.ts:30` cae a `onboarding@resend.dev`,
-  que en sandbox solo entrega a la cuenta dueña. Va junto con la verificación
-  del dominio.
+  `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`,
+  `CRON_SECRET` y **`EMAIL_FROM`** ✅ (esta última cargada y verificada el
+  17/09). Ojo con el valor: va **sin comillas**. En `.env.local` las lleva
+  porque bash necesita que se cite el `<` de `Casa Fe <avisos@…>`, y Next las
+  saca al parsear; Vercel guarda el literal y Resend responde 422. Desde el
+  17/09 el código las normaliza, así que el mismo valor sirve en los dos
+  lados — pero el que está cargado es el correcto.
+- Resend ✅ **dominio `casafepilates.com.ar` verificado el 17/09** (región
+  `sa-east-1`), y el circuito del mail de acceso ejercido en producción. Lo
+  que sigue abierto de acá es lo de abajo, entre paréntesis: usar Resend como
+  SMTP de Supabase. Hoy **"olvidé mi contraseña" no pasa por Resend** —usa el
+  mailer propio de Supabase, que en el plan gratis manda desde una dirección
+  de Supabase, tiene límite de unos pocos por hora y cae en spam seguido—, y
+  es el único camino que le queda a una clienta que ya eligió su contraseña y
+  la olvidó. El registro de abajo queda como historia:
 - Resend en sandbox: sin dominio verificado solo entrega a
   `digitalamenitiessas+1@gmail.com` —con el `+1`, así lo contesta la propia API de Resend al rechazar un envío; el registro decía la dirección sin el sufijo—. Al tener el dominio del estudio:
   Resend → Domains → verificar DNS → `EMAIL_FROM` en Vercel, y los emails

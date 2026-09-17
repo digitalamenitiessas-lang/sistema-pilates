@@ -27,6 +27,7 @@ import { cn, nombreDelDia } from '@/lib/utils'
 import { useData } from '@/lib/data-context'
 import {
   credencial,
+  cancelarMembresia,
   createSystemUser,
   reenviarAcceso,
   setMembershipAutoRenew,
@@ -58,6 +59,7 @@ const ESTADO_MEMBRESIA: Record<MembershipStatus, string> = {
   futura: 'Empieza después',
   vencida: 'Vencida',
   suspendida: 'Suspendida',
+  cancelada: 'Cancelada',
 }
 
 /** El color de cada estado, para que la vigente y el historial coincidan. */
@@ -67,6 +69,8 @@ const COLOR_ESTADO: Record<MembershipStatus, string> = {
   futura: 'bg-info-suave text-info-fuerte',
   vencida: 'bg-destructive-suave text-destructive-fuerte',
   suspendida: 'bg-muted text-muted-foreground',
+  // Gris y no rojo: una cancelación no es un problema, es una decisión.
+  cancelada: 'bg-muted text-muted-foreground',
 }
 
 /** El `T00:00` evita que un ISO suelto se lea como UTC y muestre el día anterior. */
@@ -143,6 +147,150 @@ function ReenviarAcceso({ student }: { student: Student }) {
           {motivo}
         </p>
       )}
+    </div>
+  )
+}
+
+/**
+ * Cancelar un período (0069).
+ *
+ * Existe porque al estudio le pasó lo obvio: le asignaron dos planes a la
+ * misma clienta y no había cómo deshacerlo. Las únicas acciones sobre una
+ * membresía eran asignarla y prender la renovación automática.
+ *
+ * El cartel dice lo que va a pasar ANTES de que pase, con los números a la
+ * vista: qué período, cuántas clases ya usó y cuánta cuota se va a anular.
+ * Sin eso, cancelar sería apretar a ciegas algo que toca plata.
+ *
+ * Y es un cartel propio y no un `window.confirm`: los nativos los descarta
+ * solo el navegador embebido de Instagram, por donde entran las clientas,
+ * y el botón parecería muerto.
+ */
+function CancelarMembresiaModal({
+  membresia,
+  cuota,
+  onClose,
+}: {
+  membresia: Membership
+  cuota?: Payment
+  onClose: () => void
+}) {
+  const { refresh } = useData()
+  const [motivo, setMotivo] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const confirmar = async () => {
+    setSaving(true)
+    setError(null)
+    try {
+      await cancelarMembresia(membresia.id, motivo)
+      await refresh()
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo cancelar')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/20 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="bg-card rounded-2xl shadow-2xl w-full max-w-md border border-border max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <div>
+            <h2 className="text-base font-bold text-foreground">Cancelar el período</h2>
+            <p className="text-xs text-muted-foreground">{membresia.planName}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          <div className="rounded-xl bg-muted px-3.5 py-3 space-y-1">
+            <p className="text-sm text-foreground">
+              {fecha(membresia.startDate)} — {fecha(membresia.endDate)}
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              {membresia.classesUsed}/{membresia.classesTotal} clases usadas
+            </p>
+          </div>
+
+          {/* Lo que se va con la cancelación, dicho con el número. */}
+          {cuota ? (
+            <p className="text-sm text-foreground">
+              Se anula también su cuota de{' '}
+              <span className="font-bold">${cuota.amount.toLocaleString('es-AR')}</span>, que vence
+              el {fecha(cuota.dueDate)}. Sin eso, seguiría debiendo un mes que no existe y el
+              sistema se lo reclamaría por mail.
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Este período no tiene una cuota pendiente para anular.
+            </p>
+          )}
+
+          {membresia.classesUsed > 0 && (
+            <p className="text-xs text-aviso-fuerte bg-aviso-suave rounded-xl px-3 py-2">
+              Ya usó {membresia.classesUsed} clase{membresia.classesUsed !== 1 ? 's' : ''} de este
+              período. Las reservas que ya hizo quedan en su historial —no se borra nada—, pero
+              desde ahora este período deja de servirle para reservar.
+            </p>
+          )}
+
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
+              Motivo *
+            </label>
+            <textarea
+              rows={2}
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              placeholder="Ej: se le asignó el plan equivocado"
+              className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors resize-none"
+            />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Queda escrito en la cuota anulada. Es lo que alguien va a leer en tres meses cuando se
+              pregunte por qué falta ese mes.
+            </p>
+          </div>
+
+          {error && (
+            <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">
+              {error}
+            </p>
+          )}
+        </div>
+
+        <div className="flex gap-3 px-6 py-4 border-t border-border">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors"
+          >
+            No cancelar
+          </button>
+          <button
+            type="button"
+            onClick={confirmar}
+            disabled={saving || !motivo.trim()}
+            className="flex-1 py-2.5 rounded-xl bg-destructive-fuerte text-white text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            {saving ? 'Cancelando...' : 'Cancelar el período'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -470,6 +618,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
   const [showEdit, setShowEdit] = useState(false)
   const [showAssignPlan, setShowAssignPlan] = useState(false)
   const [showPortalAccess, setShowPortalAccess] = useState(false)
+  const [aCancelar, setACancelar] = useState<Membership | null>(null)
   const [savingAutoRenew, setSavingAutoRenew] = useState(false)
   const ms = student.membership
   // El formato lo pone el estudio en Configuración, así que se deriva acá
@@ -1290,6 +1439,17 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                         >
                           {ESTADO_MEMBRESIA[m.status]}
                         </span>
+                        {/* Una vencida no se cancela: no hay nada que sacar
+                            del medio ni cuota que anular. Una cancelada
+                            tampoco, obvio. */}
+                        {canWrite && m.status !== 'cancelada' && m.status !== 'vencida' && (
+                          <button
+                            onClick={() => setACancelar(m)}
+                            className="shrink-0 px-2.5 py-1 rounded-lg border border-border text-[11px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                          >
+                            Cancelar
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1304,6 +1464,15 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
       {showAssignPlan && <AsignarPlanModal student={student} onClose={() => setShowAssignPlan(false)} />}
       {showPortalAccess && (
         <PortalAccessModal student={student} onClose={() => setShowPortalAccess(false)} />
+      )}
+      {aCancelar && (
+        <CancelarMembresiaModal
+          membresia={aCancelar}
+          cuota={payments.find(
+            (p) => p.membershipId === aCancelar.id && (p.status === 'pendiente' || p.status === 'vencido')
+          )}
+          onClose={() => setACancelar(null)}
+        />
       )}
     </div>
   )

@@ -204,6 +204,17 @@ function MembershipCard({ student }: { student: Student }) {
             : `Vence el ${pretty(ms.endDate)}`}
         </span>
       </div>
+
+      {/* Desde cuándo rige. Lo pidió el estudio el 17/09 con estas
+          palabras: "¿Desde cuándo está activa la membresía?". La tarjeta
+          decía cuándo vence y nunca cuándo empezó, así que la clienta no
+          tenía con qué chequear su propio mes. Para un período que todavía
+          no arrancó no se repite: arriba ya dice "Arranca el X". */}
+      {ms.status !== 'futura' && (
+        <p className="text-[11px] text-muted-foreground mt-1.5">
+          Activa desde el {pretty(ms.startDate)}
+        </p>
+      )}
     </div>
   )
 }
@@ -870,11 +881,23 @@ export function PortalPage() {
               <CreditCard className="w-3.5 h-3.5" />
               Tenés {myDebts.length} pago{myDebts.length !== 1 ? 's' : ''} pendiente{myDebts.length !== 1 ? 's' : ''}
             </p>
-            {myDebts.map((p) => (
+            {myDebts.map((p) => {
+              // El período al que pertenece la cuota. Cuando todavía no
+              // arrancó hay que decirlo: con el encolado de la 0036, pagar
+              // antes le crea el mes siguiente, y en el portal aparecían
+              // dos cuotas pendientes que se leían como si debiera dos
+              // meses de una. Le pasó a una clienta el 17/09 y preguntó.
+              const periodo = memberships.find((m) => m.id === p.membershipId)
+              const empiezaDespues = !!periodo && periodo.startDate > today
+              return (
               <div key={p.id} className="flex items-center justify-between gap-2 py-1.5">
                 <div className="min-w-0">
                   <p className="text-xs font-semibold text-aviso-fuerte truncate">{p.planName}</p>
-                  <p className="text-[10px] text-aviso-fuerte">Vence {pretty(p.dueDate)}</p>
+                  <p className="text-[10px] text-aviso-fuerte">
+                    {empiezaDespues && periodo
+                      ? `Del período que empieza el ${pretty(periodo.startDate)} · vence ${pretty(p.dueDate)}`
+                      : `Vence ${pretty(p.dueDate)}`}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-sm font-bold text-aviso-fuerte">
@@ -892,7 +915,8 @@ export function PortalPage() {
                   )}
                 </div>
               </div>
-            ))}
+              )
+            })}
             {!myDebts.some((p) => p.mpLink) && (
               <p className="text-[10px] text-aviso-fuerte mt-1">
                 Podés abonar en recepción o pedir el link de pago por WhatsApp.

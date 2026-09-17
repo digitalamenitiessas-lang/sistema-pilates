@@ -101,6 +101,18 @@ resultado contra la base — no contra la pantalla.
   agujeros del 16 y 17/09 —seis funciones abiertas, el padrón a la vista,
   el cupo mentido, el botón que rechazaba— aparecieron todos al entrar
   como alumna y como profesora, y ninguno al leer el código.
+- **Y en producción, no solo en desarrollo.** Hay una familia de errores
+  que en la máquina de quien programa no existe, y el 17/09 aparecieron
+  los tres juntos: una variable de entorno con comillas que `.env.local`
+  necesita y Vercel toma literales; un link de mail armado con
+  `new URL(request.url).origin`, que en local es `localhost:3000`; y
+  —el peor— `lib/estudio.ts` leyendo `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  cuando todo el resto del proyecto usa `..._PUBLISHABLE_KEY`: en
+  `.env.local` están las dos, en Vercel solo la segunda, así que esa
+  lectura devolvía vacío **siempre** en producción. Ese último estuvo
+  escondido semanas porque **su valor de respaldo era casualmente el
+  correcto** (`'Casa Fe'`). Cuidado con los `catch` que devuelven un
+  default plausible: no fallan, mienten.
 - **Y por el camino que usa la pantalla.** Una prueba puede pasar por el
   lugar equivocado: el 16/09 se verificó un cambio de cupos comparando
   números que daban iguales, y daban iguales porque la pantalla nunca
