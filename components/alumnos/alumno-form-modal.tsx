@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Loader2 } from 'lucide-react'
+import { X, Loader2, Smartphone } from 'lucide-react'
 import { useData } from '@/lib/data-context'
-import { createStudent, updateStudent } from '@/lib/api'
+import { createStudent, createSystemUser, updateStudent } from '@/lib/api'
 import type { Student } from '@/lib/types'
 
 interface AlumnoFormModalProps {
@@ -30,10 +30,35 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
   const [cirugias, setCirugias] = useState(student?.cirugias ?? '')
   const [medicacion, setMedicacion] = useState(student?.medicacion ?? '')
   const [planId, setPlanId] = useState('')
+  /**
+   * El acceso, como último paso del alta (pedido del estudio, 17/09).
+   *
+   * Antes era un segundo viaje: se cargaba la ficha, se entraba a ella y
+   * ahí estaba el botón. Se probó el circuito cargando un cliente y
+   * esperando el mail, que nunca salió — porque el mail sale con el
+   * acceso, no con la ficha. Dos pasos que parecían uno.
+   *
+   * Prendido por defecto: el caso normal es que la clienta entre al
+   * portal. Se apaga para quien no tiene mail o no lo quiere.
+   */
+  const [conAcceso, setConAcceso] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
 
   const isEdit = !!student
+
+  // El acceso necesita las dos cosas: el mail es el usuario y el
+  // documento es la contraseña inicial.
+  const dniLimpio = dni.replace(/\D/g, '')
+  const puedeAcceso = !isEdit && conAcceso
+  const faltaParaAcceso = puedeAcceso
+    ? !email.trim()
+      ? 'el email'
+      : dniLimpio.length < 6
+        ? 'el DNI'
+        : null
+    : null
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -47,9 +72,49 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
       }
       if (isEdit) {
         await updateStudent(student.id, input)
-      } else {
-        await createStudent({ ...input, planId: planId || undefined }, plans, settings)
+        await refresh()
+        onClose()
+        return
       }
+
+      const studentId = await createStudent(
+        { ...input, planId: planId || undefined },
+        plans,
+        settings
+      )
+
+      // El acceso va después y aparte: si falla, la ficha ya está guardada
+      // —con su plan y su cuota— y lo único que queda pendiente es el
+      // acceso, que se reintenta desde la ficha. Meterlo en el mismo try
+      // sin distinguir haría perder el alta por un mail mal escrito.
+      if (puedeAcceso) {
+        try {
+          const r = await createSystemUser({
+            email: email.trim(),
+            fullName: name,
+            role: 'alumno',
+            studentId,
+          })
+          await refresh()
+          if (!r.mailEnviado) {
+            setAviso(
+              `Cliente creado, pero el mail no se pudo enviar. Pasale el acceso a mano: entra con ${email.trim()} y su documento, y al entrar le vamos a pedir que la cambie.`
+            )
+            setSaving(false)
+            return
+          }
+        } catch (err) {
+          await refresh()
+          setAviso(
+            `El cliente se creó bien, pero el acceso no: ${
+              err instanceof Error ? err.message : 'error desconocido'
+            }. Se puede crear desde su ficha.`
+          )
+          setSaving(false)
+          return
+        }
+      }
+
       await refresh()
       onClose()
     } catch (err) {
@@ -178,6 +243,42 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
             </div>
           )}
 
+          {/* El acceso al portal, como último paso del alta */}
+          {!isEdit && (
+            <div className="rounded-xl border border-border px-3.5 py-3">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={conAcceso}
+                  onChange={(e) => setConAcceso(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-[var(--color-primary)]"
+                />
+                <span className="min-w-0">
+                  <span className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                    <Smartphone className="w-3.5 h-3.5 text-primary-fuerte" />
+                    Crearle el acceso y avisarle por mail
+                  </span>
+                  <span className="block text-[11px] text-muted-foreground mt-1">
+                    Entra con su email y{' '}
+                    <span className="font-semibold">su documento como contraseña</span>. Le llega un
+                    mail con cómo entrar, y al ingresar le vamos a pedir que elija una propia.
+                  </span>
+                </span>
+              </label>
+
+              {faltaParaAcceso && (
+                <p className="text-[11px] font-semibold text-aviso-fuerte mt-2">
+                  Para crearle el acceso falta {faltaParaAcceso}. Completalo arriba, o destildá esta
+                  opción y creale el acceso más adelante desde su ficha.
+                </p>
+              )}
+            </div>
+          )}
+
+          {aviso && (
+            <p className="text-sm text-aviso-fuerte bg-aviso-suave rounded-xl px-3 py-2.5">{aviso}</p>
+          )}
+
           {error && (
             <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
           )}
@@ -193,11 +294,15 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
           </button>
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || !!faltaParaAcceso}
             className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-            {isEdit ? 'Guardar cambios' : 'Crear cliente'}
+            {isEdit
+              ? 'Guardar cambios'
+              : puedeAcceso
+                ? 'Crear cliente y avisarle'
+                : 'Crear cliente'}
           </button>
         </div>
       </form>
