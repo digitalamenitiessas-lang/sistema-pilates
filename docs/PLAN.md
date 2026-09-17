@@ -1630,7 +1630,7 @@ aviso que lee la clienta ("la da Giuliana ."). Se corrigió el dato.
   que en sandbox solo entrega a la cuenta dueña. Va junto con la verificación
   del dominio.
 - Resend en sandbox: sin dominio verificado solo entrega a
-  `digitalamenitiessas@gmail.com`. Al tener el dominio del estudio:
+  `digitalamenitiessas+1@gmail.com` —con el `+1`, así lo contesta la propia API de Resend al rechazar un envío; el registro decía la dirección sin el sufijo—. Al tener el dominio del estudio:
   Resend → Domains → verificar DNS → `EMAIL_FROM` en Vercel, y los emails
   a las alumnas fluyen solos. (Opcional en ese momento: usar Resend
   también como SMTP de Supabase para los emails de reset, sin límite de
