@@ -171,17 +171,37 @@ function lineasDelBlurb(blurb: string): string[] {
 // Contexto de la landing: datos del estudio y disciplinas, cargados en vivo
 // desde las vistas públicas. Con respaldo, así la página nunca queda vacía.
 // ---------------------------------------------------------------
+/**
+ * Lo que un medio de pago le hace al precio, cuando le hace un descuento.
+ * `ajuste` viene negativo de la base (-5 es 5% menos) porque ahí conviven
+ * descuentos y recargos en la misma columna; acá solo llegan descuentos.
+ */
+interface DescuentoDePago {
+  code: string
+  nombre: string
+  ajuste: number
+}
+
 interface LandingData {
   studio: Studio
   disciplines: Record<string, DisciplineStyle>
   /** Orden en el que se muestran (el del catálogo) */
   disciplineNames: string[]
+  /**
+   * Vacío hasta que la 0056 corra, y vacío también si el estudio pone el
+   * descuento en cero o da de baja el medio: la página no tiene un número
+   * propio para caer de vuelta. Es a propósito —el respaldo acá sería un
+   * descuento que el sistema no aplica, y con `pick` (que usa el respaldo
+   * cuando el valor está vacío) el estudio no podría apagarlo nunca.
+   */
+  descuentos: DescuentoDePago[]
 }
 
 const LandingCtx = createContext<LandingData>({
   studio: STUDIO_FALLBACK,
   disciplines: DISCIPLINE_FALLBACK,
   disciplineNames: Object.keys(DISCIPLINE_FALLBACK),
+  descuentos: [],
 })
 
 function useLanding(): LandingData {
@@ -736,6 +756,7 @@ function Estudio({ schedule }: { schedule: PublicClass[] }) {
  */
 function Planes({ plans }: { plans: PublicPlan[] }) {
   const contacto = useContacto()
+  const { descuentos } = useLanding()
   const reservaPrueba = contacto(
     '¡Hola! Me interesa la clase de prueba. ¿Me cuentan cómo reservar?',
     'Quiero reservar mi clase de prueba'
@@ -910,6 +931,37 @@ function Planes({ plans }: { plans: PublicPlan[] }) {
               </Reveal>
             ))}
           </div>
+        )}
+
+        {/* "-5% OFF Efectivo" debajo de los planes (16/09, pedido del
+            estudio).
+
+            El número NO está escrito acá: sale de `payment_methods`, que
+            es con lo que el sistema cobra desde la 0028 —efectivo en -5,
+            transferencia en 0, tarjeta en +25— y que el estudio edita en
+            Configuración → Medios de pago. Lo trae la vista pública de la
+            0056, porque la tabla no le contesta a quien no tiene sesión.
+
+            Así la web no puede contradecir al mostrador: si mañana el
+            descuento pasa a 8, o se apaga, o dejan de tomar efectivo, esta
+            línea sigue al número sola. Y si el descuento no existe, la
+            línea no está — no hay un 5% de respaldo esperando aparecer.
+
+            Solo descuentos: el recargo de la tarjeta lo deja afuera la
+            vista, y anunciarlo sería una decisión del estudio. */}
+        {paid.length > 0 && descuentos.length > 0 && (
+          <Reveal delay={160}>
+            {/* Un punto más grande y más opaco que las otras notas al pie
+                de la página (10px al 50%): esto no es una aclaración, es
+                un argumento de venta al lado de un precio de seis cifras,
+                y al 60% en 10px no lo lee nadie. Sigue siendo `eyebrow`,
+                así que no se pelea con el diseño. */}
+            <p className="eyebrow text-center text-[11px] text-foreground/80 mt-9">
+              {descuentos
+                .map((d) => `-${Math.abs(d.ajuste).toLocaleString('es-AR')}% OFF ${d.nombre}`)
+                .join('  ·  ')}
+            </p>
+          </Reveal>
         )}
       </div>
     </section>
@@ -1350,6 +1402,7 @@ export function LandingPage() {
     studio: STUDIO_FALLBACK,
     disciplines: DISCIPLINE_FALLBACK,
     disciplineNames: Object.keys(DISCIPLINE_FALLBACK),
+    descuentos: [],
   })
 
   useEffect(() => {
@@ -1367,7 +1420,13 @@ export function LandingPage() {
     Promise.all([
       supabase.from('public_studio_settings').select('key, value'),
       supabase.from('public_disciplines').select('*'),
-    ]).then(([settingsRes, discRes]) => {
+      // El descuento por efectivo (0056). Si la vista todavía no existe
+      // esto vuelve con error y `data` en null, que es el mismo camino
+      // que "no hay descuentos": la línea no se dibuja y el resto de la
+      // página no se enterá. Por eso va en el mismo Promise.all y no en
+      // un try aparte — una consulta de Supabase no rechaza, contesta.
+      supabase.from('public_payment_discounts').select('code, name, ajuste_pct'),
+    ]).then(([settingsRes, discRes, descRes]) => {
       const rows = (settingsRes.data ?? []) as Array<{ key: string; value: string }>
       const map = new Map(rows.map((r) => [r.key, r.value?.trim() ?? '']))
       const pick = (key: string, fallback: string) => map.get(key) || fallback
@@ -1401,6 +1460,13 @@ export function LandingPage() {
             )
           : prev.disciplines,
         disciplineNames: discRows.length ? discRows.map((d) => d.name) : prev.disciplineNames,
+        // `Number()` porque la columna es `numeric` y PostgREST podría
+        // mandarla como texto; y el filtro repite el de la vista porque
+        // acá se publica, y una regla de plata no se apoya en que la
+        // vista de arriba no cambie.
+        descuentos: ((descRes.data ?? []) as Array<{ code: string; name: string; ajuste_pct: number | string }>)
+          .map((m) => ({ code: m.code, nombre: m.name, ajuste: Number(m.ajuste_pct) }))
+          .filter((m) => Number.isFinite(m.ajuste) && m.ajuste < 0),
       }))
     })
   }, [])

@@ -1566,6 +1566,13 @@ function PaymentMethodsSection() {
           cinco por ciento de descuento, <strong>25</strong> es veinticinco por
           ciento de recargo, <strong>0</strong> deja el precio tal cual.
         </p>
+        {/* Que este número salga en la web es de la 0056, y quien lo edita
+            tiene que saberlo antes de tocarlo: es el mismo número en los
+            dos lados justamente para que no puedan decir cosas distintas. */}
+        <p className="text-[11px] text-muted-foreground pb-1">
+          Los <strong>descuentos</strong> se publican en la web, debajo de los
+          planes. Los recargos no.
+        </p>
         {paymentMethods.length === 0 && (
           <p className="text-xs text-muted-foreground">
             Sin medios cargados. Corré la migración 0011.
