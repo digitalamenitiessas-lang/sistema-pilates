@@ -546,6 +546,7 @@ export async function fetchStudioData(): Promise<StudioData> {
       isManual: m.is_manual,
       // ?? 0 mientras la 0028 no haya corrido: sin ajuste, el precio de lista.
       ajustePct: Number(m.ajuste_pct ?? 0),
+      defaultAccountId: m.default_account_id ?? null,
       active: m.active,
       sortOrder: m.sort_order,
     }))

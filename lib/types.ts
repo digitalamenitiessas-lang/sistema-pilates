@@ -47,6 +47,14 @@ export interface PaymentMethod {
    * descuento, 25 es 25% de recargo. Cero mientras la migración no corrió.
    */
   ajustePct: number
+  /**
+   * A qué cuenta entra —o de dónde sale— la plata de este medio. Es el
+   * mismo dato con el que la base imputa los cobros sola desde la 0020,
+   * y el que la pantalla de gastos tiene que usar para sugerir la cuenta.
+   * Nulo mientras nadie lo haya configurado: ahí los cobros caen en
+   * "A imputar" y un gasto no sugiere nada.
+   */
+  defaultAccountId: string | null
   active: boolean
   sortOrder: number
 }

@@ -224,6 +224,16 @@ function Liquidacion({
         que carga el gasto en el libro por vos. No hace falta cargarlo a mano en Gastos — si lo
         hacés, el sueldo sale dos veces.
       </p>
+      {/* El prorrateo del mensual (0064) tiene que estar escrito donde se
+          mira el número: si alguien cierra una quincena y ve la mitad del
+          sueldo, sin esta línea parece un error. Antes el mes entero se
+          sumaba en cada cierre, así que dos quincenas pagaban dos
+          sueldos. */}
+      <p className="text-[11px] text-muted-foreground px-4 pb-1">
+        El <span className="font-semibold">sueldo mensual</span> se reparte por los días del mes
+        que cubre el período: un mes completo paga uno, y dos quincenas pagan mitad y mitad —
+        suman un sueldo, no dos.
+      </p>
     </div>
   )
 }
