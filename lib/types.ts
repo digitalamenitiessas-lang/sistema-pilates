@@ -97,6 +97,8 @@ export type MembershipStatus =
   | 'activa'
   | 'vencida'
   | 'por vencer'
+  /** Cancelada a mano por el estudio (0069). No reserva, no consume, no encola. */
+  | 'cancelada'
   /**
    * Pagada y con su período ya reservado, pero todavía sin empezar. Existe
    * desde la 0036: el pago anticipado no se solapa con la membresía en

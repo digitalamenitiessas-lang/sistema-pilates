@@ -276,6 +276,11 @@ function deriveMembershipStatus(
   startDate?: string
 ): Membership['status'] {
   if (status === 'suspendida') return 'suspendida'
+  // Antes que cualquier cosa derivada de las fechas: una cancelada (0069)
+  // puede tener fechas futuras, y sin esta rama diría 'futura' y seguiría
+  // apareciendo como el próximo período — que es exactamente lo que se
+  // canceló.
+  if (status === 'cancelada') return 'cancelada'
   const today = hoyISO()
   if (endDate < today) return 'vencida'
   // Con el encolado de la 0036 el pago anticipado ya no se solapa: crea una
@@ -701,7 +706,12 @@ export async function fetchStudioData(): Promise<StudioData> {
   // hace que un cliente con una sola membresía suspendida siga mostrando la
   // suya en vez de parecer que nunca compró nada.
   const cubreHoy = (m: Membership) =>
-    m.status !== 'suspendida' && m.startDate <= hoy && m.endDate >= hoy
+    m.status !== 'suspendida' &&
+    // Y la cancelada tampoco compite (0069): la base no la va a elegir para
+    // descontar, porque `membresia_para` filtra por status = 'activa'.
+    m.status !== 'cancelada' &&
+    m.startDate <= hoy &&
+    m.endDate >= hoy
   const latestMembership = new Map<string, Membership>()
   for (const m of memberships) {
     const previa = latestMembership.get(m.studentId)
@@ -1125,6 +1135,39 @@ export async function updateStudent(id: string, input: Omit<NewStudentInput, 'pl
 }
 
 /** Prende o apaga la renovación automática de una membresía. */
+/**
+ * Cancelar un período (0069).
+ *
+ * El motivo lo exige la base, no esta función: queda escrito en la cuota
+ * que se anula. Devuelve qué se canceló y cuánta cuota se fue con ella,
+ * para que la pantalla lo diga en vez de dar por hecho que salió bien.
+ *
+ * Si la cuota ya estaba cobrada, la base rechaza con su propio texto
+ * —nombrando el comprobante— y eso es lo que hay que mostrar: la plata
+ * que entró se devuelve desde Pagos.
+ */
+export async function cancelarMembresia(
+  membershipId: string,
+  motivo: string
+): Promise<{ plan: string; desde: string; hasta: string; clasesUsadas: number; cuotaAnulada: number }> {
+  const { data, error } = await supabase.rpc('cancelar_membresia', {
+    p_id: membershipId,
+    p_motivo: motivo,
+  })
+  if (error?.code === '42883' || error?.code === 'PGRST202') {
+    throw new Error('Para cancelar una membresía falta correr la migración 0069.')
+  }
+  if (error) throw errorDeLaBase(error, 'No se pudo cancelar la membresía')
+  const f = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | undefined
+  return {
+    plan: String(f?.plan ?? '—'),
+    desde: String(f?.desde ?? ''),
+    hasta: String(f?.hasta ?? ''),
+    clasesUsadas: Number(f?.clases_usadas ?? 0),
+    cuotaAnulada: Number(f?.cuota_anulada ?? 0),
+  }
+}
+
 export async function setMembershipAutoRenew(membershipId: string, autoRenew: boolean): Promise<void> {
   const { error } = await supabase
     .from('memberships')

@@ -15,6 +15,7 @@ const STATUS_CONFIG = {
   futura: { label: 'Empieza después', class: 'bg-info-suave text-info-fuerte' },
   vencida: { label: 'Vencida', class: 'bg-destructive-suave text-destructive-fuerte' },
   suspendida: { label: 'Suspendida', class: 'bg-muted text-muted-foreground' },
+  cancelada: { label: 'Cancelada', class: 'bg-muted text-muted-foreground' },
   sin_membresia: { label: 'Sin membresía', class: 'bg-muted text-muted-foreground' },
 }
 
