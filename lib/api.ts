@@ -167,6 +167,45 @@ export function cancelacionEnPlazo(
   return minutosHasta(fecha, hora, ahora) >= horasDePlazo * 60
 }
 
+/**
+ * Cuántos días faltan para una fecha, desde el hoy del estudio.
+ *
+ * Se arma con las partes del ISO y no con `new Date(iso)`, por lo mismo
+ * que `addDays`: un ISO suelto se lee como UTC y en este huso eso corre la
+ * fecha un día. El `round` cubre el cambio de hora: dos medianoches
+ * locales pueden estar a 23 o 25 horas de distancia.
+ */
+export function diasHasta(hasta: string, desde: string = hoyISO()): number {
+  const [ay, am, ad] = desde.split('-').map(Number)
+  const [by, bm, bd] = hasta.split('-').map(Number)
+  const ms = new Date(by, bm - 1, bd).getTime() - new Date(ay, am - 1, ad).getTime()
+  return Math.round(ms / 86_400_000)
+}
+
+/** "hoy", "mañana", "en 27 días", "hace 3 días". Sin verbo, para que sirva
+ *  tanto para lo que vence como para lo que arranca. */
+export function enDias(hasta: string, desde: string = hoyISO()): string {
+  const d = diasHasta(hasta, desde)
+  if (d < 0) return `hace ${-d === 1 ? 'un día' : `${-d} días`}`
+  if (d === 0) return 'hoy'
+  if (d === 1) return 'mañana'
+  return `en ${d} días`
+}
+
+/**
+ * La cuenta de días del vencimiento, en palabras.
+ *
+ * Dice "vence en N días" y no "te quedan N días" a propósito: el último
+ * día de la membresía es inclusive —se puede usar—, así que "te quedan"
+ * obligaría a decidir si hoy cuenta, y cualquiera de las dos respuestas
+ * se lee como un error de uno. "Vence en N días" mide la distancia hasta
+ * una fecha, que es lo que no admite discusión. Y la fecha queda al lado,
+ * para quien quiera el dato exacto.
+ */
+export function cuentaDeDias(hasta: string, desde: string = hoyISO()): string {
+  return `${diasHasta(hasta, desde) < 0 ? 'venció' : 'vence'} ${enDias(hasta, desde)}`
+}
+
 export function addDays(iso: string, days: number): string {
   const [y, m, d] = iso.split('-').map(Number)
   const date = new Date(y, m - 1, d + days)
