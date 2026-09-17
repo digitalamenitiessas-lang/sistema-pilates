@@ -33,6 +33,7 @@ import {
   updateReservationStatus,
   fetchWeekOccupancy,
   type Occupancy,
+  credencial,
   settingNum,
   settingText,
   esOferta,
@@ -521,6 +522,7 @@ export function PortalPage() {
   }, [weekStart, reservations])
 
   const ms = me?.membership
+  const miCredencial = credencial(me?.memberNo, settings)
   const classesLeft = ms ? ms.classesTotal - ms.classesUsed : 0
   const canBook = !!ms && (ms.status === 'activa' || ms.status === 'por vencer') && classesLeft > 0
 
@@ -706,7 +708,19 @@ export function PortalPage() {
           />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-foreground truncate">¡Hola, {me.name.split(' ')[0]}!</p>
-            <p className="text-[10px] text-muted-foreground">{settingText(settings, 'studio_name', 'Casa Fe')}</p>
+            {/* La credencial va en el header y no en una pantalla aparte
+                porque su razon de ser es identificarse: tiene que estar
+                donde ella ya mira, no a dos toques. Si la 0067 no corrio,
+                queda solo el nombre del estudio. */}
+            <p className="text-[10px] text-muted-foreground truncate">
+              {settingText(settings, 'studio_name', 'Casa Fe')}
+              {miCredencial && (
+                <>
+                  {' \u00b7 '}
+                  <span className="font-bold tabular-nums text-foreground/70">{miCredencial}</span>
+                </>
+              )}
+            </p>
           </div>
           {/* La campana, con el mismo componente que usa el mostrador. No
               lleva `onNavigate` a propósito: sus destinos son pantallas del

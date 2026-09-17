@@ -26,6 +26,7 @@ import {
 import { cn, nombreDelDia } from '@/lib/utils'
 import { useData } from '@/lib/data-context'
 import {
+  credencial,
   createSystemUser,
   reenviarAcceso,
   setMembershipAutoRenew,
@@ -471,6 +472,9 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
   const [showPortalAccess, setShowPortalAccess] = useState(false)
   const [savingAutoRenew, setSavingAutoRenew] = useState(false)
   const ms = student.membership
+  // El formato lo pone el estudio en Configuración, así que se deriva acá
+  // y no viene armado desde la base (0067).
+  const cred = credencial(student.memberNo, data?.settings ?? {})
 
   // Sus turnos fijos (0048), ordenados como los lee el mostrador: por día
   // y hora, no por cuándo se los asignaron. Vacío mientras la migración
@@ -785,6 +789,10 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {[
+                    // Primero, y con el numero destacado: es como la van a
+                    // nombrar en el mostrador. Si la 0067 no corrio, no
+                    // aparece el renglon en vez de mostrarlo vacio.
+                    ...(cred ? [{ label: 'Credencial', value: cred }] : []),
                     { label: 'Nombre completo', value: student.name },
                     { label: 'Email', value: student.email },
                     { label: 'Teléfono', value: student.phone },
