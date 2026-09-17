@@ -12,6 +12,7 @@
 
 import { supabase } from './supabase'
 import type {
+  AjusteLiquidacion,
   CondicionPago,
   HorasTrabajadas,
   FilaLiquidacion,
@@ -96,6 +97,61 @@ export async function fetchHoras(desde: string, hasta: string): Promise<HorasTra
   }))
 }
 
+// ---------------------------------------------------------------
+// Ajustes manuales (0065, requerimiento 12.6)
+// ---------------------------------------------------------------
+
+export async function fetchAjustes(desde: string, hasta: string): Promise<AjusteLiquidacion[]> {
+  const { data, error } = await supabase
+    .from('teacher_adjustments')
+    .select('*')
+    .gte('fecha', desde)
+    .lte('fecha', hasta)
+    .order('fecha', { ascending: false })
+  // Sin la 0065 la tabla no existe, y la pantalla tiene que abrir igual.
+  if (sinPersonal(error)) return []
+  if (error) throw error
+
+  return (data ?? []).map((a) => ({
+    id: a.id,
+    teacherId: a.teacher_id,
+    fecha: a.fecha,
+    monto: Number(a.monto),
+    motivo: a.motivo ?? '',
+  }))
+}
+
+export async function cargarAjuste(input: {
+  teacherId: string
+  fecha: string
+  monto: number
+  motivo: string
+}): Promise<void> {
+  const { error } = await supabase.from('teacher_adjustments').insert({
+    teacher_id: input.teacherId,
+    fecha: input.fecha,
+    monto: input.monto,
+    motivo: input.motivo.trim(),
+  })
+  // Los rechazos con texto propio son los que importan: el período ya
+  // liquidado lo explica la base, y es lo que hay que mostrar.
+  if (error) throw new Error(error.message || 'No se pudo cargar el ajuste')
+}
+
+export async function borrarAjuste(id: string): Promise<void> {
+  // Se cuentan las filas: un delete que la política rechaza devuelve
+  // `error: null` y no borra nada.
+  const { data, error } = await supabase
+    .from('teacher_adjustments')
+    .delete()
+    .eq('id', id)
+    .select('id')
+  if (error) throw new Error(error.message || 'No se pudo borrar el ajuste')
+  if ((data ?? []).length === 0) {
+    throw new Error('No se borró el ajuste: puede que el período ya esté liquidado.')
+  }
+}
+
 export async function cargarHoras(input: {
   teacherId: string
   fecha: string
@@ -153,6 +209,8 @@ export async function fetchLiquidacion(
     horas: Number(f.horas ?? 0),
     montoHoras: Number(f.monto_horas ?? 0),
     mensual: Number(f.mensual ?? 0),
+    // 0 mientras la 0065 no haya corrido: la columna no viene.
+    ajustes: Number(f.ajustes ?? 0),
     ausencias: Number(f.ausencias ?? 0),
     tardanzas: Number(f.tardanzas ?? 0),
     total: Number(f.total ?? 0),
@@ -186,6 +244,7 @@ export async function fetchLiquidacionesCerradas(
     hasta: String(f.hasta),
     clases: Number(f.clases ?? 0),
     horas: Number(f.horas ?? 0),
+    ajustes: Number(f.ajustes ?? 0),
     total: Number(f.total ?? 0),
     totalHoy: Number(f.total_hoy ?? 0),
     estado: f.estado as LiquidacionCerrada['estado'],

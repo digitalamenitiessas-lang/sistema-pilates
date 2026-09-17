@@ -102,15 +102,23 @@ function GastoModal({
     'w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary'
   const labelClass = 'block text-xs font-semibold text-foreground mb-1.5'
 
-  // Al elegir el medio se sugiere su cuenta, que es lo que pasa el 95% de
-  // las veces; se puede cambiar.
+  // Al elegir el medio se sugiere SU cuenta, la que el estudio configuró
+  // —la misma con la que la base imputa los cobros sola desde la 0020—.
+  //
+  // Antes adivinaba por tipo: efectivo → la primera caja, y TODO lo demás
+  // → la primera cuenta de banco. Así un gasto pagado con Mercado Pago
+  // sugería la Cuenta bancaria, y como la sugerencia es lo que se acepta,
+  // la plata salía de la cuenta equivocada: el banco quedaba corto y
+  // Mercado Pago largo, sin ningún error. El dato correcto ya estaba a
+  // una línea de distancia (17/09).
   const elegirMedio = (code: string) => {
     setMethod(code)
     if (!accountId) {
       const m = paymentMethods.find((p) => p.code === code)
-      const sugerida = cuentas.find((c) => c.kind === (code === 'efectivo' ? 'caja' : 'banco'))
-      if (sugerida) setAccountId(sugerida.id)
-      void m
+      // Sin cuenta configurada no se sugiere nada: es mejor que elija.
+      if (m?.defaultAccountId && cuentas.some((c) => c.id === m.defaultAccountId)) {
+        setAccountId(m.defaultAccountId)
+      }
     }
   }
 
@@ -679,7 +687,7 @@ function PagarGastoModal({
 }: {
   gasto: Expense
   cuentas: Account[]
-  paymentMethods: { code: string; name: string; active: boolean }[]
+  paymentMethods: { code: string; name: string; active: boolean; defaultAccountId: string | null }[]
   onListo: () => void
   onClose: () => void
 }) {
@@ -689,11 +697,14 @@ function PagarGastoModal({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // La misma corrección que arriba: la cuenta la dice el medio, no su tipo.
   const elegirMedio = (code: string) => {
     setMethod(code)
     if (!accountId) {
-      const sugerida = cuentas.find((c) => c.kind === (code === 'efectivo' ? 'caja' : 'banco'))
-      if (sugerida) setAccountId(sugerida.id)
+      const m = paymentMethods.find((p) => p.code === code)
+      if (m?.defaultAccountId && cuentas.some((c) => c.id === m.defaultAccountId)) {
+        setAccountId(m.defaultAccountId)
+      }
     }
   }
 

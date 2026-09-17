@@ -1,0 +1,137 @@
+-- ============================================================
+-- 0063 — Se van las diez clientas de prueba
+--
+-- El estudio empieza a usar el sistema y los datos de prueba dejaron de
+-- ser inofensivos: son plata en las cuentas.
+--
+-- POR QUÉ NO ES COSMÉTICO
+--
+-- Los CINCO cobros pagados que hay en la base son de estas diez, y suman
+-- $365.000 repartidos en tres cuentas:
+--
+--   Caja del mostrador     $110.000   (Sofi Prueba y Belén Prueba)
+--   Cuenta bancaria        $175.000
+--   Tarjetas a acreditar    $80.000
+--
+-- El saldo de una cuenta no es un campo: es la suma de sus movimientos
+-- (`account_ledger` es una VISTA). Así que mientras esos cobros estén, el
+-- sistema cree que en el cajón hay $110.000 — y el primer arqueo, cuando
+-- la encargada cuente la plata de verdad, iba a asentar un **"Faltante de
+-- arqueo" de $110.000 con su nombre y la fecha**. Irreversible salvo
+-- reabriendo el arqueo, y arrancando la relación con el módulo teniendo
+-- que explicar un número de seis cifras que nadie puede explicar.
+--
+-- Borrando los cobros, los tres saldos quedan en cero solos. No hay
+-- ningún ajuste que hacer.
+--
+-- A QUIÉN SE BORRA, Y CÓMO SE ELIGE
+--
+-- Por dominio de mail: `%@smt.gob.ar`, que son las diez alias
+-- `mlujan+algo@` que se usaron para las pruebas. Se elige por el mail y
+-- no por el nombre a propósito: "Prueba" en el nombre es una convención
+-- que cualquiera puede romper escribiendo una clienta real que se llame
+-- así, y el mail es un dato exacto.
+--
+-- Ninguna de las diez tiene cuenta de acceso, así que no queda ningún
+-- usuario de Auth huérfano.
+--
+-- Las DOS que NO se tocan, y por qué:
+--
+--   Lourdes Bobba (marialoubobba.lb@gmail.com) — tiene cuenta, ficha de
+--     salud cargada y una cuota de $65.000. No es de prueba.
+--   Matias Lujan (matiaslujanw@gmail.com) — la cuenta con la que se
+--     prueba el portal. Se deja a pedido: sirve para seguir verificando
+--     el lado de la clienta.
+--
+-- QUÉ SE VA CON ELLAS, SIN ESCRIBIRLO ACÁ
+--
+-- Las siete claves foráneas que apuntan a `students` son todas
+-- `on delete cascade` (0001, 0007, 0008, 0048, 0050). Un solo `delete`
+-- arrastra reservas, membresías, cobros, avisos, ficha de salud, bitácora
+-- y turnos fijos. Y los cobros arrastran a su vez su imputación de caja
+-- (`payment_staff`, 0020:334).
+--
+-- Lo que NO hace falta tocar porque se deriva: `account_ledger` y
+-- `monthly_revenue` son vistas, y recalculan solas. Los números de
+-- comprobante salen de una secuencia (`receipt_seq`), así que el próximo
+-- cobro sigue donde iba: va a quedar un salto en la numeración, que es lo
+-- correcto —un comprobante que no existe no debería volver a emitirse con
+-- el mismo número—.
+--
+-- ESTO NO SE PUEDE DESHACER
+--
+-- No hay bloque de vuelta atrás porque no hay vuelta atrás: son borrados
+-- de verdad, no bajas lógicas. Si hace falta conservarlos, hay que
+-- exportarlos ANTES — la consulta está al final.
+--
+-- Ejecutar completo en el SQL Editor del dashboard de Supabase.
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- ANTES DE BORRAR: mirar qué se va
+--
+-- Correr esto SOLO y leerlo. Si no dice diez filas y los nombres
+-- esperados, parar acá.
+-- ------------------------------------------------------------
+--
+--   select s.name, s.email,
+--          (select count(*) from public.reservations r where r.student_id = s.id) as reservas,
+--          (select count(*) from public.memberships m where m.student_id = s.id) as membresias,
+--          (select count(*) from public.payments   p where p.student_id = s.id) as cobros
+--     from public.students s
+--    where s.email like '%@smt.gob.ar'
+--    order by s.name;
+--
+--   -- y los saldos de ahora, para comparar después
+--   select a.name, sum(case when l.sentido = 'ingreso' then l.monto else -l.monto end) as saldo
+--     from public.account_ledger l join public.accounts a on a.id = l.account_id
+--    group by a.name order by 2 desc;
+
+begin;
+
+delete from public.students
+ where email like '%@smt.gob.ar';
+
+commit;
+
+-- ============================================================
+-- CÓMO VERIFICAR
+--
+--   -- 1. Quedan dos clientas, las de verdad
+--   select name, email from public.students order by name;
+--   → Lourdes Bobba y Matias Lujan
+--
+--   -- 2. Las tres cuentas en cero. Este es el punto de toda la migración.
+--   select a.name, coalesce(sum(case when l.sentido = 'ingreso' then l.monto else -l.monto end), 0) as saldo
+--     from public.accounts a
+--     left join public.account_ledger l on l.account_id = a.id
+--    group by a.name order by a.name;
+--   → todas en 0
+--
+--   -- 3. No quedó nada colgado de las que se fueron
+--   select
+--     (select count(*) from public.reservations    r left join public.students s on s.id = r.student_id where s.id is null) as reservas_huerfanas,
+--     (select count(*) from public.memberships     m left join public.students s on s.id = m.student_id where s.id is null) as membresias_huerfanas,
+--     (select count(*) from public.payments        p left join public.students s on s.id = p.student_id where s.id is null) as cobros_huerfanos;
+--   → cero, cero, cero (las FK son cascade, así que tiene que dar cero solo)
+--
+--   -- 4. Y lo que NO se tenía que ir sigue ahí
+--   select (select count(*) from public.class_sessions) as clases,
+--          (select count(*) from public.teachers)       as profesoras,
+--          (select count(*) from public.plans)          as planes;
+--   → 64, 3, 12
+--
+-- En el sistema: el tablero tiene que mostrar 2 clientes, $0 de ingresos
+-- del mes y la caja en cero, y la cajita roja de Caja no tiene que
+-- denunciar ningún "cobro sin cuenta".
+--
+-- SI HACE FALTA GUARDARLOS ANTES
+--
+--   select json_agg(t) from (
+--     select s.*,
+--            (select json_agg(m) from public.memberships m where m.student_id = s.id) as membresias,
+--            (select json_agg(p) from public.payments    p where p.student_id = s.id) as cobros,
+--            (select json_agg(r) from public.reservations r where r.student_id = s.id) as reservas
+--       from public.students s where s.email like '%@smt.gob.ar'
+--   ) t;
+-- ============================================================

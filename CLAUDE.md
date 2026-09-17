@@ -71,7 +71,13 @@ hay que saber para no romperlo:
 - Cambios deliberados ya hechos sobre la matriz, para que nadie los lea
   como un error: **`profesor` tiene `salud.ver`** desde el 15/09 —la
   profesora es quien está en la clase si alguien se descompone— y por eso
-  el grupo `Datos sensibles` está en `activo`.
+  el grupo `Datos sensibles` está en `activo`. Y desde el 16/09 el grupo
+  **`Reservas` también rige** (`0058`), con dos cambios más: la profesora
+  tiene **`reservas.ver.propio` en vez de `reservas.ver`** —ve las
+  reservas de sus clases y no las del estudio entero— y **`reservas.asistencia`**
+  (`0059`), que le alcanza para marcar presente y ausente pero no para
+  desmarcar, porque volver a 'confirmada' lo manda la restrictiva a
+  `reservas.editar`.
 - El encendido va grupo por grupo: `update permission_keys set
   enforce_mode = 'activo' where grupo = '...'`, y se revierte igual. Ojo
   que ese grupo va por su tercer nombre: `Alumnos` (0012) → `Clientas`
@@ -90,6 +96,20 @@ hay que saber para no romperlo:
 **Nada se da por hecho sin verlo andar.** El flujo es: `preview_start` con
 `pilates-dev`, entrar con la sesión real, ejercer la acción y comprobar el
 resultado contra la base — no contra la pantalla.
+
+- **Con la sesión del rol que importa, no con la del admin.** Los cuatro
+  agujeros del 16 y 17/09 —seis funciones abiertas, el padrón a la vista,
+  el cupo mentido, el botón que rechazaba— aparecieron todos al entrar
+  como alumna y como profesora, y ninguno al leer el código.
+- **Y por el camino que usa la pantalla.** Una prueba puede pasar por el
+  lugar equivocado: el 16/09 se verificó un cambio de cupos comparando
+  números que daban iguales, y daban iguales porque la pantalla nunca
+  usaba el valor que se había cambiado.
+- Los carteles nativos (`window.confirm`, `window.prompt`) **los descarta
+  solo** este panel de vista previa —y también el navegador de Instagram,
+  por donde van a entrar las clientas—: devuelven "no" en un milisegundo
+  sin mostrar nada, y el botón parece muerto. Si algo "no hace nada",
+  mirar eso antes de buscar el error en otro lado.
 
 - Para probar algo que la interfaz no expone, se agrega una sonda temporal
   en `lib/data-context.tsx` (`window.__loquesea`, solo en desarrollo), se
@@ -118,6 +138,14 @@ resultado contra la base — no contra la pantalla.
 - `fetchStudioData` (en [`lib/api.ts`](lib/api.ts)) trae el estudio entero en
   un solo paquete y las pantallas derivan de ahí. Para reportes con rangos
   de fechas eso no va a escalar: hay que ir a vistas SQL.
+- **El cupo de una clase NO se deriva de las reservas legibles.** Sale de
+  `class_occupancy` (`0005`), que es una vista sin `security_invoker`: corre
+  con los permisos del dueño y cuenta todas las reservas, no sólo las que
+  quien pregunta puede leer. Desde la `0058` la profesora ve sólo las
+  reservas de sus clases, así que derivarlo otra vez de ahí haría aparecer
+  en 0/8 las clases de las demás — un cupo que miente, que es peor que uno
+  escondido. Está en dos lugares y los dos usan la vista:
+  `fetchStudioData` y la Agenda, que recalcula por semana visible.
 - Una tabla sin permiso devuelve **cero filas, no un error**. Por eso
   `StudioData.denied` dice qué quedó fuera de alcance, y las pantallas
   distinguen "no tenés acceso" de "está vacío" en vez de mostrar un $0 que

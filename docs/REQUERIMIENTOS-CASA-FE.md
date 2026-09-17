@@ -8,7 +8,7 @@
 > **¿Buscás qué falta? Está en la §0, acá abajo.** Es la única lista al día; el
 > resto del documento es el análisis y la historia.
 
-## 0. LO QUE FALTA — la lista viva  ·  al 15/09/2026, cerrando el día
+## 0. LO QUE FALTA — la lista viva  ·  al 17/09/2026
 
 > **Esta es la única lista al día.** Las secciones de abajo son el análisis y la
 > historia de cómo se llegó acá, y varias quedaron viejas a propósito: son la
@@ -24,13 +24,25 @@
 El 15/09 entraron diez migraciones —`0046` a `0055`— y pasaron a verde la 3
 (ficha), la 4 (tablero), la 6 (personal) y la 10 (notificaciones).
 
+El **16 y 17/09** no se agregaron funciones: se probó el sistema con las
+sesiones reales de una clienta y de una profesora, y eso encontró cosas que
+ninguna lectura de código había encontrado. Entraron `0056` a `0060`. El
+detalle está en `PLAN.md`; lo que importa acá es que **cuatro de los cinco
+hallazgos eran agujeros, no faltantes**, y que se descubrieron ejerciendo el
+sistema y no leyéndolo. Tres de ellos venían anotados por escrito en
+migraciones viejas, esperando a que alguien mirara.
+
 ### Lo que falta construir
 
 | | Qué | Tamaño |
 |---|---|---|
 | **§2** | **Que las reservas del turno fijo se creen solas cada semana.** Es lo último de §2. Ya no depende de ninguna respuesta: Matías definió el 15/09 que manda la cantidad de clases del plan | chico |
 | **§2** | **Ventana de fechas en `fetchStudioData`.** Va en el mismo paso, no después: hoy trae **todas** las reservas sin filtro ni límite en cada ingreso. Con 8 filas no se nota; con turnos fijos reservando cada semana son miles en meses | chico |
-| — | **Los otros 40 lugares donde el mensaje de la base no llega a la pantalla.** El mismo arreglo de una línea que el de la `0046`, pero toca todos los módulos y va con su propia verificación | mediano |
+| 🔴 | **`teachers.dni` y `notas_laborales` los lee cualquiera logueado.** Deuda de la `0053`: RLS filtra filas y no columnas, y esas dos quedaron como columnas de `teachers`. Hoy están **vacías**, así que no se filtró nada. Va con tabla satélite (`teacher_private`, el patrón de `student_private`) y toca el formulario. **Hasta que esté, no cargar esos dos campos** | chico |
+| — | **Los otros 40 lugares donde el mensaje de la base no llega a la pantalla.** El mismo arreglo de una línea que el de la `0046`, pero toca todos los módulos y va con su propia verificación. El 17/09 se le puso una red abajo: cualquier rechazo de RLS ahora se traduce a "Tu rol no tiene permiso para esta acción" en vez de mostrar el texto interno de Postgres | mediano |
+| — | **15 acciones siguen pidiendo confirmación con un cartel nativo** (8 `confirm` y 7 `prompt`). Los navegadores embebidos los descartan solos: el botón no hace nada y no hay error. El del portal ya se cambió por uno propio el 17/09; los 15 que quedan son pantallas internas, que se usan en un navegador normal. Los 7 `prompt` son el grupo peor: son la única forma de escribir el motivo de una anulación | mediano |
+| — | **La profesora no ve nada de lo suyo como trabajadora.** No tiene Personal —bien, ahí hay sueldos— pero tampoco puede ver cuántas clases dio en el mes, que es un dato suyo y sin plata | chico |
+| — | **Marcar asistencia no filtra por clase propia en la base.** La permisiva de update mira la clave y no el `class_id`, así que en teoría una profesora podría marcar en la clase de otra; en la práctica no tiene por dónde, porque desde la `0058` no lee esas filas y para escribir hace falta el uuid. No se cerró con la `0059` a propósito: esa pareja de políticas es la más delicada del sistema —la restrictiva alcanza también a la cancelación de la alumna— y se prueba con tiempo | chico |
 | **§1** | Cambio de horario por fecha. La tabla lo soporta desde la `0018`; falta la pantalla | chico |
 | — | Foto del comprobante de gasto (primer uso de Storage) · avisos de caja en el proceso diario | chico |
 | — | **Fichaje de entrada y salida** de las profesoras. Se apoya en `staff_work_logs` sin rehacer nada, pero necesita que tengan cuenta | chico |
@@ -40,8 +52,36 @@ El 15/09 entraron diez migraciones —`0046` a `0055`— y pasaron a verde la 3
 
 | | |
 |---|---|
-| **Tomar asistencia la profesora** | Faltan `reservas.asistencia` **y** `reservas.editar`, y **encender el grupo Reservas** — son 8 claves y afecta a todos los roles, así que conviene mirar antes qué cambia |
-| **19 de 22 grupos siguen en sombra** | Rigen Caja, Gastos, Reportes y Datos sensibles. El resto responde el legado: tildar un permiso ahí **no hace nada** hasta encender su grupo |
+| ✅ **Tomar asistencia la profesora** | Hecho el 17/09 (`0059`). Y la nota que estaba acá era **equivocada en un punto**: `reservas.editar` NO hace falta para marcar. Hace falta para *desmarcar*, que es otra cosa — la restrictiva de la `0013` manda a `editar` el volver a 'confirmada'. Se resolvió en la pantalla: quien no puede desmarcar cambia la marca entre presente y ausente, que es lo que la base sí le deja |
+| **17 de 22 grupos siguen en sombra** | Rigen **Caja, Gastos, Reportes, Datos sensibles y Reservas** (este último desde la `0058`). El resto responde el legado: tildar un permiso ahí **no hace nada** hasta encender su grupo. Contado contra la base el 17/09 — la cuenta que estaba acá decía 19 y no cerraba con los grupos que listaba |
+| **Encender un grupo lo saca de la red** | `perm_diff()` compara **solo las claves en sombra** desde la `0020`. Lo que protege es lo que todavía no rige, así que de Reservas en adelante el control de esas 8 claves es la verificación que se hizo antes de encenderlas, no la función |
+| **Acotar lo que la profesora ve de las clientas** | Ve las 12 con DNI, teléfono y ficha de salud, incluidas las que nunca pisan sus clases. Quedó incoherente después de acotarle las reservas. **No es un tilde**: `reservas.ver.propio` es la única clave acotada del catálogo, así que hay que crear la clave y la política. Y hay una decisión del estudio en el medio: la ficha de salud tiene sentido para la clienta que está en SU clase, que es quien está ahí si alguien se descompone |
+
+### Del lado de la clienta, lo que el portal todavía no hace
+
+Salió de probar el portal con una sesión real el 16/09. Ninguno rompe nada:
+son cosas que la clienta esperaría poder hacer y hoy pasan por el mostrador.
+
+| | |
+|---|---|
+| **No ve el historial** | El portal muestra lo que viene y nunca lo que pasó, así que no puede auditar contra qué clases se le fue descontando el plan. Ve "te quedan 3" y no cuáles fueron las otras |
+| **No puede tomar el lugar que se liberó** | El aviso de la `0052` le dice "entrá a reservarlo" y en el portal encuentra el renglón "En espera" sin ningún botón. La base sí lo permitiría |
+| **El recupero no existe del lado de ella** | Desde el 17/09 el cartel de cancelar le dice cuántas recuperaciones le quedan y hasta cuándo, pero pedirla sigue siendo ir al mostrador |
+| **El turno fijo es invisible** | Quien tiene turno fijo ve lo mismo que quien no: reserva a mano cada semana su horario de siempre y no ve hasta cuándo conserva la prioridad. La `0048` promete por escrito que ve el motivo si se lo liberan, y no hay dónde |
+| **Los domingos no existen** | La base admite `day_of_week = 6`; el portal tiene seis días y recorta el índice a 5 |
+| **Un pago en mostrador no le avisa nada** | `pago_acreditado` es de staff, y el mail "Recibimos tu pago" sale solo por el camino de Mercado Pago |
+| **No puede corregir ni un dato propio** | Ni el teléfono. Y sus datos de salud le viajan al navegador aunque la pantalla no los use |
+
+### Y del lado de la profesora
+
+| | |
+|---|---|
+| ✅ **Ve la ocupación de cada clase** | Con barra y número, en Agenda y en Inicio. Desde la `0058` ese número lo cuenta la base (`class_occupancy`) y no las reservas legibles, así que sigue siendo verdadero aunque ella no pueda leer las reservas de las demás |
+| ✅ **Ve solo las reservas de sus clases** | `0058`. Pasó de 13 a 7 con los datos de hoy |
+| ✅ **Pasa lista** | `0059` |
+| ✅ **Le avisan si le suspenden una clase o le cambian la profesora** | `0060`. Y el aviso de suspensión **no** cuelga de que alguien haya reservado: es la diferencia entre ir al estudio y no ir |
+| 🟡 **El teléfono no le vibra** | La campana de adentro sí; el push reparte por roles escritos a mano en el código y `avisos.recibir_push` no gobierna nada. Anotado desde la `0012` |
+| 🟡 **Su ficha no tiene mail** | Las tres tienen `teachers.email` vacío, aunque Ivana y Leandro ya tengan cuenta: crear el acceso **no** escribe el mail en la ficha. Cualquier mail a las profesoras hoy no llega a ninguna parte. Es el mismo desfasaje que con las clientas |
 
 ### Los documentos, y para quién es cada uno
 
@@ -61,10 +101,25 @@ Agenda, que es donde el mostrador pasa el día.
 
 | | |
 |---|---|
-| 🔴 | **Nombre y mail de la profesora del turno tarde.** Ivana y Leandro ya tienen cuenta; ella sigue con nombre provisorio |
+| 🔴 | **Mail de Giuliana**, la profesora del turno tarde. El nombre ya llegó —la agenda la muestra— pero no tiene mail ni cuenta, así que no puede entrar ni recibir los avisos de la `0060` |
+| 🔴 | **Decidir si la clase de prueba sigue generando deuda.** Pasó a $0 el 16/09, pero las membresías vendidas antes guardan su precio: hay cuotas de $20.000 de pruebas pendientes de cobro que quizá haya que anular |
+| 🔴 | **El WhatsApp de la web está roto.** `studio_whatsapp` quedó cargado como `3815727352`, sin el 54 y el 9, así que los **nueve** botones de la landing apuntan a un número que `wa.me` lee como de otro país. Debería ser `5493815727352`, pero el número hay que confirmarlo: antes había otro cargado |
 | 🟡 | Conectar la cuenta de **Mercado Pago** (verificado: sin conectar) |
 | 🟡 | Verificar el **dominio en Resend** + `EMAIL_FROM` en Vercel. Hasta entonces el mail a las clientas **solo llega a la casilla dueña** |
 | 🟡 | Probar el portal desde una **cuenta de clienta**: es lo único que ejercita el aislamiento por cliente, y no se puede verificar desde adentro del sistema |
+
+### Seguridad — lo que se cerró y lo que queda
+
+Todo esto salió de probar con sesiones reales el 16 y 17/09, no de leer.
+
+| | |
+|---|---|
+| ✅ | **Seis funciones `security definer` le contestaban a quien no debía** (`0057`). `liquidacion()` le devolvía a un alumno logueado el nombre y los montos de cada profesora; `consumo_control()` y `renovacion_control()` contestaban **sin sesión**, con la llave pública. Daban vacío por casualidad —sin tarifas cargadas, sin inconsistencias—, no por diseño |
+| ✅ | **El auto-registro del portal convertía email + DNI en credenciales.** Ahora tiene interruptor y **nace apagado** (`0057`). Se le arregló además el `ilike` del email, donde `_` es comodín, y el update del vínculo, que no miraba cuántas filas tocó |
+| 🟡 | **Para encenderlo hace falta confirmar el mail**, y eso necesita Resend con dominio verificado. Hasta entonces el acceso lo crea el mostrador desde la ficha |
+| 🔴 | **`teachers.dni` y `notas_laborales`** — ver "lo que falta construir" |
+| 🟡 | **La clienta y la profesora leen toda la configuración del estudio** (38 parámetros) y `param()` desde la API. Es deliberado en parte —`config.ver` es clave fija porque el portal necesita `cancel_hours`— pero le llega la tabla entera, no lo que necesita |
+| 🟡 | **Sin ejercer**: dos huecos de escritura razonados con las políticas en la mano y no probados, porque probarlos era escribir sobre datos de otra persona: reescribir `cancel_kind` con un segundo update, y colgar una reserva de lista de espera de la membresía de otra clienta |
 
 ### Lo que se cotiza aparte
 

@@ -107,6 +107,15 @@ function CierreModal({
           <p className="text-xs text-muted-foreground mt-0.5">
             Turno abierto desde {new Date(sesion.openedAt).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
           </p>
+          {/* Y también acá, que es donde se escribe el número: si el turno
+              viene de atrás, lo que se cuenta no es la plata de hoy. */}
+          {diasAbierta(sesion.openedAt) !== null && (
+            <p className="text-xs font-semibold text-aviso-fuerte mt-1">
+              Viene abierto de hace {diasAbierta(sesion.openedAt)}{' '}
+              {diasAbierta(sesion.openedAt) === 1 ? 'día' : 'días'}: lo que contás incluye esos
+              días, no solo hoy.
+            </p>
+          )}
         </div>
 
         <div className="px-5 py-4 space-y-4">
@@ -363,6 +372,27 @@ function MovimientoModal({
 // ─────────────────────────────────────────────────────────────────
 // Pantalla
 // ─────────────────────────────────────────────────────────────────
+/**
+ * Hace cuántos días quedó abierto el turno, o null si abrió hoy.
+ *
+ * El turno de caja no es un día: va de un cierre al siguiente, así que si
+ * nadie cierra no se pierde un peso — lo que se pierde es el arqueo
+ * diario, porque el jueves se cuenta el efectivo de tres días juntos y una
+ * diferencia ya no se puede atribuir a un día. La pantalla decía sólo
+ * "Abierta desde el 21 sep 09:15", que es el dato y no el problema: hay
+ * que pararse a restar para darse cuenta.
+ *
+ * Se cuenta en días de calendario del estudio, igual que el aviso del
+ * proceso diario, para que los dos digan el mismo número.
+ */
+function diasAbierta(fechaISO: string): number | null {
+  const abrio = fechaISO.slice(0, 10)
+  const hoy = hoyISO()
+  if (abrio >= hoy) return null
+  const dias = Math.round((Date.parse(hoy) - Date.parse(abrio)) / 86400000)
+  return dias > 0 ? dias : null
+}
+
 export function CajaPage() {
   const { can, canWrite } = useData()
   const [tab, setTab] = useState<Tab>('caja')
@@ -542,6 +572,16 @@ export function CajaPage() {
                         ? `Abierta desde ${new Date(sesion.openedAt).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
                         : 'Sin turno abierto'}
                     </p>
+                    {/* El dato que hay que ver sin restar: si el turno viene
+                        de días anteriores, el arqueo de hoy junta la plata
+                        de todos esos días. */}
+                    {sesion && diasAbierta(sesion.openedAt) !== null && (
+                      <p className="text-xs font-semibold text-aviso-fuerte mt-0.5">
+                        Sin cerrar hace {diasAbierta(sesion.openedAt)}{' '}
+                        {diasAbierta(sesion.openedAt) === 1 ? 'día' : 'días'} · el arqueo va a
+                        juntar todos esos días
+                      </p>
+                    )}
                   </div>
                   {sesion ? (
                     puedeCerrar && (

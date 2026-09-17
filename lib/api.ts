@@ -375,7 +375,7 @@ export async function fetchStudioData(): Promise<StudioData> {
   const semanaDesde = mondayOf()
   const semanaHasta = addDays(semanaDesde, 6)
 
-  const [teachersRes, plansRes, studentsRes, membershipsRes, classesRes, reservationsRes, paymentsRes, revenueRes, cuposRes] =
+  const [teachersRes, plansRes, studentsRes, membershipsRes, classesRes, reservationsRes, paymentsRes, revenueRes, cuposRes, privadoRes] =
     await Promise.all([
       supabase.from('teachers').select('*').eq('active', true).order('name'),
       supabase.from('plans').select('*').eq('active', true).order('price'),
@@ -405,6 +405,13 @@ export async function fetchStudioData(): Promise<StudioData> {
         .select('class_id, date, confirmed, waitlist')
         .gte('date', semanaDesde)
         .lte('date', semanaHasta),
+      // El DNI y las notas laborales de las profesoras (0061). Viven
+      // aparte de `teachers` porque esa tabla la lee cualquiera logueado
+      // y las políticas filtran filas, no columnas. Sin
+      // `personal.ver` esto vuelve con CERO FILAS —no con un error—, y
+      // los dos campos quedan vacíos: es lo mismo que veía quien no
+      // tenía acceso antes, y el formulario sólo se le abre a quien puede.
+      supabase.from('teacher_private').select('teacher_id, dni, notas_laborales'),
     ])
 
   // Antes acá había un throw con el primer error, y eso convertía el
@@ -539,6 +546,7 @@ export async function fetchStudioData(): Promise<StudioData> {
       isManual: m.is_manual,
       // ?? 0 mientras la 0028 no haya corrido: sin ajuste, el precio de lista.
       ajustePct: Number(m.ajuste_pct ?? 0),
+      defaultAccountId: m.default_account_id ?? null,
       active: m.active,
       sortOrder: m.sort_order,
     }))
@@ -584,6 +592,19 @@ export async function fetchStudioData(): Promise<StudioData> {
       ]
     : fallaron
 
+  // Sin `personal.ver` esto llega vacío, y los dos campos quedan en ''.
+  const privados = new Map<string, { dni: string; notasLaborales: string }>()
+  for (const r of (privadoRes.data ?? []) as Array<{
+    teacher_id: string
+    dni: string | null
+    notas_laborales: string | null
+  }>) {
+    privados.set(r.teacher_id, {
+      dni: r.dni ?? '',
+      notasLaborales: r.notas_laborales ?? '',
+    })
+  }
+
   const teachers: Teacher[] = (teachersRes.data ?? []).map((t) => ({
     id: t.id,
     name: t.name,
@@ -594,13 +615,15 @@ export async function fetchStudioData(): Promise<StudioData> {
     color: t.color,
     // ?? null mientras la 0012 no haya corrido
     userId: t.user_id ?? null,
-    // La ficha laboral (0053). Llega con el select('*') y queda vacía
-    // mientras la migración no corrió.
+    // La ficha laboral (0053), partida en dos desde la 0061: las fechas
+    // siguen en `teachers` —`fecha_baja` la usan `liquidacion()` y
+    // `sesiones_dictadas()` por dentro— y el DNI y las notas vienen de la
+    // satélite, que no todos leen.
     laboral: {
       fechaIngreso: t.fecha_ingreso ?? null,
       fechaBaja: t.fecha_baja ?? null,
-      dni: t.dni ?? '',
-      notasLaborales: t.notas_laborales ?? '',
+      dni: privados.get(t.id)?.dni ?? '',
+      notasLaborales: privados.get(t.id)?.notasLaborales ?? '',
     },
   }))
 
@@ -1582,7 +1605,22 @@ export async function moverVencimiento(
  */
 function errorDeLaBase(error: { message?: string } | null, sino: string): Error {
   const msg = error?.message?.trim()
-  return new Error(msg && msg.length > 0 ? msg : sino)
+  if (!msg) return new Error(sino)
+
+  // Un rechazo de RLS no tiene mensaje escrito por nadie: Postgres dice
+  // "new row violates row-level security policy \"nombre\" for table
+  // \"tabla\"". Eso apareció en pantalla el 17/09, a una profesora que
+  // quiso deshacer una marca de asistencia. Cuando la base tiene un motivo
+  // escrito —"Ya usó las 2 clases de su plan"— hay que mostrarlo; cuando
+  // lo que hay es el texto interno del motor, no: no le dice nada a nadie
+  // y encima nombra políticas y tablas.
+  //
+  // La pantalla igual no tendría que haber ofrecido la acción. Esto es la
+  // red de abajo, para cuando se nos escape otra.
+  if (/row-level security policy/i.test(msg)) {
+    return new Error('Tu rol no tiene permiso para esta acción.')
+  }
+  return new Error(msg)
 }
 
 /**
@@ -1822,9 +1860,12 @@ export interface TeacherInput {
 }
 
 /**
- * Lo laboral va aparte del resto: si la 0053 no corrió, la columna no
- * existe y el insert entero falla. Se separa para poder reintentar sin
- * ella en vez de perder el alta.
+ * Las fechas laborales van aparte del resto: si la 0053 no corrió, la
+ * columna no existe y el insert entero falla. Se separa para poder
+ * reintentar sin ellas en vez de perder el alta.
+ *
+ * El DNI y las notas ya no están acá: desde la 0061 viven en
+ * `teacher_private`, y se guardan con `guardarFichaPrivada`.
  */
 function filaTeacher(input: TeacherInput, conLaboral: boolean) {
   const base = {
@@ -1839,18 +1880,51 @@ function filaTeacher(input: TeacherInput, conLaboral: boolean) {
     ...base,
     fecha_ingreso: input.fechaIngreso || null,
     fecha_baja: input.fechaBaja || null,
-    dni: input.dni ?? '',
-    notas_laborales: input.notasLaborales ?? '',
   }
 }
 
+/**
+ * El DNI y las notas laborales, en su tabla aparte (0061).
+ *
+ * Se escribe siempre que el formulario los mande —también vacíos, que es
+ * cómo se borra un dato cargado—, y no se escribe nada si el formulario
+ * no los trae, para no crear una fila vacía por cada profesora.
+ *
+ * Si la tabla todavía no existe (42P01 / PGRST205) se sigue sin ella: el
+ * resto del alta ya se guardó y no tiene por qué caerse con esto.
+ */
+async function guardarFichaPrivada(teacherId: string, input: TeacherInput): Promise<void> {
+  if (input.dni === undefined && input.notasLaborales === undefined) return
+  const { error } = await supabase.from('teacher_private').upsert(
+    {
+      teacher_id: teacherId,
+      dni: input.dni ?? '',
+      notas_laborales: input.notasLaborales ?? '',
+    },
+    { onConflict: 'teacher_id' }
+  )
+  if (!error) return
+  if (error.code === '42P01' || error.code === 'PGRST205') return
+  throw errorDeLaBase(error, 'Se guardó la profesora, pero no el DNI ni las notas laborales')
+}
+
 export async function createTeacher(input: TeacherInput): Promise<void> {
-  let { error } = await supabase.from('teachers').insert(filaTeacher(input, true))
-  // 42703 = la 0053 no corrió: se reintenta sin los campos laborales.
+  // Con `select`: hace falta el id para escribir la ficha privada.
+  let { data, error } = await supabase
+    .from('teachers')
+    .insert(filaTeacher(input, true))
+    .select('id')
+    .single()
+  // 42703 = la 0053 no corrió: se reintenta sin las fechas laborales.
   if (error?.code === '42703') {
-    ;({ error } = await supabase.from('teachers').insert(filaTeacher(input, false)))
+    ;({ data, error } = await supabase
+      .from('teachers')
+      .insert(filaTeacher(input, false))
+      .select('id')
+      .single())
   }
   if (error) throw errorDeLaBase(error, 'No se pudo guardar la profesora')
+  if (data?.id) await guardarFichaPrivada(data.id, input)
 }
 
 export async function updateTeacher(id: string, input: TeacherInput): Promise<void> {
@@ -1859,6 +1933,7 @@ export async function updateTeacher(id: string, input: TeacherInput): Promise<vo
     ;({ error } = await supabase.from('teachers').update(filaTeacher(input, false)).eq('id', id))
   }
   if (error) throw errorDeLaBase(error, 'No se pudo guardar la profesora')
+  await guardarFichaPrivada(id, input)
 }
 
 export async function deactivateTeacher(id: string): Promise<void> {
@@ -2183,7 +2258,13 @@ async function adminApi<T>(body: object, method: 'POST' | 'DELETE' = 'POST'): Pr
 
 export async function createSystemUser(input: {
   email: string
-  password: string
+  /**
+   * Opcional para una clienta: desde el 17/09 su acceso nace con el DNI de
+   * la ficha como contraseña, y el servidor lo lee de ahí —no de acá— para
+   * que el navegador no pueda elegir la clave de una cuenta ajena. Para el
+   * staff sigue siendo obligatoria.
+   */
+  password?: string
   fullName: string
   role: Role
   /** si se pasa, vincula la cuenta creada con esta ficha de alumno */
@@ -2194,8 +2275,9 @@ export async function createSystemUser(input: {
    * "ver solo mis clases" no puede funcionar por más permiso que se le dé.
    */
   teacherId?: string
-}): Promise<void> {
-  await adminApi(input)
+}): Promise<{ mailEnviado: boolean }> {
+  const r = await adminApi<{ ok: boolean; mailEnviado?: boolean }>(input)
+  return { mailEnviado: Boolean(r?.mailEnviado) }
 }
 
 // ---------------------------------------------------------------

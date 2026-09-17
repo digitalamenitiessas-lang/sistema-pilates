@@ -82,26 +82,39 @@ function textoCuota(p: Payment): string {
   return `cuota de ${monto} sin cobrar, vence el ${fecha(p.dueDate)}`
 }
 
+/**
+ * Crear el acceso de una clienta.
+ *
+ * Ya no se elige una contraseña: el acceso nace con el DOCUMENTO de la
+ * ficha (decisión del estudio, 17/09) y la clienta recibe un mail con
+ * cómo entrar. El mostrador no inventa ni dicta nada.
+ *
+ * El documento lo lee el servidor de la ficha, así que acá no se manda: si
+ * la ficha no lo tiene, el pedido vuelve con el motivo y este formulario
+ * lo muestra en vez de adivinarlo.
+ */
 function PortalAccessModal({ student, onClose }: { student: Student; onClose: () => void }) {
   const { refresh } = useData()
   const [email, setEmail] = useState(student.email)
-  const [password, setPassword] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
+  const [mailEnviado, setMailEnviado] = useState(false)
+
+  const dni = (student.dni ?? '').replace(/\D/g, '')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
     setError(null)
     try {
-      await createSystemUser({
+      const r = await createSystemUser({
         email,
-        password,
         fullName: student.name,
         role: 'alumno',
         studentId: student.id,
       })
+      setMailEnviado(r.mailEnviado)
       await refresh()
       setDone(true)
     } catch (err) {
@@ -125,9 +138,23 @@ function PortalAccessModal({ student, onClose }: { student: Student; onClose: ()
           <div className="px-6 py-8 text-center">
             <CheckCircle2 className="w-10 h-10 mx-auto mb-3 text-exito-fuerte" />
             <h3 className="text-base font-bold text-foreground mb-1">Acceso creado</h3>
+            {/* Si el mail salió, no hay nada que dictar. Si no salió —falta
+                verificar el dominio en Resend—, hay que decirlo: el
+                mostrador tiene que pasar el acceso a mano y sin este
+                cartel se iría creyendo que la clienta ya fue avisada. */}
             <p className="text-sm text-muted-foreground mb-5">
-              Pasale a {student.name.split(' ')[0]} el email y la contraseña. Entra desde el mismo
-              login del sistema y ve su propio portal.
+              {mailEnviado ? (
+                <>
+                  Le mandamos un mail a <span className="font-semibold">{email}</span> con cómo
+                  entrar. La contraseña es su documento y al entrar le vamos a pedir que la cambie.
+                </>
+              ) : (
+                <>
+                  <span className="font-semibold text-aviso-fuerte">El mail no se pudo enviar.</span>{' '}
+                  Pasale el acceso a mano: entra con <span className="font-semibold">{email}</span>{' '}
+                  y su documento como contraseña. Al entrar le vamos a pedir que la cambie.
+                </>
+              )}
             </p>
             <button
               onClick={onClose}
@@ -152,28 +179,39 @@ function PortalAccessModal({ student, onClose }: { student: Student; onClose: ()
                 <label className={labelClass}>Email de acceso *</label>
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputClass} />
               </div>
-              <div>
-                <label className={labelClass}>Contraseña inicial *</label>
-                <input
-                  type="text"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={6}
-                  placeholder="Mínimo 6 caracteres"
-                  className={inputClass}
-                />
-                <p className="text-[11px] text-muted-foreground mt-1.5">
-                  Se la compartís al cliente; con ella entra a su portal para reservar y ver sus pagos.
-                </p>
-              </div>
+              {/* El documento no se edita acá: se arregla en la ficha, que
+                  es donde vive. Mostrarlo editable invitaría a "arreglarlo
+                  para pasar" y la cuenta quedaría con una clave que no es
+                  la que la clienta sabe. */}
+              {dni.length >= 6 ? (
+                <div className="rounded-xl bg-muted px-3.5 py-3">
+                  <p className="text-sm text-foreground">
+                    La contraseña inicial es su documento:{' '}
+                    <span className="font-bold">{dni}</span>
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Le llega un mail con cómo entrar, y al ingresar le vamos a pedir que elija una
+                    contraseña propia — el documento no es un secreto, así que sirve una sola vez.
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-xl bg-aviso-suave px-3.5 py-3">
+                  <p className="text-sm font-semibold text-aviso-fuerte">
+                    Falta el DNI en la ficha
+                  </p>
+                  <p className="text-[11px] text-aviso-fuerte/90 mt-1">
+                    La contraseña inicial es el documento, así que hay que cargarlo primero en los
+                    datos de {student.name.split(' ')[0]}.
+                  </p>
+                </div>
+              )}
               {error && <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
             </div>
             <div className="flex gap-3 px-6 py-4 border-t border-border">
               <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors">
                 Cancelar
               </button>
-              <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2">
+              <button type="submit" disabled={saving || dni.length < 6} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2">
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                 Crear acceso
               </button>
