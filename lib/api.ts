@@ -119,6 +119,54 @@ export function reservaCerrada(
   return enMinutos(hora) - minutosDeCorte <= enMinutos(ahora.hora)
 }
 
+/**
+ * Cuántos minutos faltan para que empiece esa clase, según el reloj del
+ * estudio. Negativo si ya empezó.
+ *
+ * El día se pasa a minutos absolutos con `Date.UTC` —no con la fecha
+ * local— porque lo único que hace falta es la distancia entre dos días, y
+ * en UTC un día son 1440 minutos siempre. La hora del día ya viene del
+ * huso del estudio (`ahoraDelEstudio`).
+ */
+function minutosHasta(
+  fecha: string,
+  hora: string,
+  ahora: { fecha: string; hora: string } = ahoraDelEstudio()
+): number {
+  const dia = (iso: string) => {
+    const [y, m, d] = iso.split('-').map(Number)
+    return Date.UTC(y, m - 1, d) / 60000
+  }
+  return dia(fecha) + enMinutos(hora) - (dia(ahora.fecha) + enMinutos(ahora.hora))
+}
+
+/**
+ * Si cancelar esa clase AHORA devuelve la clase al plan, o si se pierde.
+ *
+ * Es la misma cuenta que hace la base al sellar `cancel_kind` (0029): en
+ * plazo es `now() <= inicio - cancel_hours`. Acá está repetida porque el
+ * cliente tiene que enterarse ANTES de apretar, no después: la base lo
+ * clasifica bien y no devuelve la clase, y hasta el 16/09 el portal no
+ * decía una palabra al respecto.
+ *
+ * Que sean dos cuentas separadas es una deuda conocida, y por eso esta
+ * versión no puede ser más permisiva que la de la base: si alguna vez se
+ * corren un minuto, tiene que avisar de más y no de menos.
+ *
+ * NO sirve `reservaCerrada` para esto: cruza el día devolviendo
+ * `fecha < ahora.fecha` sin mirar el corte, así que con un plazo de más
+ * de ocho horas —configurable— mentiría en las clases de la mañana
+ * siguiente.
+ */
+export function cancelacionEnPlazo(
+  fecha: string,
+  hora: string,
+  horasDePlazo: number,
+  ahora: { fecha: string; hora: string } = ahoraDelEstudio()
+): boolean {
+  return minutosHasta(fecha, hora, ahora) >= horasDePlazo * 60
+}
+
 export function addDays(iso: string, days: number): string {
   const [y, m, d] = iso.split('-').map(Number)
   const date = new Date(y, m - 1, d + days)
