@@ -268,8 +268,15 @@ grant execute on function public.liquidaciones_cerradas(date, date) to authentic
 -- `rige = true` porque el código de esta misma entrega lo lee.
 -- ------------------------------------------------------------
 
+-- `group_key` tiene lista cerrada (0020:64) y no incluye 'sistema': va en
+-- 'general', que existe para esto y ya tiene título en Configuración.
+--
+-- `solo_admin` en true: esta clave abre una puerta al portal de una
+-- persona —pagos, deuda, salud—, así que la política restrictiva
+-- "parametros de control: solo admin" (0020) la deja fuera del alcance de
+-- recepción. Es el mismo criterio que los parámetros de caja.
 insert into public.studio_settings
-  (key, value, kind, options, label, help, group_key, sort_order, is_public, rige)
+  (key, value, kind, options, label, help, group_key, sort_order, is_public, solo_admin, rige)
 values
   ('portal_autoregistro', 'false', 'boolean', '{}',
    'El cliente puede crearse el acceso solo',
@@ -278,7 +285,7 @@ values
    -- sesión y necesita leerlo para no ofrecer un botón que el servidor va
    -- a rechazar. Lo único que se publica es si la puerta está abierta, y
    -- eso ya se sabe intentando.
-   'sistema', 40, true, true)
+   'general', 10, true, true, true)
 on conflict (key) do nothing;
 
 commit;
@@ -302,21 +309,33 @@ commit;
 --          has_function_privilege('service_role',  'public.recordar_clases_de_hoy()', 'execute');
 --   → false, true, false, true
 --
---   -- 3. La tarifa ya no se llama suelta, pero la liquidación sigue andando
+--   -- 3. La tarifa ya no se llama suelta
 --   select has_function_privilege('authenticated', 'public.tarifa_vigente(uuid, text, date)', 'execute');
 --   → false
+--
+--   -- 4. Y el candado de adentro corta. OJO, esto es al revés de lo que
+--   --    parece: acá TIENE que fallar. En el SQL Editor no hay sesión,
+--   --    auth.uid() es null, mis_permisos() devuelve '{}' (0012:193-195) y
+--   --    entonces can() da false. Que rechace es la prueba.
 --   select count(*) from public.liquidacion(date_trunc('month', current_date)::date, current_date);
---   → tres filas (en el SQL Editor entrás como postgres, donde can() da true)
+--   → ERROR: No tenés permiso para ver las remuneraciones
+--
+--   -- Si querés verla andar desde acá, hay que ponerse la sesión de un
+--   -- admin a mano, en la MISMA ejecución:
+--   --   set local role authenticated;
+--   --   set local request.jwt.claims = '{"sub":"<uuid del perfil admin>"}';
+--   --   select count(*) from public.liquidacion('2026-09-01', '2026-09-30');
+--   -- → tres filas
 --
 -- Lo que hay que ejercer desde el navegador, que es donde estaba el
 -- agujero:
 --
---   -- 4. Con la sesión de un ALUMNO, las seis tienen que rebotar:
+--   -- 5. Con la sesión de un ALUMNO, las seis tienen que rebotar:
 --   --    liquidacion y liquidaciones_cerradas → "No tenés permiso para ver
 --   --    las remuneraciones"; las otras cuatro → permission denied.
---   -- 5. Con la sesión del ADMIN, Personal tiene que seguir mostrando la
+--   -- 6. Con la sesión del ADMIN, Personal tiene que seguir mostrando la
 --   --    liquidación del período igual que antes.
---   -- 6. Con la ANON key, consumo_control y renovacion_control tienen que
+--   -- 7. Con la ANON key, consumo_control y renovacion_control tienen que
 --   --    pasar de 200 a 401.
 --
 -- PARA VOLVER ATRÁS
