@@ -1376,6 +1376,49 @@ de seguridad.** Lo que protege es lo que todavía no rige.
 
   delete from role_permissions where role = 'profesor' and clave = 'salud.ver';
 
+### ✅ La web publica el descuento por efectivo (16/09) — `0056`
+
+El estudio pidió que debajo de los planes diga **"-5% OFF Efectivo"**.
+
+**EL NÚMERO YA EXISTÍA Y YA RIGE.** `payment_methods.ajuste_pct` tiene el
+efectivo en `-5` desde la `0028` —transferencia en 0, tarjeta en +25—, es con lo
+que el sistema cobra, y la clienta lo edita en Configuración → Medios de pago.
+Escribirlo en la web sería el mismo dato dos veces: el día que lo mueva a 8, la
+página seguiría prometiendo 5. **Cobrar una cosa y publicar otra es peor que no
+publicar nada.**
+
+**POR QUÉ HIZO FALTA UNA MIGRACIÓN PARA UNA LÍNEA DE TEXTO.** La landing entra
+sin login y `payment_methods` no le contesta: con la anon key devuelve `[]` y
+ningún error, porque las políticas filtran filas. De ahí
+`public_payment_discounts`, la quinta vista pública. Publica **solo descuentos**
+—`ajuste_pct < 0`— y solo de medios activos: el +25 de la tarjeta se queda
+adentro, porque anunciar un recargo es una decisión del estudio y no algo que
+pase solo porque la fila está al lado.
+
+**Sin respaldo en el código, a propósito.** Un respaldo acá sería un descuento
+que el sistema no aplica, y con `pick` —que usa el respaldo cuando el valor está
+vacío, ver el comentario de `studio_parking`— la clienta no podría apagarlo
+nunca.
+
+**VERIFICADO EJERCIÉNDOLO, no consultando el esquema.** Corrió el 16/09:
+
+| Qué se probó | Resultado |
+| --- | --- |
+| La vista con la **anon key** (el caso real de la web) | una fila: `efectivo · Efectivo · -5.00` |
+| `payment_methods` con la anon key | `[]` — la tabla sigue cerrada |
+| La tarjeta en la vista | `[]` — el recargo no se publica |
+| Antes de correrla | la página entera igual, los 5 planes, sin línea y sin romperse |
+| La página | **"-5% OFF EFECTIVO"** centrado debajo de la grilla, en 375 y en 1440 |
+| Se movió el descuento a **-8** | la web dijo `-8% OFF EFECTIVO` |
+| Se puso en **0** | la línea desapareció y los 5 planes quedaron intactos |
+| Se devolvió a **-5** | la web volvió a decir `-5% OFF EFECTIVO`; la tabla quedó como estaba (efectivo -5, transferencia 0, tarjeta 25, MP 0) |
+
+Las cinco consultas de la landing responden 200, incluida la nueva.
+
+En Configuración, al lado del porcentaje, ahora avisa que **los descuentos se
+publican en la web y los recargos no**: quien lo edita toca los dos lados, que
+es justamente el punto.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
@@ -1434,7 +1477,7 @@ de seguridad.** Lo que protege es lo que todavía no rige.
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a **`0055`** ✅. La **`0053` corrió el 15/09**. La **`0052` corrió el 15/09** y se corrigió una redacción; es idempotente. La **`0051` corrió el 15/09** y se corrigió dos veces sobre la marcha —los nombres en castellano y el día en el corte por clase—; es idempotente, todo `create or replace`. La **`0050` corrió el 15/09**, se corrigió la clave foránea del autor y se volvió a correr; es idempotente a propósito. La **`0048` y la `0049` corrieron el 15/09** y se verificaron ejerciéndolas: el cupo rechazó el noveno turno fijo, un pausado quedó fuera de la liberación automática, y el interruptor encendido liberó exactamente uno. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Migraciones aplicadas | `0001` a **`0056`** ✅. La **`0056` corrió el 16/09** y se verificó moviendo el descuento a -8 y a 0 con la web abierta: la línea siguió al número y desapareció al apagarlo; el dato quedó restaurado en -5. La **`0053` corrió el 15/09**. La **`0052` corrió el 15/09** y se corrigió una redacción; es idempotente. La **`0051` corrió el 15/09** y se corrigió dos veces sobre la marcha —los nombres en castellano y el día en el corte por clase—; es idempotente, todo `create or replace`. La **`0050` corrió el 15/09**, se corrigió la clave foránea del autor y se volvió a correr; es idempotente a propósito. La **`0048` y la `0049` corrieron el 15/09** y se verificaron ejerciéndolas: el cupo rechazó el noveno turno fijo, un pausado quedó fuera de la liberación automática, y el interruptor encendido liberó exactamente uno. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
 | Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |
