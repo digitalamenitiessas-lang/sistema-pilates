@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
@@ -38,7 +38,9 @@ import {
   updateClassSession,
   deactivateClassSession,
   clasesRecuperables,
+  fetchWeekOccupancy,
   type ClassInput,
+  type Occupancy,
 } from '@/lib/api'
 import type { ClassSession, Discipline } from '@/lib/types'
 
@@ -1012,6 +1014,27 @@ export function AgendaPage() {
   const weekEnd = addDays(weekStart, 5)
   const today = hoyISO()
 
+  // Cuántas hay anotadas en cada clase de la semana visible, contado por la
+  // base.
+  //
+  // Esta pantalla no puede derivarlo de `reservations` como hacía: desde la
+  // 0058 la profesora sólo lee las reservas de SUS clases, así que las de
+  // las demás le aparecían en 0/8 — un cupo que miente es peor que un cupo
+  // escondido, y quien mira la grilla para saber si entra una clienta más
+  // necesita el número de verdad.
+  //
+  // `class_occupancy` (0005) no tiene `security_invoker`: corre con los
+  // permisos del dueño y cuenta todas las reservas. Es la misma llamada,
+  // con la misma dependencia en `reservations`, que ya usa el portal de la
+  // clienta para mostrar "8 lugares libres" sin ver quién los ocupa.
+  //
+  // Va por semana visible y no en el paquete del estudio porque acá se
+  // navega de semana en semana, y el paquete trae sólo la actual.
+  const [ocupacion, setOcupacion] = useState<Map<string, Occupancy>>(new Map())
+  useEffect(() => {
+    fetchWeekOccupancy(weekStart).then(setOcupacion)
+  }, [weekStart, reservations])
+
   // Cupos por clase para la semana visible
   const weekClasses: WeekClass[] = useMemo(() => {
     const weekLast = addDays(weekStart, 6)
@@ -1034,7 +1057,11 @@ export function AgendaPage() {
           suspended: occ?.status === 'suspendida',
           substitute: !!occ?.teacherId,
           occurrenceReason: occ?.reason ?? '',
-          enrolled: ofDay.filter((r) => r.status === 'confirmada' || r.status === 'asistió').length,
+          // El cupo lo dice la base; si la vista no contestó, se deriva de
+          // lo legible, que es la cuenta correcta para quien lee todo.
+          enrolled:
+            ocupacion.get(`${c.id}|${date}`)?.confirmed ??
+            ofDay.filter((r) => r.status === 'confirmada' || r.status === 'asistió').length,
           // Las que hay que mirar al pasar lista, incluidas las que ya se
           // marcaron ausente. Separado de `enrolled` —que es ocupación—
           // porque si no, marcar ausente a todas dejaba el conteo en cero,
@@ -1043,10 +1070,15 @@ export function AgendaPage() {
           conLista: ofDay.filter(
             (r) => r.status === 'confirmada' || r.status === 'asistió' || r.status === 'ausente'
           ).length,
-          waitlist: ofDay.filter((r) => r.status === 'lista de espera').length,
+          waitlist:
+            ocupacion.get(`${c.id}|${date}`)?.waitlist ??
+            ofDay.filter((r) => r.status === 'lista de espera').length,
         }
       })
-  }, [classes, reservations, occurrences, weekStart])
+    // `conLista` queda derivado de lo legible a propósito: es para pasar
+    // lista, y sólo se pasa lista de la clase propia. La vista además no
+    // separa las ausentes, que son justo las que ese número necesita.
+  }, [classes, reservations, occurrences, weekStart, ocupacion])
 
   // El detalle se re-lee de la semana en cada render: si se suspende el día
   // o se cambia la profesora, el modal abierto muestra el cambio al toque
