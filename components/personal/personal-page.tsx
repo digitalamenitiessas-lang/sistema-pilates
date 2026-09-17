@@ -264,6 +264,20 @@ function Condiciones() {
   const [modalidad, setModalidad] = useState<CondicionPago['modalidad']>('por_clase')
   const [monto, setMonto] = useState('')
   const [desde, setDesde] = useState(inicioDeMes())
+  /**
+   * El paso de confirmación, y no es ceremonia.
+   *
+   * Una condición no se edita ni se borra —es el requerimiento 12.5, el
+   * historial no se reemplaza— así que un nombre mal elegido en el
+   * desplegable no tiene vuelta desde el sistema: hay que ir al SQL
+   * Editor. Y pasó en el primer uso real: se quiso fijar una tarifa a una
+   * profesora y quedó en la otra (17/09).
+   *
+   * Así que antes de guardar se lee en una frase a quién, cuánto y desde
+   * cuándo. No es un `window.confirm`: los navegadores embebidos los
+   * descartan solos y el botón parecería no hacer nada.
+   */
+  const [confirmando, setConfirmando] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -278,6 +292,7 @@ function Condiciones() {
     try {
       await fijarCondicion({ teacherId, modalidad, monto: Number(monto) || 0, desde })
       setAbierto(false)
+      setConfirmando(false)
       setMonto('')
       cargar()
     } catch (e) {
@@ -350,22 +365,57 @@ function Condiciones() {
             <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className={input} />
           </div>
           {error && <p className="text-xs text-destructive-fuerte">{error}</p>}
-          <div className="flex gap-2">
-            <button
-              disabled={saving || !teacherId || !monto}
-              onClick={guardar}
-              className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              Guardar
-            </button>
-            <button
-              onClick={() => setAbierto(false)}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-muted-foreground hover:bg-muted"
-            >
-              Cancelar
-            </button>
-          </div>
+
+          {confirmando ? (
+            <div className="rounded-xl bg-aviso-suave px-3.5 py-3 space-y-2.5">
+              <p className="text-xs text-aviso-fuerte">
+                Vas a fijarle a{' '}
+                <span className="font-bold">
+                  {teachers.find((t) => t.id === teacherId)?.name ?? '—'}
+                </span>{' '}
+                un pago <span className="font-bold">{MODALIDAD[modalidad].toLowerCase()}</span> de{' '}
+                <span className="font-bold">{plata(Number(monto) || 0)}</span>, desde el{' '}
+                <span className="font-bold">{fecha(desde)}</span>.
+              </p>
+              <p className="text-[11px] text-aviso-fuerte/90">
+                Esto <span className="font-semibold">no se edita ni se borra</span>: si el nombre o
+                el monto están mal, la única salida es cargar otra condición desde una fecha
+                posterior, y las dos quedan en el historial.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  disabled={saving}
+                  onClick={guardar}
+                  className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Sí, fijar
+                </button>
+                <button
+                  onClick={() => setConfirmando(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-muted-foreground hover:bg-muted"
+                >
+                  Volver
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                disabled={saving || !teacherId || !monto}
+                onClick={() => setConfirmando(true)}
+                className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                Guardar
+              </button>
+              <button
+                onClick={() => setAbierto(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-muted-foreground hover:bg-muted"
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <button
