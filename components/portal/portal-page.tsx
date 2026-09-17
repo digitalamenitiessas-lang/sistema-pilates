@@ -37,7 +37,7 @@ import {
   settingText,
   esOferta,
 } from '@/lib/api'
-import type { Discipline, Reservation, Student } from '@/lib/types'
+import type { Discipline, Membership, Reservation, Student } from '@/lib/types'
 
 const DAYS_SHORT = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
@@ -208,6 +208,56 @@ function MembershipCard({ student }: { student: Student }) {
 }
 
 /**
+ * Qué le puede pasar a la clase si la cancela ahora, para poder decírselo
+ * ANTES. Tres casos distintos, y el tercero importa tanto como los otros:
+ *
+ *   'vuelve'      → está en plazo, la clase vuelve al plan
+ *   'no-consume'  → la reserva no sale de ningún plan (entró por una
+ *                   excepción que el estudio autorizó, `membershipId` en
+ *                   nulo), así que no hay nada que perder. Sin esta rama
+ *                   el cartel rojo le mentiría: le diría que pierde una
+ *                   clase que nunca se le descontó.
+ *   'se-pierde'   → fuera de plazo. Acá va el recupero.
+ *
+ * El recupero se cuenta igual que en la base (0046): reposiciones hechas
+ * contra ESA membresía, sin contar las canceladas, contra el tope de
+ * `recovery_max`. Es la segunda cuenta duplicada del portal, por el mismo
+ * motivo que la del plazo — el cliente tiene que saberlo antes de
+ * apretar—, y como la otra, la base es la que decide.
+ */
+function suerteDeLaClase(
+  reserva: Reservation,
+  reservas: Reservation[],
+  membresias: Membership[],
+  horasDePlazo: number,
+  tope: number
+): {
+  caso: 'vuelve' | 'no-consume' | 'se-pierde'
+  tope: number
+  restantes: number
+  hastaCuando: string | null
+} {
+  const enPlazo = cancelacionEnPlazo(reserva.date, reserva.time, horasDePlazo)
+  const hechas = reserva.membershipId
+    ? reservas.filter(
+        (r) =>
+          r.membershipId === reserva.membershipId &&
+          r.recoversReservationId != null &&
+          r.status !== 'cancelada'
+      ).length
+    : 0
+  return {
+    caso: enPlazo ? 'vuelve' : !reserva.membershipId ? 'no-consume' : 'se-pierde',
+    tope,
+    restantes: Math.max(0, tope - hechas),
+    // El recupero tiene que caer dentro del período que pagó la clase, así
+    // que el vencimiento es parte del aviso: con el período por cerrarse,
+    // "te quedan 2" sin fecha es una promesa que no se puede usar.
+    hastaCuando: membresias.find((m) => m.id === reserva.membershipId)?.endDate ?? null,
+  }
+}
+
+/**
  * El cartel de cancelar.
  *
  * Reemplaza un `window.confirm`, y no por gusto: los carteles nativos los
@@ -224,19 +274,21 @@ function MembershipCard({ student }: { student: Student }) {
  */
 function ConfirmarCancelacion({
   reserva,
+  suerte,
   horasDePlazo,
   trabajando,
   onCerrar,
   onConfirmar,
 }: {
   reserva: Reservation
+  suerte: ReturnType<typeof suerteDeLaClase>
   horasDePlazo: number
   trabajando: boolean
   onCerrar: () => void
   onConfirmar: () => void
 }) {
-  const enPlazo = cancelacionEnPlazo(reserva.date, reserva.time, horasDePlazo)
   const plazo = `${horasDePlazo} ${horasDePlazo === 1 ? 'hora' : 'horas'}`
+  const { caso, tope, restantes, hastaCuando } = suerte
 
   return (
     <div
@@ -268,9 +320,9 @@ function ConfirmarCancelacion({
           </div>
 
           {/* Lo que le pasa a la clase, que es el dato que faltaba. En
-              verde y en rojo porque son dos cosas distintas, no dos
+              verde y en rojo porque son cosas distintas, no dos
               redacciones de la misma. */}
-          {enPlazo ? (
+          {caso === 'vuelve' && (
             <div className="rounded-xl bg-exito-suave px-3.5 py-3">
               <p className="text-sm font-semibold text-exito-fuerte">
                 La clase vuelve a tu plan
@@ -280,15 +332,53 @@ function ConfirmarCancelacion({
                 usar en otro horario.
               </p>
             </div>
-          ) : (
+          )}
+
+          {caso === 'no-consume' && (
+            <div className="rounded-xl bg-muted px-3.5 py-3">
+              <p className="text-sm font-semibold text-foreground">
+                No perdés ninguna clase
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Esta reserva no sale de tu plan, así que cancelarla no te descuenta
+                nada. Avisale al estudio igual, para que puedan darle el lugar a otra
+                persona.
+              </p>
+            </div>
+          )}
+
+          {caso === 'se-pierde' && (
             <div className="rounded-xl bg-destructive/10 px-3.5 py-3">
               <p className="text-sm font-semibold text-destructive-fuerte">
                 Esta clase no se te devuelve
               </p>
               <p className="text-xs text-destructive-fuerte/90 mt-1">
-                El plazo para recuperarla era hasta {plazo} antes de que empiece. Si no
-                podés venir, avisale al estudio igual.
+                El plazo para recuperarla era hasta {plazo} antes de que empiece.
               </p>
+
+              {/* La salida. Antes el cartel rojo terminaba acá y era un
+                  callejón: le decía que la perdía y no que el estudio
+                  puede reponérsela. El tope y las usadas son las de la
+                  base, no un número escrito a mano. */}
+              {tope <= 0 ? (
+                <p className="text-xs text-destructive-fuerte/90 mt-2">
+                  Si no podés venir, avisale al estudio igual.
+                </p>
+              ) : restantes > 0 ? (
+                <p className="text-xs text-destructive-fuerte/90 mt-2">
+                  <strong className="font-semibold">Pero se puede recuperar:</strong> el
+                  estudio repone hasta {tope} {tope === 1 ? 'clase' : 'clases'} por
+                  período y te {restantes === 1 ? 'queda' : 'quedan'} {restantes}.
+                  Pedila en recepción
+                  {hastaCuando ? ` antes del ${pretty(hastaCuando)}` : ''}.
+                </p>
+              ) : (
+                <p className="text-xs text-destructive-fuerte/90 mt-2">
+                  Ya usaste {tope === 1 ? 'la recuperación' : `las ${tope} recuperaciones`}{' '}
+                  de este período, así que esta no se puede reponer. Avisale al estudio
+                  igual.
+                </p>
+              )}
             </div>
           )}
 
@@ -545,6 +635,12 @@ export function PortalPage() {
   }
 
   const horasDeCancelacion = settingNum(settings, 'cancel_hours', 3)
+  // El mismo default que la base (0046): sin la clave, dos por período.
+  const topeDeRecuperos = settingNum(settings, 'recovery_max', 2)
+
+  // `reservations` ya son sólo las suyas: RLS no le manda las de nadie más.
+  const suerteDe = (r: Reservation) =>
+    suerteDeLaClase(r, reservations, misMembresias, horasDeCancelacion, topeDeRecuperos)
 
   // Antes esto arrancaba con un `window.confirm`. Los navegadores
   // embebidos lo descartan solos —devuelven "no" sin mostrar nada—, así
@@ -561,11 +657,16 @@ export function PortalPage() {
       setACancelar(null)
       // El aviso repite lo que el cartel ya dijo, porque entre apretar y
       // que vuelva el paquete del estudio pasan segundos y la lista de
-      // arriba tarda en reflejarlo.
+      // arriba tarda en reflejarlo. Y la reserva desaparece de "próximas
+      // clases" al cancelarse, así que si el recupero no se nombra acá,
+      // no queda escrito en ninguna parte.
+      const suerte = suerteDe(r)
       flash(
         'ok',
-        cancelacionEnPlazo(r.date, r.time, horasDeCancelacion)
+        suerte.caso === 'vuelve'
           ? 'Reserva cancelada. La clase volvió a tu plan.'
+          : suerte.caso === 'se-pierde' && suerte.tope > 0 && suerte.restantes > 0
+          ? 'Reserva cancelada. Pedile la recuperación al estudio.'
           : 'Reserva cancelada.'
       )
     } catch (err) {
@@ -640,6 +741,7 @@ export function PortalPage() {
       {aCancelar && (
         <ConfirmarCancelacion
           reserva={aCancelar}
+          suerte={suerteDe(aCancelar)}
           horasDePlazo={horasDeCancelacion}
           trabajando={busyId === aCancelar.id}
           onCerrar={() => setACancelar(null)}
