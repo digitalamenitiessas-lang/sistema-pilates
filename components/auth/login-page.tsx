@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Lock, Mail, Loader2, ArrowLeft, IdCard, CheckCircle2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { useNombreDelEstudio } from '@/lib/estudio-client'
+import { useAutoregistro, useNombreDelEstudio } from '@/lib/estudio-client'
 import { Logotipo } from '@/components/layout/logotipo'
 
 type Mode = 'login' | 'forgot' | 'register'
@@ -19,6 +19,7 @@ const buttonClass =
 
 export function LoginPage() {
   const estudio = useNombreDelEstudio()
+  const autoregistro = useAutoregistro()
   const [mode, setMode] = useState<Mode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -172,16 +173,22 @@ export function LoginPage() {
               {loading ? 'Ingresando...' : 'Ingresar'}
             </button>
 
-            <p className="text-center text-xs text-muted-foreground pt-1">
-              ¿Sos cliente del estudio y no tenés cuenta?{' '}
-              <button
-                type="button"
-                onClick={() => switchMode('register')}
-                className="text-primary-fuerte font-semibold hover:underline"
-              >
-                Creá tu acceso
-              </button>
-            </p>
+            {/* El enlace aparece sólo si el estudio dejó abierta esa
+                puerta (0057). Apagada, el acceso lo crea el mostrador
+                desde la ficha, así que ofrecerlo sería mandar a la
+                clienta a un formulario que termina en un rechazo. */}
+            {autoregistro && (
+              <p className="text-center text-xs text-muted-foreground pt-1">
+                ¿Sos cliente del estudio y no tenés cuenta?{' '}
+                <button
+                  type="button"
+                  onClick={() => switchMode('register')}
+                  className="text-primary-fuerte font-semibold hover:underline"
+                >
+                  Creá tu acceso
+                </button>
+              </p>
+            )}
           </form>
         )}
 
