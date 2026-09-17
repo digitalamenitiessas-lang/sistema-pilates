@@ -28,6 +28,7 @@ import {
   mondayOf,
   ahoraDelEstudio,
   reservaCerrada,
+  cancelacionEnPlazo,
   createReservation,
   updateReservationStatus,
   fetchWeekOccupancy,
@@ -206,6 +207,116 @@ function MembershipCard({ student }: { student: Student }) {
   )
 }
 
+/**
+ * El cartel de cancelar.
+ *
+ * Reemplaza un `window.confirm`, y no por gusto: los carteles nativos los
+ * descartan solos los navegadores embebidos —el de Instagram, el panel de
+ * vista previa— sin mostrar nada y devolviendo "no". Ahí el botón
+ * Cancelar parecía roto: no pasaba absolutamente nada. El portal vive en
+ * el teléfono y buena parte de las clientas lo van a abrir desde un link
+ * de Instagram, así que la confirmación tiene que ser de la página.
+ *
+ * Y de paso arregla lo que el `confirm` genérico no decía: si la clase se
+ * devuelve o se pierde. El plazo sale de `cancel_hours`, el mismo
+ * parámetro con el que la base sella `cancel_kind`, y el aviso se calcula
+ * contra la hora real de ESA clase, no contra una regla escrita a mano.
+ */
+function ConfirmarCancelacion({
+  reserva,
+  horasDePlazo,
+  trabajando,
+  onCerrar,
+  onConfirmar,
+}: {
+  reserva: Reservation
+  horasDePlazo: number
+  trabajando: boolean
+  onCerrar: () => void
+  onConfirmar: () => void
+}) {
+  const enPlazo = cancelacionEnPlazo(reserva.date, reserva.time, horasDePlazo)
+  const plazo = `${horasDePlazo} ${horasDePlazo === 1 ? 'hora' : 'horas'}`
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/20 backdrop-blur-sm"
+      onClick={onCerrar}
+    >
+      <div
+        className="bg-card rounded-2xl shadow-2xl w-full max-w-sm border border-border"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h2 className="text-base font-bold text-foreground">¿Cancelar la clase?</h2>
+          <button
+            type="button"
+            onClick={onCerrar}
+            className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
+            aria-label="Cerrar"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="px-5 py-5 space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-foreground">{reserva.className}</p>
+            <p className="text-xs text-muted-foreground">
+              {pretty(reserva.date)} · {reserva.time} · {reserva.teacherName}
+            </p>
+          </div>
+
+          {/* Lo que le pasa a la clase, que es el dato que faltaba. En
+              verde y en rojo porque son dos cosas distintas, no dos
+              redacciones de la misma. */}
+          {enPlazo ? (
+            <div className="rounded-xl bg-exito-suave px-3.5 py-3">
+              <p className="text-sm font-semibold text-exito-fuerte">
+                La clase vuelve a tu plan
+              </p>
+              <p className="text-xs text-exito-fuerte/90 mt-1">
+                Estás cancelando con más de {plazo} de anticipación, así que la podés
+                usar en otro horario.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-xl bg-destructive/10 px-3.5 py-3">
+              <p className="text-sm font-semibold text-destructive-fuerte">
+                Esta clase no se te devuelve
+              </p>
+              <p className="text-xs text-destructive-fuerte/90 mt-1">
+                El plazo para recuperarla era hasta {plazo} antes de que empiece. Si no
+                podés venir, avisale al estudio igual.
+              </p>
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onCerrar}
+              disabled={trabajando}
+              className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-muted transition-colors disabled:opacity-60"
+            >
+              Mejor no
+            </button>
+            <button
+              type="button"
+              onClick={onConfirmar}
+              disabled={trabajando}
+              className="flex-1 py-2.5 rounded-xl bg-destructive text-white text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {trabajando && <Loader2 className="w-4 h-4 animate-spin" />}
+              {trabajando ? 'Cancelando...' : 'Sí, cancelar'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function UpcomingList({
   reservations,
   suspendidas,
@@ -293,6 +404,7 @@ export function PortalPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
   const [showChangePassword, setShowChangePassword] = useState(false)
+  const [aCancelar, setACancelar] = useState<Reservation | null>(null)
 
   const weekStart = addDays(mondayOf(), weekOffset * 7)
 
@@ -432,14 +544,32 @@ export function PortalPage() {
     }
   }
 
-  const cancel = async (r: Reservation) => {
-    if (!window.confirm(`¿Cancelar tu reserva de ${r.className} del ${pretty(r.date)}?`)) return
+  const horasDeCancelacion = settingNum(settings, 'cancel_hours', 3)
+
+  // Antes esto arrancaba con un `window.confirm`. Los navegadores
+  // embebidos lo descartan solos —devuelven "no" sin mostrar nada—, así
+  // que el botón no hacía nada y no había forma de saber por qué.
+  const cancel = (r: Reservation) => setACancelar(r)
+
+  const confirmarCancelacion = async () => {
+    const r = aCancelar
+    if (!r) return
     setBusyId(r.id)
     try {
       await updateReservationStatus(r.id, 'cancelada')
       await refresh()
-      flash('ok', 'Reserva cancelada')
+      setACancelar(null)
+      // El aviso repite lo que el cartel ya dijo, porque entre apretar y
+      // que vuelva el paquete del estudio pasan segundos y la lista de
+      // arriba tarda en reflejarlo.
+      flash(
+        'ok',
+        cancelacionEnPlazo(r.date, r.time, horasDeCancelacion)
+          ? 'Reserva cancelada. La clase volvió a tu plan.'
+          : 'Reserva cancelada.'
+      )
     } catch (err) {
+      setACancelar(null)
       flash('error', err instanceof Error ? err.message : 'No se pudo cancelar')
     } finally {
       setBusyId(null)
@@ -506,6 +636,16 @@ export function PortalPage() {
           </button>
         </div>
       </header>
+
+      {aCancelar && (
+        <ConfirmarCancelacion
+          reserva={aCancelar}
+          horasDePlazo={horasDeCancelacion}
+          trabajando={busyId === aCancelar.id}
+          onCerrar={() => setACancelar(null)}
+          onConfirmar={confirmarCancelacion}
+        />
+      )}
 
       {showChangePassword && (
         <ChangePasswordModal
@@ -652,6 +792,16 @@ export function PortalPage() {
             Tus próximas clases
           </h2>
           <UpcomingList reservations={myUpcoming} suspendidas={suspendidas} onCancel={cancel} busyId={busyId} />
+          {/* La regla, a la vista y no recién al apretar Cancelar. Sale del
+              mismo parámetro que usa la base, así que si el estudio lo
+              cambia, esto cambia. Sólo si hay algo que cancelar. */}
+          {myUpcoming.length > 0 && (
+            <p className="text-[11px] text-muted-foreground mt-2.5 px-1">
+              Podés cancelar hasta {horasDeCancelacion}{' '}
+              {horasDeCancelacion === 1 ? 'hora' : 'horas'} antes de que empiece la clase
+              y se te devuelve al plan. Después de ese plazo, la clase se consume.
+            </p>
+          )}
         </section>
 
         {/* Reservar */}
