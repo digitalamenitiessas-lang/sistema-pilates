@@ -204,7 +204,7 @@ function CancelarMembresiaModal({
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
-            <h2 className="text-base font-bold text-foreground">Cancelar el per\u00edodo</h2>
+            <h2 className="text-base font-bold text-foreground">Cancelar el período</h2>
             <p className="text-xs text-muted-foreground">{membresia.planName}</p>
           </div>
           <button
@@ -219,32 +219,32 @@ function CancelarMembresiaModal({
         <div className="px-6 py-5 space-y-4">
           <div className="rounded-xl bg-muted px-3.5 py-3 space-y-1">
             <p className="text-sm text-foreground">
-              {fecha(membresia.startDate)} \u2014 {fecha(membresia.endDate)}
+              {fecha(membresia.startDate)} — {fecha(membresia.endDate)}
             </p>
             <p className="text-[11px] text-muted-foreground">
               {membresia.classesUsed}/{membresia.classesTotal} clases usadas
             </p>
           </div>
 
-          {/* Lo que se va con la cancelaci\u00f3n, dicho con el n\u00famero. */}
+          {/* Lo que se va con la cancelación, dicho con el número. */}
           {cuota ? (
             <p className="text-sm text-foreground">
-              Se anula tambi\u00e9n su cuota de{' '}
+              Se anula también su cuota de{' '}
               <span className="font-bold">${cuota.amount.toLocaleString('es-AR')}</span>, que vence
-              el {fecha(cuota.dueDate)}. Sin eso, seguir\u00eda debiendo un mes que no existe y el
-              sistema se lo reclamar\u00eda por mail.
+              el {fecha(cuota.dueDate)}. Sin eso, seguiría debiendo un mes que no existe y el
+              sistema se lo reclamaría por mail.
             </p>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Este per\u00edodo no tiene una cuota pendiente para anular.
+              Este período no tiene una cuota pendiente para anular.
             </p>
           )}
 
           {membresia.classesUsed > 0 && (
             <p className="text-xs text-aviso-fuerte bg-aviso-suave rounded-xl px-3 py-2">
-              Ya us\u00f3 {membresia.classesUsed} clase{membresia.classesUsed !== 1 ? 's' : ''} de este
-              per\u00edodo. Las reservas que ya hizo quedan en su historial \u2014no se borra nada\u2014, pero
-              desde ahora este per\u00edodo deja de servirle para reservar.
+              Ya usó {membresia.classesUsed} clase{membresia.classesUsed !== 1 ? 's' : ''} de este
+              período. Las reservas que ya hizo quedan en su historial —no se borra nada—, pero
+              desde ahora este período deja de servirle para reservar.
             </p>
           )}
 
@@ -256,12 +256,12 @@ function CancelarMembresiaModal({
               rows={2}
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
-              placeholder="Ej: se le asign\u00f3 el plan equivocado"
+              placeholder="Ej: se le asignó el plan equivocado"
               className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors resize-none"
             />
             <p className="text-[11px] text-muted-foreground mt-1">
               Queda escrito en la cuota anulada. Es lo que alguien va a leer en tres meses cuando se
-              pregunte por qu\u00e9 falta ese mes.
+              pregunte por qué falta ese mes.
             </p>
           </div>
 
@@ -287,7 +287,7 @@ function CancelarMembresiaModal({
             className="flex-1 py-2.5 rounded-xl bg-destructive-fuerte text-white text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-            {saving ? 'Cancelando...' : 'Cancelar el per\u00edodo'}
+            {saving ? 'Cancelando...' : 'Cancelar el período'}
           </button>
         </div>
       </div>
