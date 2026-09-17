@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabaseAdmin } from '@/lib/mp-server'
 import { esDenegado, exigir } from '@/lib/permisos-server'
-import { emailLayout, sendEmail } from '@/lib/email-server'
+import { enviarMail } from '@/lib/email-server'
+import { mailDeAcceso } from '@/lib/mail-acceso'
 
 // Crear y eliminar usuarios requiere la Admin API de Supabase
 // (SUPABASE_SERVICE_ROLE_KEY en el entorno del servidor). Solo un
@@ -191,6 +192,12 @@ export async function POST(request: Request) {
   // repetir. Al revés —mandar el mail antes de vincular— sería avisarle de
   // un acceso que todavía no funciona.
   let mailEnviado = false
+  // El motivo viaja hasta la pantalla. Hasta el 17/09 sólo viajaba un
+  // `false`, y cuando el mail no salió en producción no había forma de
+  // saber si faltaba la API key, si el remitente era inválido o si Resend
+  // había rechazado el dominio — tres arreglos distintos, cada uno con su
+  // redeploy para probar si era ese.
+  let mailMotivo: string | null = null
   if (role === 'alumno' && studentId && created.user) {
     // El mail del acceso pasa a ser el de la ficha. Sin esto, el mostrador
     // podía crear el acceso con una dirección y dejar la ficha con otra, y
@@ -204,27 +211,120 @@ export async function POST(request: Request) {
         .eq('id', studentId)
     }
 
-    const nombre = String(fullName ?? '').trim().split(' ')[0] || 'Hola'
-    const origen = new URL(request.url).origin
-    mailEnviado = await sendEmail(
-      String(email).trim(),
-      'Tu acceso al portal',
-      await emailLayout(
-        `¡Hola ${nombre}!`,
-        `<p>Ya podés entrar a tu portal: reservar tus clases, ver cuántas te quedan y tus pagos.</p>
-         <p style="margin:18px 0 6px;"><strong>Cómo entrar</strong></p>
-         <p style="margin:0;">Usuario: <strong>${String(email).trim()}</strong><br>
-         Contraseña: <strong>tu número de documento</strong>, sin puntos</p>
-         <p style="margin:18px 0;"><a href="${origen}/sistema" style="display:inline-block;padding:12px 22px;border-radius:12px;background:#847164;color:#fff;text-decoration:none;font-weight:700;">Entrar al portal</a></p>
-         <p style="font-size:13px;color:#6B5646;">La primera vez te vamos a pedir que elijas una contraseña nueva: tu documento no es un secreto, así que sirve para entrar una sola vez.</p>`
-      )
+    const { subject, html } = await mailDeAcceso({
+      email: String(email).trim(),
+      nombre: String(fullName ?? ''),
+      origen: new URL(request.url).origin,
+    })
+    const r = await enviarMail(String(email).trim(), subject, html)
+    mailEnviado = r.ok
+    if (!r.ok) mailMotivo = r.motivo
+  }
+
+  // `mailEnviado` en false no es un error: la cuenta ya sirve y el acceso
+  // se puede pasar a mano o reenviar desde la ficha. Pero el motivo va
+  // igual, porque es lo único que distingue "falta configurar Resend" de
+  // "el mail de la ficha no existe".
+  return NextResponse.json({ ok: true, mailEnviado, mailMotivo })
+}
+
+/**
+ * Reenviar el mail de acceso de una clienta que ya tiene cuenta.
+ *
+ * Existe porque el 17/09 pasó lo obvio: la cuenta se creó, el mail no
+ * salió, y la pantalla no ofrecía ninguna forma de volver a intentarlo —
+ * la ficha con cuenta sólo mostraba "Activo". La única salida era borrar
+ * la cuenta y crearla de nuevo.
+ *
+ * Tres cosas que hace que no son de adorno:
+ *
+ * 1. **Se niega si la clienta ya eligió su contraseña.** El mail dice "tu
+ *    contraseña es tu documento": si ella ya la cambió, ese mail miente y
+ *    además la deja llamando al estudio. Para ese caso está "olvidé mi
+ *    contraseña" en la pantalla de ingreso, que es de ella y no del
+ *    mostrador.
+ * 2. **Vuelve a fijar el documento como clave.** Si alguien corrigió el
+ *    DNI en la ficha después de crear el acceso, la clave seguía siendo el
+ *    documento viejo y el mail volvería a mentir. Es seguro justamente
+ *    porque el paso 1 ya garantizó que nadie eligió una clave propia.
+ * 3. **Mueve el mail de la cuenta si la ficha cambió.** El motivo más
+ *    probable de un reenvío es que el mail estaba mal escrito; sin esto,
+ *    el reenvío iría a la dirección nueva anunciando un usuario que es el
+ *    viejo.
+ */
+export async function PUT(request: Request) {
+  const auth = await authorize(request, 'usuarios.crear_alumno')
+  if (!auth.ok) return auth.response
+
+  const { studentId } = await request.json().catch(() => ({}))
+  if (!studentId) return NextResponse.json({ error: 'Falta studentId' }, { status: 400 })
+
+  const { data: ficha } = await auth.admin
+    .from('students')
+    .select('name, email, dni, user_id')
+    .eq('id', studentId)
+    .maybeSingle()
+  if (!ficha) return NextResponse.json({ error: 'No se encontró la ficha' }, { status: 404 })
+  if (!ficha.user_id) {
+    return NextResponse.json(
+      { error: 'Esa ficha todavía no tiene acceso. Crealo con "Crear acceso".' },
+      { status: 400 }
+    )
+  }
+  const mail = String(ficha.email ?? '').trim().toLowerCase()
+  if (!mail) {
+    return NextResponse.json(
+      { error: 'La ficha no tiene email, así que no hay a dónde mandarlo.' },
+      { status: 400 }
+    )
+  }
+  const dni = soloDigitos(ficha.dni ?? '')
+  if (dni.length < 6) {
+    return NextResponse.json(
+      { error: 'La ficha no tiene un documento usable como contraseña. Cargalo primero.' },
+      { status: 400 }
     )
   }
 
-  // `mailEnviado` en false no es un error: puede no haber dominio
-  // verificado todavía. La pantalla lo dice para que el mostrador sepa si
-  // tiene que pasar el acceso a mano.
-  return NextResponse.json({ ok: true, mailEnviado })
+  const { data: cuenta, error: leerError } = await auth.admin.auth.admin.getUserById(ficha.user_id)
+  if (leerError || !cuenta?.user) {
+    return NextResponse.json(
+      { error: `No se pudo leer la cuenta: ${leerError?.message ?? 'no existe'}` },
+      { status: 400 }
+    )
+  }
+  const meta = cuenta.user.user_metadata ?? {}
+  if (meta.debe_cambiar_clave !== true) {
+    return NextResponse.json(
+      {
+        error:
+          'Ya eligió su propia contraseña, así que este mail le diría algo que no es. Si no puede entrar, que use "Olvidé mi contraseña" en la pantalla de ingreso.',
+      },
+      { status: 409 }
+    )
+  }
+
+  const { error: updError } = await auth.admin.auth.admin.updateUserById(ficha.user_id, {
+    password: dni,
+    ...(mail !== String(cuenta.user.email ?? '').trim().toLowerCase()
+      ? { email: mail, email_confirm: true }
+      : {}),
+    user_metadata: { ...meta, debe_cambiar_clave: true },
+  })
+  if (updError) {
+    return NextResponse.json(
+      { error: `No se pudo preparar el acceso: ${updError.message}` },
+      { status: 400 }
+    )
+  }
+
+  const { subject, html } = await mailDeAcceso({
+    email: mail,
+    nombre: String(ficha.name ?? ''),
+    origen: new URL(request.url).origin,
+  })
+  const r = await enviarMail(mail, subject, html)
+  return NextResponse.json({ ok: true, mailEnviado: r.ok, mailMotivo: r.ok ? null : r.motivo })
 }
 
 export async function DELETE(request: Request) {
