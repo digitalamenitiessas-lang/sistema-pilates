@@ -97,8 +97,12 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
           })
           await refresh()
           if (!r.mailEnviado) {
+            // El motivo va primero y completo: es lo único que dice si hay
+            // que ir a Vercel, a Resend o a corregir la ficha. Antes este
+            // cartel decía sólo "no se pudo enviar" y había que adivinar.
             setAviso(
-              `Cliente creado, pero el mail no se pudo enviar. Pasale el acceso a mano: entra con ${email.trim()} y su documento, y al entrar le vamos a pedir que la cambie.`
+              `Cliente creado y acceso creado, pero el mail no salió. ${r.mailMotivo ?? ''}` +
+                ` Mientras tanto pasale el acceso a mano: entra con ${email.trim()} y su documento, y al entrar le vamos a pedir que la cambie. También podés reintentar el mail desde su ficha.`
             )
             setSaving(false)
             return

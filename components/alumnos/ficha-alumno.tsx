@@ -27,6 +27,7 @@ import { cn, nombreDelDia } from '@/lib/utils'
 import { useData } from '@/lib/data-context'
 import {
   createSystemUser,
+  reenviarAcceso,
   setMembershipAutoRenew,
   esOferta,
   hoyISO,
@@ -83,6 +84,69 @@ function textoCuota(p: Payment): string {
 }
 
 /**
+ * Volver a mandar el mail de acceso.
+ *
+ * Hasta el 17/09 la ficha con cuenta sólo mostraba "Activo", así que
+ * cuando el mail no salía —y pasó la primera vez que se usó en
+ * producción— la única salida era borrar la cuenta y crearla de nuevo.
+ *
+ * El botón aparece siempre que haya cuenta, sin preguntarle antes a la
+ * base si el reenvío corresponde: eso lo decide el servidor, que sabe si
+ * la clienta ya eligió su contraseña, y si dice que no, su motivo es lo
+ * que se muestra. Esconder el botón adivinando sería esconderlo mal —la
+ * pantalla no tiene la metadata de la cuenta— y el reenvío no es una
+ * acción que haya que temerle: manda el mismo mail al mismo lugar.
+ */
+function ReenviarAcceso({ student }: { student: Student }) {
+  const [estado, setEstado] = useState<'listo' | 'mandando' | 'ok' | 'falla'>('listo')
+  const [motivo, setMotivo] = useState<string | null>(null)
+
+  const reenviar = async () => {
+    setEstado('mandando')
+    setMotivo(null)
+    try {
+      const r = await reenviarAcceso(student.id)
+      setEstado(r.mailEnviado ? 'ok' : 'falla')
+      setMotivo(r.mailMotivo)
+    } catch (err) {
+      setEstado('falla')
+      setMotivo(err instanceof Error ? err.message : 'No se pudo reenviar')
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-2 w-full sm:w-auto sm:max-w-[26rem]">
+      <div className="flex items-center gap-2 justify-end">
+        {estado === 'ok' ? (
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-exito-fuerte">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            Mail reenviado a {student.email}
+          </span>
+        ) : (
+          <button
+            onClick={reenviar}
+            disabled={estado === 'mandando'}
+            className="px-3 py-1.5 rounded-xl border border-border text-xs font-semibold text-foreground hover:bg-muted transition-colors disabled:opacity-60 flex items-center gap-1.5"
+          >
+            {estado === 'mandando' ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Mail className="w-3.5 h-3.5" />
+            )}
+            {estado === 'mandando' ? 'Mandando...' : 'Reenviar el mail de acceso'}
+          </button>
+        )}
+      </div>
+      {estado === 'falla' && motivo && (
+        <p className="w-full text-left text-xs text-aviso-fuerte bg-aviso-suave rounded-xl px-3 py-2">
+          {motivo}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/**
  * Crear el acceso de una clienta.
  *
  * Ya no se elige una contraseña: el acceso nace con el DOCUMENTO de la
@@ -100,6 +164,7 @@ function PortalAccessModal({ student, onClose }: { student: Student; onClose: ()
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
   const [mailEnviado, setMailEnviado] = useState(false)
+  const [mailMotivo, setMailMotivo] = useState<string | null>(null)
 
   const dni = (student.dni ?? '').replace(/\D/g, '')
 
@@ -115,6 +180,7 @@ function PortalAccessModal({ student, onClose }: { student: Student; onClose: ()
         studentId: student.id,
       })
       setMailEnviado(r.mailEnviado)
+      setMailMotivo(r.mailMotivo)
       await refresh()
       setDone(true)
     } catch (err) {
@@ -150,7 +216,8 @@ function PortalAccessModal({ student, onClose }: { student: Student; onClose: ()
                 </>
               ) : (
                 <>
-                  <span className="font-semibold text-aviso-fuerte">El mail no se pudo enviar.</span>{' '}
+                  <span className="font-semibold text-aviso-fuerte">El mail no salió.</span>{' '}
+                  {mailMotivo && <span className="block mt-1.5 mb-1.5 text-left">{mailMotivo}</span>}
                   Pasale el acceso a mano: entra con <span className="font-semibold">{email}</span>{' '}
                   y su documento como contraseña. Al entrar le vamos a pedir que la cambie.
                 </>
@@ -750,10 +817,13 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                     </div>
                   </div>
                   {student.userId ? (
-                    <span className="flex items-center gap-1.5 text-xs font-semibold text-exito-fuerte bg-exito-suave px-2.5 py-1 rounded-full">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Activo
-                    </span>
+                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                      <span className="flex items-center gap-1.5 text-xs font-semibold text-exito-fuerte bg-exito-suave px-2.5 py-1 rounded-full">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Activo
+                      </span>
+                      {canWrite && <ReenviarAcceso student={student} />}
+                    </div>
                   ) : canWrite ? (
                     <button
                       onClick={() => setShowPortalAccess(true)}

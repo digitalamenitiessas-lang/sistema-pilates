@@ -2247,7 +2247,7 @@ export async function fetchProfiles(): Promise<Profile[]> {
   }))
 }
 
-async function adminApi<T>(body: object, method: 'POST' | 'DELETE' = 'POST'): Promise<T> {
+async function adminApi<T>(body: object, method: 'POST' | 'PUT' | 'DELETE' = 'POST'): Promise<T> {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Sesión expirada, volvé a ingresar')
   const res = await fetch('/api/admin/users', {
@@ -2282,9 +2282,37 @@ export async function createSystemUser(input: {
    * "ver solo mis clases" no puede funcionar por más permiso que se le dé.
    */
   teacherId?: string
-}): Promise<{ mailEnviado: boolean }> {
-  const r = await adminApi<{ ok: boolean; mailEnviado?: boolean }>(input)
-  return { mailEnviado: Boolean(r?.mailEnviado) }
+}): Promise<ResultadoAcceso> {
+  const r = await adminApi<{ ok: boolean; mailEnviado?: boolean; mailMotivo?: string | null }>(input)
+  return { mailEnviado: Boolean(r?.mailEnviado), mailMotivo: r?.mailMotivo ?? null }
+}
+
+/**
+ * Qué pasó con el mail, y por qué cuando no pasó.
+ *
+ * `mailEnviado: false` con `mailMotivo: null` no puede existir: si el mail
+ * no salió, el servidor siempre dice por qué. Sin eso, el mostrador sólo
+ * veía "no se pudo enviar" y el arreglo —que puede estar en Vercel, en
+ * Resend o en la ficha— había que adivinarlo (17/09).
+ */
+export interface ResultadoAcceso {
+  mailEnviado: boolean
+  mailMotivo: string | null
+}
+
+/**
+ * Volver a mandarle el mail de acceso a una clienta que ya tiene cuenta.
+ *
+ * El servidor rechaza el reenvío si ella ya eligió su contraseña, porque
+ * el mail dice que la clave es su documento. Ese rechazo llega con su
+ * texto y es lo que hay que mostrar.
+ */
+export async function reenviarAcceso(studentId: string): Promise<ResultadoAcceso> {
+  const r = await adminApi<{ ok: boolean; mailEnviado?: boolean; mailMotivo?: string | null }>(
+    { studentId },
+    'PUT'
+  )
+  return { mailEnviado: Boolean(r?.mailEnviado), mailMotivo: r?.mailMotivo ?? null }
 }
 
 // ---------------------------------------------------------------
