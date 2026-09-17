@@ -34,6 +34,8 @@ import {
   fetchWeekOccupancy,
   type Occupancy,
   credencial,
+  cuentaDeDias,
+  enDias,
   settingNum,
   settingText,
   esOferta,
@@ -210,11 +212,15 @@ function MembershipCard({ student }: { student: Student }) {
           decía cuándo vence y nunca cuándo empezó, así que la clienta no
           tenía con qué chequear su propio mes. Para un período que todavía
           no arrancó no se repite: arriba ya dice "Arranca el X". */}
-      {ms.status !== 'futura' && (
-        <p className="text-[11px] text-muted-foreground mt-1.5">
-          Activa desde el {pretty(ms.startDate)}
-        </p>
-      )}
+      {/* La cuenta de días al lado de la fecha. El estudio la pidió el
+          17/09 pensando en la clienta: "vence el 14 oct" no se lee como
+          urgencia y "vence en 3 días" sí, y es la diferencia entre
+          renovar a tiempo y perder el turno fijo. */}
+      <p className="text-[11px] text-muted-foreground mt-1.5">
+        {ms.status === 'futura'
+          ? `Arranca ${enDias(ms.startDate)}`
+          : `Activa desde el ${pretty(ms.startDate)} · ${cuentaDeDias(ms.endDate)}`}
+      </p>
     </div>
   )
 }
