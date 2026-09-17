@@ -1748,6 +1748,87 @@ function errorDeLaBase(error: { message?: string } | null, sino: string): Error 
  * Devuelve null para la reserva de todos los días, que es la mayoría y
  * no necesita que le expliquen nada.
  */
+/**
+ * Qué pasó con una clase reservada, y si le contó del plan.
+ *
+ * ESPEJA `consumo_contadas` (0046, sobre la 0029), que es la función con
+ * la que la base calcula `classes_used`. Si mañana cambia qué consume,
+ * **las dos tienen que cambiar juntas**: es la misma advertencia que la
+ * 0046 le dejó escrita a `recupero_elegible`, y acá importa más, porque
+ * esto es lo que la clienta va a usar para auditar su propio contador. Una
+ * lista que no suma lo que dice el número de arriba es peor que no tener
+ * lista.
+ *
+ * La regla, tal cual está en la base:
+ *
+ *   cuenta si  membership_id = ese período
+ *         y    no es un recupero
+ *         y    el estudio no suspendió ese día
+ *         y    (confirmada | asistió
+ *               | ausente y la ausencia consume
+ *               | cancelada fuera de plazo)
+ *
+ * Las que entraron por excepción no aparecen en ningún período: la base
+ * las deja con `membership_id` nulo, así que el filtro del período las
+ * excluye solo.
+ */
+export interface SuerteDeLaClase {
+  /** Si esta clase le descontó del plan. */
+  conto: boolean
+  etiqueta: string
+  detalle?: string
+}
+
+export function suerteDeLaReserva(
+  r: Reservation,
+  opts: { suspendida: boolean; ausenciaConsume: boolean; hoy?: string }
+): SuerteDeLaClase {
+  if (opts.suspendida) {
+    return {
+      conto: false,
+      etiqueta: 'Suspendida',
+      detalle: 'El estudio suspendió la clase, así que no te la contamos',
+    }
+  }
+  if (r.recoversReservationId) {
+    return {
+      conto: false,
+      etiqueta: 'Recuperada',
+      detalle: 'Es la recuperación de una clase que ya habías perdido, no te contó de nuevo',
+    }
+  }
+  if (r.overrideReason) {
+    return { conto: false, etiqueta: 'Excepción', detalle: 'Entró por excepción y no se descontó de ningún plan' }
+  }
+  if (r.status === 'cancelada') {
+    return r.cancelKind === 'fuera de plazo'
+      ? { conto: true, etiqueta: 'Cancelada tarde', detalle: 'Fuera del plazo, así que la clase se perdió' }
+      : { conto: false, etiqueta: 'Cancelada', detalle: 'Cancelaste a tiempo y la clase volvió a tu plan' }
+  }
+  if (r.status === 'asistió') return { conto: true, etiqueta: 'Viniste' }
+  if (r.status === 'ausente') {
+    return opts.ausenciaConsume
+      ? { conto: true, etiqueta: 'No viniste', detalle: 'Sin avisar, así que la clase se contó' }
+      : { conto: false, etiqueta: 'No viniste', detalle: 'No te la contamos' }
+  }
+  if (r.status === 'lista de espera') {
+    return { conto: false, etiqueta: 'En espera', detalle: 'Todavía no tenés lugar, así que no se descontó' }
+  }
+  if (r.status === 'confirmada') {
+    // Cuenta desde que reservó. Si la fecha ya pasó y nadie la marcó, se
+    // dice: es información de ella y explica el contador.
+    const hoy = opts.hoy ?? hoyISO()
+    return r.date < hoy
+      ? { conto: true, etiqueta: 'Sin marcar', detalle: 'Ese día no se tomó asistencia' }
+      : { conto: true, etiqueta: 'Reservada', detalle: 'La clase se descuenta al reservar' }
+  }
+  // Un estado que el tipo no conoce. La base admite 'ofrecida' (0022) y
+  // `ReservationStatus` no la lista, así que para el compilador esto no
+  // pasa nunca — pero si pasa, no se cuenta: inventar "Reservada" acá
+  // sería sumarle una clase que la base no sumó.
+  return { conto: false, etiqueta: 'Sin definir' }
+}
+
 export function formaDeLaReserva(
   r: Reservation
 ): { texto: string; tono: 'info' | 'aviso' | 'neutro' } | null {
