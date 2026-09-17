@@ -25,8 +25,26 @@ export const NOMBRE_POR_DEFECTO = 'Casa Fe'
  */
 async function leerPublico(key: string): Promise<string> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!url || !anon) return ''
+  // El nombre de la variable importa, y acá estaba el equivocado.
+  //
+  // Todo el proyecto lee `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` —el nombre
+  // nuevo de Supabase— y este archivo era el ÚNICO que pedía
+  // `NEXT_PUBLIC_SUPABASE_ANON_KEY`. En `.env.local` están las dos, así
+  // que en desarrollo funcionaba; en Vercel está sólo la que usa el resto,
+  // así que en producción esta lectura devolvía vacío SIEMPRE.
+  //
+  // Y no se notaba porque los dos valores que se leen tienen un respaldo
+  // que da lo mismo: el nombre del estudio caía en 'Casa Fe', que es
+  // justo lo que dice la base. Se descubrió el 17/09 por el otro: el link
+  // del mail salió con el dominio de Vercel en vez del que el estudio
+  // había cargado en `portal_url` diez minutos antes.
+  const anon =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !anon) {
+    console.error('[estudio] no hay credencial pública para leer la configuración; se usan los valores de respaldo')
+    return ''
+  }
   try {
     const db = createClient(url, anon, { auth: { persistSession: false } })
     const { data } = await db
@@ -35,7 +53,11 @@ async function leerPublico(key: string): Promise<string> {
       .eq('key', key)
       .maybeSingle()
     return data?.value?.trim() ?? ''
-  } catch {
+  } catch (err) {
+    // Que la configuración no se pueda leer no puede tumbar un mail ni el
+    // manifest, pero tiene que dejar rastro: el respaldo silencioso es
+    // exactamente lo que escondió este error durante semanas.
+    console.error(`[estudio] no se pudo leer '${key}':`, err instanceof Error ? err.message : err)
     return ''
   }
 }
