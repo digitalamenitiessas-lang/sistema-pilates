@@ -370,7 +370,12 @@ export interface StudioData {
 }
 
 export async function fetchStudioData(): Promise<StudioData> {
-  const [teachersRes, plansRes, studentsRes, membershipsRes, classesRes, reservationsRes, paymentsRes, revenueRes] =
+  // La ventana de los cupos: la semana en curso, que es lo que muestran la
+  // agenda y el tablero.
+  const semanaDesde = mondayOf()
+  const semanaHasta = addDays(semanaDesde, 6)
+
+  const [teachersRes, plansRes, studentsRes, membershipsRes, classesRes, reservationsRes, paymentsRes, revenueRes, cuposRes] =
     await Promise.all([
       supabase.from('teachers').select('*').eq('active', true).order('name'),
       supabase.from('plans').select('*').eq('active', true).order('price'),
@@ -380,6 +385,26 @@ export async function fetchStudioData(): Promise<StudioData> {
       supabase.from('reservations').select('*, students(name), class_sessions(title, discipline, start_time, teachers(name))').order('date', { ascending: false }),
       supabase.from('payments').select('*, students(name)').order('due_date', { ascending: false }),
       supabase.from('monthly_revenue').select('*'),
+      // Cuántas hay anotadas en cada clase, contado por la base.
+      //
+      // `class_occupancy` (0005) es una vista SIN `security_invoker`, así
+      // que corre con los permisos del dueño y cuenta TODAS las reservas,
+      // no sólo las que quien pregunta puede leer. Es la misma vista con
+      // la que el portal de la clienta muestra "8 lugares libres" sin
+      // enterarse de quién ocupa los otros.
+      //
+      // Hasta acá el cupo se derivaba de la lista de reservas que volvía
+      // en este mismo paquete, y eso funcionaba sólo porque todos los
+      // roles leían todas las reservas. En el momento en que un rol ve
+      // menos —la profesora con `reservas.ver.propio`— esa cuenta pasa a
+      // mentir: las clases de la otra profesora aparecerían en 0/8. Un
+      // cupo equivocado es peor que un cupo escondido; con este número la
+      // grilla sigue diciendo la verdad para todos.
+      supabase
+        .from('class_occupancy')
+        .select('class_id, date, confirmed, waitlist')
+        .gte('date', semanaDesde)
+        .lte('date', semanaHasta),
     ])
 
   // Antes acá había un throw con el primer error, y eso convertía el
@@ -699,8 +724,34 @@ export async function fetchStudioData(): Promise<StudioData> {
   })
 
   // Cupos de la semana actual por clase (confirmadas + asistencias)
-  const weekStart = mondayOf()
-  const weekEnd = addDays(weekStart, 6)
+  const weekStart = semanaDesde
+  const weekEnd = semanaHasta
+
+  // Lo que dijo la base, sumado por clase dentro de la semana. Se suma en
+  // vez de tomar la fila del día para reproducir exactamente lo que hacía
+  // la cuenta anterior: una clase regular tiene una sola fecha en la
+  // semana, pero una especial puede tener la suya fuera del rango y ahí
+  // las dos dan cero.
+  //
+  // Si la vista no contesta —no existe, o el día que alguien le ponga
+  // `security_invoker`— el mapa queda vacío y abajo se cae a la cuenta
+  // vieja. Eso no es un modo degradado silencioso: la cuenta vieja es la
+  // correcta mientras el rol lea todas las reservas, que es el caso de
+  // recepción y del admin.
+  const cupos = new Map<string, { confirmed: number; waitlist: number }>()
+  for (const row of (cuposRes.data ?? []) as Array<{
+    class_id: string
+    date: string
+    confirmed: number | string
+    waitlist: number | string
+  }>) {
+    const previo = cupos.get(row.class_id) ?? { confirmed: 0, waitlist: 0 }
+    cupos.set(row.class_id, {
+      confirmed: previo.confirmed + Number(row.confirmed),
+      waitlist: previo.waitlist + Number(row.waitlist),
+    })
+  }
+  const hayCupos = (cuposRes.data ?? []).length > 0 || !cuposRes.error
   const classes: ClassSession[] = (classesRes.data ?? []).map((c) => {
     // Las especiales tienen su propia fecha; las regulares caen en el día
     // de la semana que les toca (migración 0017).
@@ -718,8 +769,12 @@ export async function fetchStudioData(): Promise<StudioData> {
       time: c.start_time.slice(0, 5),
       durationMinutes: c.duration_minutes,
       capacity: c.capacity,
-      enrolled: ofWeek.filter((r) => r.status === 'confirmada' || r.status === 'asistió').length,
-      waitlist: ofWeek.filter((r) => r.status === 'lista de espera').length,
+      enrolled: hayCupos
+        ? cupos.get(c.id)?.confirmed ?? 0
+        : ofWeek.filter((r) => r.status === 'confirmada' || r.status === 'asistió').length,
+      waitlist: hayCupos
+        ? cupos.get(c.id)?.waitlist ?? 0
+        : ofWeek.filter((r) => r.status === 'lista de espera').length,
       room: c.room,
       color: c.color ?? '#847164',
       kind: (c.kind ?? 'regular') as ClassSession['kind'],
