@@ -2272,19 +2272,52 @@ export async function fetchProfiles(): Promise<Profile[]> {
   }))
 }
 
-async function adminApi<T>(body: object, method: 'POST' | 'PUT' | 'DELETE' = 'POST'): Promise<T> {
+/**
+ * Los endpoints de administración, con el token al día.
+ *
+ * Estos pedidos arman el `Authorization` a mano, así que —al revés que
+ * las consultas normales, que las renueva el cliente de Supabase solo—
+ * mandaban el token guardado tal como estuviera. Una pantalla que lleva
+ * horas abierta tiene el token vencido, el servidor contesta 401 y la
+ * persona veía **"No autenticado"**: jerga nuestra, en medio de un
+ * formulario, sin decirle qué hacer. Le pasó al estudio el 17/09
+ * intentando crear el acceso de una clienta.
+ *
+ * Ahora, ante un 401, se renueva la sesión y se reintenta una vez. Si
+ * sigue rechazando, el mensaje dice lo único que sirve: volver a entrar.
+ */
+async function adminApi<T>(
+  body: object,
+  method: 'POST' | 'PUT' | 'PATCH' | 'DELETE' = 'POST'
+): Promise<T> {
+  const VENCIDA = 'Tu sesión venció. Cerrá sesión, volvé a entrar y probá de nuevo.'
+
+  const pedir = (token: string) =>
+    fetch('/api/admin/users', {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    })
+
   const { data: { session } } = await supabase.auth.getSession()
-  if (!session) throw new Error('Sesión expirada, volvé a ingresar')
-  const res = await fetch('/api/admin/users', {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${session.access_token}`,
-    },
-    body: JSON.stringify(body),
-  })
+  if (!session) throw new Error(VENCIDA)
+
+  let res = await pedir(session.access_token)
+  if (res.status === 401) {
+    // Un reintento y no más: si el refresh token también venció, insistir
+    // sólo demora el cartel que le dice qué hacer.
+    const { data: renovada } = await supabase.auth.refreshSession()
+    if (renovada.session) res = await pedir(renovada.session.access_token)
+  }
+
   const json = await res.json().catch(() => null)
-  if (!res.ok) throw new Error(json?.error ?? `Error del servidor (${res.status})`)
+  if (!res.ok) {
+    if (res.status === 401) throw new Error(VENCIDA)
+    throw new Error(json?.error ?? `Error del servidor (${res.status})`)
+  }
   return json as T
 }
 
@@ -2370,16 +2403,10 @@ export async function fetchWeekOccupancy(weekStart: string): Promise<Map<string,
 }
 
 export async function reactivateSystemUser(userId: string): Promise<void> {
-  const { data } = await supabase.auth.getSession()
-  const res = await fetch('/api/admin/users', {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${data.session?.access_token ?? ''}`,
-    },
-    body: JSON.stringify({ userId }),
-  })
-  if (!res.ok) throw new Error((await res.json()).error ?? 'No se pudo reactivar')
+  // Pasa por adminApi como el resto: armaba su propio fetch y mandaba un
+  // token vacío cuando no había sesión, o sea el mismo 401 con el mismo
+  // texto interno en pantalla.
+  await adminApi({ userId }, 'PATCH')
 }
 
 /** Da de baja el acceso: el perfil se conserva y el login queda bloqueado. */
