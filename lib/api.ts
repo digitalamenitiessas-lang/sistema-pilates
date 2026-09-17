@@ -1582,7 +1582,22 @@ export async function moverVencimiento(
  */
 function errorDeLaBase(error: { message?: string } | null, sino: string): Error {
   const msg = error?.message?.trim()
-  return new Error(msg && msg.length > 0 ? msg : sino)
+  if (!msg) return new Error(sino)
+
+  // Un rechazo de RLS no tiene mensaje escrito por nadie: Postgres dice
+  // "new row violates row-level security policy \"nombre\" for table
+  // \"tabla\"". Eso apareció en pantalla el 17/09, a una profesora que
+  // quiso deshacer una marca de asistencia. Cuando la base tiene un motivo
+  // escrito —"Ya usó las 2 clases de su plan"— hay que mostrarlo; cuando
+  // lo que hay es el texto interno del motor, no: no le dice nada a nadie
+  // y encima nombra políticas y tablas.
+  //
+  // La pantalla igual no tendría que haber ofrecido la acción. Esto es la
+  // red de abajo, para cuando se nos escape otra.
+  if (/row-level security policy/i.test(msg)) {
+    return new Error('Tu rol no tiene permiso para esta acción.')
+  }
+  return new Error(msg)
 }
 
 /**

@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Check, X, Loader2, Undo2, Users } from 'lucide-react'
+import { Check, X, Loader2, Repeat2, Undo2, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { updateReservationStatus } from '@/lib/api'
@@ -40,6 +40,25 @@ export function TomarAsistencia({
   // podía hacer antes, así que esto es equivalente a canWrite hasta que el
   // estudio encienda la clave y se la dé a las profesoras.
   const puedeMarcar = can('reservas.asistencia') || canWrite
+
+  /**
+   * Deshacer una marca NO es marcar: es volver la reserva a 'confirmada',
+   * y la restrictiva de la 0013 manda ese caso a `reservas.editar`. La
+   * profesora tiene `reservas.asistencia` desde la 0059 y no tiene
+   * editar, así que puede marcar y no puede desmarcar.
+   *
+   * Hasta el 17/09 el botón de deshacer se le ofrecía igual, la base lo
+   * rechazaba y la pantalla mostraba el texto crudo de Postgres ("new row
+   * violates row-level security policy..."). Verificado con la sesión de
+   * Ivana: marcar presente 200, marcar ausente 200, volver a 'confirmada'
+   * 403.
+   *
+   * Así que a quien no puede deshacer se le ofrece lo que la base sí le
+   * deja: pasar de presente a ausente y al revés. Esconder el botón sin
+   * más le sacaría la única forma de corregir un toque equivocado, que es
+   * justo lo que una lista de asistencia necesita.
+   */
+  const puedeDeshacer = can('reservas.editar') || canWrite
 
   const lista = useMemo(
     () =>
@@ -155,7 +174,7 @@ export function TomarAsistencia({
                     <span className="text-xs text-muted-foreground shrink-0">
                       {r.status === 'asistió' ? 'Presente' : r.status === 'ausente' ? 'Ausente' : '—'}
                     </span>
-                  ) : marcada ? (
+                  ) : marcada && puedeDeshacer ? (
                     <button
                       onClick={() => marcar(r, 'confirmada')}
                       className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground shrink-0 px-2 py-1"
@@ -163,6 +182,17 @@ export function TomarAsistencia({
                     >
                       {r.status === 'asistió' ? 'Presente' : 'Ausente'}
                       <Undo2 className="w-3.5 h-3.5" />
+                    </button>
+                  ) : marcada ? (
+                    // Sin permiso para deshacer: el botón cambia la marca
+                    // en vez de borrarla.
+                    <button
+                      onClick={() => marcar(r, r.status === 'asistió' ? 'ausente' : 'asistió')}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground shrink-0 px-2 py-1"
+                      aria-label={`Cambiar ${r.studentName} a ${r.status === 'asistió' ? 'ausente' : 'presente'}`}
+                    >
+                      {r.status === 'asistió' ? 'Presente' : 'Ausente'}
+                      <Repeat2 className="w-3.5 h-3.5" />
                     </button>
                   ) : (
                     // Botones grandes a propósito: se usan de pie, con una mano
