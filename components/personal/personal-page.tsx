@@ -209,12 +209,20 @@ function Liquidacion({
         <p className="text-sm font-bold text-foreground tabular-nums">{plata(total)}</p>
       </div>
 
-      {/* Liquidar no es pagar, y el mostrador tiene que saberlo antes de
-          cerrar el mes: el pago entra al libro como cualquier gasto. */}
+      {/* Este texto decía "cuando le pagues, cargalo en Gastos", y era
+          cierto hasta que existió el botón de pagar. Desde la 0054 el
+          gasto lo crea `pagar_liquidacion()` —van juntos en una sola
+          función justamente para que no haya una liquidación pagada sin su
+          gasto—, así que seguir la instrucción al pie de la letra hacía
+          salir el sueldo DOS VECES del libro: el gasto del botón y el
+          cargado a mano, los dos legítimos a los ojos del sistema.
+          Encontrado el 17/09 revisando el módulo antes de que lo usen. */}
       <p className="text-[11px] text-muted-foreground px-4">
         Este cálculo sale de las clases que figuran dictadas en la agenda y de las condiciones que
-        regían cada día. <span className="font-semibold">Liquidar no es pagar</span>: cuando le
-        pagues, cargalo en Gastos para que entre al libro.
+        regían cada día. <span className="font-semibold">Liquidar no es pagar</span>: primero se
+        cierra el período y después se usa <span className="font-semibold">Registrar el pago</span>,
+        que carga el gasto en el libro por vos. No hace falta cargarlo a mano en Gastos — si lo
+        hacés, el sueldo sale dos veces.
       </p>
     </div>
   )
