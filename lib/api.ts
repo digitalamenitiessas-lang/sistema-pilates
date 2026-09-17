@@ -2258,7 +2258,13 @@ async function adminApi<T>(body: object, method: 'POST' | 'DELETE' = 'POST'): Pr
 
 export async function createSystemUser(input: {
   email: string
-  password: string
+  /**
+   * Opcional para una clienta: desde el 17/09 su acceso nace con el DNI de
+   * la ficha como contraseña, y el servidor lo lee de ahí —no de acá— para
+   * que el navegador no pueda elegir la clave de una cuenta ajena. Para el
+   * staff sigue siendo obligatoria.
+   */
+  password?: string
   fullName: string
   role: Role
   /** si se pasa, vincula la cuenta creada con esta ficha de alumno */
@@ -2269,8 +2275,9 @@ export async function createSystemUser(input: {
    * "ver solo mis clases" no puede funcionar por más permiso que se le dé.
    */
   teacherId?: string
-}): Promise<void> {
-  await adminApi(input)
+}): Promise<{ mailEnviado: boolean }> {
+  const r = await adminApi<{ ok: boolean; mailEnviado?: boolean }>(input)
+  return { mailEnviado: Boolean(r?.mailEnviado) }
 }
 
 // ---------------------------------------------------------------

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import { CambiarClaveObligatorio } from '@/components/auth/cambiar-clave-obligatorio'
 import { Sidebar, type PageKey } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
 import { DashboardPage } from '@/components/dashboard/dashboard-page'
@@ -94,6 +96,28 @@ function AppShell() {
   if (!data && !dataError) return <FullScreenLoader message="Cargando datos del estudio..." />
   // No mostrar ninguna interfaz hasta conocer el rol del usuario
   if (!profileReady && !dataError) return <FullScreenLoader message="Cargando tu perfil..." />
+
+  /**
+   * Antes de cualquier pantalla: si la cuenta nació con el documento como
+   * contraseña, elegir una propia es lo único que se puede hacer.
+   *
+   * Va acá y no adentro del portal porque tiene que valer para todos los
+   * roles: el día que un acceso de staff se cree igual, el corte ya está.
+   * Y va después de `profileReady` para no parpadear antes de saber quién
+   * es, pero ANTES del portal y del sistema: si estuviera después, habría
+   * un instante en el que la pantalla real ya se dibujó.
+   */
+  if (session.user?.user_metadata?.debe_cambiar_clave) {
+    return (
+      <CambiarClaveObligatorio
+        // Recargar es lo más simple y lo más seguro: la sesión vuelve con
+        // la metadata nueva y el corte de arriba deja de aplicar. Mutar el
+        // usuario en memoria dejaría dos fuentes de verdad.
+        onListo={() => window.location.reload()}
+        onSalir={() => void supabase.auth.signOut()}
+      />
+    )
+  }
 
   // Los clientes ven su portal, no el sistema de gestión
   if (profile?.role === 'alumno' && data) {
