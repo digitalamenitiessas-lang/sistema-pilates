@@ -99,11 +99,19 @@ S += T('Activar los avisos en ese celular', [
 S += [Paragraph('Las tareas de todos los días', h1)]
 
 S += T('Dar de alta un cliente', [
-    '<b>Clientes</b> → <b>Nuevo cliente</b>.',
-    'Lo único obligatorio es el nombre. El resto se completa después.',
-    'Si ya sabés qué plan lleva, elegilo en <b>Asignar plan</b> y te ahorrás el paso siguiente.',
-    '<b>Crear cliente</b>.',
-])
+    '<b>Clientes</b> → el botón <b>+</b>.',
+    'Nombre, <b>email</b> y <b>DNI</b>. El nombre es lo único que el sistema exige siempre; el '
+    'email y el DNI hacen falta para el último paso, que es crearle el acceso.',
+    'Lo de salud —lesiones, embarazo, cirugías, medicación, contacto de emergencia— si lo '
+    'tenés a mano. Se puede completar después.',
+    'En <b>Asignar plan</b> elegí el que lleva: eso le crea la membresía desde hoy y deja la '
+    'cuota generada en <b>Pagos</b>.',
+    'Abajo, la casilla <b>Crearle el acceso y avisarle por mail</b> viene marcada. Dejala así.',
+    '<b>Crear cliente y avisarle</b>.',
+], aviso='el alta <b>no cobra</b>: deja la cuota esperando en Pagos. Si pagó en ese momento, '
+         'cobrala ahí —es el paso “Cobrar una cuota”—. Y si la casilla del acceso te avisa que '
+         'falta el email o falta el DNI, completalos arriba: la contraseña con la que entra <b>es '
+         'su documento</b>, así que sin DNI no hay acceso que crear.')
 
 S += T('Asignarle o renovarle el plan', [
     'Abrí su ficha → pestaña <b>Membresía</b>.',
@@ -164,11 +172,23 @@ S += T('Cerrar la caja del día', [
 ], aviso='el sistema te muestra cuánto <b>debería haber</b> y la diferencia si no coincide. '
          'Si cerraste por error, se puede <b>Reabrir</b>.')
 
-S += T('Crear el acceso al portal de un cliente', [
+S += T('Crearle el acceso a alguien que ya estaba cargado', [
     'Abrí su ficha → <b>Crear acceso</b>.',
-    'Poné su email y una contraseña. Ella la cambia después desde el portal.',
-], aviso='hace falta su email. Desde el portal ve <b>solo lo suyo</b>: su plan, sus clases y la '
-         'grilla — nada de nadie más.')
+    'Confirmá el email. La contraseña <b>no se elige</b>: es su documento, y la pantalla te lo '
+    'muestra para que veas cuál le va a quedar.',
+    '<b>Crear acceso</b>. El mail le sale solo.',
+], aviso='si la ficha no tiene DNI el sistema no te deja: cargalo primero en la ficha. Desde el '
+         'portal ella ve <b>solo lo suyo</b> —su plan, sus clases y la grilla, nada de nadie más—.')
+
+S += T('Si el mail de acceso no le llegó', [
+    'Abrí su ficha → <b>Reenviar el mail de acceso</b>.',
+    'Si el email estaba mal escrito, corregilo primero con <b>Editar</b> y después reenviá: el '
+    'reenvío también le mueve el usuario a la dirección nueva.',
+], aviso='esto sirve <b>hasta que ella entra por primera vez</b>. Después el sistema lo rechaza, y '
+         'está bien que lo haga: el mail dice que su contraseña es su documento, y una vez que '
+         'ella eligió la suya eso sería mentira. Si no puede entrar, es <b>ella</b> la que usa '
+         '“Olvidé mi contraseña” en la pantalla de ingreso — nadie del mostrador le toca la '
+         'contraseña a nadie.')
 
 S += T('Cambiar un precio, un horario o un plazo', [
     'Precios y planes: <b>Planes</b> → editar el plan.',
@@ -177,6 +197,35 @@ S += T('Cambiar un precio, un horario o un plazo', [
 ], aviso='casi todo número o texto del sistema se cambia desde Configuración, sin pedirnos nada. '
          'Si un parámetro dice <b>“Todavía no rige”</b>, está cargado pero el sistema aún no lo '
          'aplica: eso lo avisa a propósito.')
+
+# ── El lado de la clienta ─────────────────────────
+S += [Paragraph('Cómo entra la clienta, del otro lado', h1)]
+S += [Paragraph('La clienta no se registra sola ni elige su usuario: el acceso se lo crea el '
+                'estudio en el alta y ella recibe un mail. Son cuatro momentos, y en cada uno el '
+                'sistema la lleva de la mano.', cuerpo)]
+S += [tabla([
+    ['Cuándo', 'Qué le pasa a ella'],
+    ['Al minuto de darla de alta',
+     'Le llega un mail de Casa Fe —<b>Tu acceso al portal</b>— con el usuario (su email), la '
+     'contraseña (su documento, sin puntos) y un botón para entrar.'],
+    ['La primera vez que entra',
+     'Antes de ver nada, el sistema le pide <b>elegir una contraseña propia</b>. No se puede '
+     'saltear: no hay menú ni botón de atrás, sólo elegirla o cerrar sesión.'],
+    ['De ahí en adelante',
+     'Entra con su email y la contraseña que ella eligió. El documento deja de servir.'],
+    ['Si se la olvida',
+     '<b>Olvidé mi contraseña</b> en la pantalla de ingreso: le llega un enlace y elige una '
+     'nueva. El estudio no interviene.'],
+], [38 * mm, 134 * mm])]
+S += [Spacer(1, 6)]
+S += [Paragraph('<b>Por qué la contraseña es su documento y dura un solo ingreso:</b> así el '
+                'mostrador no tiene que inventar una clave ni dictarla por teléfono, y el mail le '
+                'dice algo que ella ya sabe de memoria. Pero el documento no es un secreto —está '
+                'escrito en su ficha—, así que sirve para entrar una vez y nada más.', cuerpo)]
+S += [Paragraph('Dos cosas que conviene decirle cuando empieza: desde el portal <b>no</b> puede '
+                'anotarse en una clase que ya arrancó, y si cancela con menos de 3 horas la clase '
+                'no le vuelve. Las dos se las avisa la pantalla antes de confirmar, con el plazo '
+                'escrito y diciendo qué pasa con esa clase.', cuerpo)]
 
 # ── Los avisos ──────────────────────────────────────────────
 S += [Paragraph('Los avisos que el sistema manda solo', h1)]
@@ -201,12 +250,10 @@ S += [Paragraph('Los mails salen a nombre del estudio, con el nombre y los datos
                 'cargados en Configuración — no hay que escribirlos ni copiarlos: el sistema los '
                 'arma y los manda. Cuando la cuenta de Mercado Pago está conectada, el mail de '
                 'renovación ya lleva el botón para pagar.', cuerpo)]
-S += [Paragraph('<b>Y hay algo que hay que saber ahora:</b> para que los mails lleguen a las '
-                'clientas hace falta terminar de habilitar el dominio del estudio en el servicio '
-                'que los envía. Hasta que eso esté hecho, <b>los mails no salen</b> — y el sistema '
-                'no avisa que no salieron. Los avisos de la campana y del celular sí funcionan, '
-                'así que mientras tanto esos son el canal. Es un trámite de una vez, no algo que '
-                'se rompa.', cuerpo)]
+S += [Paragraph('El dominio del estudio ya está habilitado: los mails salen a nombre de Casa Fe '
+                'y desde su propia dirección, no desde un servicio prestado. Y si alguna vez uno '
+                'no sale, la pantalla te dice <b>por qué</b> en el momento, en vez de dejarte '
+                'creyendo que la clienta fue avisada.', cuerpo)]
 
 # ── Cuando el sistema dice no ───────────────────────────────
 S += [Paragraph('Cuando el sistema dice que no', h1)]
@@ -231,7 +278,7 @@ S += [tabla([
 ], [62 * mm, 110 * mm])]
 
 S += [Spacer(1, 14)]
-S += [Paragraph('Casa Fe · Manual del mostrador · 10 de septiembre de 2026. '
+S += [Paragraph('Casa Fe · Manual del mostrador · 17 de septiembre de 2026. '
                 'Si algo no se comporta como dice acá, avisá con tres datos: en qué pantalla '
                 'estabas, qué hiciste y qué esperabas que pasara.', nota)]
 
