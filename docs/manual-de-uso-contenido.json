@@ -1,0 +1,1647 @@
+{
+ "secciones": [
+  {
+   "pantalla": "Inicio",
+   "queEs": "Es la primera pantalla que se abre al entrar al sistema: el resumen del día del estudio en una sola vista, con las clases de hoy, las alertas, las membresías que están por vencer, la plata del mes y los pagos que faltan cobrar.",
+   "cuandoSeUsa": "A la mañana, al abrir el sistema, para saber en un minuto cómo viene el día: cuántas clases hay, cuáles están llenas, a quién hay que reclamarle un pago y a quién se le vence la membresía. También durante el día, para tomar asistencia de la clase que está por empezar sin tener que entrar a la Agenda.",
+   "partes": [
+    {
+     "nombre": "Las cuatro tarjetas de arriba",
+     "queMuestra": "\"Clientes activos\" (los que tienen membresía vigente o por vencer, y abajo \"X clientes totales\"), \"Clases hoy\" (cuántas clases hay hoy y cuántas \"reservas confirmadas\" suman entre todas), \"Ingresos\" con el mes en el título —\"Ingresos Sep\"— y el porcentaje contra el mes anterior, y \"Pagos pendientes\" con la cantidad y abajo el total."
+    },
+    {
+     "nombre": "La plata del mes",
+     "queMuestra": "Cuatro números: \"Entró este mes\" (todo lo cobrado en el mes corriente), \"Salió este mes\" (los gastos pagados, con el renglón chiquito de cuánto se gastó hoy o \"sin gastos hoy\"), \"Resultado\" (con el texto que aclara cómo está calculado: \"cobrado menos pagado\") y \"En el cajón\" (el efectivo de la cuenta que se arquea, de fábrica \"Caja del mostrador\", con el renglón \"para arquear\"). Abajo, en una línea, el saldo de las demás cuentas: de fábrica \"Cuenta bancaria\", \"Mercado Pago\", \"Tarjetas a acreditar\", y \"A imputar\" solo cuando tiene plata. El botón \"Ver caja\" lleva a la pantalla Caja."
+    },
+    {
+     "nombre": "Clases de Hoy",
+     "queMuestra": "El listado de las clases del día ordenadas por horario, cada una con la hora, los \"50min\", el nombre, la profesora, la sala, y una barrita de ocupación con los lugares tomados sobre 8. La barra está verde y recién cuando queda un solo lugar (7 de 8) se pone amarilla; completa se pone roja, aparece el cartel \"Llena\" y, si hay gente esperando, \"+2 en espera\". A la derecha de cada clase con gente anotada está el botón \"Asistencia\". Arriba, \"Ver agenda\" lleva a la Agenda. Si no hay clases, dice \"No hay clases programadas para hoy\"."
+    },
+    {
+     "nombre": "Alertas",
+     "queMuestra": "La columna de la derecha, arriba, con el número de avisos en el globito. Cada aviso con un puntito de color: rojo para lo urgente (membresía vencida, pago vencido), amarillo para lo que avisa (membresía que vence, cliente sin clases disponibles) y azul para información (clase completa con lista de espera). En cada aviso de una persona hay un ícono de WhatsApp para avisarle. Si no hay nada, dice \"Sin alertas por ahora\". La lista se desliza hacia abajo cuando hay varias."
+    },
+    {
+     "nombre": "Por vencer",
+     "queMuestra": "Abajo de Alertas. Los clientes a los que se les vence la membresía dentro de los próximos días, con el nombre, el plan (FE FLOW, FE STRONG, etc.) y la fecha de vencimiento escrita al revés, como 2026-09-17. Si no hay nadie, dice \"Ninguna membresía por vencer\". \"Ver todas\" lleva a la pantalla Planes."
+    },
+    {
+     "nombre": "Ingresos mensuales y Pagos pendientes",
+     "queMuestra": "Las dos tarjetas de abajo. A la izquierda, \"Ingresos mensuales\", el gráfico de barras con el subtítulo \"Últimos 6 meses\" y al pie el monto exacto del último mes, como \"Total Sep\". A la derecha, la lista de pagos que faltan cobrar —nombre, concepto, monto y si está \"Vencido\" o \"Vence 2026-09-20\"— cada uno con su ícono de WhatsApp, y el \"Total adeudado\" al pie. \"Ver todos\" lleva a la pantalla Pagos."
+    }
+   ],
+   "tareas": [
+    {
+     "titulo": "Arrancar el día con Inicio",
+     "pasos": [
+      "Entrá al sistema: Inicio se abre solo.",
+      "Mirá \"Clases hoy\": te dice cuántas clases hay y cuántas reservas suman. Con la grilla cargada, un día de semana son 12 clases (de 8 a 13 y de 14 a 19) y los sábados 4 (de 9 a 12).",
+      "Recorré \"Clases de Hoy\" y fijate cuáles tienen la barra en rojo o el cartel \"Llena\": esas ya no toman a nadie más, y si dicen \"+2 en espera\" hay gente esperando lugar.",
+      "Leé \"Alertas\": los puntitos rojos son lo que hay que resolver hoy.",
+      "Mirá \"Pagos pendientes\" y el \"Total adeudado\" para saber qué hay que salir a cobrar."
+     ],
+     "ojo": "Si arriba de todo aparece una tira roja que dice \"No se pudieron actualizar los datos… Estás viendo la última versión que se pudo cargar.\", los números de la pantalla son viejos. Tocá \"Reintentar\" antes de tomar cualquier decisión con ellos."
+    },
+    {
+     "titulo": "Tomar asistencia de una clase",
+     "pasos": [
+      "Buscá la clase en \"Clases de Hoy\" y tocá el botón \"Asistencia\" que está a la derecha.",
+      "Se abre una ventana con el nombre de la clase, el horario, cuánta gente hay y la lista de quienes reservaron, ordenada por nombre.",
+      "A cada persona tocale el tilde verde, el de la derecha, si vino; o la cruz, la de la izquierda, si faltó.",
+      "Arriba vas viendo el conteo: \"4 presentes\", \"1 ausente\", \"1 sin marcar\".",
+      "Si te equivocaste, tocá donde ahora dice \"Presente\" o \"Ausente\" con la flechita de deshacer: vuelve a quedar sin marcar.",
+      "Cuando terminaste, tocá \"Listo\" (o tocá fuera de la ventana: es lo mismo, no se pierde nada)."
+     ],
+     "ojo": "No hay confirmación: cada toque se guarda en el momento. Si el sistema rechaza una marca, aparece un texto rojo adentro de la ventana y esa persona queda sin marcar. Y ojo con el ausente: le consume la clase igual que si hubiera venido —así viene configurado, se apaga en Configuración con \"La ausencia sin aviso consume la clase\"—, le baja la ocupación a la clase y, si marcás ausentes a todas, al cerrar la ventana el botón \"Asistencia\" desaparece de Inicio. Para corregir eso entrá por Agenda, que ahí el botón sigue estando."
+    },
+    {
+     "titulo": "Avisarle a un cliente lo que dice una alerta",
+     "pasos": [
+      "En \"Alertas\", buscá el aviso de la persona.",
+      "Tocá el ícono de WhatsApp a la derecha del aviso.",
+      "Se abre WhatsApp con el mensaje ya escrito.",
+      "Leelo, corregilo si hace falta, y recién ahí tocá enviar."
+     ],
+     "ojo": "El sistema no manda nada solo: deja el mensaje escrito y vos lo enviás. El texto copia la alerta tal cual, así que a veces queda en tercera persona (\"No le quedan clases disponibles\") y las fechas salen escritas al revés, como 2026-09-17. Conviene arreglarlo antes de enviar. Si la persona no tiene teléfono cargado, el ícono directamente no aparece; y si el teléfono está cargado sin el código de país, WhatsApp abre un número que no existe. En la ficha el teléfono va como +54 9 381…"
+    },
+    {
+     "titulo": "Reclamar un pago pendiente",
+     "pasos": [
+      "Andá a la tarjeta \"Pagos pendientes\", abajo a la derecha.",
+      "Los que tienen el punto rojo y dicen \"Vencido\" son los que ya pasaron de fecha; los del punto amarillo todavía están en plazo y dicen \"Vence\" con la fecha al revés, como 2026-09-20.",
+      "Tocá el ícono de WhatsApp de esa fila.",
+      "Se abre WhatsApp con el recordatorio escrito, con el concepto y el monto. Si esa cuota tiene link de pago de Mercado Pago, el link va incluido.",
+      "Revisalo y enviálo.",
+      "Para trabajar la lista completa, cobrar o anular, tocá \"Ver todos\" y seguí en la pantalla Pagos."
+     ],
+     "ojo": "El número de Inicio junta los pendientes y los vencidos en uno solo. En Pagos están separados en dos tarjetas, \"Pendientes\" y \"Vencidos\", así que ese número de arriba casi nunca coincide con el de Inicio: hay que sumar las dos."
+    },
+    {
+     "titulo": "Ver a quién se le vence la membresía",
+     "pasos": [
+      "Mirá la tarjeta \"Por vencer\", en la columna de la derecha.",
+      "Ahí están los clientes a los que les vence la membresía dentro de los próximos días, con el plan y la fecha.",
+      "Si dice \"Ninguna membresía por vencer\", no hay nadie en ese rango.",
+      "Para ver el listado completo de membresías, tocá \"Ver todas\": te lleva a Planes, que se abre en la pestaña \"Planes\". Ahí tocá la otra pestaña, \"Membresías activas\".",
+      "Para renovarle a alguien, el camino es otro: entrá a Clientes, abrí su ficha y tocá \"Renovar membresía\"."
+     ],
+     "ojo": "De cuántos días antes avisa lo decide el estudio desde Configuración (\"Aviso de vencimiento (días antes)\", que viene en 5). Si lo cambiás, esta lista se agranda o se achica sola. Y en Planes no se renueva nada: esa pantalla solo muestra."
+    },
+    {
+     "titulo": "Controlar la plata del mes",
+     "pasos": [
+      "Mirá \"La plata del mes\": \"Entró este mes\" es todo lo cobrado, \"Salió este mes\" los gastos pagados y \"Resultado\" la resta de los dos.",
+      "\"En el cajón\" es el efectivo que tiene que estar físicamente para arquear al cierre.",
+      "En la línea de abajo mirá los saldos de las otras cuentas.",
+      "Si aparece \"A imputar\" con plata y en amarillo, hay cobros que todavía no se asignaron a ninguna cuenta: entrá a Caja con \"Ver caja\" y asignalos."
+     ],
+     "ojo": "\"Resultado\" viene calculado como lo cobrado menos lo pagado. Se puede cambiar a la otra lectura —que suma los gastos cargados aunque no se hayan pagado— desde Configuración, en \"Cómo se calcula el resultado neto\". El texto chiquito abajo del número te dice cuál de las dos estás mirando. La línea de saldos también se puede apagar, con \"Mostrar los saldos de cuentas en el inicio\": si un día no la ves, fijate ahí antes de asustarte."
+    }
+   ],
+   "avisos": [
+    "Los números no se refrescan solos mientras mirás la pantalla. Si alguien cobró desde otra computadora, acá no se ve. Cambiá a otra pestaña del navegador y volvé —el sistema vuelve a pedir los datos, siempre que haya pasado un minuto desde la última vez— o recargá la página, que es lo seguro.",
+    "\"La plata del mes\" no se actualiza con ese ida y vuelta entre pestañas: ese bloque se rehace cuando entrás a otra pantalla y volvés a Inicio, o cuando recargás la página. Marcar asistencia, en cambio, actualiza todo en el momento.",
+    "La tarjeta de ingresos puede estar mostrando el mes pasado. Muestra el último mes en el que se cobró algo, y el título lo dice: si es 2 de septiembre y todavía no entró un peso, la tarjeta dice \"Ingresos Ago\" con el total de agosto. El bloque \"La plata del mes\" siempre es del mes corriente, así que a principio de mes los dos números no coinciden y está bien que sea así.",
+    "El porcentaje al lado del gráfico siempre sale verde y con la flechita para arriba, aunque el número sea negativo. Mirá el número, no el color.",
+    "El número grande de ingresos está redondeado a miles: $47.500 aparece como \"$48k\", y si en el mes entraron menos de $500 dice \"$0k\". El monto exacto está al pie del gráfico, en \"Total\" con el mes al lado.",
+    "El gráfico son los últimos seis meses en los que se cobró algo, no los últimos seis del calendario. Un mes sin cobros no aparece en cero: no aparece.",
+    "\"Clases de Hoy\" no mira las excepciones de la Agenda. Si hoy suspendiste una clase o pusiste una profesora de reemplazo, acá la clase sigue apareciendo con el horario y la profesora de siempre. La Agenda sí muestra la suspensión y el reemplazo: para ese día, la Agenda manda.",
+    "Una clase \"Especial\" (un taller con fecha) aparece en Inicio todas las semanas en ese mismo día, antes y después de su fecha, porque Inicio mira solo el día de la semana. En la Agenda aparece solo en su semana, que es lo correcto.",
+    "El botón \"Asistencia\" solo aparece si hay alguien anotado en esa clase. Si nadie reservó, no hay botón: no se puede pasar lista de alguien que no reservó desde acá. Y cada persona que marcás ausente deja de contar como anotada: la barrita baja, la clase llena pierde el cartel \"Llena\" y el número de \"reservas confirmadas\" de arriba también baja.",
+    "El ícono de WhatsApp usa el teléfono tal cual está escrito en la ficha, sin agregarle nada. Si está cargado sin el código de país —3815000001, por ejemplo, como están los diez clientes de prueba— WhatsApp abre un número que no existe.",
+    "La lista de Alertas corta en 12. Primero se arman las de membresías, después las de pagos vencidos y al final las de clase completa, así que si hay muchas membresías por vencer un pago vencido puede quedar afuera. El numerito del globito tampoco pasa de 12: para la deuda completa, mirá \"Pagos pendientes\" o entrá a Pagos.",
+    "Cada cliente genera un solo aviso de membresía, y gana el del vencimiento: a quien le vence la membresía y además se le acabaron las clases, solo le vas a ver \"Membresía vence el…\". Y la alerta roja de membresía vencida se calla a los 30 días de vencida: desaparece de Alertas aunque el cliente siga sin renovar. Para esos, el lugar es Clientes.",
+    "\"Pagos pendientes\" no cuenta las cuotas de renovación que todavía nadie pagó. Esas son un ofrecimiento —el mes que le estás ofreciendo, no algo que deba— así que no suman al \"Total adeudado\": en la pantalla Pagos tienen su propia tarjeta, \"Renovaciones\". Y si no hay ningún pago pendiente, esta tarjeta no dice nada: queda la lista en blanco y abajo \"Total adeudado $0\".",
+    "\"X clientes totales\" cuenta solo los clientes activos. Cuando das de baja a alguien el sistema no lo borra, lo apaga, y deja de sumar acá. Ojo también con los diez clientes de prueba (apellido \"Prueba\"): suman en estas cuentas hasta que se les dé de baja.",
+    "Una clienta que pagó adelantado pero a la que ya se le venció la membresía anterior no cuenta en \"Clientes activos\" ni genera alerta: para el sistema su membresía nueva todavía no arrancó. Si no la encontrás acá, buscala en Clientes."
+   ],
+   "key": "dashboard",
+   "nombre": "Inicio"
+  },
+  {
+   "pantalla": "Agenda",
+   "queEs": "La grilla semanal del estudio: todas las clases de lunes a sábado, con cuántos lugares tiene cada una y cuántos están tomados.",
+   "cuandoSeUsa": "Es la pantalla de todos los días. Se entra acá para anotar a una clienta en una clase, para pasar lista cuando la clase termina, y para avisarle al sistema que un día no se dicta o que la da otra profesora.",
+   "partes": [
+    {
+     "nombre": "La barra de arriba: Disciplinas",
+     "queMuestra": "Dice \"Disciplinas:\" y al lado un botón redondo por cada disciplina encendida (hoy, Pilates Reformer y Pilates Embarazadas). Si tocás uno, la grilla muestra solo esas clases; si tocás varios, muestra todas esas. Cuando hay alguno prendido aparece \"Limpiar\" al lado, que los apaga todos. A la derecha del todo está \"Nueva clase\" — en el celular de ese botón se ve solo el signo +."
+    },
+    {
+     "nombre": "La semana",
+     "queMuestra": "Una flecha a cada lado y en el medio \"Semana del 7 sep — 12 sep 2026\". Las flechas mueven una semana para atrás o para adelante, sin límite. Si te fuiste de la semana actual aparece un \"Hoy\" en letra chica al lado del título, que te trae de vuelta."
+    },
+    {
+     "nombre": "La grilla",
+     "queMuestra": "Seis columnas: Lunes, Martes, Miércoles, Jueves, Viernes, Sábado. Cada columna arriba tiene el día, la fecha y, si hay al menos una clase, un globito con cuántas son. La columna del día de hoy queda con el borde marcado. Un día sin clases dice \"Sin clases\". Como de lunes a viernes hay doce clases —una por hora de 8 a 13 y de 14 a 19— y los sábados cuatro, la columna es larga y se baja con la rueda. En el celular no hay seis columnas: hay una fila de días arriba (Lun, Mar, Mié…), se ve un día por vez, y el día vacío dice \"Sin clases este día\"."
+    },
+    {
+     "nombre": "Las tarjetas de clase",
+     "queMuestra": "Una por clase. Trae el nombre, abajo la hora y la profesora, y una barrita de ocupación con el número al lado (por ejemplo 5/8). El número siempre está en gris; la que cambia de color es la barra: amarilla desde el 80% y roja cuando la clase está llena. Si está llena aparece además el cartel \"LLENA\". Si hay gente esperando dice \"+2 en espera\". Una clase suspendida ese día se ve tachada y gris. Una con profesora de reemplazo lleva un muñequito con tilde antes del nombre; un taller o evento lleva una estrellita."
+    },
+    {
+     "nombre": "La ventana de la clase",
+     "queMuestra": "Se abre al tocar una tarjeta. Arriba, la disciplina, el nombre y la fecha, y a la derecha un lápiz y un tachito. Abajo: \"Horario\", \"Sala\", \"Profesora/or\" y un recuadro de \"Ocupación\" con el 5/8 y el porcentaje. Después, el recuadro \"Solo para el 12 sep\", el botón \"Tomar asistencia\" y el desplegable para anotar gente. OJO: acá no hay lista de nombres. Ves cuántas son, no quiénes son."
+    },
+    {
+     "nombre": "El resumen del pie",
+     "queMuestra": "Cuatro números de la semana que estás viendo: clases esta semana, reservas confirmadas, clases llenas y en listas de espera. Si tenés filtros de disciplina prendidos, los números cuentan solo lo filtrado."
+    }
+   ],
+   "tareas": [
+    {
+     "titulo": "Anotar a una clienta en una clase",
+     "pasos": [
+      "Ubicá la clase en la semana y tocá la tarjeta. Se abre la ventana de la clase.",
+      "Abajo de todo hay un desplegable que dice \"Cliente a reservar...\". Elegí a la persona. En esa lista están las clientas activas que todavía no tienen lugar ese día: la que ya está anotada no aparece.",
+      "Tocá \"Reservar lugar\". Si no elegiste a nadie, te avisa \"Seleccioná un cliente primero\".",
+      "El nombre aparece arriba del desplegable con un tilde verde, y el desplegable pasa a decir \"Anotar a otro cliente...\". Podés seguir anotando gente sin cerrar la ventana.",
+      "Si la clase está llena, el botón dice \"Clase completa\" y está apagado. Al lado te aparece \"Lista de espera\": con ese la anotás igual, esperando que se libere un lugar."
+     ],
+     "ojo": "Reservar le descuenta la clase a la membresía en ese mismo momento, no el día que viene. Y el plan tiene que estar vigente EL DÍA DE LA CLASE, no hoy: si la anotás para dentro de un mes y su plan vence antes, la rechaza igual. Los tres rechazos posibles: \"No tiene una membresía vigente para el 15/09/2026 — asignale un plan antes de reservarle esa clase\", \"Ya usó las 8 clases de su plan. Para anotarla igual, renovale la membresía o cambiale el plan\", y —el día que haya clases de embarazadas— \"El plan FE FLOW no incluye Pilates Embarazadas. Para anotarla en esta clase necesita el plan de esa modalidad\". En los tres casos la reserva NO se crea: primero se arregla el plan desde Clientes."
+    },
+    {
+     "titulo": "Tomar asistencia y ver quiénes están anotadas",
+     "pasos": [
+      "Tocá la tarjeta de la clase.",
+      "Tocá el botón \"Tomar asistencia\". Está pensado para el celular: los botones son grandes.",
+      "Vas a ver la lista de quienes reservaron, ordenada por nombre. Arriba dice la hora y cuántas clientas son. Esta es la única lista de nombres de la Agenda: si solo querés ver quién viene, entrá acá y salí con \"Listo\".",
+      "Al lado de cada nombre hay dos botones: la ✕ a la izquierda es ausente, el ✓ verde a la derecha es presente.",
+      "A medida que marcás, arriba se actualiza: \"3 presentes  1 ausente  2 sin marcar\". Lo de ausentes y sin marcar aparece solo cuando hay alguno.",
+      "Cada marca se guarda sola, en el momento. No hay nada que confirmar al final.",
+      "Si te equivocaste, tocá la palabra \"Presente\" o \"Ausente\" que quedó al lado del nombre, la que tiene la flechita de volver. La persona vuelve a quedar sin marcar y podés marcarla de nuevo.",
+      "Cuando terminaste, \"Listo\". Ese botón solo cierra la ventana."
+     ],
+     "ojo": "La clase ya se descontó cuando se reservó. Marcar presente no cambia nada del saldo. Marcar ausente tampoco se la devuelve: faltar sin avisar consume la clase igual, salvo que apagues eso en Configuración, en \"La ausencia sin aviso consume la clase\". Una clase vuelve al plan de la clienta en dos casos y en ninguno se hace desde acá: si ella cancela dentro del plazo de cancelación (eso se hace desde Reservas), o si el estudio suspende ese día. Cancelar tarde no se la devuelve."
+    },
+    {
+     "titulo": "Suspender un día (feriado, arreglo, lo que sea)",
+     "pasos": [
+      "Tocá la tarjeta de esa clase, en esa fecha.",
+      "En el recuadro que dice \"Solo para el 12 sep\", tocá \"Suspender este día\".",
+      "Se abre una ventanita del navegador pidiendo el motivo. Viene con \"Feriado\" escrito; podés cambiarlo. Aceptá.",
+      "La tarjeta queda tachada y gris, y donde antes estaba el desplegable de clientes ahora dice \"Clase suspendida ese día\".",
+      "Para volver atrás: abrí la tarjeta de nuevo y tocá \"Volver a dictarla\"."
+     ],
+     "ojo": "Ese motivo lo lee la clienta en su portal, así que escribilo pensando en ella. Suspender NO cancela las reservas: si hay gente anotada, el recuadro te lo dice desde antes de que toques nada — \"Hay 3 reservas para ese día. Suspender no las cancela: avisales vos y decidí si les devolvés la clase.\" Lo que sí hace solo el sistema es no gastarles la clase mientras el día esté suspendido; si después tocás \"Volver a dictarla\", se la vuelve a descontar. Y mientras está suspendida no se puede pasar lista: el botón \"Tomar asistencia\" desaparece."
+    },
+    {
+     "titulo": "Poner una profesora de reemplazo, solo por un día",
+     "pasos": [
+      "Tocá la tarjeta de esa clase en esa fecha.",
+      "En el recuadro \"Solo para el 12 sep\" hay un desplegable que dice \"La da Ivana (como siempre)\".",
+      "Elegí la opción \"Ese día la da Leandro\". Se guarda solo, no hay botón de confirmar.",
+      "En la grilla, esa tarjeta queda con un muñequito con tilde antes del nombre.",
+      "Para volver a la titular, entrá de nuevo y elegí \"La da Ivana (como siempre)\"."
+     ],
+     "ojo": "Cambia solo esa fecha. El resto de las semanas siguen con la profesora de siempre. En la lista también figura la profesora que ya da la clase: si la elegís a ella, el día queda marcado como reemplazo —con el muñequito y todo— aunque no haya cambiado nadie. Y si lo que querés es cambiarla para siempre, eso se hace con el lápiz de editar la clase."
+    },
+    {
+     "titulo": "Crear una clase nueva",
+     "pasos": [
+      "Tocá \"Nueva clase\", arriba a la derecha.",
+      "Elegí el tipo. \"Regular\" se repite todas las semanas. \"Especial\" es un taller o evento con su fecha, y aparece una sola vez.",
+      "Completá \"Nombre de la clase *\" (por ejemplo, Pilates Reformer).",
+      "Elegí Disciplina y \"Profesor/a *\". Los tres campos con asterisco son obligatorios: si dejás uno vacío, el navegador frena el guardado y te señala cuál falta.",
+      "Si es Regular, elegí el Día. Si es Especial, elegí la \"Fecha *\".",
+      "\"Hora de inicio\", \"Duración (min)\" y \"Cupo máximo\" ya vienen con lo que usa el estudio: 50 minutos y 8 lugares. Cambialos solo si esta clase es distinta.",
+      "Elegí la Sala. Hoy hay una sola: Sala Reformer.",
+      "Lo de abajo es opcional: Descripción (se ve en la web y en el portal), \"Nivel o público\" (por ejemplo, Embarazadas), Precio, Requisitos.",
+      "El Precio se deja vacío si la clase entra en el plan; debajo del campo el sistema te lo recuerda: \"Vacío = la cubre la membresía\".",
+      "Abajo de todo hay una llavecita: \"El cliente puede reservarla solo\". Apagada, la clase se ve en la agenda pero el lugar lo asigna recepción.",
+      "Tocá \"Crear clase\"."
+     ],
+     "ojo": "Una clase Regular se repite para siempre, y también hacia atrás: si la creás hoy, también va a aparecer en las semanas anteriores cuando navegues para atrás. Para un taller de un solo día, usá Especial."
+    },
+    {
+     "titulo": "Editar o sacar una clase de la grilla",
+     "pasos": [
+      "Tocá la tarjeta de la clase.",
+      "Arriba a la derecha de la ventana hay un lápiz (\"Editar clase\") y un tachito (\"Eliminar clase\").",
+      "El lápiz abre el mismo formulario de antes, ya completo. Cambiá lo que haga falta y tocá \"Guardar cambios\".",
+      "El tachito te pregunta: ¿Eliminar \"Pilates Reformer\" de la grilla? El historial de reservas se conserva. Si aceptás, la clase desaparece de la agenda."
+     ],
+     "ojo": "Las dos cosas valen para TODAS las semanas, las que vienen y las que ya pasaron. Y ojo con lo que pasa con la historia: si movés una clase de los lunes a los martes, las reservas viejas se quedan pegadas a sus lunes, así que en las semanas pasadas vas a ver la clase el martes con el contador en cero y las asistencias de antes ya no aparecen en la Agenda (siguen estando, en Reservas). Con el tachito pasa lo mismo: la clase se borra de todas las semanas y sus reservas dejan de verse acá, aunque queden guardadas. Una clase eliminada no se puede volver a poner desde esta pantalla: hay que crearla de nuevo a mano, y la nueva arranca sin nada de esa historia."
+    }
+   ],
+   "avisos": [
+    "Reservar descuenta la clase al toque. No cuando la clienta viene. Si te equivocaste de persona, la clase ya salió de su plan: hay que ir a Reservas y cancelarla para que vuelva.",
+    "El desplegable de clientes muestra a las clientas activas que todavía no tienen lugar ese día. La que ya está anotada, la que está en lista de espera y la que ya quedó marcada presente o ausente no aparecen. Si buscás a alguien y no está, fijate primero si no está anotada ya.",
+    "El sistema no te avisa antes de que la clienta no puede: el rechazo llega recién cuando tocás \"Reservar lugar\".",
+    "El plan de la clienta tiene que estar vigente el día de la clase, no hoy. Por eso el mensaje de rechazo trae la fecha de la clase.",
+    "Los seis planes FE habilitan solo Pilates Reformer. Cuando se carguen las clases de Pilates Embarazadas, anotar ahí a una clienta con plan FE va a ser rechazado: necesita el plan de esa modalidad. No es un error del sistema, es lo que pidió el estudio.",
+    "Poner a alguien en \"Lista de espera\" no descuenta ni revisa el plan: entra cualquiera. El control salta después, cuando le confirmás el lugar desde Reservas, que es el momento en que se le descuenta la clase.",
+    "Quien está en lista de espera NO aparece en \"Tomar asistencia\". Si vino igual porque se liberó un lugar, primero hay que confirmarle la reserva desde la pantalla de Reservas.",
+    "El botón \"Tomar asistencia\" no aparece si nadie reservó esa clase, ni si ese día está suspendido. Si alguien llegó sin reserva, hay que anotarla primero y después pasar lista.",
+    "Ponerle Precio a una clase no cobra nada. Es un rótulo: en la ventana de la clase va a decir \"$3.500 — se cobra aparte\", pero la reserva le gasta una clase del plan igual, y sin plan no la vas a poder anotar ni aunque la clase tenga su propio precio. El cobro se carga a mano en Pagos.",
+    "Si suspendés un día o ponés un reemplazo a más de dos meses de distancia, se guarda pero la pantalla te lo va a seguir mostrando como una clase normal: la agenda solo trae las excepciones de los últimos 30 días y de los próximos 60. Parece que no anduvo, pero anduvo: si intentás reservar ese día el sistema te va a frenar con \"Esa clase está suspendida ese día\".",
+    "Una clase suspendida sigue contando en el globito del día y en los números del pie. El pie no descuenta lo suspendido.",
+    "Bajar el \"Cupo máximo\" no saca a nadie. Si la clase tiene 8 anotadas y le ponés cupo 6, la tarjeta va a decir 8/6, con la barra roja y el cartel LLENA, y las 8 siguen adentro.",
+    "No hay control de choques de horario. Podés crear dos clases el mismo día a la misma hora en la misma sala y el sistema no dice nada: van a aparecer las dos, una debajo de la otra.",
+    "Una clase Especial con fecha de domingo se guarda, y hasta se cuenta en el pie de página, pero no la vas a ver en ninguna columna: la grilla va de lunes a sábado.",
+    "El motivo que escribís al suspender un día lo lee la clienta en su portal. No es una nota interna.",
+    "Si una clienta canceló y después quiere volver a la misma clase, elegila de nuevo y listo: el sistema reactiva su reserva anterior en vez de crear una nueva. No la vas a ver duplicada.",
+    "Desde la agenda sí se puede anotar a alguien en una clase que ya pasó — es el flujo normal del mostrador, para quien llegó sin reserva. La clienta desde su portal no puede: a ella el sistema le corta cuando la clase empieza.",
+    "\"Pilates Embarazadas\" ya aparece como filtro arriba, pero todavía no tiene clases cargadas en la grilla. Si la filtrás, vas a ver todo vacío hasta que se le cargue el horario."
+   ],
+   "key": "agenda",
+   "nombre": "Agenda"
+  },
+  {
+   "pantalla": "Clientes",
+   "queEs": "El listado de todas las clientas del estudio y, detrás de cada tarjeta, su ficha completa: datos personales, reservas, pagos y membresías.",
+   "cuandoSeUsa": "Cuando llega alguien nuevo y hay que cargarla, cuando hay que asignarle o renovarle el plan, y cada vez que alguien pregunta algo de su cuenta —cuántas clases le quedan, si pagó, desde cuándo viene— porque todo eso está junto en un solo lugar.",
+   "partes": [
+    {
+     "nombre": "La barra de arriba",
+     "queMuestra": "El buscador «Buscar cliente...», los cinco filtros —Todos, Activa, Por vencer, Vencida, Sin membresía— y, a la derecha, el botón «Nuevo cliente». En el celular ese botón se achica y queda solo el signo +, en el mismo lugar."
+    },
+    {
+     "nombre": "La línea de números",
+     "queMuestra": "A la izquierda, cuántos clientes estás viendo con el filtro que pusiste. A la derecha, tres totales del estudio entero: activos, por vencer y vencidos."
+    },
+    {
+     "nombre": "Las tarjetas",
+     "queMuestra": "Una por clienta, ordenadas por nombre. Cada una trae las iniciales, el nombre, el mail, el cartelito de estado (Activa, Por vencer, Empieza después, Vencida, Suspendida o Sin membresía), cuántas clases le quedan, una barra de avance, y abajo el nombre del plan con un conteo tipo 3/8, que es clases ya usadas sobre el total del plan. El redondelito naranja con un signo de admiración, al lado del nombre, quiere decir que esa clienta tiene notas médicas cargadas."
+    },
+    {
+     "nombre": "La ficha: la cabecera",
+     "queMuestra": "Se abre al tocar una tarjeta. Nombre, «Cliente desde» con el mes y el año, mail, teléfono, DNI, el botón «Editar», y tres números grandes: Asistencias, Clases rest. y Próximas. Debajo aparecen, cuando corresponde, los dos recuadros celestes de renovación."
+    },
+    {
+     "nombre": "La ficha: las cuatro pestañas",
+     "queMuestra": "«Resumen» (Datos personales, Acceso al portal, y los recuadros «Observaciones médicas» y «Observaciones», que aparecen solo si tienen algo escrito), «Reservas» (todas las que tuvo, de la más nueva a la más vieja), «Pagos» (todas sus cuotas, de la que vence más adelante a la más vieja) y «Membresía» (el período que la ficha muestra arriba, la renovación automática, los botones para asignar o renovar, y el «Historial de membresías» con un renglón por período)."
+    }
+   ],
+   "tareas": [
+    {
+     "titulo": "Buscar a una clienta y abrir su ficha",
+     "pasos": [
+      "Entrá a Clientes desde el menú.",
+      "Escribí en «Buscar cliente...». Alcanza con una parte del nombre.",
+      "Si querés achicar más la lista, tocá uno de los filtros; se combinan con lo que escribiste.",
+      "Tocá la tarjeta y se abre la ficha.",
+      "Para salir, «Volver a clientes», arriba a la izquierda."
+     ],
+     "ojo": "El buscador mira el nombre y el mail, nada más. Si buscás por DNI o por teléfono no te va a aparecer nadie, aunque el dato esté cargado en la ficha."
+    },
+    {
+     "titulo": "Dar de alta una clienta nueva",
+     "pasos": [
+      "Antes que nada, buscala por nombre: el sistema deja cargar dos veces a la misma persona y no avisa.",
+      "Tocá «Nuevo cliente».",
+      "Completá «Nombre completo». Es el único campo obligatorio, pero cargá igual Email y DNI.",
+      "El DNI podés escribirlo con puntos o sin puntos, da lo mismo.",
+      "Si ya sabés qué plan lleva, elegilo en «Asignar plan (opcional)»; FE FIRST aparece ahí con la aclaración «(prueba)». Si todavía no sabés, dejá «Sin plan por ahora».",
+      "Tocá «Crear cliente». Si elegiste un plan, la membresía queda creada desde hoy, y la cuota aparece sola en Pagos siempre que ese plan tenga precio."
+     ],
+     "ojo": "Sin Email y DNI cargados, la clienta no puede crearse sola el acceso desde la web: el registro del portal la busca por esos dos datos juntos, y si alguno falta no la encuentra. Si el mail está mal escrito (sin arroba), el navegador no te deja guardar y te avisa arriba del campo. Y si después de tocar «Crear cliente» te aparece un mensaje en rojo, NO vuelvas a tocarlo: la ficha puede haber quedado creada igual y solo falló el plan. Cerrá, buscala en el listado, y si ya está, asignale el plan desde su ficha."
+    },
+    {
+     "titulo": "Corregir datos o cargar una nota médica",
+     "pasos": [
+      "Abrí la ficha y tocá «Editar», arriba a la derecha, al lado del nombre.",
+      "Cambiá lo que haga falta.",
+      "Lo que escribas en «Notas médicas» va a salir en el Resumen dentro del recuadro amarillo «Observaciones médicas», y le pone el redondelito naranja a la tarjeta del listado.",
+      "«Observaciones» es para lo demás: horarios que prefiere, con quién viene, lo que sea.",
+      "Tocá «Guardar cambios»."
+     ],
+     "ojo": "La fecha de ingreso al estudio no se puede cambiar: la pone el sistema el día que cargás la ficha. En «Editar» no hay plan: las membresías se tocan desde la pestaña «Membresía», nunca desde acá. Y si la clienta ya tiene acceso al portal, cambiarle el Email acá NO le cambia el mail con el que entra: sigue entrando con el de antes."
+    },
+    {
+     "titulo": "Asignar, renovar o cambiar la membresía",
+     "pasos": [
+      "Abrí la ficha y andá a la pestaña «Membresía».",
+      "Tocá «Asignar membresía» si no tiene ninguna, o «Renovar membresía» / «Cambiar plan» si ya tiene. Los tres abren la misma ventana, que siempre se llama «Asignar plan».",
+      "Fijate qué plan viene marcado: si el que tiene hoy sigue activo, ya está elegido de entrada. Elegí el que corresponda de la lista; solo aparecen los planes activos.",
+      "Leé la línea gris de abajo ANTES de tocar nada: ahí dice desde qué día va a estar vigente. Si ya tiene un período asignado, el nuevo no arranca hoy, arranca al día siguiente del último que tenga; pagar antes no le corta el mes. FE FIRST es la excepción: el pase de prueba arranca el día que se compra.",
+      "Si le queda un período sin vencer y elegís un plan distinto, va a aparecer un recuadro amarillo: dice que el cambio de plan también «se encola», o sea que paga hoy y lo empieza a usar recién cuando se le termina lo que ya tiene. Decíselo antes de cobrarle. Si su membresía ya está vencida, ese aviso no sale y el plan nuevo arranca hoy.",
+      "Tocá «Asignar». El período queda creado y, si el plan tiene precio, la cuota aparece sola en Pagos para cobrarla."
+     ],
+     "ojo": "Esto no se deshace. No hay forma de borrar ni de anular un período de membresía, y una cuota que todavía no cobraste tampoco se puede anular: el botón para anular, en Pagos, solo aparece en los cobros ya hechos. Si te equivocaste de plan, el período y su cuota quedan ahí para siempre. Mirá bien el plan antes de tocar «Asignar». Y asignar otra vez el mismo plan no reemplaza nada: suma un período más atrás, con su propia cuota."
+    },
+    {
+     "titulo": "Darle acceso al portal para que reserve desde el celular",
+     "pasos": [
+      "Abrí la ficha, pestaña «Resumen», y buscá el recuadro «Acceso al portal».",
+      "Si dice «Todavía no tiene cuenta para reservar por su cuenta», tocá «Crear acceso».",
+      "Revisá el «Email de acceso»: viene el de la ficha, pero podés poner otro. Con ese mail va a entrar.",
+      "Escribí una «Contraseña inicial» de seis letras o números como mínimo.",
+      "Tocá «Crear acceso» y después «Listo».",
+      "Pasale vos el mail y la contraseña: el sistema no le manda ningún correo."
+     ],
+     "ojo": "La contraseña se ve escrita en la pantalla mientras la tipeás, así que fijate quién está mirando. Si ese mail ya lo usa otra cuenta, te va a decir «Ya existe un usuario con ese email» y no crea nada. Si acá ponés un mail distinto al de la ficha, la ficha sigue mostrando el de antes: son dos datos separados, y el que sirve para entrar es este. Una vez creado, el botón desaparece y queda el cartelito verde «Activo»: para dar de baja ese acceso hay que ir a Configuración, «Usuarios del sistema». Y si te sale un mensaje largo en rojo que habla de una clave del servidor, no es culpa tuya: avisale a quien mantiene el sistema."
+    },
+    {
+     "titulo": "Prender o apagar la renovación automática",
+     "pasos": [
+      "Ficha → pestaña «Membresía».",
+      "Abajo del todo del recuadro del plan está «Renovación automática», con un interruptor a la derecha.",
+      "Tocalo. Se guarda solo: no hay botón de guardar ni confirmación.",
+      "Leé el texto que está al lado del interruptor. Ahí dice, con todas las letras, qué hace el sistema hoy cuando esa membresía vence: unos días antes le genera la cuota del período siguiente, y el período nuevo recién nace cuando esa cuota se cobra."
+     ],
+     "ojo": "El interruptor es de ese período nomás, el que la ficha muestra arriba. Cada período nuevo nace con la renovación automática prendida, así que si una clienta avisó que deja el estudio, apagásela en el período que esté corriendo."
+    }
+   ],
+   "avisos": [
+    "No hay forma de borrar ni de dar de baja a una clienta. No existe el botón. Una vez cargada, la ficha queda para siempre en el listado; lo único que se hace con la que deja el estudio es apagarle la renovación automática.",
+    "«Cambiar plan» y «Renovar membresía» son el mismo botón con dos nombres: abren exactamente la misma ventana —la que se llama «Asignar plan»— y hacen lo mismo. No busques diferencia entre uno y otro.",
+    "Un período de membresía no se borra ni se anula, y una cuota que todavía no cobraste, tampoco: en Pagos, el botón para anular solo aparece en los cobros ya hechos. O sea que un plan asignado por error queda, y su cuota pendiente también.",
+    "Arriba de la ficha hay dos recuadros celestes parecidos que dicen cosas opuestas. El de borde punteado, «Le ofrecimos la renovación y todavía no la pagó», no es deuda: si no la paga, el sistema anula la oferta y el período no existe. El de borde lleno, «El próximo período ya está asignado», sí: ese mes ya está vendido y no hay que volver a cobrarlo.",
+    "Los números «Asistencias» y «Próximas» dependen de que se haya tomado asistencia. Una reserva vieja que nadie marcó sigue contando como «Próxima» para siempre y nunca pasa a asistencia. Si esos números no cierran, el problema está en la asistencia sin tomar, no en la ficha.",
+    "Los filtros de arriba no cubren todos los estados: no hay botón para «Empieza después» ni para «Suspendida». Una clienta en esos estados solo aparece con el filtro «Todos», y tampoco cae en «Sin membresía», porque membresía tiene. De paso: «Suspendida» es un cartelito que el sistema sabe mostrar pero que ninguna pantalla sabe poner. Pausar un plan no se puede.",
+    "Los tres números de la derecha —activos, por vencer, vencidos— son del estudio entero y no se mueven cuando filtrás ni cuando buscás. El único que cambia con el filtro es el de la izquierda.",
+    "El sistema no controla mails ni DNI repetidos: si cargás dos veces a la misma persona, quedan dos fichas y las reservas y los pagos se reparten entre las dos. Ninguna de las dos muestra la historia completa, y juntarlas después no se puede.",
+    "En la pestaña «Reservas», y en los renglones comunes de «Pagos» («Vence 2026-10-05», «Pagado el ...»), las fechas se ven al revés: año-mes-día. En el resto de la pantalla van día/mes/año. Es la misma fecha escrita distinto.",
+    "Si una ficha se cargó un día 1, el «Cliente desde» del encabezado puede mostrar el mes anterior. La fecha buena es la del Resumen, en «Ingreso al estudio».",
+    "Tocar fuera de cualquiera de estas ventanas —Nuevo cliente, Editar cliente, Asignar plan, Acceso al portal— la cierra y borra lo que escribiste, sin avisar. Usá «Cancelar» si querés salir, y el botón de guardar si querés quedarte con el cambio.",
+    "Las diez clientas con apellido «Prueba» que ves en el listado son datos de prueba nuestros, no gente real."
+   ],
+   "key": "alumnos",
+   "nombre": "Clientes"
+  },
+  {
+   "pantalla": "Planes",
+   "queEs": "Es la lista de los planes que el estudio vende —hoy los seis FE— y el lugar donde se crean, se les cambia el precio, se les cambia la vigencia y se dan de baja.",
+   "cuandoSeUsa": "Se entra poco: cuando cambian los precios, cuando hay que armar una modalidad nueva, o cuando querés ver de un vistazo cuánta gente hay en cada plan. Acá no se cobra ni se le asigna un plan a nadie: eso se hace desde la ficha de cada cliente, en Clientes.",
+   "partes": [
+    {
+     "nombre": "Las dos solapas, arriba a la izquierda",
+     "queMuestra": "“Planes (6)” y “Membresías activas (N)”. El número de Planes cuenta solo los que están activos: un plan dado de baja pierde su tarjeta y no se suma ahí. Ojo que su nombre no desaparece del todo del sistema: en la otra solapa sigue figurando en el renglón de cada cliente que lo tenga, porque ese nombre quedó guardado con la membresía. El número de Membresías activas cuenta una por cliente, la que está corriendo hoy."
+    },
+    {
+     "nombre": "El botón “Nuevo plan”, arriba a la derecha",
+     "queMuestra": "Abre la ventana para crear un plan. Aparece solo cuando estás parada en la solapa Planes; si te pasás a Membresías activas, se esconde. Desde el celular el botón se achica y queda solo el signo +, sin la palabra."
+    },
+    {
+     "nombre": "Las tarjetas de los planes",
+     "queMuestra": "Una tarjeta por plan, con una franja de color arriba. Trae el nombre, la descripción y el precio —con “/mes” pegado cuando la vigencia está en meses, y sin nada cuando está en días—, la cantidad de clases (“8 clases por mes” en un plan mensual, “2 clases” a secas en uno por días), la vigencia (“Vigencia 1 mes”, “Vigencia 7 días”), cuánto sale cada clase, las disciplinas que incluye, y abajo “N clientes activos”. El que está marcado como “Es clase de prueba” lleva el cartelito “Clase de prueba” arriba a la derecha, y el destacado lleva “Popular”. Las tarjetas se ordenan solas por precio, del más barato al más caro: no se pueden reordenar a mano."
+    },
+    {
+     "nombre": "El número de “clientes activos”, abajo de cada tarjeta",
+     "queMuestra": "Son las membresías de ese plan que están corriendo hoy, contando las que están por vencer. No cuenta las suspendidas, ni los períodos que alguien pagó por adelantado y que todavía no arrancaron. Sí cuenta las de clientes que están dados de baja. Por eso este número puede no coincidir con el de la solapa Membresías activas: no es un error, están contando cosas distintas."
+    },
+    {
+     "nombre": "Los dos botones chiquitos de cada tarjeta",
+     "queMuestra": "Abajo a la derecha de cada tarjeta: el lápiz abre “Editar plan”, el tacho de basura da de baja el plan. No hay confirmación en el lápiz, sí en el tacho."
+    },
+    {
+     "nombre": "La solapa “Membresías activas”",
+     "queMuestra": "Una lista de renglones, uno por cliente: las iniciales, el nombre, la etiqueta “Activa” o “Por vencer”, una barra con las clases usadas sobre el total (por ejemplo 3/8), el nombre del plan y “Vence” con la fecha. La fecha sale escrita al revés de como la escribimos acá: primero el año, después el mes y después el día, o sea 2026-10-19 para el 19 de octubre. Es solo para mirar: desde acá no se toca nada. Si no hay ninguna, dice “No hay membresías activas”."
+    }
+   ],
+   "tareas": [
+    {
+     "titulo": "Crear un plan nuevo",
+     "pasos": [
+      "Tocá “Nuevo plan”, arriba a la derecha. Se abre una ventana que dice “Nuevo plan”.",
+      "Escribí el “Nombre del plan *”. Es lo que va a leer la clienta en la web y lo que figura después en el recibo.",
+      "En “Precio ($)” poné el precio por transferencia, sin puntos: 65000, no 65.000.",
+      "En “Cantidad de clases” poné las clases de todo el período, no las de una semana. FE FLOW tiene 8, que son las de un mes.",
+      "“Veces por semana” es solo un dato informativo. Poné 0 si no aplica.",
+      "En “Vigencia” elegí el número y, al lado, si son “meses” o “días”. Ojo que al cambiar la unidad el número se reemplaza solo: pasa a 1 si elegís meses y a 7 si elegís días. Revisalo antes de guardar.",
+      "Elegí un “Color” de los seis redondelitos.",
+      "En “Disciplinas habilitadas *” tocá las disciplinas que el plan incluye. Las elegidas quedan con el borde marcado. Hoy la ventana ofrece dos, “Pilates Reformer” y “Pilates Embarazadas”, porque son las dos disciplinas encendidas.",
+      "Escribí la “Descripción”: es la frase que se lee en la tarjeta y en la web, tipo “2 veces por semana · 8 clases por mes.”.",
+      "Marcá “Es clase de prueba” solo si es el pase inicial para alguien que viene a conocer. Marcá “Destacarlo en la web” si querés que aparezca en la página como “El más elegido”.",
+      "Tocá “Crear plan”. La ventana se cierra y la tarjeta nueva aparece en la lista, ubicada según su precio."
+     ],
+     "ojo": "Si no elegiste ninguna disciplina, al tocar “Crear plan” aparece en rojo “Seleccioná al menos una disciplina” y no guarda nada. El nombre, el precio, la cantidad de clases y la vigencia también son obligatorios: si falta alguno, el navegador te marca el campo y no deja seguir. Y si algo sale mal al guardar, la ventana se queda abierta con el motivo en rojo abajo: mientras veas ese cartel, el plan no se guardó."
+    },
+    {
+     "titulo": "Cambiarle el precio a un plan",
+     "pasos": [
+      "Tocá el lápiz, abajo a la derecha de la tarjeta. Se abre “Editar plan” con todos los datos cargados.",
+      "Cambiá lo que dice “Precio ($)”.",
+      "Tocá “Guardar cambios”."
+     ],
+     "ojo": "El precio nuevo no le cambia nada a quien ya tiene el plan: cada membresía se quedó con el precio que se le cobró. Rige para lo que se venda de acá en adelante y para las cuotas de renovación que se emitan de acá en adelante. Y esas cuotas salen una semana antes de que la membresía venza: a quien ya se le emitió la suya, esa cuota salió con el precio viejo y sigue con el precio viejo. Si estás subiendo precios, tené presente que la gente que vence en los próximos siete días ya tiene su cuota emitida al valor anterior."
+    },
+    {
+     "titulo": "Cambiar qué disciplinas incluye un plan",
+     "pasos": [
+      "Tocá el lápiz de la tarjeta.",
+      "En “Disciplinas habilitadas *”, tocá una disciplina para prenderla y tocala de nuevo para apagarla.",
+      "Tocá “Guardar cambios”."
+     ],
+     "ojo": "Esto no es un rótulo decorativo: manda al reservar. Sacarle una disciplina a un plan deja afuera, desde ese momento, a todos los que lo tengan — no los vas a poder anotar en esas clases aunque vinieran yendo. Las reservas que ya estaban hechas no se borran."
+    },
+    {
+     "titulo": "Dar de baja un plan",
+     "pasos": [
+      "Mirá primero el número de “clientes activos” de la tarjeta: esa es la gente a la que le vas a cortar la renovación automática.",
+      "Tocá el tacho de basura, abajo a la derecha de la tarjeta.",
+      "El navegador pregunta: “¿Desactivar el plan FE FLOW? Las membresías existentes no se modifican.” Tocá Aceptar si estás segura, o Cancelar para volver.",
+      "La tarjeta desaparece de la lista y el plan deja de verse en la web."
+     ],
+     "ojo": "No hay vuelta atrás, y esto es en serio: el plan no se borra, se apaga, pero ninguna pantalla del sistema lo vuelve a prender. Ni ésta ni ninguna. Para recuperarlo hay que pedírselo a quien maneja la base. Mientras tanto, lo único que podés hacer vos con la gente que lo tenía es asignarle otro plan desde su ficha, en Clientes. Si te equivocaste de tarjeta, avisá el mismo día."
+    },
+    {
+     "titulo": "Revisar las membresías que están corriendo",
+     "pasos": [
+      "Tocá la solapa “Membresías activas (N)”.",
+      "Leé cada renglón: el nombre, si dice “Activa” o “Por vencer”, la barra con las clases usadas sobre el total, el plan y la fecha de “Vence”.",
+      "Acordate de leer la fecha al revés: 2026-10-19 es el 19 de octubre de 2026.",
+      "Las que dicen “Por vencer” son las que se vencen dentro de los próximos cinco días, salvo que hayan cambiado ese número en Configuración, en Membresías, donde dice “Aviso de vencimiento (días antes)”."
+     ],
+     "ojo": "Es una foto, no se toca nada desde acá. Para renovar, cambiar de plan o cobrar hay que ir a la ficha del cliente, en Clientes."
+    }
+   ],
+   "avisos": [
+    "Dar de baja un plan le corta la renovación automática a todos los que lo tengan. El sistema, que todos los días emite las cuotas de renovación, saltea a esa gente y deja un aviso en la campana que dice “No se ofreció la renovación: plan desactivado”, con el nombre del cliente y la fecha en que se le vence; tocándolo te trae a esta pantalla. Al cliente no le llega nada. Si nadie mira ese aviso, la membresía se vence sin que nadie haya cobrado.",
+    "Ese aviso te dice “Reactivá el plan o asignale otro”, y la primera mitad no se puede hacer: reactivar un plan no existe como botón en ningún lado. Lo que sí podés hacer, y el aviso te da unos días para hacerlo, es entrar a la ficha de esa persona y asignarle otro plan.",
+    "La cuota de renovación sale siete días antes del vencimiento, y solo para quien tenga la renovación automática prendida en su ficha. Si está apagada, no sale la cuota, tampoco sale el aviso de la campana, y no hay nada que te avise que no hubo aviso: esa renovación la tiene que armar el mostrador. Los siete días se cambian en Configuración, en Membresías, donde dice “Cuota de renovación (días antes de vencer)”. Es otro campo distinto del “Aviso de vencimiento (días antes)”, que es el que decide cuándo la lista empieza a decir “Por vencer”.",
+    "Un plan con el precio en 0 tampoco se renueva solo. En la tarjeta dice “Gratis” y el aviso de la campana dice “No se ofreció la renovación: plan sin precio”. Si querés un plan sin cargo, tené presente que además de no cobrarse, no se va a renovar.",
+    "El precio que escribís es el de transferencia. Al momento de cobrar en el mostrador, el sistema le saca el 5% si es en efectivo y le suma el 25% si es con tarjeta, redondea a los 50 pesos y te muestra el número final antes de que confirmes. No hace falta cargar tres planes distintos para eso. Lo que sí conviene saber: cobrado por el link de Mercado Pago no se suma el 25%, se cobra el precio de lista.",
+    "Editar un plan no cambia nada de lo ya vendido. Ni el precio, ni la “Cantidad de clases”, ni la “Vigencia”. Cada membresía guardó sus números el día que se creó. Lo que toques acá rige de la próxima venta en adelante, y para las renovaciones que todavía no se emitieron.",
+    "Hoy los seis planes FE incluyen solamente “Pilates Reformer”. Pilates Embarazadas está encendida como disciplina —se ve en la web y se puede elegir al cargar una clase— pero todavía no hay ninguna clase de esa modalidad en la grilla. El día que se carguen, van a aparecer vacías y nadie va a poder anotarse: ningún plan incluye esa disciplina. Antes de cargar esas clases hay que crear acá el plan de embarazadas, o agregarle la disciplina a un plan existente.",
+    "Cuando el plan no incluye la disciplina de la clase, el sistema rechaza la reserva y aparece el cartel “El plan FE FLOW no incluye Pilates Embarazadas. Para anotarla en esta clase necesita el plan de esa modalidad”. No hay forma de saltearlo desde el mostrador, ni siendo administradora: la salida es darle el plan que corresponde.",
+    "“Veces por semana” no limita nada. Se guarda y se vuelve a ver cuando editás, pero no aparece en la tarjeta, no aparece en la web y no frena a nadie que venga más seguido. Lo único que de verdad limita cuántas veces puede venir es “Cantidad de clases”.",
+    "Lo que cargás acá se ve en la página pública del estudio, al toque. Un plan nuevo aparece ahí; uno dado de baja desaparece; el precio que escribas es el que va a leer cualquiera que entre de afuera. No es un borrador.",
+    "La ventana de crear o editar se cierra si tocás afuera de ella, y se pierde todo lo que escribiste sin preguntarte nada. Lo mismo hace la X de arriba a la derecha, y el botón “Cancelar”. No hay ningún “¿querés guardar?”: lo único que guarda es “Crear plan” o “Guardar cambios”.",
+    "Al editar cualquiera de los seis planes FE vas a ver los seis colores y ninguno marcado. Es correcto: los colores que esos planes tienen hoy no son ninguno de los seis que ofrece el formulario. Si no tocás ningún redondelito, el plan se guarda con el color de siempre. Si tocás uno, el color viejo se pierde y desde esta pantalla no hay forma de recuperarlo.",
+    "“Es clase de prueba” hace dos cosas de verdad, más allá del cartelito: ese plan no se renueva solo, y arranca el mismo día que se compra en vez de ponerse en fila detrás de la membresía que la persona ya tenga. Hoy lo tiene FE FIRST. Si marcás un segundo plan como clase de prueba, la web va a mostrar uno solo de los dos y no elegís vos cuál.",
+    "“Destacarlo en la web” no tiene tope: si marcás dos planes, la web destaca los dos con el cartel “El más elegido” y el destaque deja de significar algo. Hoy lo tiene FE FLOW. Y si un mismo plan lleva las dos marcas, los cartelitos “Popular” y “Clase de prueba” se dibujan en el mismo rincón de la tarjeta y se pisan.",
+    "Lo que alguien pagó por adelantado no aparece en “Membresías activas”, y no es que se perdió. El período nuevo arranca recién cuando se termina el que está corriendo, así que hasta ese día la lista muestra el actual. Ese detalle se ve en la ficha del cliente.",
+    "“Vigencia” en meses cuenta meses de calendario, no 30 días: arrancando el 20/09 vence el 19/10 inclusive. En días cuenta días corridos incluyendo el primero: 7 días desde el 20/09 vencen el 26/09. La misma pantalla te lo recuerda debajo del campo según la unidad que elijas.",
+    "Nada impide crear dos planes con el mismo nombre. Si pasa, vas a ver dos tarjetas iguales y al momento de asignar o cobrar no se distinguen. Antes de crear uno, fijate que el nombre no esté usado."
+   ],
+   "key": "planes",
+   "nombre": "Planes"
+  },
+  {
+   "pantalla": "Reservas",
+   "queEs": "Es la lista de todas las reservas del estudio, ordenada por día, y el lugar donde se marca quién vino, quién faltó y quién canceló.",
+   "cuandoSeUsa": "Todos los días: a la mañana para ver quién se anotó, y al terminar cada clase para marcar la asistencia. También cada vez que alguien avisa que no viene. Acá no se anota gente nueva: para darle una clase a una clienta se entra por Agenda, o se anota ella sola desde su portal.",
+   "partes": [
+    {
+     "nombre": "La barra de arriba: buscador, fecha y filtros",
+     "queMuestra": "A la izquierda el casillero \"Buscar cliente o clase...\", que busca por nombre de la clienta o por nombre de la clase, y nada más: no busca por profesora ni por disciplina. Al lado, un casillero de fecha para ver un solo día. Después, seis botoncitos redondos para filtrar: Todas, Confirmada, En espera, Asistió, Cancelada y Ausente. Fijate que el botón dice \"En espera\" y el cartelito que vas a ver en la fila dice \"Lista de espera\": es lo mismo."
+    },
+    {
+     "nombre": "La franja con los cuatro números",
+     "queMuestra": "Cuántas reservas hay confirmadas, en espera, asistieron y canceladas, cada una con su puntito de color, y a la derecha \"Mostrando N registros\". Cuidado: los cuatro números de la izquierda son el total de todas las reservas cargadas en el sistema y no se mueven cuando filtrás. El único que responde a los filtros es el de \"Mostrando\"."
+    },
+    {
+     "nombre": "Hoy",
+     "queMuestra": "El bloque más importante, y la primera vez viene abierto. Las reservas de hoy agrupadas por clase: cada clase con su horario, su nombre y su profesora, y debajo cuántas van presentes, cuántas ausentes y cuántas en espera. El cartelito \"N sin marcar\" es la tarea pendiente: son las que todavía dicen Confirmada. Cada clase tiene su botón \"Tomar asistencia\". Abajo, la lista de las anotadas con su cartelito de estado y, al final de cada fila, los botoncitos para marcarla o cancelarla."
+    },
+    {
+     "nombre": "Mañana y Más adelante",
+     "queMuestra": "\"Mañana\" también viene abierto y también va agrupado por clase, pero acá el cartelito dice \"N anotados\" en vez de \"N sin marcar\", porque todavía no hay nada que marcar, y no aparece el botón \"Tomar asistencia\". \"Más adelante\" es todo lo que viene después de mañana: se ve como tabla, con columna \"Fecha\", y solo aparece si hay algo reservado para esos días."
+    },
+    {
+     "nombre": "Historial",
+     "queMuestra": "Todo lo que ya pasó, de lo más reciente a lo más viejo, también en tabla. Viene cerrado: tocá el título para abrirlo. Acá están las canceladas, las ausentes y las que asistieron. Ojo con el ancho: las tres tablas de la pantalla —\"Más adelante\", \"Historial\" y \"Resultados de la búsqueda\"— esconden solas las columnas \"Disciplina\" y \"Profesora/or\" cuando la ventana se hace angosta, en un celular o con la ventana a media pantalla. El dato sigue guardado, simplemente no entra."
+    }
+   ],
+   "tareas": [
+    {
+     "titulo": "Tomar la asistencia de una clase",
+     "pasos": [
+      "Abrí el bloque \"Hoy\" si estuviera cerrado: tocá el título.",
+      "Buscá la clase por su horario. Si al lado dice \"6 sin marcar\", esas seis son las que faltan.",
+      "Tocá \"Tomar asistencia\" en esa clase. Se abre una ventana con el nombre de la clase, el horario y la lista de anotadas.",
+      "Al lado de cada nombre hay dos botones grandes: a la izquierda la cruz, que la marca ausente; a la derecha el tilde verde, que la marca presente.",
+      "Cada toque se guarda solo, en el momento. No hay nada que confirmar.",
+      "Si te equivocaste, tocá donde ahora dice \"Presente\" o \"Ausente\" (tiene una flechita de volver atrás al lado) y esa persona vuelve a quedar sin marcar.",
+      "Para cerrar, tocá \"Listo\" abajo de todo. \"Listo\" no guarda nada: ya está todo guardado."
+     ],
+     "ojo": "El botón \"Tomar asistencia\" solo existe en el bloque \"Hoy\", y aparece en todas las clases del día, aunque ya esté todo marcado. En esa ventana no entran ni las canceladas ni las que están en lista de espera: si alguien de la lista de espera hizo la clase, confirmala primero desde la lista de abajo y recién ahí aparece. Si en esa clase no quedó nadie anotado, la ventana dice \"Nadie reservó esta clase\"."
+    },
+    {
+     "titulo": "Marcar a una sola persona sin abrir la ventana",
+     "pasos": [
+      "Encontrá la fila de esa persona. Tiene que decir Confirmada: si ya dice Asistió, Ausente o Cancelada, no hay botones.",
+      "Mirá el final de la fila, a la derecha del todo. En \"Hoy\" y en \"Mañana\" los botoncitos están ahí sueltos, sin encabezado; en las tablas de \"Más adelante\", \"Historial\" y \"Resultados de la búsqueda\" están abajo de la columna \"Acciones\".",
+      "Dejá el mouse quieto encima y te va a decir qué hace cada uno: el muñequito con tilde es \"Marcar asistencia\" y el círculo con cruz es \"Marcar ausente\".",
+      "Tocá el que corresponda. Se aplica al toque, sin preguntar nada."
+     ],
+     "ojo": "Desde la fila se marca, pero no se desmarca: en cuanto la fila pasa a Asistió o Ausente, esos botones desaparecen. Para corregirla hay que entrar por \"Tomar asistencia\" — y si el día ya pasó, eso se hace desde Agenda: retrocedé con la flechita hasta esa semana, abrí esa clase en ese día y tocá \"Tomar asistencia\" ahí."
+    },
+    {
+     "titulo": "Cancelar una reserva",
+     "pasos": [
+      "Encontrá la fila de la clienta. Tiene que decir Confirmada.",
+      "Tocá la cruz que está al final de la fila. Si dejás el mouse encima, dice \"Cancelar reserva\".",
+      "Listo: la fila pasa a Cancelada. Si estaba en \"Hoy\" o en \"Mañana\", se va al final de su clase."
+     ],
+     "ojo": "No pregunta nada: no hay ningún \"¿estás segura?\", y desde esta pantalla no se deshace. Y el momento importa para la plata: si cancelás con 3 horas o más de anticipación, la clase le vuelve a la clienta; con menos, la pierde. Lo decide el sistema solo, con la hora de Tucumán, en el instante exacto en que tocás la cruz."
+    },
+    {
+     "titulo": "Confirmar a alguien que está en lista de espera",
+     "pasos": [
+      "Buscá la fila con el cartelito del relojito que dice \"Lista de espera\".",
+      "Al final de esa fila hay un solo botón: \"Confirmar\". Tocalo.",
+      "La fila pasa a Confirmada, ocupa lugar en la clase, y recién en ese momento se le descuenta la clase del plan."
+     ],
+     "ojo": "Acá el sistema te puede decir que no, con un cartel gris del navegador: \"La clase ya está completa\" si se llenó mientras tanto, \"Esa clase está suspendida ese día\" si el estudio la dio de baja ese día, o un mensaje del plan — \"Ya usó las N clases de su plan…\" o \"No tiene una membresía vigente para el …\". Si aparece cualquiera de esos carteles, la reserva no cambió: quedó en Lista de espera."
+    },
+    {
+     "titulo": "Buscar una reserva puntual",
+     "pasos": [
+      "Escribí el nombre de la clienta en \"Buscar cliente o clase...\", o elegí un día en el casillero de fecha, o tocá uno de los filtros de estado.",
+      "La pantalla cambia de forma: desaparecen los bloques por día y queda una sola tabla, \"Resultados de la búsqueda\", con todo junto de lo más nuevo a lo más viejo.",
+      "Los botoncitos de cada fila siguen andando igual: desde acá también podés marcar, cancelar o confirmar.",
+      "Para volver a la vista normal: vaciá el buscador, borrá la fecha del casillero y dejá el filtro en \"Todas\". Con que quede uno solo puesto, la vista por día no vuelve."
+     ],
+     "ojo": "Mientras estés filtrando no vas a ver el botón \"Tomar asistencia\" por ningún lado: se va junto con los bloques por día. Si entraste a buscar a alguien y después querés tomar asistencia, primero limpiá los tres filtros."
+    },
+    {
+     "titulo": "Devolver una reserva que se canceló por error",
+     "pasos": [
+      "Desde esta pantalla no se puede: una fila Cancelada no tiene ningún botón.",
+      "Andá a Agenda y parate en la semana de esa fecha con las flechitas de arriba.",
+      "Abrí esa clase en ese día, elegí a la clienta en la lista \"Cliente a reservar...\" y tocá \"Reservar lugar\".",
+      "El sistema se da cuenta de que ya había una reserva suya ahí y la reactiva con toda su historia, y le vuelve a descontar la clase."
+     ],
+     "ojo": "Si mientras tanto la clase se llenó, el botón \"Reservar lugar\" queda apagado y dice \"Clase completa\". Al lado te aparece \"Lista de espera\": por ahí sí se la podés devolver, pero queda esperando y no ocupa lugar hasta que alguien la confirme."
+    }
+   ],
+   "avisos": [
+    "Acá no se crea ninguna reserva. Esta pantalla mira y corrige lo que ya existe. Para anotar a alguien se entra por Agenda, o se anota ella sola desde su portal.",
+    "La clase se le descuenta a la clienta CUANDO SE RESERVA, no cuando viene. Por eso marcar Asistió o marcar Ausente no le cambia el saldo: las clases del plan ya bajaron el día que se anotó.",
+    "Faltar sin avisar le cuesta la clase igual, y cancelar tarde también. Marcarla Ausente no se la devuelve. Es la regla que pidió el estudio y está escrita así.",
+    "La excepción: si el estudio suspendió esa clase ese día, nadie pierde nada, ni siquiera las que habían cancelado sobre la hora. El sistema lo resuelve solo, sin que nadie tenga que ir reserva por reserva.",
+    "Pero ojo: esta pantalla no muestra las suspensiones. Una clase suspendida aparece en \"Hoy\" como cualquier otra, con su botón \"Tomar asistencia\" incluido. Si un día está suspendido se ve en Agenda, no acá.",
+    "El horario, la disciplina y la profesora que ves en Reservas son los que la clase tiene hoy en la grilla, no los de ese día puntual. Si esa mañana hubo reemplazo, o si después movieron la clase de horario, Reservas —Historial incluido— te sigue mostrando el titular y el horario de la grilla.",
+    "Las 3 horas se cambian sin esperar a nadie: Configuración → \"Reservas y clases\" → \"Plazo de cancelación (horas)\". Ahí al lado está \"La ausencia sin aviso consume la clase\", por si algún día el estudio decide que faltar no se cobre.",
+    "El día que el sistema llama \"Hoy\" es el día de Tucumán, no el reloj de la computadora. Si la computadora tiene la hora mal, la lista igual está bien.",
+    "Cancelar no pregunta y no se deshace desde acá. Es un solo toque en la cruz.",
+    "Desde Reservas no se saca a nadie de la lista de espera: esas filas tienen un único botón, \"Confirmar\". Para cancelarle la espera hay que ir a Agenda.",
+    "Nadie sube solo de la lista de espera. Aunque se libere un lugar, el sistema no promueve a la que sigue: alguien tiene que tocar \"Confirmar\". Y hasta que eso pase, el lugar está libre y otra clienta se lo puede llevar desde su portal.",
+    "Los cuatro números de colores de la franja de arriba (confirmadas, en espera, asistieron, canceladas) NO respetan los filtros: son el total de todas las reservas cargadas en el sistema. Si filtrás por un día y esos números no bajan, no está roto. El que sigue al filtro es \"Mostrando N registros\".",
+    "Nada se borra. Una reserva cancelada sigue ahí: al final de su clase si es de hoy o de mañana, y en el Historial cuando el día ya pasó. Es a propósito, para que la historia de la clienta quede completa.",
+    "Cuando la base rechaza algo en la lista, sale un cartel gris del navegador con el motivo escrito en criollo (\"La clase ya está completa\", \"Ya usó las N clases de su plan…\"). Leelo antes de cerrarlo: si apareció, el cambio no se hizo. Dentro de la ventana \"Tomar asistencia\" no hay cartel: el motivo sale como un texto rojo abajo de la lista, así que si una marca no quedó, bajá la vista antes de tocar \"Listo\".",
+    "En las tablas, la columna \"Fecha\" viene al revés: 2026-09-12 quiere decir 12 de septiembre de 2026. Los títulos de los bloques sí están en criollo (\"vie 12 sept\").",
+    "La pantalla no se actualiza sola mientras la mirás. Si una clienta cancela desde su celular en ese rato, no lo vas a ver hasta que hagas alguna acción acá, o hasta que vuelvas a esta pestaña desde otra habiendo pasado al menos un minuto.",
+    "Qué bloques quedan abiertos y cuáles cerrados se recuerda en esa computadora y en ese navegador. Si alguien deja el Historial cerrado, la próxima vez aparece cerrado — y solo ahí, no para las demás."
+   ],
+   "key": "reservas",
+   "nombre": "Reservas"
+  },
+  {
+   "pantalla": "Pagos",
+   "queEs": "Es la lista de toda la plata que el estudio cobró y de la que todavía tiene que cobrar, con el botón para cobrar cada cuota y el comprobante que sale de ahí.",
+   "cuandoSeUsa": "Se entra cada vez que alguien paga en el mostrador, y también a la mañana para ver quién quedó debiendo y mandarle el recordatorio. Acá no se crea ninguna deuda: las cuotas nacen en la ficha de la clienta cuando se le asigna un plan, y las de renovación las emite el sistema solo.",
+   "partes": [
+    {
+     "nombre": "Las tarjetas de números (arriba de todo)",
+     "queMuestra": "Cuatro recuadros: \"Ingresos\" con el nombre del mes (lo cobrado en ese mes, en miles: $358k), \"Pagos al día\" (cuántos cobros hay y cuánta plata suman), \"Pendientes\" y \"Vencidos\" (cuántas cuotas y cuánto se debe). Cuando hay renovaciones ofrecidas sin pagar se suma un quinto recuadro, \"Renovaciones\", que abajo aclara \"no cuenta como deuda\"."
+    },
+    {
+     "nombre": "La barra de buscar y filtrar",
+     "queMuestra": "El buscador \"Buscar cliente...\", los botones redondos \"Todos\", \"Pagado\", \"Pendiente\" y \"Vencido\" —con \"Renovaciones\" metido entre los dos últimos cuando hay alguna— y, a la derecha, el botón \"Registrar pago\"."
+    },
+    {
+     "nombre": "La tira verde de Mercado Pago",
+     "queMuestra": "Aparece sola al entrar, y solo si se acreditó algo: \"Se acreditaron 2 pagos de Mercado Pago — comprobante generado automáticamente\". Si no hay nada nuevo, no aparece."
+    },
+    {
+     "nombre": "La tabla de pagos",
+     "queMuestra": "Una fila por cobro o por cuota, ordenadas por Vencimiento del más nuevo al más viejo, con las columnas Cliente, Concepto, Monto, Vencimiento, Método, Comp. (el número de comprobante) y Estado. En las filas ya cobradas, debajo del vencimiento hay un renglón chiquito que dice \"Pagado\" con la fecha. Al final de cada fila están los botones: \"Cobrar\", el ícono de cadena para el link de Mercado Pago, el globo de diálogo para WhatsApp y, en los cobros ya hechos, el ícono de prohibido para anular. Si el filtro no deja nada, dice \"No se encontraron pagos\"."
+    },
+    {
+     "nombre": "Evolución de ingresos (columna de la derecha)",
+     "queMuestra": "Una barra por mes, \"Últimos 6 meses\", con la última resaltada. Más abajo, \"Cobrado por método\": cuánta plata entró por Efectivo, Transferencia, Tarjeta y Mercado Pago, en pesos y en porcentaje."
+    }
+   ],
+   "tareas": [
+    {
+     "titulo": "Cobrar una cuota que ya está en la lista",
+     "pasos": [
+      "Buscá la fila: escribí el nombre de la clienta en \"Buscar cliente...\", o tocá el filtro \"Pendiente\".",
+      "Tocá \"Cobrar\". Se abre la ventana \"Cobrar pago\" con el nombre, el concepto y el monto.",
+      "Elegí el método: \"Efectivo\", \"Transferencia\" o \"Tarjeta\". Hasta que no elegís uno, el botón \"Confirmar cobro\" está apagado y no se puede tocar.",
+      "Mirá el monto grande: se recalcula solo —efectivo baja 5%, tarjeta sube 25%— y abajo aparece \"Precio de lista $…\" con el descuento o el recargo que se aplicó.",
+      "Tocá \"Confirmar cobro\". Aparece \"Pago registrado\" con el número de comprobante.",
+      "Tocá \"Listo\". La fila ya quedó en \"Pagado\" y la plata entró sola a Caja, a la cuenta del medio que elegiste."
+     ],
+     "ojo": "La ventana no deja tocar el monto: cobra todo o nada. Si la clienta te entrega una parte, o un importe distinto al que dice la fila, esa cuota no se puede cobrar desde acá."
+    },
+    {
+     "titulo": "Registrar un pago que no figura en la lista",
+     "pasos": [
+      "Tocá \"Registrar pago\", arriba a la derecha.",
+      "Elegí la clienta en \"Cliente *\". Si tiene membresía, el sistema completa solo el \"Concepto\" y el \"Monto ($) *\" con el precio de su plan.",
+      "Cambiá el \"Concepto\" si hace falta. Podés escribir lo que quieras; si lo dejás vacío se guarda como \"Pago\".",
+      "Dejá en el \"Monto ($) *\" el precio de lista, sin descuento ni recargo. Vacío no te deja seguir.",
+      "Elegí el \"Método de pago *\". Si el monto cambia, aparece un renglón gris que dice cuánto se cobra y por qué.",
+      "Tocá \"Cobrar\" —está apagado hasta que haya cliente y método— y después \"Listo\"."
+     ],
+     "ojo": "Esto crea un cobro suelto y nada más: no salda la cuota que la clienta tenga pendiente ni le renueva el mes. Si la cuota ya está en la lista, cobrala con el botón \"Cobrar\" de su fila; si no, te quedan las dos cosas, el cobro hecho y la deuda igual de abierta."
+    },
+    {
+     "titulo": "Mandarle el link de Mercado Pago",
+     "pasos": [
+      "En la fila de una cuota pendiente o vencida, tocá el ícono de cadena que está al lado de \"Cobrar\". Se abre la ventana \"Link de pago\".",
+      "Si el link todavía no existía, esperá a que termine de decir \"Generando link en Mercado Pago...\". Si ya existía —el ícono de cadena se ve celeste— aparece al toque.",
+      "Tocá \"Copiar link\" para pegarlo donde quieras, o \"WhatsApp\" para abrir el chat con el mensaje ya escrito. Ese botón \"WhatsApp\" aparece solo si la clienta tiene teléfono cargado en su ficha.",
+      "Cuando la clienta paga, el cobro se acredita cuando alguien entra a Pagos: la fila pasa a \"Pagado\", el método queda \"Mercado Pago\" y el comprobante se genera solo."
+     ],
+     "ojo": "El ícono de cadena aparece únicamente si Mercado Pago está conectado en Configuración. El link cobra el precio de lista —sin el 5% de descuento ni el 25% de recargo— y se genera una sola vez: no hay manera de cambiarle el monto ni de darlo de baja. Si después cobrás esa misma cuota en efectivo, el link sigue vivo, y una clienta que pague por ahí manda plata que el sistema ya no acredita solo."
+    },
+    {
+     "titulo": "Mandar el recordatorio por WhatsApp",
+     "pasos": [
+      "En la fila pendiente o vencida, tocá el ícono del globo de diálogo.",
+      "Se abre WhatsApp con el mensaje ya escrito: el nombre, el concepto y el monto. Si esa cuota tiene link de pago, el link va incluido.",
+      "Fijate qué texto salió: si la fila es una renovación, el mensaje no le reclama nada, le dice que ya puede renovar y hasta qué día tiene.",
+      "Leelo, cambiale lo que quieras, y mandalo vos."
+     ],
+     "ojo": "El sistema abre el chat y nada más: si no tocás enviar, no se manda nada. Y si la clienta no tiene teléfono cargado en su ficha, el ícono ni aparece."
+    },
+    {
+     "titulo": "Cobrar una renovación",
+     "pasos": [
+      "Tocá el filtro \"Renovaciones\", que aparece solo cuando hay alguna.",
+      "Mirá la columna Estado: en vez de \"Pendiente\" dice \"Renovación\", en celeste. En Concepto van con el nombre del plan y la palabra renovación (por ejemplo \"FE FLOW — renovación\"), y en Vencimiento aclaran \"Límite para renovar\": ese día todavía se puede cobrar.",
+      "Tocá \"Cobrar\". Adentro de la ventana hay un recuadro celeste que avisa que es la renovación del período siguiente, para que no dudes de si estás cobrando el mes dos veces.",
+      "Elegí el método y tocá \"Confirmar cobro\".",
+      "Con ese cobro recién nace el mes nuevo: si el que está en curso todavía no venció, el nuevo arranca cuando ese termina; si ya venció, arranca hoy."
+     ],
+     "ojo": "Una renovación sin pagar no es deuda: no suma en \"Pendientes\" y el sistema la anula solo cuando pasa el límite. Y si a esa clienta ya le asignaste el plan a mano desde su ficha, no la cobres desde acá: el sistema registra la plata y no crea ningún período."
+    },
+    {
+     "titulo": "Anular un cobro mal hecho",
+     "pasos": [
+      "Buscá la fila. Tiene que estar en \"Pagado\": es el único estado que muestra el ícono de prohibido, al final de la fila.",
+      "Leé lo que dice la ventana \"Anular cobro\": el cobro deja de contar como plata entrada y baja el saldo de esa cuenta.",
+      "Escribí el motivo en \"¿Por qué se anula?\". Sin motivo no avanza: te contesta \"Escribí por qué se anula\".",
+      "Tocá \"Anular\". En la columna Estado la fila pasa a decir \"Anulado\", con la palabra tachada; el resto de la fila se ve igual que siempre."
+     ],
+     "ojo": "Anular no devuelve plata ni deshace nada más. El comprobante que se emitió queda, el arqueo firmado de ese día no cambia, y si el cobro era una renovación, el mes que creó sigue vivo: eso se arregla a mano desde la ficha de la clienta. La devolución, si la hay, se registra hoy desde Caja. Y la fila anulada se queda sin ningún botón: desde acá no se puede reactivar ni volver a cobrar."
+    }
+   ],
+   "avisos": [
+    "Las cuotas pendientes no nacen en esta pantalla: aparecen cuando le asignás un plan a la clienta desde su ficha. Las de renovación las emite el sistema solo, una vez por día, unos días antes de que venza la membresía (siete, y ese número se cambia en Configuración).",
+    "Acá casi nada se borra. Un cobro anulado no desaparece de la lista: queda con \"Anulado\" tachado en la columna Estado, y como no hay filtro \"Anulado\", solo lo volvés a ver con \"Todos\".",
+    "El motivo que escribís al anular se guarda en el pago, pero la pantalla no lo vuelve a mostrar en ningún lado. Conviene avisarle a quien corresponda por otro lado.",
+    "Anular se puede siempre, incluso si el día de ese cobro ya se cerró en Caja. Lo que el día cerrado bloquea es cambiarle el monto o el medio a un cobro viejo, y eso no se hace desde esta pantalla.",
+    "El descuento y el recargo salen del medio de pago, no del plan: efectivo 5% menos, tarjeta 25% más, transferencia y Mercado Pago sin cambio. Lo que queda guardado es lo que entró de verdad, no el precio de lista. Esos porcentajes se cambian en Configuración.",
+    "Los tres botones de método están fijos: \"Efectivo\", \"Transferencia\" y \"Tarjeta\" aparecen siempre con ese nombre, aunque en Configuración apagues o renombres un medio de pago. El porcentaje sí lo toma de Configuración.",
+    "El número de comprobante lo pone el sistema en el momento de cobrar, va uno atrás del otro y nunca se repite. Anular no libera el número: queda usado. Ojo al compararlo: en la pantalla \"Pago registrado\" sale con ocho dígitos (N° 00000012) y en la columna Comp. con seis (#000012). Es el mismo número.",
+    "Mercado Pago se revisa al entrar a la pantalla, no mientras estás parada en ella. Si estás esperando que se acredite algo, salí a otra pantalla y volvé a Pagos. La tira verde tampoco se cierra sola: se va cuando salís.",
+    "La lista trae todos los pagos de la historia del estudio y no tiene filtro por fecha ni por mes. Viene ordenada por Vencimiento, del más nuevo al más viejo: el cobro que acabás de hacer no salta al principio. Y el buscador busca solo por nombre de la clienta, no por concepto ni por número de comprobante.",
+    "\"Pagos al día\" y \"Cobrado por método\" suman toda la historia, no el mes. El único número del mes es la primera tarjeta, \"Ingresos\", que va en miles y redondea: un mes flojo puede llegar a decir \"$0k\". Muestra el último mes en el que hubo cobros, así que si arranca el mes y todavía no cobraste nada sigue diciendo el mes anterior —aunque abajo insista con \"Cobrado este mes\"—. Por eso el nombre del mes está escrito al lado del número.",
+    "En \"Evolución de ingresos\" pasa lo mismo: son los últimos seis meses con cobros. Un mes sin nada no aparece como barra en cero, directamente no está, y la barra resaltada es la del último mes con cobros, que puede no ser este.",
+    "En la columna Vencimiento las fechas se ven al revés, como 2026-09-20 (año, mes, día), igual que el renglón chiquito \"Pagado\" de las filas cobradas. En las ventanas que se abren encima van normales.",
+    "En \"Registrar pago\" la lista \"Cliente *\" trae solo a las clientas activas. A alguien que está de baja no le podés registrar un cobro desde acá.",
+    "Lo que cobrás entra solo a Caja según el medio: el efectivo a \"Caja del mostrador\", la transferencia a \"Cuenta bancaria\", la tarjeta a \"Tarjetas a acreditar\" y Mercado Pago a su propia cuenta. Por eso el efectivo es lo único que después hay que contar en el arqueo.",
+    "Cada cobro deja un aviso \"Pago acreditado\" en la campana del sistema. Anularlo después no borra ese aviso.",
+    "En pantallas angostas la tabla va escondiendo columnas: en una tablet no se ven Método ni Comp., y en un celular tampoco Concepto ni Vencimiento. Del botón \"Registrar pago\" queda solo el signo +. Los botones de cada fila siguen estando.",
+    "Las diez clientas con apellido \"Prueba\" son datos de prueba, pero lo que les cobres suma en los totales igual que un cobro real."
+   ],
+   "key": "pagos",
+   "nombre": "Pagos"
+  },
+  {
+   "pantalla": "Caja",
+   "queEs": "Es la pantalla donde el estudio abre y cierra el cajón del mostrador, controla cuánta plata hay en cada cuenta y anota los movimientos que no son ni un cobro ni un gasto.",
+   "cuandoSeUsa": "Se entra dos veces por día: al empezar, para abrir la caja, y al terminar, para contar la plata del cajón y cerrarla. También cada vez que hay que anotar una transferencia, un retiro o una devolución.",
+   "partes": [
+    {
+     "nombre": "Las cuatro pestañas de arriba",
+     "queMuestra": "\"Caja de hoy\", \"Cuentas\", \"Movimientos\" y \"Cierres\". Arrancás siempre en \"Caja de hoy\". Ojo que \"Movimientos\" muestra exactamente la misma lista que \"Caja de hoy\" —solo lo de hoy y solo lo del cajón del mostrador—, con el encabezado \"Hoy\" en vez de \"Movimientos de hoy\"."
+    },
+    {
+     "nombre": "El aviso rojo \"Hay algo que revisar\"",
+     "queMuestra": "Aparece debajo de las pestañas, antes de las tarjetas, y se ve estés en la pestaña que estés. Dice \"Hay algo que revisar\" o \"Hay 3 cosas que revisar\" y lista los renglones. Si no aparece, está todo en orden. No se puede tapar ni marcar como leído: se va solo cuando se arregla la causa. Dos detalles: el número del título cuenta todos los problemas pero la lista muestra como mucho cinco, y los renglones no dicen a cuál cobro ni a cuál medio de pago se refieren."
+    },
+    {
+     "nombre": "El cabezal de \"Caja del mostrador\"",
+     "queMuestra": "El nombre de la caja y, debajo, \"Sin turno abierto\" o \"Abierta desde\" con el día y la hora. A la derecha, el botón \"Abrir caja\" o el botón \"Cerrar caja\", según corresponda. Nunca los dos juntos: si dice \"Sin turno abierto\", el botón de cerrar no existe."
+    },
+    {
+     "nombre": "Los tres números del día",
+     "queMuestra": "\"Entró hoy\" en verde (los cobros que cayeron en el cajón —hoy, los de efectivo— más la plata que entró por un movimiento a mano), \"Salió hoy\" en rojo (los gastos que se pagaron de ahí y lo que salió) y \"Debería haber\" en negro, que es lo que el sistema calcula que tiene que estar en el cajón en este momento."
+    },
+    {
+     "nombre": "\"Movimientos de hoy\"",
+     "queMuestra": "La lista del día, la más nueva arriba. Cada renglón tiene una tilde verde si entró plata o una cruz roja si salió, el concepto, la hora, con quién fue y el monto con + o −. Si está vacía dice \"Todavía no hay movimientos\". Arriba a la derecha está el botón \"Nuevo\"."
+    },
+    {
+     "nombre": "Las pestañas \"Cuentas\" y \"Cierres\"",
+     "queMuestra": "\"Cuentas\" es una tarjeta por cada lugar donde hay plata: Caja del mostrador, Cuenta bancaria, Mercado Pago, Tarjetas a acreditar y A imputar, con el saldo y cuántos movimientos tuvo cada una. Debajo del nombre vas a leer \"Se cuenta al cierre\" en la del mostrador y una palabra suelta del sistema en las otras: banco, billetera, pasarela, transitoria. La lista incluye también las cuentas dadas de baja. Solo muestra: desde ahí no se crean ni se editan cuentas. \"Cierres\" es la lista de los últimos 20 cierres del cajón, con la fecha, \"Cerrada\" y la hora, el motivo que se escribió pegado a esa hora, cuánto se contó, si \"sobró\", \"faltó\" o \"cerró justo\", y un botón \"Reabrir\" al costado. Si nunca se cerró, dice \"Todavía no se cerró ninguna caja\"."
+    }
+   ],
+   "tareas": [
+    {
+     "titulo": "Cargar por primera vez la plata que ya hay en el cajón",
+     "pasos": [
+      "Entrá a Caja, pestaña \"Caja de hoy\".",
+      "Tocá \"Nuevo\", arriba a la derecha de \"Movimientos de hoy\". Se abre la ventana \"Nuevo movimiento\".",
+      "En \"Tipo\" elegí \"Saldo inicial\".",
+      "En \"Entra a\" elegí \"Caja del mostrador\".",
+      "En \"Monto\" escribí cuánta plata hay hoy en el cajón. Números pelados: 45000. Si escribís 45.000, el sistema entiende cuarenta y cinco pesos y lo guarda así.",
+      "Dejá la \"Fecha\" de hoy y en \"Concepto\" escribí algo como: Plata con la que arranca el cajón.",
+      "Tocá \"Registrar\"."
+     ],
+     "ojo": "Esto se hace una sola vez, antes del primer cierre. El sistema arranca creyendo que el cajón está en cero, así que si no lo cargás te va a sobrar plata todos los días. Y si lo cargás dos veces no hay forma de borrarlo: vas a tener que compensar con un \"Retiro\" por el mismo monto, sacándolo de \"Caja del mostrador\"."
+    },
+    {
+     "titulo": "Abrir la caja al empezar el día",
+     "pasos": [
+      "Entrá a Caja. Vas a caer en \"Caja de hoy\".",
+      "Debajo de \"Caja del mostrador\" tiene que decir \"Sin turno abierto\".",
+      "Tocá \"Abrir caja\".",
+      "Listo: el texto cambia a \"Abierta desde\" con el día y la hora, y en lugar de \"Abrir caja\" ahora está el botón \"Cerrar caja\"."
+     ],
+     "ojo": "Abrir no es opcional: el botón \"Cerrar caja\" solamente aparece si hay un turno abierto. Si te olvidaste a la mañana, no perdiste nada — tocá \"Abrir caja\" cuando te acordás y cerrá normal. El turno siempre se cuenta desde el cierre anterior, no desde la hora en que abriste, así que todos los cobros y los gastos del día entran igual. La hora de apertura es al solo efecto de saber quién arrancó el mostrador."
+    },
+    {
+     "titulo": "Anotar un movimiento que no es un cobro ni un gasto",
+     "pasos": [
+      "En \"Caja de hoy\" tocá \"Nuevo\", o en la pestaña \"Movimientos\" tocá \"Nuevo movimiento\".",
+      "En \"Tipo\" elegí qué es. \"Transferencia entre cuentas\" para pasar plata de un lado a otro (por ejemplo, retirar el saldo de Mercado Pago al banco, o depositar la recaudación). \"Retiro\" para plata que sale y no es un gasto del estudio. \"Aporte\" para plata que entra y no es un cobro. \"Devolución\" para plata que se le devolvió a una clienta. Debajo del casillero hay una línea gris que te explica cada uno.",
+      "Según lo que elegiste van a aparecer \"Sale de\", \"Entra a\", o los dos. Elegí las cuentas en cada uno. Tienen que ser distintas.",
+      "Escribí el \"Monto\". Números pelados, sin puntos ni comas.",
+      "La \"Fecha\" viene con el día de hoy. Cambiala solo si estás anotando algo de otro día, y nunca a un día ya cerrado.",
+      "En \"Concepto\" escribí de qué se trata. Si lo dejás vacío, en la lista va a figurar apenas una palabra del sistema —\"transferencia\", \"retiro\", \"aporte\", \"devolucion\"— y dentro de un mes eso no le dice nada a nadie.",
+      "Tocá \"Registrar\"."
+     ],
+     "ojo": "Dos cosas. Una: si tocás fuera de la ventana, se cierra sin preguntar y perdés todo lo que escribiste. Dos: un movimiento registrado no se puede borrar ni corregir desde esta pantalla. Si te equivocaste de monto o de cuenta, la única salida es cargar otro movimiento al revés que lo compense."
+    },
+    {
+     "titulo": "Cerrar la caja al terminar el día",
+     "pasos": [
+      "Antes de tocar nada, asegurate de que estén cargados todos los cobros y todos los gastos del día. Después de cerrar ya no se pueden corregir.",
+      "Contá la plata del cajón.",
+      "En \"Caja de hoy\", tocá \"Cerrar caja\". Se abre la ventana \"Cerrar Caja del mostrador\", con \"Saldo al abrir\", \"Entró\", \"Salió\" y, abajo de todo, \"Debería haber\".",
+      "En \"¿Cuánto contaste?\" escribí el total que contaste recién. El número gris que ya está en el casillero es lo que el sistema espera, no lo que contaste vos: si no escribís nada, el botón queda apagado.",
+      "Si el número coincide, vas a leer en verde \"La caja cierra justo\".",
+      "Si no coincide, aparece en amarillo \"Sobra $X\" o \"Falta $X\" y se abre el casillero \"¿Qué pasó?\". Contá de nuevo, y si el número es correcto escribí ahí el motivo: \"vuelto mal dado a la mañana\", \"le pagué el agua al repartidor\". Eso va a quedar a la vista en la lista de \"Cierres\".",
+      "Tocá \"Cerrar caja\". La pantalla vuelve a decir \"Sin turno abierto\"."
+     ],
+     "ojo": "Si hay diferencia y no escribís el motivo, el sistema no te deja cerrar: te va a decir \"La diferencia es de ... y hace falta un motivo\". Eso lo podés aflojar vos en Configuración → \"Caja y arqueo\". Y cuando cerrás con diferencia, el sistema anota solo un movimiento llamado \"Faltante de arqueo\" o \"Sobrante de arqueo\" para que el saldo quede igual a lo que contaste. Ese movimiento lo vas a ver en la lista y no hay que tocarlo."
+    },
+    {
+     "titulo": "Corregir un cierre que se cargó mal",
+     "pasos": [
+      "Andá a la pestaña \"Cierres\".",
+      "Buscá la fecha del cierre equivocado. Al costado, a la derecha, está el botón \"Reabrir\".",
+      "Tocá \"Reabrir\". Se abre un cartel que te pregunta \"¿Reabrir el arqueo del ...?\" y te avisa que el cierre deja de estar firmado y la caja vuelve a quedar abierta.",
+      "Aceptá.",
+      "Ese renglón desaparece de \"Cierres\", la caja vuelve a aparecer abierta en \"Caja de hoy\" —con la hora de apertura vieja— y el \"Faltante de arqueo\" o \"Sobrante de arqueo\" que había dejado ese cierre queda anulado solo. No te asustes: no se perdió plata, se deshizo el ajuste.",
+      "Volvé a cerrarla con el número correcto, como siempre."
+     ],
+     "ojo": "Reabrí y volvé a cerrar el mismo día. Al volver a cerrar, el cierre queda fechado HOY y el turno se come todo lo que pasó en el medio: reabrir el cierre del martes un jueves deja un cierre fechado el jueves con tres días adentro. Y si en este momento hay una caja abierta, el sistema no te va a dejar reabrir la anterior: arriba de todo, debajo de las pestañas, vas a leer \"Esa cuenta ya tiene un turno abierto: cerralo antes de reabrir el anterior\". Reabrir es para el error de tipeo, un cero de más al cargar lo contado. No es para retocar la historia."
+    },
+    {
+     "titulo": "Revisar lo que el aviso rojo marca como pendiente",
+     "pasos": [
+      "Si aparece \"Hay algo que revisar\", leé los renglones de la lista. Fijate en el número del título: si dice más de cinco, hay renglones que no se están mostrando.",
+      "Si dice \"arqueo desactualizado\": alguien anuló un cobro o un gasto de un día que ya estaba cerrado, o se cargó un movimiento a mano con fecha de un día cerrado. No hay nada que tocar acá, pero conviene saber que ese cierre viejo ya no coincide con lo que dice hoy el sistema. El renglón no dice de qué día es.",
+      "Si dice \"cuenta inactiva con saldo\": hay plata anotada en una cuenta que se dio de baja. Pasala a una cuenta activa con un movimiento del tipo \"Transferencia entre cuentas\".",
+      "Si dice \"cobro sin cuenta\" o \"medio de pago sin cuenta\": eso no se arregla desde esta pantalla, y el renglón ni siquiera te dice cuál cobro o cuál medio es. Avisale a quien mantiene el sistema.",
+      "Mirá también la pestaña \"Cuentas\": si la tarjeta \"A imputar\" está pintada de amarillo y con saldo, hay cobros que entraron sin saber a qué cuenta van."
+     ],
+     "ojo": "La tarjeta \"A imputar\" dice \"Hay plata sin asignar a una cuenta real. Revisá estos cobros y ponelos donde van\", pero hoy no se puede hacer desde el sistema: esa cuenta ni siquiera aparece en las listas de \"Sale de\" y \"Entra a\". Es un aviso para pedir ayuda, no una tarea que puedas resolver sola."
+    }
+   ],
+   "avisos": [
+    "\"Debería haber\" no es lo del día: es toda la plata que el sistema cree que hay en el cajón desde siempre. Si nunca cargaste el \"Saldo inicial\", ese número arranca en cero y la caja te va a sobrar todos los días.",
+    "Escribí los montos como números pelados: 45000. El punto NO se rechaza: si ponés 45.000 el sistema lo toma como cuarenta y cinco pesos y lo guarda así, sin avisarte. Y si ponés coma —45,000— el casillero la rechaza, queda vacío y te va a decir \"Poné un monto\". El punto es la trampa peligrosa, porque no protesta.",
+    "Los movimientos que cargás a mano quedan anotados a las 12 del mediodía del día que elegiste, no a la hora en que los cargaste. Por eso en la lista siempre los vas a ver a las 12:00.",
+    "Por lo mismo: un movimiento cargado DESPUÉS de cerrar la caja, o fechado en un día que ya se cerró, entra en ese turno cerrado y el sistema te lo va a marcar arriba como \"arqueo desactualizado\". Anotá los movimientos antes de cerrar. Los cobros, en cambio, no tienen ese problema: si entra una clienta a pagar después del cierre, el cobro cae en el turno siguiente y está bien.",
+    "Un movimiento no se borra ni se edita. Si te equivocaste, se compensa con otro movimiento al revés.",
+    "Una vez que cerraste la caja, un gasto de ese turno ya no se deja cambiar de monto, de medio de pago ni de cuenta. Lo que vas a ver al tocar \"Guardar\" es apenas \"No se pudo guardar\", sin explicar por qué: la causa es que ese día ya se arqueó. Anular sí se puede, y en ese caso el cierre viejo queda marcado para revisar. Los cobros ni siquiera se editan: desde Pagos solo se pueden anular.",
+    "Si cerrás la caja dos veces en el mismo día —sirve cuando cambia la persona del mostrador—, en la ventana del segundo cierre las líneas \"Saldo al abrir\", \"Entró\" y \"Salió\" te muestran los totales de TODO el día, no los de ese segundo turno. Están mal a propósito de nadie, pero están mal. El que sí es correcto es \"Debería haber\": guiate por ese y por lo que contaste.",
+    "Las dos ventanas —\"Nuevo movimiento\" y la del cierre— se cierran si tocás fuera de ellas, sin preguntar nada, y perdés lo que hayas escrito. Usá \"Cancelar\" si querés salir.",
+    "\"Entró hoy\" y \"Salió hoy\" son solo del cajón del mostrador. Una transferencia de Mercado Pago al banco no va a aparecer en ninguna de las dos, aunque la hayas cargado recién: se ve en los saldos de la pestaña \"Cuentas\".",
+    "Las listas de \"Caja de hoy\" y de \"Movimientos\" muestran únicamente el día de hoy. No hay forma de mirar el día de ayer desde esta pantalla.",
+    "Si algo sale mal al registrar un movimiento, el único mensaje que vas a leer es \"No se pudo registrar\", sin explicación. La causa más común es haber elegido la misma cuenta en \"Sale de\" y en \"Entra a\": el sistema no acepta una transferencia de una cuenta a sí misma.",
+    "Los avisos de error de esta pantalla salen siempre arriba de todo, debajo de las pestañas. Si tocás \"Reabrir\" en la pestaña \"Cierres\" y parece que no pasó nada, subí la vista: la explicación está allá arriba.",
+    "Los montos se muestran redondeados a pesos enteros. Los centavos existen pero no se ven en pantalla.",
+    "La pestaña \"Cuentas\" solamente muestra. No se crean, no se renombran ni se dan de baja cuentas desde el sistema, y también aparecen ahí las que ya se dieron de baja. Si alguna vez leés \"No hay ninguna cuenta marcada para arquear. Configurá una en Cuentas\", esa configuración hoy no está en ninguna pantalla: hay que pedirla.",
+    "Si en Configuración se crea un medio de pago nuevo, ese medio arranca sin cuenta asignada y todo lo que se cobre con él va a caer en \"A imputar\". El aviso rojo te lo va a marcar como \"medio de pago sin cuenta\", pero asignarle la cuenta no se hace desde el sistema.",
+    "Cuánta diferencia se tolera sin explicación, si se pide motivo, y si un día cerrado queda bloqueado: las tres son reglas tuyas y se cambian en Configuración → \"Caja y arqueo\". Hoy están en pedir motivo por cualquier diferencia y bloquear el día cerrado.",
+    "La pantalla no se refresca sola. Si tu compañera cobra desde otra computadora mientras vos la tenés abierta, los números y el aviso rojo no se mueven hasta que vuelvas a entrar.",
+    "\"Cierres\" muestra los últimos 20. Los anteriores siguen guardados, pero no se ven acá."
+   ],
+   "key": "caja",
+   "nombre": "Caja"
+  },
+  {
+   "pantalla": "Gastos",
+   "queEs": "Es el registro de todo lo que el estudio paga o tiene que pagar: alquiler, sueldos, insumos, servicios, impuestos.",
+   "cuandoSeUsa": "Se entra cada vez que se paga algo del estudio y se quiere dejar asentado, y también cuando llega una factura que se va a pagar más adelante. A fin de mes se vuelve acá para ver cuánto se gastó, en qué y a quién.",
+   "partes": [
+    {
+     "nombre": "La barra de totales",
+     "queMuestra": "Arriba del todo, tres números: \"Pagado en el período\", \"Queda por pagar\" y \"Gastos\" (la cantidad). No son los totales de siempre: son los totales de lo que quedó filtrado abajo. Los gastos anulados no entran en ninguno de los tres."
+    },
+    {
+     "nombre": "La barra de filtros",
+     "queMuestra": "Dos casillas de fecha con una \"a\" en el medio, que es el período que estás mirando. Al lado, el botón \"Filtros\" (dice \"Filtros activos\" y se pinta cuando hay alguno puesto) y \"Limpiar\", que solo aparece si hay filtros puestos. A la derecha del todo, el botón \"Nuevo gasto\"."
+    },
+    {
+     "nombre": "El panel de filtros",
+     "queMuestra": "Se abre y se cierra tocando \"Filtros\". Trae seis casillas: \"Toda categoría\", \"Proveedor\", \"Todo medio\", \"Toda cuenta\", \"Etiqueta\" y \"Todo estado\" (Pagados, Por pagar, Anulados). Se combinan entre sí y con el rango de fechas. Ojo que \"Toda cuenta\" lista también \"A imputar\", que es la cuenta de descarte del sistema y no una cuenta del estudio."
+    },
+    {
+     "nombre": "El listado",
+     "queMuestra": "Un renglón por gasto, ordenados por la fecha del comprobante, del más nuevo al más viejo (los del mismo día quedan en cualquier orden entre sí). En cada uno: de qué se trata, un cartelito con el estado (\"Pagado\" en verde, \"Por pagar\" en amarillo, \"Anulado\" en gris y tachado), abajo en letra chica la fecha, la categoría, el proveedor, el comprobante —solo si le cargaste el Número— y, si está anulado, el motivo. A la derecha el monto y, al lado, los botones de acción: el tilde (si dejás el dedo encima dice \"Registrar el pago\"; aparece solo en los que quedan por pagar), el lápiz (\"Editar\") y el círculo tachado (\"Anular\"). Un gasto anulado no muestra ningún botón. Si no hay nada, dice \"Todavía no hay gastos cargados\" o \"Ningún gasto con esos filtros\"."
+    }
+   ],
+   "tareas": [
+    {
+     "titulo": "Cargar un gasto que ya pagaste",
+     "pasos": [
+      "Tocá \"Nuevo gasto\", arriba a la derecha. Se abre una ventana.",
+      "En \"Fecha\" poné la fecha del comprobante. Viene con la de hoy y no se puede dejar vacía.",
+      "En \"Monto *\" escribí cuánto, sin el signo $ y sin puntos de mil. Tiene que ser mayor que cero.",
+      "En \"De qué se trata *\" escribilo en criollo: \"alquiler de septiembre\", \"toallas\", \"service del reformer\".",
+      "Elegí la \"Categoría\" si querés: no es obligatoria, y la primera opción de la lista es \"Sin categoría\". Ojo con el desplegable: el nombre de cada rubro aparece dos veces seguidas. El de arriba, en gris claro, es el título del grupo y no se puede elegir; el de abajo es el que se elige.",
+      "En \"Proveedor\" poné a quién se le pagó.",
+      "Si tenés comprobante, elegí el tipo en \"Comprobante\" y escribí el \"Número\". Si no tenés, dejalo en \"sin comprobante\" y el Número vacío.",
+      "En \"Estado\" dejá marcado \"Ya lo pagué\".",
+      "Elegí el \"Medio\" (Efectivo, Transferencia, Tarjeta, Mercado Pago).",
+      "Mirá \"Sale de *\": el sistema propone una cuenta solo, pero no siempre acierta. Ahí tenés que decir de dónde salió la plata de verdad.",
+      "Mirá \"Fecha de pago\": viene con la de hoy aunque la \"Fecha\" del comprobante sea otra. Ese es el día en que la plata se descuenta de la cuenta.",
+      "Si querés, poné \"Etiquetas\" separadas por coma y una \"Notas\".",
+      "Tocá \"Cargar gasto\"."
+     ],
+     "ojo": "Los rechazos salen de a uno, en este orden: si falta el monto o es cero, \"Poné el monto\"; si falta el detalle, \"Escribí de qué se trata\"; y si el gasto está pagado y dejaste \"Sale de *\" vacío, \"Elegí de qué cuenta salió\". El \"Medio\", en cambio, se puede dejar sin elegir y guarda igual."
+    },
+    {
+     "titulo": "Anotar una factura que todavía no pagaste",
+     "pasos": [
+      "Tocá \"Nuevo gasto\".",
+      "Cargá la \"Fecha\" del comprobante, el \"Monto *\", \"De qué se trata *\", la \"Categoría\" y el \"Proveedor\" igual que siempre.",
+      "En \"Estado\" tocá \"Queda por pagar\". Debajo dice \"No mueve plata todavía\", y es literal.",
+      "Fijate que al elegir eso desaparecen \"Medio\", \"Sale de\" y \"Fecha de pago\". Todavía no hacen falta.",
+      "Tocá \"Cargar gasto\"."
+     ],
+     "ojo": "Mientras esté en \"Por pagar\" no baja ningún saldo, no aparece en la Caja y no entra en el total \"Pagado en el período\": solo suma en \"Queda por pagar\". La plata se mueve recién el día que registrás el pago."
+    },
+    {
+     "titulo": "Registrar el pago de un gasto pendiente",
+     "pasos": [
+      "Buscá el gasto en el listado. Tiene el cartelito amarillo \"Por pagar\".",
+      "Tocá el tilde, el primero de los botoncitos de la derecha.",
+      "Se abre la ventana \"Registrar el pago\", con el detalle y el monto arriba para que confirmes que es el que querías.",
+      "Los tres campos arrancan vacíos, en \"Elegir...\". Empezá por \"¿Con qué se pagó?\" y elegí el medio.",
+      "Recién ahí el sistema completa solo \"¿De qué cuenta salió?\". Revisá lo que propuso y corregilo si hace falta.",
+      "En \"¿Qué día?\" poné el día real del pago. Viene con hoy.",
+      "Tocá \"Registrar\"."
+     ],
+     "ojo": "Los dos primeros campos son obligatorios: si falta uno te dice \"Elegí con qué se pagó\" o \"Elegí de qué cuenta salió\". El día que pongas es el día en que el gasto le pega a la caja de esa cuenta, no la fecha del comprobante — y si ponés un día cuya caja ya cerraste, el sistema te deja igual, sin avisar nada. Mirá el aviso de más abajo."
+    },
+    {
+     "titulo": "Buscar un gasto o ver cuánto se gastó",
+     "pasos": [
+      "Poné el período en las dos casillas de fecha de arriba. La pantalla abre mostrando los últimos 30 días.",
+      "Tocá \"Filtros\" para abrir el panel de abajo.",
+      "Filtrá por lo que necesites: categoría, proveedor, medio, cuenta, etiqueta o estado. Se combinan.",
+      "Mirá los tres números de arriba: cambian solos con lo que filtraste.",
+      "Para volver a ver todo, tocá \"Limpiar\". Eso borra los seis filtros del panel, pero no toca el rango de fechas: ese lo corregís a mano."
+     ],
+     "ojo": "El filtro \"Proveedor\" busca por pedacito de texto y no distingue mayúsculas: poniendo \"muni\" encontrás \"Municipalidad\". El filtro \"Etiqueta\", en cambio, busca la etiqueta exacta, con las mismas mayúsculas y tildes con las que se escribió."
+    },
+    {
+     "titulo": "Corregir un gasto ya cargado",
+     "pasos": [
+      "Tocá el lápiz del renglón.",
+      "Se abre la misma ventana, ahora con el título \"Editar gasto\" y todo cargado.",
+      "Cambiá lo que haga falta.",
+      "Tocá \"Guardar\"."
+     ],
+     "ojo": "Si a un gasto pagado le tocás \"Queda por pagar\", el sistema le borra el medio, la cuenta y la fecha de pago, y esa plata vuelve al saldo de la cuenta. Y si el gasto ya entró en un arqueo de caja cerrado, el sistema rechaza el cambio de monto, medio, cuenta, fecha de pago o estado, con el mensaje \"Ese movimiento entró en un arqueo ya cerrado y no se puede modificar. Registrá el ajuste en la caja de hoy.\" No es un error: es que el arqueo ya firmado dejaría de coincidir con la base. El detalle, la categoría, el proveedor, las etiquetas y las notas sí se pueden corregir siempre."
+    },
+    {
+     "titulo": "Anular un gasto cargado por error",
+     "pasos": [
+      "Tocá el círculo tachado, el último botoncito del renglón.",
+      "Se abre una ventanita chica del navegador que pregunta: ¿Por qué se anula \"...\"? — con el detalle del gasto entre comillas.",
+      "Escribí el motivo. Va a quedar escrito en el renglón, a la vista de todos.",
+      "Tocá Aceptar. Si tocás Cancelar no pasa nada."
+     ],
+     "ojo": "Esto no se deshace. El gasto no se borra: queda tachado en la lista para siempre y deja de sumar en los totales. Si lo anulaste por error, la única salida es cargar el gasto de nuevo."
+    }
+   ],
+   "avisos": [
+    "El rango de fechas de arriba filtra por la fecha del comprobante, no por el día en que se pagó. Una factura con fecha de marzo que pagaste en abril aparece en marzo, y el total \"Pagado en el período\" la cuenta en marzo. O sea que ese número no es \"lo que salió de la caja este mes\": es lo que ya está pagado de los comprobantes de ese período.",
+    "La pantalla abre mostrando solo los últimos 30 días, y el cartel del vacío no lo tiene en cuenta. Si en ese rango no hay nada y no tocaste ningún filtro del panel, te va a decir \"Todavía no hay gastos cargados\" aunque haya cientos cargados afuera de esas fechas. Antes de pensar que algo no se guardó, corré la casilla de la izquierda más para atrás.",
+    "\"Fecha de pago\" arranca siempre en hoy, aunque la \"Fecha\" del comprobante sea de la semana pasada. Si no la corregís, el egreso le pega a la caja de hoy y el arqueo de hoy va a dar distinto.",
+    "La \"Fecha\" no se puede dejar vacía. Si la borrás, el guardado falla con un mensaje largo en inglés, que no es un aviso del sistema sino el error crudo de la base.",
+    "Al elegir el \"Medio\", el sistema completa \"Sale de\" solo con una regla muy simple: si es Efectivo propone la primera cuenta de caja (\"Caja del mostrador\") y para cualquier otro medio propone la primera cuenta bancaria (\"Cuenta bancaria\"). Por eso con Mercado Pago te propone el banco, y con Tarjeta también, cuando la cuenta que corresponde es \"Tarjetas a acreditar\". Cambiala a mano. Además, la sugerencia solo aparece si \"Sale de\" está vacío: si ya elegiste una cuenta, cambiar el medio no la vuelve a tocar.",
+    "La lista de \"Sale de *\" incluye \"A imputar\". Esa es la cuenta de descarte del sistema, donde va a parar la plata que no se sabe de dónde salió. No la elijas a propósito.",
+    "El sistema no deja cargar dos veces el mismo comprobante: si ya existe un gasto del mismo proveedor con el mismo \"Número\", el segundo se rechaza con un mensaje feo en inglés que menciona \"expenses_comprobante_unico\". El proveedor se compara sin distinguir mayúsculas, así que \"MUNICIPALIDAD\" y \"municipalidad\" cuentan como el mismo. Tres cosas más: si de verdad son dos gastos distintos, dejá el \"Número\" vacío; si cargás dos comprobantes con el mismo número y el \"Proveedor\" vacío en los dos, también los toma como repetidos; y un número que anulaste deja de contar, así que se puede volver a cargar.",
+    "Cerrar la ventana tocando el fondo oscuro, afuera del recuadro, la cierra sin preguntar nada y se pierde todo lo escrito. Lo mismo con \"Cancelar\".",
+    "Anular es definitivo: el gasto queda tachado con su motivo y no hay ningún botón, en ninguna pantalla, para revivirlo. Si el gasto estaba pagado, al anularlo esa plata vuelve al saldo de la cuenta y el gasto desaparece de la Caja.",
+    "Dos movimientos pueden dejar un arqueo ya cerrado sin coincidir, y el sistema los deja pasar sin avisar en el momento. Uno: anular un gasto pagado de un día cuya caja ya cerraste. El otro: registrar el pago de un gasto pendiente poniendo en \"¿Qué día?\" una fecha de un día ya cerrado (el candado del día arqueado no lo frena, porque hasta ese momento el gasto no tenía ni cuenta ni fecha de pago). En los dos casos, en la pantalla Caja va a aparecer el cartel \"Hay algo que revisar\".",
+    "En la ventanita que pide el motivo de la anulación se puede tocar Aceptar sin escribir nada, y el gasto se anula igual, sin explicación. Conviene escribirlo siempre.",
+    "Los gastos anulados siguen apareciendo en el listado, tachados, pero no suman en ninguno de los tres números de arriba ni figuran en la Caja. El sistema casi no borra nada: deja el registro y lo marca como anulado.",
+    "Las categorías son las diez que vienen cargadas de fábrica (Alquiler y expensas, Servicios, Sueldos y honorarios, Impuestos y tasas, Insumos, Mantenimiento, Equipamiento, Marketing, Comisiones y gastos bancarios, Otros). Hoy no se pueden agregar, renombrar ni dar de baja desde ninguna pantalla del sistema.",
+    "La pantalla redondea los montos a pesos enteros para mostrarlos. Los centavos se guardan igual, pero no los vas a ver ni en el renglón ni en los totales.",
+    "Con qué estado arranca un gasto nuevo y si el comprobante es obligatorio no se deciden acá: se configuran en Configuración, sección \"Gastos\". Si está encendida la exigencia de comprobante y dejás \"sin comprobante\", el sistema no guarda y avisa \"El estudio pide comprobante para cargar un gasto\"."
+   ],
+   "key": "gastos",
+   "nombre": "Gastos"
+  },
+  {
+   "pantalla": "Reportes",
+   "queEs": "Es la pantalla donde sacás los números del estudio: nueve listados que se arman en el momento, se miran por el período que vos elijas y se bajan a Excel.",
+   "cuandoSeUsa": "Cuando necesitás un número que no está en el Inicio: cuánto entró el mes pasado, quiénes deben plata, a quién hay que llamar para renovar, qué clases se llenan y cuáles no. Y a fin de mes, para cerrar y dejar el archivo guardado.",
+   "partes": [
+    {
+     "nombre": "Los nueve reportes, en tres grupos",
+     "queMuestra": "Arriba de todo, los botones para elegir qué mirar, bajo tres títulos en mayúsculas. En PLATA: Cobros, Deudas, Egresos, Resultado por mes y Cobrado por medio. En CLIENTES: Clientes nuevos y Membresías que vencen. En CLASES: Asistencias y Ocupación por clase. El que estás mirando queda pintado; los otros, grises. Cuando entrás viene puesto Cobros."
+    },
+    {
+     "nombre": "La barra del período",
+     "queMuestra": "Abajo de los botones. A la izquierda, el nombre del reporte y una frase chiquita que dice qué trae. A la derecha, dos casillas de fecha separadas por una \"a\": la de la izquierda es el desde y la de la derecha el hasta. Vienen puestas con los últimos 30 días. Al final, los botones Excel y PDF, que están apagados mientras la tabla no tenga ninguna fila."
+    },
+    {
+     "nombre": "La tabla",
+     "queMuestra": "El grueso de la pantalla. Las columnas cambian según el reporte: Cobros trae Fecha, Cliente, Concepto, Medio, Cuenta, Comprobante y Monto; Deudas trae Cliente, Concepto, Vencía, Días y Monto; Ocupación por clase trae Clase, Profesora, Cupo, Reservas, Asistieron, Faltaron y Ocupación. Mientras busca los datos da vueltas una rueda. Si no encuentra nada dice \"No hay datos en este período\". Si hay más de 300 filas, en pantalla se ven solo las primeras 300."
+    },
+    {
+     "nombre": "El pie de la tabla",
+     "queMuestra": "Una franja abajo de todo. A la izquierda, cuántas filas hay, y si pasan de 300 agrega \"se muestran las primeras 300, la descarga las trae todas\". A la derecha, el total del reporte, que siempre se calcula sobre TODAS las filas y no solo sobre las 300 que se ven: plata en Cobros, Deudas, Egresos, Cobrado por medio y Resultado por mes (ahí suma la columna Resultado, no los Ingresos); \"12 altas\" en Clientes nuevos; un número solo, sin palabra al lado, en Membresías que vencen; \"3 asistieron · 1 faltaron\" en Asistencias; \"24 reservas\" en Ocupación por clase."
+    }
+   ],
+   "tareas": [
+    {
+     "titulo": "Mirar un reporte de un período",
+     "pasos": [
+      "Tocá el botón del reporte que querés, arriba de todo.",
+      "Poné el desde en la casilla de fecha de la izquierda y el hasta en la de la derecha.",
+      "No busques un botón \"Buscar\": no existe. Apenas cambiás una fecha o cambiás de reporte, la tabla se rehace sola.",
+      "Esperá a que pare la ruedita.",
+      "Leé el pie de la tabla: ahí está la suma o el conteo, ya calculado sobre todas las filas, no solo sobre las 300 que se ven."
+     ],
+     "ojo": "El período que elegiste queda puesto cuando saltás a otro reporte. Si venís de mirar el año entero en Cobros y tocás Ocupación por clase, vas a estar mirando el año entero también ahí."
+    },
+    {
+     "titulo": "Llevarte el reporte: a Excel o a PDF",
+     "pasos": [
+      "Dejá la tabla mostrando lo que querés llevarte y esperá a que termine de cargar.",
+      "Para el archivo, tocá Excel. Se baja solo a la carpeta de Descargas, con el período en el nombre: por ejemplo cobros_2026-08-13_a_2026-09-12.",
+      "Abrilo con doble clic. Excel lo abre derecho, con los acentos bien.",
+      "Para imprimirlo o guardarlo en PDF, tocá PDF. Se abre la ventana de impresión del navegador y ahí elegís la impresora, o elegís \"Guardar como PDF\" si lo querés en un archivo."
+     ],
+     "ojo": "Tres cosas. Una: el botón dice Excel pero el archivo es un .csv, armado para un Excel en español — separa las columnas con punto y coma, usa la coma para los decimales, escribe las fechas al revés (2026-09-12) y manda los montos como números pelados, sin el signo $, para que los puedas sumar. Dos: el botón PDF no arma un PDF prolijo, manda a imprimir la pantalla tal como se ve, con el menú de la izquierda y todo, y si el reporte tiene más de 300 filas imprime solo esas 300; para un listado largo completo, usá Excel, que sí baja todas. Tres: no toques ninguno de los dos mientras la ruedita sigue girando — el Excel te sale con las filas del reporte anterior debajo de los títulos del nuevo, casi todo en blanco."
+    },
+    {
+     "titulo": "Sacar la lista de las que deben, para llamar",
+     "pasos": [
+      "Tocá Deudas, en el grupo PLATA.",
+      "Poné la fecha de la derecha en el día de hoy.",
+      "La lista sale ordenada de la deuda más vieja a la más nueva. La columna Vencía te dice cuándo vencía cada cuota y la columna Días, hace cuántos días.",
+      "Mirá el pie: ahí está cuánta plata te falta cobrar en total.",
+      "Si vas a repartir los llamados, tocá Excel y mandá el archivo."
+     ],
+     "ojo": "En este reporte la fecha de la izquierda no hace nada. Deudas mira solo la de la derecha y trae todo lo que se debe hasta ese día, sea de este mes o del año pasado. Tres consecuencias: la columna Días se cuenta contra esa fecha de la derecha y no contra hoy, así que si la ponés en una fecha vieja los días de atraso van a dar menos de lo que son; si la ponés en el futuro te van a entrar cuotas que todavía no vencieron y que nadie te debe todavía; y cuando una cuota vence justo ese día, en Días no vas a ver un número sino la palabra \"al día\"."
+    },
+    {
+     "titulo": "Ver a quién hay que llamar para renovar",
+     "pasos": [
+      "Tocá Membresías que vencen, en el grupo CLIENTES.",
+      "Poné la fecha de la izquierda en hoy y la de la derecha unos quince días para adelante: este reporte filtra por el día en que la membresía TERMINA.",
+      "Mirá la columna Vence, y la columna Clases, que dice cuántas usó de cuántas — por ejemplo 6/8.",
+      "En la columna Estado, salteá las que dicen \"futura\": esas ya renovaron y pagaron, están esperando su turno.",
+      "Tocá Excel si vas a repartir los llamados."
+     ],
+     "ojo": "Tal como viene puesto —los últimos 30 días— este reporte NO te muestra a quién llamar: te muestra las que YA vencieron, que es la lista para recuperar, no la de renovar. Para las que están por vencer tenés que correr las dos fechas hacia adelante. Y el Estado se calcula contra el día de hoy, no contra el período que elegiste."
+    },
+    {
+     "titulo": "Cerrar el mes",
+     "pasos": [
+      "Tocá Resultado por mes y poné el desde y el hasta dentro del mes que querés cerrar.",
+      "Vas a ver una fila por mes, con Ingresos, Egresos y Resultado. El mes sale escrito con el año adelante: 2026-09 es septiembre de 2026.",
+      "Tocá Cobrado por medio con las mismas fechas para ver cuánto entró por Efectivo, Transferencia, Tarjeta y Mercado Pago.",
+      "Si algún número no te cierra, tocá Cobros y Egresos para ver el detalle fila por fila.",
+      "Bajá los cuatro a Excel y guardalos: el sistema no archiva reportes, los arma de nuevo cada vez."
+     ],
+     "ojo": "Resultado por mes no respeta los días, trabaja con meses enteros. Si ponés del 15 de enero al 10 de febrero, te muestra enero completo y febrero completo. Por eso solo va a coincidir con lo que sumen Cobros y Egresos cuando el período sea un mes redondo, del 1 al último día; con cualquier otro período va a dar de más. Ojo también con el nombre del archivo, que igual te va a poner las dos fechas que elegiste aunque el reporte haya usado los meses enteros."
+    },
+    {
+     "titulo": "Ver qué clases se llenan y cuáles no",
+     "pasos": [
+      "Tocá Ocupación por clase, en el grupo CLASES.",
+      "Poné un período de una semana: por ejemplo del lunes al domingo.",
+      "Mirá la columna Ocupación: es cuánto se llenó respecto de la columna Cupo, que en todas las clases de la grilla dice 8.",
+      "Comparála con Asistieron y Faltaron: una clase con 8 reservas y 3 faltas no está tan llena como parece.",
+      "Para ver quién faltó, tocá Asistencias con las mismas fechas."
+     ],
+     "ojo": "El porcentaje de Ocupación solo sirve si el período es de una semana o menos. Con períodos más largos la clase se dictó varias veces y el sistema suma todas las reservas contra los 8 lugares: con los 30 días que vienen puestos vas a ver ocupaciones de 300% o 400%. No está roto, está sumando cuatro martes."
+    }
+   ],
+   "avisos": [
+    "Las 64 clases de la grilla se llaman todas \"Pilates Reformer\", y ni Ocupación por clase ni Asistencias tienen columna de día ni de hora. Por la profesora podés separar tres bloques (Ivana la mañana, la profesora del turno tarde, y Leandro los sábados), y en Ocupación el orden va de la más reservada a la menos. Si necesitás saber de verdad cuál es cuál, la grilla con los horarios está en Agenda, que es la segunda opción del menú de la izquierda.",
+    "Ocupación por clase lista solo las clases que están encendidas, y las lista a todas, incluso las que no tuvieron una sola reserva (van al fondo, con ceros). Si apagás una clase, desaparece de este reporte aunque esa semana haya tenido gente. Esas reservas no se pierden: siguen apareciendo en Asistencias, que no mira si la clase está encendida o apagada.",
+    "En Ocupación, la lista de espera cuenta como reserva y las canceladas no. Por eso una clase puede mostrar más de 8 reservas con 8 lugares de cupo.",
+    "Cobros va por la fecha en que se cobró, no por la fecha en que vencía. Una cuota de agosto que te pagaron en septiembre cuenta en septiembre. Es lo correcto para la caja, pero no confundas ese número con \"lo que facturé en agosto\".",
+    "Cobros, Egresos y Resultado por mes muestran únicamente lo que está efectivamente pagado. Un gasto que cargaste y todavía no pagaste no aparece en ningún reporte, y los cobros anulados tampoco figuran en ninguna parte.",
+    "Las cuotas de renovación que el sistema deja ofrecidas y que nadie tomó todavía no son deuda y no salen en Deudas. Cobran un mes que todavía no empezó: ponerle días de atraso a alguien que no debe nada sería mentir.",
+    "En Asistencias, el Estado sale tal como está cargado, y puede decir cinco cosas además de \"asistió\": \"ausente\", \"confirmada\", \"cancelada\", \"lista de espera\" y \"ofrecida\". El pie SOLO cuenta las que dicen \"asistió\" y las que dicen \"ausente\"; todas las demás están en la lista pero no suman ni de un lado ni del otro. \"confirmada\" quiere decir que la reserva existe pero nadie le tomó asistencia todavía. Si el pie te da 0 y 0, probablemente falte tomar la asistencia, no es que no vino nadie.",
+    "En Membresías que vencen, el Estado puede decir \"vigente\", \"vencida\", \"suspendida\" o \"futura\". Una \"futura\" es una membresía ya pagada que todavía no arrancó, encolada detrás de la que está corriendo: no la llames para renovar, ya renovó.",
+    "Clientes nuevos trae a todos los que se dieron de alta en el período, incluidos los que después dejaron el estudio: acá nada se borra, las bajas se apagan y siguen existiendo. También van a aparecer las diez clientas de prueba con apellido \"Prueba\" si su fecha de alta cae dentro del período.",
+    "Si ponés la fecha de la izquierda después de la de la derecha, el sistema no te avisa nada: la tabla sale vacía con \"No hay datos en este período\" y parece que no hubo movimiento. Revisá siempre las dos fechas antes de sacar conclusiones.",
+    "Si algo falla al buscar los datos, vas a ver un cartel rojo arriba de la tabla y abajo el mismo \"No hay datos en este período\". Ese cartel rojo es la diferencia entre \"no hubo movimiento\" y \"no se pudo consultar\": si aparece, no saques conclusiones del cero.",
+    "El nombre del archivo de Excel siempre se arma con las dos fechas que están en la pantalla, aunque el reporte no las haya usado. En Deudas, la fecha de la izquierda que ves en el nombre no se miró para nada; en Resultado por mes, las dos fechas del nombre en realidad fueron meses enteros. Si vas a guardar esos archivos, anotá al lado a qué corresponden.",
+    "En la columna Medio del reporte Cobros los medios salen escritos como los guarda el sistema, en minúscula y pegados: \"efectivo\", \"transferencia\", \"tarjeta\", \"mercadopago\". En Cobrado por medio salen con el nombre lindo: Efectivo, Transferencia, Tarjeta y Mercado Pago. Es el mismo dato. Si un cobro se cargó sin medio, en Cobros la celda sale vacía y en Cobrado por medio cae en una fila que dice \"Sin medio\".",
+    "El sistema no guarda los reportes: los arma en vivo cada vez que entrás. Si un número te importa para dejar constancia, bajalo a Excel en el momento — mañana los datos pueden haber cambiado y el reporte va a dar otra cosa."
+   ],
+   "key": "reportes",
+   "nombre": "Reportes"
+  },
+  {
+   "pantalla": "Configuración",
+   "queEs": "Es el tablero donde se cargan las reglas, los catálogos y los accesos del sistema: todo lo que las demás pantallas después dan por hecho.",
+   "cuandoSeUsa": "No es una pantalla del día a día. Se entra cuando cambia un dato del estudio, cuando hay que ajustar una regla (un plazo, un descuento, un aviso), o cuando alguien entra o se va del equipo. Se llega desde el botón Configuración, abajo de todo en la barra de la izquierda.",
+   "partes": [
+    {
+     "nombre": "La barra de arriba",
+     "queMuestra": "Una línea que recuerda que cada sección se abre y se cierra tocando su título, y a la derecha un botón: dice Contraer todo mientras haya aunque sea una sección abierta, y recién cuando están todas cerradas cambia a Desplegar todo. El sistema recuerda en esa computadora cómo dejaste cada sección la última vez que entraste."
+    },
+    {
+     "nombre": "El estudio",
+     "queMuestra": "Una sola sección, Datos del estudio, que viene abierta sola: Nombre del estudio, Dirección, Link de Google Maps, WhatsApp, Instagram, Email de contacto, Horario de atención y Estacionamiento. Es lo que se publica en la web."
+    },
+    {
+     "nombre": "Reglas del negocio",
+     "queMuestra": "Seis secciones con los números del negocio: Reservas y clases, Membresías, Cobros, Avisos automáticos, Caja y arqueo y Gastos. Cada campo tiene abajo una línea que explica qué hace, y cada sección tiene su propio botón Guardar, que está apagado hasta que cambiás algo."
+    },
+    {
+     "nombre": "Catálogos",
+     "queMuestra": "Disciplinas (hoy prendidas Pilates Reformer y Pilates Embarazadas) y Medios de pago (Efectivo, Transferencia, Tarjeta y Mercado Pago, cada uno con el porcentaje que le suma o le resta al precio de lista). Mercado Pago lleva al lado la etiqueta automático, porque ese no se registra a mano."
+    },
+    {
+     "nombre": "Equipo y espacios",
+     "queMuestra": "Profesores, con sus disciplinas, el color que llevan en la agenda y la listita para elegir con qué cuenta entra cada una — hoy hay tres cargadas y las tres dicen Sin cuenta. Y Salas, que hoy tiene una sola prendida: Sala Reformer."
+    },
+    {
+     "nombre": "Accesos e Integraciones",
+     "queMuestra": "Son dos rótulos distintos, uno abajo del otro. En Accesos están Usuarios del sistema (quiénes pueden ingresar y con qué rol) y Permisos (una tabla de qué puede hacer cada rol, con un cartel naranja arriba que dice cuántos permisos todavía no rigen: hoy 65 de 75). En Integraciones está Mercado Pago, que hoy figura Sin conectar."
+    }
+   ],
+   "tareas": [
+    {
+     "titulo": "Cambiar los datos que ve la gente en la web",
+     "pasos": [
+      "Abrí Datos del estudio, abajo del rótulo El estudio. Es la única sección que viene abierta sola.",
+      "Editá el campo que te interesa: Nombre del estudio, Dirección, Link de Google Maps, WhatsApp, Instagram, Email de contacto, Horario de atención o Estacionamiento.",
+      "En Dirección y en Horario de atención, cada renglón es una línea. En el horario, un renglón en blanco arranca un bloque nuevo: el día arriba, la hora abajo.",
+      "En Instagram va solo el nombre de usuario, sin el @ y sin la dirección completa. Hoy dice casafe.pilates.",
+      "El WhatsApp va solo con números: sin el +, sin espacios y sin el 15. Primero 54, después 9, después la característica sin el 0 y después el número. El que está cargado hoy es 5493816249107.",
+      "Tocá Guardar, abajo de la sección. Tiene que aparecer Guardado en verde. El cambio sale publicado en la web enseguida; no hay que avisarle a nadie."
+     ],
+     "ojo": "Vaciar un campo no lo borra de la web. Cuando queda vacío, la página vuelve a mostrar el texto que el sistema trae escrito por defecto, que hoy es justo el que ves cargado: la dirección, el horario, el WhatsApp y el Instagram no se sacan de la web desde acá, se cambian por otro texto. Y ojo con el WhatsApp: si el número queda mal armado nadie te avisa — el botón de la web abre un chat que no existe y el mensaje no llega. Después de tocarlo, probá vos misma el botón desde la web."
+    },
+    {
+     "titulo": "Cambiar una regla del negocio",
+     "pasos": [
+      "Abajo del rótulo Reglas del negocio están Reservas y clases, Membresías, Cobros, Avisos automáticos, Caja y arqueo y Gastos.",
+      "Tocá el título de la que corresponda para desplegarla.",
+      "Cambiá el número, el texto, la llavecita o la lista. Debajo de cada campo hay una línea que explica exactamente qué hace ese valor.",
+      "Fijate si el campo tiene la etiqueta naranja Todavía no rige. Si la tiene, lo podés dejar cargado, pero el sistema todavía no lo mira.",
+      "Tocá Guardar dentro de esa misma sección y esperá el Guardado en verde. Mientras no cambiaste nada, el botón Guardar está apagado."
+     ],
+     "ojo": "Cada sección tiene su propio Guardar. Si tocaste dos secciones, guardá las dos: el cartel naranja Sin guardar en el título te dice cuál te falta, y todo lo que no guardaste se pierde apenas salís de Configuración."
+    },
+    {
+     "titulo": "Sumar una disciplina nueva",
+     "pasos": [
+      "Abajo del rótulo Catálogos, abrí Disciplinas.",
+      "Tocá el + de la derecha. Se abre una ventana que dice Nueva disciplina.",
+      "Escribí el Nombre, que es obligatorio, y si querés la Descripción para la web: esa frase sale publicada en la web.",
+      "Elegí el Color: es la rayita de la izquierda que la clase va a llevar en la agenda. Después Fondo de la etiqueta y Texto de la etiqueta, que son el fondo y las letras de la tarjeta de esa clase. Abajo de todo se ve cómo va a quedar.",
+      "Tocá Crear.",
+      "Para cambiarla más adelante, usá el lápiz. Para apagarla, el tachito: primero pregunta «¿Dar de baja la disciplina \"…\"? Las clases que la usan no se tocan.» y recién si decís que sí la apaga."
+     ],
+     "ojo": "El tachito no borra: apaga. La disciplina desaparece de la lista y no hay ningún botón acá para traerla de vuelta, pero sigue ocupando el nombre. Si después la querés otra vez con el mismo nombre, el sistema responde Ya existe una disciplina con ese nombre. Hoy están apagadas Pilates Mat, Pilates Clínico, Pilates 3ra Edad, Yoga, Stretching y Funcional."
+    },
+    {
+     "titulo": "Cambiar el descuento o el recargo de un medio de pago",
+     "pasos": [
+      "Abajo de Catálogos, abrí Medios de pago. Arriba de la lista hay una línea que explica cómo se lee el número.",
+      "El casillero con el % de cada fila es el ajuste sobre el precio de lista. Hoy está Efectivo en −5, Transferencia en 0, Tarjeta en 25 y Mercado Pago en 0.",
+      "Escribí el número nuevo y tocá en cualquier otro lado de la pantalla. Ahí se guarda solo: no hay botón Guardar. Mientras el cursor siga adentro del casillero, todavía no se guardó nada.",
+      "Si dejás el casillero vacío, no queda \"sin ajuste especial\": queda en 0, o sea precio de lista.",
+      "Para renombrar un medio, usá el lápiz. Para apagarlo, el ojo tachado: el nombre queda tachado en la lista y se vuelve a encender con el ojo. Este es el único botón de toda la pantalla que no pregunta antes."
+     ],
+     "ojo": "El porcentaje es lo único de esta lista que la pantalla Pagos mira de verdad. Los tres botones de cobro de Pagos —Efectivo, Transferencia y Tarjeta— están escritos adentro del sistema: si acá renombrás uno, apagás uno o agregás uno nuevo, Pagos sigue mostrando los mismos tres de siempre. Los cambios de nombre, el apagado y los medios nuevos sí se ven en Gastos. Un medio de pago nuevo, entonces, sirve para cargar gastos, no para cobrar cuotas."
+    },
+    {
+     "titulo": "Sumar una profesora y darle su acceso",
+     "pasos": [
+      "Primero el acceso. Abajo del rótulo Accesos, abrí Usuarios del sistema y tocá Agregar. Se abre la ventana Nuevo usuario.",
+      "Los obligatorios son Email y Contraseña inicial (mínimo 6 caracteres). Nombre lo podés dejar vacío, pero cargalo igual: es lo que después vas a ver en la listita de cuentas.",
+      "En Rol elegí Profesor/a — solo consulta. Es el único rol que después aparece en la listita de cuentas de Profesores; si la creás como Recepción no la vas a encontrar ahí y nada te lo va a explicar. Tocá Crear usuario.",
+      "Pasale ese email y esa contraseña a ella. Después se la cambia sola con ¿Olvidaste tu contraseña? en la pantalla de ingreso.",
+      "Ahora la ficha. Abajo de Equipo y espacios, abrí Profesores y tocá Agregar.",
+      "Poné Nombre completo y marcá al menos una disciplina en Disciplinas que dicta: sin eso no deja guardar y avisa Seleccioná al menos una disciplina. Si querés, cargá Teléfono, Email y Color en la agenda. Tocá Crear.",
+      "En la fila de la profesora, en la listita que dice Sin cuenta, elegí la cuenta que acabás de crear. Eso es lo que hace que el sistema sepa cuáles son sus clases.",
+      "El día que se va: primero ponele Sin cuenta en esa listita, y recién después tocá el tachito, que pregunta «¿Dar de baja a …? Sus clases quedan en la agenda hasta que las edites.» El ingreso se corta aparte, con el ícono de la persona con el menos en Usuarios del sistema."
+     ],
+     "ojo": "El orden del último paso importa. Cada cuenta se vincula con una sola profesora, y darla de baja no le suelta la cuenta: la ficha desaparece de la lista con la cuenta pegada, y esa cuenta no se le puede dar a nadie más. Cada vez que lo intentes va a responder Esa cuenta ya está vinculada a otra profesora, y desde Configuración no hay forma de destrabarlo. Poné Sin cuenta antes del tachito."
+    },
+    {
+     "titulo": "Conectar la cuenta de Mercado Pago",
+     "pasos": [
+      "Abajo del rótulo Integraciones, abrí Mercado Pago. Hoy dice Sin conectar.",
+      "Seguí los cuatro pasos que están escritos ahí mismo. El 1 es entrar a Mercado Pago Developers con la cuenta del estudio. El 2 es crear una aplicación con el nombre del estudio y, en Tipo de solución, elegir Pagos online → Checkout Pro. El 3 es ir a Credenciales de producción y copiar el Access Token y la Public Key.",
+      "Pegá el Access Token en Access Token (producción) y la Public Key en Public Key (producción). Los dos empiezan con APP_USR-. El ojito al costado muestra o esconde el token.",
+      "Tocá Probar conexión (queda apagado mientras el Access Token esté vacío). Si está bien, aparece un cartel verde Conectado como con el nombre de la cuenta. Si no, dice El access token no es válido. Revisá que sea el de producción y esté completo.",
+      "Recién cuando probaste, tocá Guardar. Ahí aparece Configuración guardada. Ya se pueden generar links de pago desde Pagos."
+     ],
+     "ojo": "Guardar no revisa nada: guarda lo que esté escrito, aunque esté vacío o equivocado. Si vaciás los campos y guardás, el estudio se queda sin links de pago y nadie te avisa. Probá siempre antes de guardar."
+    }
+   ],
+   "avisos": [
+    "Acá casi nada se borra. Dar de baja es apagar: deja de aparecer, pero sigue existiendo por detrás y sigue ocupando el nombre.",
+    "Antes de apagar algo, el sistema pregunta. Disciplinas, salas, profesoras y accesos abren una ventanita de confirmación que dice qué va a pasar. El único que no pregunta es el ojo tachado de los medios de pago: apaga en el acto.",
+    "Lo que apagás en Disciplinas, Salas y Profesores no tiene botón para volver desde esta pantalla. Los medios de pago sí (se vuelven a encender con el ojo) y los accesos de personas también (la flecha redonda).",
+    "Los nombres no se pueden repetir, ni siquiera con los apagados. Crear una sala o una disciplina con el nombre de una que apagaste devuelve Ya existe una sala con ese nombre. Hoy están apagadas las salas Sala 1, Sala 2 y Sala Clínica, y seis disciplinas (Pilates Mat, Pilates Clínico, Pilates 3ra Edad, Yoga, Stretching y Funcional), aunque no las veas en la lista.",
+    "Los nombres de profesoras sí se repiten y el sistema no dice nada: si cargás dos veces a la misma, quedan las dos y las dos aparecen en la agenda.",
+    "Cada sección de Reglas del negocio guarda por su cuenta. Cerrar una sección no borra lo que tipeaste, solo lo esconde; pero salir de Configuración sin guardar sí lo pierde. El cartel naranja Sin guardar en el título es el aviso.",
+    "Un campo de número vacío no significa \"sin límite\": vale cero. Si borrás Plazo de cancelación (horas) y guardás, el plazo queda en cero y se puede cancelar hasta el último minuto.",
+    "La etiqueta naranja Todavía no rige quiere decir que el valor se guarda pero el sistema no lo usa. Hoy la tienen Recordatorio de deuda (días antes), Congelamiento máximo (días), Días sin renovar para ponerla en la lista de contacto, Tiempo para confirmar un lugar (minutos), Permitir adjuntar la foto del comprobante y Tamaño máximo del comprobante (MB).",
+    "Renombrar arrastra. Cambiarle el nombre a una sala se lo cambia a todas sus clases; cambiárselo a una disciplina se lo cambia a las clases, los planes y los profesores. El nombre viejo deja de existir en todos lados. La excepción es Medios de pago: ahí el nombre nuevo se ve en Configuración y en Gastos, pero la pantalla Pagos sigue mostrando Efectivo, Transferencia, Tarjeta y Mercado Pago, que los tiene escritos por dentro.",
+    "En Permisos la tilde se guarda sola apenas la tocás: no hay botón Guardar ni pregunta de confirmación. La tabla es por rol, no por persona: las columnas son Admin, Recepción, Profesor/a y Cliente, y lo que destildás se lo sacás a todas las personas que tengan ese rol.",
+    "La mayoría de los permisos todavía no rige y el cartel naranja de arriba lo dice. Pero los de Caja, Gastos y Reportes sí rigen: destildar uno ahí se lo saca a ese rol en el momento, en plena jornada. Y la columna Admin también se puede destildar: si le sacás Ver la caja diaria al Admin, te lo sacaste a vos misma.",
+    "Los permisos con candado no se pueden cambiar. Tocá el nombre del permiso y te explica por qué.",
+    "Sacarle Ver información financiera (pagos, facturación, deuda) a un rol le esconde los pagos y la facturación, pero no el precio que figura en la membresía de cada cliente. La base filtra por dato, no por campo suelto.",
+    "No podés cambiar tu propio rol ni darte de baja a vos misma: al lado de tu nombre dice Vos y esos botones ni aparecen. El sistema tampoco se deja quedar sin ningún admin: si intentás bajar o dar de baja al último, lo rechaza con El sistema no puede quedarse sin ningún admin activo.",
+    "A una persona dada de baja no se le puede cambiar el rol: el desplegable de su fila queda apagado hasta que la reactivés con la flecha redonda.",
+    "El desplegable de rol de cada fila tiene cuatro opciones, una más que la ventana de alta: Cliente. Pasar a alguien a Cliente le saca el sistema entero y le deja solo el portal.",
+    "Desde esta pantalla no se le cambia la contraseña a nadie. La contraseña inicial se pone al crear la cuenta; después cada persona se la cambia sola con ¿Olvidaste tu contraseña? en la pantalla de ingreso."
+   ],
+   "key": "configuracion",
+   "nombre": "Configuración"
+  }
+ ],
+ "antes": [
+  {
+   "titulo": "Cómo entrar al sistema",
+   "rotulo": "Primeros pasos",
+   "parrafos": [
+    "El sistema se abre en el navegador, igual que cualquier página: en la compu del mostrador o en el celular. Es la dirección de la web del estudio con <b>/sistema</b> al final, pero no hace falta escribirla: en la web, arriba a la derecha, está el botón <b>Ingresar</b>, y abajo de todo el enlace <b>Acceso al sistema</b>. No se instala nada para empezar, y entran por ahí todos: vos, recepción, las profesoras y también los clientes.",
+    "La pantalla de ingreso es una sola y el sistema se acomoda solo a quién entró. Si entrás vos o recepción, se abre el sistema de gestión, con el menú a la izquierda. Si entra un cliente, se abre <b>su portal</b>: sus clases, su membresía y sus pagos. Nadie elige por dónde entrar, lo decide la cuenta. Y no es solo un menú escondido: si un rol no tiene acceso a los pagos, el sistema le niega los datos aunque sepa dónde buscarlos.",
+    "Se entra con <b>email y contraseña</b>. No hay nombre de usuario aparte: el email es el usuario. Al crear una cuenta, la contraseña tiene que tener al menos 6 caracteres. Si algo no coincide, el cartel dice \"Email o contraseña incorrectos\" sin aclarar cuál de los dos está mal, y eso es a propósito. Si en cambio aparece un mensaje raro o en inglés, no es la contraseña: suele ser una cuenta dada de baja. Avisanos antes de crear otra.",
+    "Si alguien se olvida la contraseña, en la pantalla de ingreso está <b>¿Olvidaste tu contraseña?</b>. Se escribe el email y el sistema contesta siempre lo mismo, exista o no la cuenta, así que ese cartel verde no confirma que el mail haya salido. Revisá el correo no deseado. Y tené en cuenta que el mail lo manda el servicio que está detrás del sistema, que <b>tiene un tope de cuántos envía por hora</b>: si se piden varios seguidos, los últimos no llegan. En ese caso se espera un rato y se pide de nuevo, no se crea otra cuenta.",
+    "Para salir está <b>Cerrar sesión</b>, abajo de todo en el menú de la izquierda. Los clientes lo tienen arriba, en su portal. Vale la pena tomarlo como costumbre en la compu del mostrador: si no se cierra, la sesión queda abierta y la próxima persona que se siente entra con el usuario de la anterior, con todo lo que ese usuario puede hacer.",
+    "Dar de baja un acceso <b>no borra nada</b>. La persona deja de poder ingresar y todo su historial —clases, pagos, asistencias— queda donde estaba. Ojo con una cosa: si en ese momento tenía el sistema abierto en su celular, lo puede seguir viendo un rato, hasta que le pida ingresar otra vez. Se reactiva cuando quieras desde la misma lista.",
+    "En el celular el sistema se puede dejar como si fuera una aplicación, con su propio ícono al lado de WhatsApp. Después de entrar te aparece abajo un cartelito que dice <b>\"Llevá el estudio en tu celu\"</b>. En Android tocás \"Sí, agregar\" y listo; en iPhone te muestra los tres pasos (Compartir → Agregar a inicio → Agregar), y hay que hacerlo desde Safari."
+   ],
+   "listas": [
+    {
+     "titulo": "Quién ve qué",
+     "items": [
+      {
+       "nombre": "Administradora",
+       "texto": "Ve todo: Inicio, Agenda, Clientes, Planes, Reservas, Pagos, Caja, Gastos, Reportes y Configuración. Es la única que entra a Usuarios del sistema y a Permisos, y la única que ve y carga los datos de la cuenta de Mercado Pago. Junto con recepción, es la única que ve las observaciones médicas y el contacto de emergencia de cada ficha."
+      },
+      {
+       "nombre": "Recepción",
+       "texto": "Todo el trabajo del mostrador: anota clientes, arma reservas, cobra, carga gastos y cierra la caja. Ve las mismas pantallas que vos, incluida Configuración, con cuatro diferencias: no ve la lista de usuarios, no ve la tabla de permisos, no ve los datos de la cuenta de Mercado Pago (sí ve si está conectada o no), y tres parámetros de Caja le aparecen con un candado, porque aflojan el control del arqueo y los cambia solo la administradora."
+      },
+      {
+       "nombre": "Profesora",
+       "texto": "Solo consulta. Ve Inicio, Agenda, Clientes, Planes y Reservas, y no puede modificar nada: arriba a la izquierda le queda un cartelito que dice \"Solo consulta\" (en el celular, solo el ojito). No ve Pagos, ni Caja, ni Gastos, ni Reportes, ni Configuración. Y en la ficha del cliente <b>no ve las observaciones médicas ni el contacto de emergencia</b>."
+      },
+      {
+       "nombre": "Cliente",
+       "texto": "No entra al sistema de gestión. Entra por la misma dirección, con su email y su contraseña, y ve su portal: su membresía y cuántas clases le quedan, sus próximas clases, sus pagos y un botón para cambiar su contraseña. Para reservar necesita la membresía activa; si no la tiene, el portal le dice que consulte en recepción. De los demás clientes no ve nada."
+      }
+     ]
+    },
+    {
+     "titulo": "Crear una cuenta nueva",
+     "items": [
+      {
+       "nombre": "Para alguien del equipo",
+       "texto": "Configuración → Accesos → Usuarios del sistema → Agregar. Se carga nombre, email, una contraseña inicial (mínimo 6 caracteres) y el rol: Recepción, Profesor/a o Admin. Esa sección la ves solamente vos."
+      },
+      {
+       "nombre": "Para un cliente, desde el mostrador",
+       "texto": "Abrí su ficha en Clientes y tocá \"Crear acceso\". Te propone el email que ya tiene cargado, te pide una contraseña inicial y después te recuerda pasárselos. Con eso el cliente ya entra a su portal. Lo puede hacer recepción también. Una vez creado, el botón desaparece y la ficha queda marcada como \"Activo\"."
+      },
+      {
+       "nombre": "Para un cliente, por su cuenta",
+       "texto": "En la pantalla de ingreso, abajo, dice \"¿Sos cliente del estudio y no tenés cuenta? Creá tu acceso\". Le pide email, DNI y una contraseña (dos veces). Para que lo deje, su ficha tiene que estar activa, tener <b>el email y el DNI cargados</b> y no tener ya un acceso creado. Si algo de eso falta, no lo deja y le dice que consulte en recepción: nadie se crea una cuenta sin estar cargado antes por el estudio. En el mostrador, nueve de cada diez veces el problema es una ficha sin DNI."
+      },
+      {
+       "nombre": "Para una profesora que además da clase",
+       "texto": "Son dos cosas distintas y hay que hacer las dos. La cuenta con la que entra se crea en Usuarios del sistema; su ficha, la que aparece en la grilla de la Agenda, en Configuración → Profesores. Después, en la fila de esa profesora, hay un desplegable que dice \"Sin cuenta\": ahí elegís su cuenta y quedan unidas. Ese vínculo deja anotado quién es quién; hoy no cambia lo que ella ve en pantalla."
+      }
+     ]
+    },
+    {
+     "titulo": "La lista de Usuarios del sistema",
+     "items": [
+      {
+       "nombre": "Cambiarle el rol a alguien",
+       "texto": "Al lado de cada nombre hay un desplegable. Ahí pasás a alguien de Recepción a Admin, o a Profesor/a. Si elegís Cliente, esa persona deja de ver el sistema de gestión y pasa a ver el portal. Tu propio rol no lo podés cambiar vos."
+      },
+      {
+       "nombre": "Sacarle el acceso a alguien",
+       "texto": "El botoncito de la personita con un signo menos. Te pide confirmar, deja de poder entrar, pero sigue figurando en la lista como \"Dado de baja\" y su historial queda intacto. A vos misma no te deja darte de baja, y el sistema no permite quedarse sin ninguna administradora activa: si intentás cualquiera de las dos cosas, te lo frena."
+      },
+      {
+       "nombre": "Devolverle el acceso",
+       "texto": "En la misma fila, el botoncito de la flecha redonda. Vuelve a quedar activa con el rol que tenía y entra con su misma contraseña de siempre."
+      }
+     ]
+    }
+   ],
+   "avisos": [
+    "Nadie puede cambiarle la contraseña a otro desde el sistema, ni vos. El único camino es el enlace de \"¿Olvidaste tu contraseña?\" que llega al mail de esa persona. Y una vez que un cliente tiene su acceso creado, el botón \"Crear acceso\" de su ficha ya no vuelve a aparecer. Por eso el email que cargues tiene que ser uno al que entre de verdad.",
+    "Los clientes sí tienen, dentro de su portal, un botón para cambiar su propia contraseña. En el sistema de gestión ese botón todavía no está: el equipo cambia la suya por el enlace del mail. Si en la pantalla de alta de usuario leés \"puede cambiarla después\", es por ahí, no desde adentro del sistema.",
+    "El enlace que llega por mail se usa una sola vez y vence. Si ya se usó, la pantalla dice \"El enlace no es válido o venció\" y hay que pedir uno nuevo. La contraseña nueva, además, tiene que ser distinta a la anterior.",
+    "En Configuración → Permisos vas a ver una tabla para tildar qué puede hacer cada rol. Hoy la mayoría de esos tildes todavía no rigen, y la pantalla te lo avisa con un cartel amarillo: podés dejar la tabla como la querés y se va activando de a un grupo por vez. Lo que ya rige es Caja, Gastos y Reportes; el resto sigue funcionando por rol, tal como está descripto arriba.",
+    "Sacarle a un rol \"ver información financiera\" le esconde los pagos y la facturación, pero no el precio que figura en la membresía de cada cliente. El sistema filtra por dato, no por campo suelto.",
+    "La profesora ve a todos los clientes y todas las clases, no solamente las suyas, y ve el precio del plan de cada uno. Lo que no ve son las observaciones médicas ni el contacto de emergencia. Las dos cosas se pueden cambiar, pero no del mismo modo: que vea los datos de salud es un tilde en la tabla de Permisos, en un grupo que todavía no rige —o sea que tildarlo hoy no cambia nada—; que vea solo sus clases es un desarrollo. Avisanos y lo vemos.",
+    "Mientras no esté conectada la dirección definitiva del estudio, puede pasar que el enlace de recuperar contraseña abra la página de inicio en vez de la pantalla para cambiarla. Si te pasa eso, avisá antes de asumir que la cuenta está rota.",
+    "Instalada en el celular sigue siendo la misma página: necesita internet para funcionar. Sin señal no abre. Y si alguna vez tocaste \"Ahora no\" en el cartelito, no te lo vuelve a ofrecer en ese teléfono; se instala igual desde el menú del navegador."
+   ]
+  }
+ ],
+ "despues": [
+  {
+   "titulo": "Lo que el sistema hace solo",
+   "rotulo": "Procesos automáticos",
+   "parrafos": [
+    "Hay cosas que pasan sin que nadie las toque. Todos los días, cerca de las <b>6 de la mañana</b>, el sistema revisa las membresías y los pagos del estudio. Y cada vez que alguien reserva una clase o entra un pago, hace las cuentas en el momento. Esta página es la lista completa de eso: lo que se hace solo, lo que no, y lo que todavía no llega a destino.",
+    "Todo lo que revisa a la mañana termina en <b>la campana</b>, arriba a la derecha de la pantalla. Ahí aparecen los avisos del mostrador: quién está por vencer, quién venció, quién debe. La campana la ven la administradora y recepción; la profesora no la tiene. Los avisos vienen apareciendo ahí desde el 10 de septiembre.",
+    "Esos mismos avisos pueden llegarte además al teléfono, pero <b>hoy no le llegan a nadie</b>. Hay que abrir la campana y tocar <b>Activar avisos en este dispositivo</b>, que está abajo de todo. Se hace uno por uno, en cada teléfono y cada computadora, y todavía no lo hizo nadie. En iPhone hay que agregar antes el sistema a la pantalla de inicio: si no, el botón ni aparece.",
+    "La renovación es el automatismo más importante y conviene entender el orden, porque no es el que uno espera. <b>Siete días antes</b> de que venza una membresía, el sistema emite la cuota del período siguiente. La membresía nueva no se crea ahí: nace recién <b>cuando el pago entra</b>. Todavía no pasó ninguna vez: la primera membresía que vence es a fin de mes, así que hasta hoy el sistema no emitió ni una sola cuota de renovación.",
+    "Si paga antes del vencimiento, el período nuevo arranca el día después de que termina el que está usando: pagar antes no le quita días. Si paga después, arranca el día que pagó, pero el margen es corto. <b>La cuota vale hasta el día siguiente al vencimiento</b> —vence el 19 de octubre, se paga hasta el 20— y a partir de ahí se anula sola. Mientras tanto no figura como deuda ni le llega ningún mensaje de cobranza: es una oferta que no tomó, no algo que debe.",
+    "Al reservar, la clase se descuenta en el momento. El sistema no deja anotar a nadie sin membresía vigente ni con las clases de su plan agotadas, y eso vale para todos, mostrador incluido. Lo que el mostrador sí puede hacer, y la clienta desde su portal no, es anotar a alguien en una clase que ya empezó: es el caso de la que llegó sin reserva y se le carga después.",
+    "Los avisos de renovación están preparados para la clienta por tres vías independientes: la campana de su portal, un aviso en su celular y un mail. <b>Hoy ninguna de las tres le está llegando</b>, y abajo de todo está explicado por qué."
+   ],
+   "listas": [
+    {
+     "titulo": "Todos los días, temprano a la mañana",
+     "items": [
+      {
+       "nombre": "La cuota de renovación",
+       "texto": "Siete días antes de que venza una membresía, emite la cuota del período siguiente por el precio de lista del plan. Solo de las clientas que tienen la renovación automática encendida en su ficha, con el plan activo y con precio cargado. Los siete días se cambian en Configuración, en Membresías."
+      },
+      {
+       "nombre": "Los pases de prueba quedan afuera",
+       "texto": "FE FIRST está cargado como pase de prueba, así que nunca genera cuota de renovación, y tampoco deja aviso de que no la generó. Si alguien tiene que seguir después del pase, la renovación se arma a mano desde su ficha."
+      },
+      {
+       "nombre": "Tres recordatorios",
+       "texto": "Cinco días antes, dos días antes y el mismo día del vencimiento. Si un día el sistema no corre, al día siguiente sale el que corresponda: el más urgente de los que se pasaron, y uno solo por día. Los tres números los elegís vos en Configuración, en Avisos automáticos."
+      },
+      {
+       "nombre": "Las que vencieron",
+       "texto": "Al día siguiente de vencer avisa quiénes se quedaron sin renovar. Ese día todavía se puede pagar la cuota: el aviso lo dice. Mira hasta una semana para atrás: lo que venció hace más de siete días no vuelve a aparecer en ningún aviso."
+      },
+      {
+       "nombre": "Las cuotas que nadie tomó",
+       "texto": "El plazo de la cuota es el día siguiente al vencimiento de la membresía. Pasado ese día, la revisión de la mañana la anula sola. También anula la de quien ya renovó por otro camino, para que nadie la pague por error y quede un mes de más colgado."
+      },
+      {
+       "nombre": "Las deudas vencidas",
+       "texto": "Los pagos que pasaron su fecha, de hasta un mes atrás, avisan una sola vez por pago: en la campana y, además, con un mail a la clienta. Las cuotas de renovación sin pagar no entran acá, a propósito."
+      },
+      {
+       "nombre": "El resumen del día",
+       "texto": "Un solo aviso al celular, con el conteo de todo lo anterior. No repite: aunque el proceso corra dos veces, la noticia sale una sola. Hoy no sale a ningún lado, porque nadie activó todavía los avisos en su teléfono."
+      },
+      {
+       "nombre": "Cuando algo no se pudo",
+       "texto": "Si un plan quedó apagado o sin precio, avisa con nombre y apellido que a esa clienta no se le emitió la renovación. Y avisa antes de que venza, así queda tiempo de arreglarlo sin que ella se entere de nada."
+      }
+     ]
+    },
+    {
+     "titulo": "En el momento en que alguien reserva",
+     "items": [
+      {
+       "nombre": "Se descuenta la clase",
+       "texto": "Al reservar, no al asistir. El sistema no suma ni resta de a una: cada vez vuelve a contar desde cero las reservas de esa membresía. Por eso una clase no se puede cobrar dos veces ni quedar sin devolver."
+      },
+      {
+       "nombre": "Cancelar con 3 horas o más",
+       "texto": "La clase vuelve. Con menos de 3 horas, se pierde. Las 3 horas se cambian en Configuración, en Reservas y clases, y el sistema mira el reloj del estudio, no el del teléfono de quien cancela."
+      },
+      {
+       "nombre": "Faltar sin avisar",
+       "texto": "Hoy consume la clase. Es una opción que se prende y se apaga en Configuración: si mañana el estudio decide lo contrario, se cambia ahí."
+      },
+      {
+       "nombre": "Si el estudio suspende la clase",
+       "texto": "Nadie pierde nada. La clase vuelve sola a todas las que tenían la reserva viva, sin que haya que cancelar nada a mano. Ese día tampoco se puede anotar a nadie nuevo. Y si después volvés a dictarlo, se descuenta de nuevo."
+      },
+      {
+       "nombre": "Lo que no deja hacer nunca, a nadie",
+       "texto": "Anotar a alguien sin membresía vigente para esa fecha, o con las clases de su plan agotadas. Tampoco un noveno lugar en una sala de ocho, ni un día en que esa clase no se dicta. En cada caso el sistema frena y explica cuál es el motivo. Esto vale igual para el mostrador."
+      },
+      {
+       "nombre": "Lo que el mostrador sí puede y la clienta no",
+       "texto": "Anotar a alguien en una clase que ya empezó, o en una que ya pasó. Desde el portal la clienta no puede; la administradora, recepción y la profesora sí. Es para la que llegó sin reserva y se le carga la clase después, y queda registrado quién la cargó y a qué hora."
+      }
+     ]
+    },
+    {
+     "titulo": "En el momento en que entra un pago",
+     "items": [
+      {
+       "nombre": "El número de comprobante",
+       "texto": "Se asigna solo, en orden, y recién cuando el pago se cobra: una cuota pendiente todavía no tiene número. La numeración hoy va por 68 porque los ensayos se llevaron los primeros, así que el primer comprobante real no va a arrancar en 1. Un cobro anulado conserva su número."
+      },
+      {
+       "nombre": "La caja",
+       "texto": "El pago se imputa solo a la cuenta que corresponde: efectivo a la caja del mostrador, transferencia a la cuenta bancaria, y tarjeta y Mercado Pago cada uno a la suya. Y queda registrado quién lo cobró."
+      },
+      {
+       "nombre": "La membresía del período nuevo",
+       "texto": "Nace sola si lo que se cobra es <b>la cuota de renovación que emitió el sistema</b>: con su plan, sus fechas y el monto que efectivamente se cobró. Si en cambio cargás un cobro suelto desde Pagos, no nace ninguna membresía. Para eso hay que asignarle el plan desde la ficha."
+      },
+      {
+       "nombre": "El recargo y el descuento por medio de pago",
+       "texto": "Efectivo hace 5% menos y tarjeta 25% más. La cuota se emite con el precio de lista, así que lo que la clienta ve en su aviso puede no ser lo que termina pagando en el mostrador. La membresía nueva queda registrada con el monto cobrado, recargo incluido."
+      },
+      {
+       "nombre": "Hasta cuándo vale",
+       "texto": "Los cinco planes mensuales valen un mes de calendario, no treinta días: arranca el 20 de septiembre y se usa hasta el 19 de octubre inclusive. Los meses cortos los resuelve solo (arrancando un 31 de enero llega al 27 de febrero). FE FIRST es la excepción: son 7 días."
+      },
+      {
+       "nombre": "El aviso de pago acreditado",
+       "texto": "Aparece en la campana del mostrador apenas entra, venga del mostrador o de un pago online."
+      },
+      {
+       "nombre": "Si algo sale mal",
+       "texto": "El cobro se registra igual, porque la plata entró. Pero no se queda callado: deja un aviso en la campana diciendo que la membresía no se creó y que hay que asignarla a mano desde la ficha."
+      }
+     ]
+    },
+    {
+     "titulo": "Lo que no hace falta hacer a mano",
+     "items": [
+      {
+       "nombre": "Emitir la cuota de renovación",
+       "texto": "Sale sola siete días antes. Si preferís resolverla vos, asignale el plan desde la ficha: ahí el sistema ve que ya está renovada y no ofrece nada."
+      },
+      {
+       "nombre": "Crear la membresía del mes nuevo",
+       "texto": "Nace de cobrar esa cuota. Si igual se la asignás vos a mano, la cuota que estaba esperando se anula sola en la revisión de la mañana siguiente."
+      },
+      {
+       "nombre": "Dar de baja la cuota que nadie pagó",
+       "texto": "Caduca sola al día siguiente de su plazo."
+      },
+      {
+       "nombre": "Llevar la cuenta de clases usadas",
+       "texto": "La lleva el sistema, reserva por reserva."
+      },
+      {
+       "nombre": "Calcular hasta cuándo vale una membresía",
+       "texto": "La fecha la pone el sistema al crearla."
+      },
+      {
+       "nombre": "Numerar comprobantes",
+       "texto": "Va solo, en orden, al cobrar."
+      },
+      {
+       "nombre": "Devolver las clases de un día suspendido",
+       "texto": "Vuelven solas a las que tenían la reserva viva."
+      }
+     ]
+    },
+    {
+     "titulo": "Lo que sigue estando en manos de alguien",
+     "items": [
+      {
+       "nombre": "Marcar asistencia",
+       "texto": "El sistema no marca presente ni ausente solo. Eso lo hace el mostrador o la profesora."
+      },
+      {
+       "nombre": "La lista de espera",
+       "texto": "Cuando se libera un lugar, el sistema no se lo ofrece a nadie ni avisa. Hay que mirar la lista y llamar."
+      },
+      {
+       "nombre": "El tope de dos recuperos por mes",
+       "texto": "Es una regla del estudio, no del sistema. El sistema devuelve la clase cuando se cancela en plazo, pero no cuenta cuántas recuperó cada una."
+      },
+      {
+       "nombre": "Quien canceló antes de que suspendieras el día",
+       "texto": "Esa no recupera sola. Hay que volver a anotarla en esa clase: el sistema reconoce la reserva que había cancelado y la reactiva."
+      },
+      {
+       "nombre": "Confirmar la reserva y recordar la clase",
+       "texto": "Esos dos mensajes todavía no existen. Nadie recibe una confirmación al reservar ni un recordatorio el día anterior."
+      },
+      {
+       "nombre": "Avisar un cambio de horario, de profesora, o una clase suspendida",
+       "texto": "No sale solo. Se avisa a mano."
+      },
+      {
+       "nombre": "Los mensajes de WhatsApp",
+       "texto": "El sistema te arma el texto y te abre el chat con el número cargado, desde Inicio y desde Pagos. Enviar lo hacés vos."
+      },
+      {
+       "nombre": "La caja",
+       "texto": "No hay aviso de caja sin cerrar ni de diferencia de arqueo. Eso se ve entrando a Caja."
+      },
+      {
+       "nombre": "Cuatro parámetros que están pero no rigen",
+       "texto": "Congelamiento máximo, Días sin renovar para ponerla en la lista de contacto, Tiempo para confirmar un lugar y Recordatorio de deuda. Los vas a ver en Configuración y los vas a poder guardar, con un cartel que avisa que todavía no rigen: cambiarlos hoy no produce ningún efecto."
+      }
+     ]
+    }
+   ],
+   "avisos": [
+    "Los mails a las clientas todavía no salen. El servicio de correo está en modo de prueba y solo entrega a la casilla con la que se creó la cuenta. Todo lo que dice esta página sobre mails está construido y andando, pero para que lleguen a destino los mails tienen que salir desde una dirección propia del estudio, y eso es un trámite afuera del sistema, no un desarrollo.",
+    "Ninguna clienta tiene todavía su cuenta del portal, así que la campana del portal y los avisos en su celular no le llegan a nadie. Se encienden de a una: cuando le creás el acceso y ella activa los avisos en su teléfono.",
+    "Los avisos al celular del estudio tampoco están llegando: nadie activó todavía el botón de la campana. Se activa por dispositivo, no por persona, así que cada teléfono y cada computadora del mostrador se activa por separado. En iPhone hay que agregar antes el sistema a la pantalla de inicio.",
+    "Mercado Pago no está conectado. Mientras siga así, los avisos de renovación no llevan botón para pagar online: dicen que se abona en el estudio. Al conectar la cuenta, el botón aparece solo en los avisos siguientes; para una cuota ya emitida, el link se genera a mano desde Pagos.",
+    "La cuota de renovación sale sola únicamente si la clienta tiene la renovación automática encendida en su ficha —viene encendida— y si su plan está activo y con precio cargado. Un plan sin precio apaga la renovación de todas sus clientas de golpe. El sistema te avisa cuando pasa, pero conviene saberlo de antemano. Los pases de prueba nunca renuevan solos, y de eso no avisa.",
+    "Hoy en el sistema hay diez clientas de prueba, todas con apellido Prueba. No son del estudio: están para ensayar y se borran cuando terminemos de probar."
+   ]
+  },
+  {
+   "titulo": "Lo que todavía no hace",
+   "rotulo": "Límites del sistema",
+   "parrafos": [
+    "Esta página está para que no te enteres un martes a las nueve, con la sala llena. Nada de lo que sigue rompe el sistema: son cosas que por ahora seguís resolviendo a mano, o que esperan una definición tuya. Leela una vez entera y volvé cuando algo no aparezca donde lo buscabas.",
+    "Conviene separar tres grupos y no mezclarlos. Lo que <b>no existe</b>: no está construido, lo seguís haciendo como hasta ahora. Lo que está <b>a medias</b>: una parte funciona sola y la otra la completás vos. Y lo que <b>depende de vos</b>: de este lado está hecho, falta un dato, una cuenta o una firma.",
+    "Un punto que vale por todos: en Configuración hay seis campos que podés editar y que todavía no cambian nada. Están puestos a propósito, para que los dejes armados, y cada uno avisa <b>\"Todavía no rige\"</b> debajo del campo. Si no dice eso, rige. Si lo dice, guardalo igual, pero el sistema todavía no lo mira.",
+    "El caso más concreto, y el que más te va a importar ahora que arranca Embarazadas: cuando cargues esas clases, el sistema <b>no te va a controlar nada de la grilla</b>. No avisa si dos clases caen el mismo día a la misma hora en la misma sala —son ocho reformers y podés terminar con dieciséis personas anotadas—, te ofrece las tres profesoras para cualquier horario aunque ese no sea su turno, y tampoco mira si la profesora que elegís tiene cargada esa disciplina. Los tres controles los hacés a ojo, y conviene hacerlos el día que cargás.",
+    "Con las membresías, en cambio, sí quedó una regla de verdad. Si un plan dice \"solo Pilates Reformer\", el sistema <b>rechaza</b> la reserva de una clase de Embarazadas y explica por qué. Lo probamos contra la base y frena. Lo que todavía no hace es esconder la clase antes: la clienta la va a ver en su portal, la va a tocar, y recién ahí le salta el cartel. Es feo, no es peligroso.",
+    "Hoy Pilates Embarazadas está encendida como disciplina y ya se ve en la web, pero <b>no tiene ni una clase cargada ni un plan que la incluya</b>. Son dos cosas separadas y las dos faltan: los seis planes FE habilitan solo Reformer, así que aunque cargues los horarios mañana, con las membresías de hoy no la puede reservar nadie. Primero la grilla, después con qué se paga.",
+    "Y una que no vas a encontrar porque está en todos lados menos ahí: <b>a una clienta no se la puede dar de baja ni borrar</b>. A una profesora sí, a una sala sí, a un acceso sí, a una disciplina sí. A una clienta no: solo podés editarle la ficha. La que se fue queda en la lista como si siguiera viniendo.",
+    "Esta lista se achica a medida que avanzamos, y el manual se actualiza con ella. Lo que no va a pasar es que algo desaparezca de acá sin que te lo digamos."
+   ],
+   "listas": [
+    {
+     "titulo": "Todavía no existe",
+     "items": [
+      {
+       "nombre": "Días y horarios fijos",
+       "texto": "Lo pediste expresamente y es la deuda más grande. Hoy cada reserva es de a una y por fecha: no hay forma de decir \"ella tiene los lunes y jueves a las 9\" y que el mes se arme solo."
+      },
+      {
+       "nombre": "Dar de baja o borrar una clienta",
+       "texto": "No se puede, ni con motivo ni sin motivo. La ficha se edita pero no se archiva, y la que dejó de venir sigue apareciendo en las listas y contando en el tablero. Por ahora se distingue mirándole el vencimiento."
+      },
+      {
+       "nombre": "Congelar una membresía",
+       "texto": "El campo está en Configuración, dice 30 días y no hace nada. Si alguien se va de viaje, por ahora se arregla corriéndole la fecha de vencimiento a mano."
+      },
+      {
+       "nombre": "El tope de 2 recuperos por mes",
+       "texto": "Ojo con este, porque no es que falte un contador: el recupero como tal no existe en el sistema. Lo que pasa hoy es que si cancela con 3 horas o más, la clase le vuelve al saldo sola y con ese saldo se anota otro día, las veces que quiera. Nadie las cuenta y nadie frena la tercera: ese control es tuyo, y es sobre algo que ocurre solo."
+      },
+      {
+       "nombre": "La lista de las que dejaron de venir",
+       "texto": "El campo dice 15 días y todavía no arma ninguna lista. Para saber quién no volvió hay que mirar los vencimientos."
+      },
+      {
+       "nombre": "Embarazo, lesiones y contacto de emergencia por separado",
+       "texto": "Hay una sola caja de texto libre, \"Notas médicas\", donde entra todo junto. No hay campo de embarazo, ni de lesiones, ni de a quién llamar si pasa algo. Para Embarazadas conviene que te pongas de acuerdo con recepción en cómo escribirlo siempre igual, o después no se puede buscar."
+      },
+      {
+       "nombre": "Personal y sueldos",
+       "texto": "Horas trabajadas, reemplazos, condiciones y liquidación. No hay nada. Las profesoras están cargadas solo para asignarlas a una clase."
+      },
+      {
+       "nombre": "Cumpleaños del mes",
+       "texto": "La fecha está en cada ficha, pero no hay una pantalla que te los junte."
+      },
+      {
+       "nombre": "Pagos parciales",
+       "texto": "Un pago entra entero o no entra. Si te dejan una seña, por ahora se anota aparte."
+      },
+      {
+       "nombre": "La foto del comprobante de un gasto",
+       "texto": "El gasto se carga completo —categoría, proveedor, tipo y número de comprobante, cuenta—, pero no se le puede adjuntar la imagen."
+      },
+      {
+       "nombre": "El editor de la web",
+       "texto": "Los planes, la grilla, las disciplinas y los datos del estudio salen del sistema y se actualizan solos. Los textos, las fotos y los banners no: eso se cambia de nuestro lado. La sección de preguntas frecuentes todavía no está hecha."
+      },
+      {
+       "nombre": "Cupones, beneficios, gift cards, productos y campañas de mail",
+       "texto": "Quedaron fuera del alcance de esta etapa, hablado y decidido. No están empezados."
+      }
+     ]
+    },
+    {
+     "titulo": "Está a medias",
+     "items": [
+      {
+       "nombre": "La lista de espera",
+       "texto": "La clienta se anota bien y vos la ves. Falta el aviso automático cuando se libera un lugar: hoy la llamás vos y la pasás a mano con el botón de confirmar."
+      },
+      {
+       "nombre": "Los avisos a las clientas",
+       "texto": "Salen cuatro: la membresía por vencer, la membresía vencida, la cuota de renovación y la deuda pendiente. Los tres primeros le llegan por la campana de su portal y como aviso en el celular; el mail todavía no sale (mirá el recuadro de abajo). La deuda va solo por mail, así que hoy esa la das vos. No salen la confirmación de la reserva, el recordatorio de la clase, el cambio de profesora ni la clase suspendida."
+      },
+      {
+       "nombre": "El aviso de que el pago entró",
+       "texto": "Cuando una clienta paga, el aviso le llega al mostrador, no a ella. El comprobante queda numerado en el sistema y se lo pasás vos."
+      },
+      {
+       "nombre": "El panel de notificaciones",
+       "texto": "No hay pantalla para cambiar el texto de un aviso, su anticipación, ni para ver qué se mandó. Por ahora se ajusta de nuestro lado."
+      },
+      {
+       "nombre": "Los permisos",
+       "texto": "La tabla de permisos por rol y por persona está y la podés dejar armada, pero hoy mandan de verdad solo tres bloques: Caja, Gastos y Reportes. Los demás avisan en la pantalla que todavía no rigen, y mientras tanto manda el rol de siempre."
+      },
+      {
+       "nombre": "La profesora y los datos de salud",
+       "texto": "Quedó decidido que la profesora vea lesiones y embarazo, y todavía no ve nada de eso: las notas médicas las ven solo administradora y recepción. Para una clase de embarazadas eso pesa, así que hasta entonces se lo pasás vos."
+      },
+      {
+       "nombre": "La que llega sin reserva",
+       "texto": "Si hay lugar toma la clase, pero la reserva la carga recepción. La profesora marca asistencia, no agrega gente."
+      },
+      {
+       "nombre": "Quién cargó cada reserva",
+       "texto": "El sistema sí lo guarda: cada reserva anota quién la hizo, desde dónde entró y quién marcó la asistencia. Lo que falta es la pantalla que te lo muestre. Si mañana hay una discusión sobre quién anotó a quién, el dato está y te lo sacamos nosotros; vos sola todavía no lo podés mirar."
+      },
+      {
+       "nombre": "Los reportes",
+       "texto": "Hay nueve, con rango de fechas. El botón Excel te baja un archivo que Excel abre de una; el botón PDF abre la impresión del navegador y ahí elegís \"Guardar como PDF\". Faltan los dos que dependen de lo que no existe: personal y mostrador."
+      },
+      {
+       "nombre": "WhatsApp",
+       "texto": "Los botones de la web abren WhatsApp con el mensaje ya escrito, y eso anda bien. El WhatsApp automático es otra cosa: necesita la cuenta de empresa de Meta y se paga por conversación."
+      }
+     ]
+    },
+    {
+     "titulo": "Los seis campos que podés editar y todavía no rigen",
+     "items": [
+      {
+       "nombre": "Congelamiento máximo (30 días)",
+       "texto": "Dejalo armado. Hoy no congela nada."
+      },
+      {
+       "nombre": "Días sin renovar para la lista de contacto (15)",
+       "texto": "No arma ninguna lista todavía."
+      },
+      {
+       "nombre": "Tiempo para confirmar un lugar (120 minutos)",
+       "texto": "Además, tal como está redactado contradice tu política: vos avisás a todas a la vez, no de a una con reloj. Cuando se construya, se hace a tu manera."
+      },
+      {
+       "nombre": "Recordatorio de deuda (3 días antes)",
+       "texto": "El aviso de deuda se manda igual. Lo que todavía no se mira es esta anticipación."
+      },
+      {
+       "nombre": "Adjuntar la foto del comprobante, y su tamaño máximo",
+       "texto": "Son dos campos y los dos esperan lo mismo: que se construya el guardado de archivos."
+      }
+     ]
+    },
+    {
+     "titulo": "Depende de que contestes o contrates",
+     "items": [
+      {
+       "nombre": "La cuenta de Mercado Pago",
+       "texto": "Todavía no está conectada: en Configuración vas a ver el cartel gris que dice \"Sin conectar\". Hasta que la cargues no hay pago online ni link de pago, y todo se cobra en el mostrador. Cuando la conectes avisanos: queda un paso del lado de Mercado Pago que hacemos nosotros, y sin él el pago se acredita igual pero recién cuando alguien abre la pantalla Pagos."
+      },
+      {
+       "nombre": "El dominio propio y el correo",
+       "texto": "Sin dominio verificado, los mails a las clientas no salen del sistema: hoy llegan solo a nuestra casilla. Es lo primero que conviene destrabar."
+      },
+      {
+       "nombre": "El recargo de la tarjeta cuando se paga por link",
+       "texto": "En el mostrador esto anda: efectivo baja 5% y tarjeta sube 25%, y el sistema hace la cuenta solo. Por el link de Mercado Pago no, porque ahí no se sabe con qué va a pagar: se cobra el precio de lista, sin el 25%. Hay que decidir qué recargo querés para el link. Y de paso, si querés tope de cuotas: eso hoy no existe en el sistema, es una decisión tuya sobre cómo configurás tu cuenta de Mercado Pago."
+      },
+      {
+       "nombre": "La grilla de Embarazadas",
+       "texto": "Días, horarios, con qué profesora, y con qué membresía se paga. Las dos últimas no son un detalle: la profesora hay que habilitarla en esa disciplina desde Configuración, y sin un plan que incluya Embarazadas la clase se ve pero no la reserva nadie."
+      },
+      {
+       "nombre": "El nombre de la profesora del turno tarde",
+       "texto": "Está cargada como \"Profesora turno tarde\". También faltan teléfono y mail de Ivana y de Leandro: sin el mail no les podemos crear la cuenta. Y las tres figuran dictando solo Reformer, así que eso se actualiza cuando definas quién da Embarazadas."
+      },
+      {
+       "nombre": "El redondeo de precios",
+       "texto": "Quedó en cincuenta, que deja tus doce precios tal como los publicaste. Redondear al próximo mil cambiaría ocho de los doce, así que no lo tocamos hasta que confirmes la tabla nueva."
+      },
+      {
+       "nombre": "Factura electrónica, Gympass y Totalpass",
+       "texto": "Los tres dependen de un trámite o un convenio tuyo. El sistema no los tiene y no los va a tener hasta que eso exista."
+      },
+      {
+       "nombre": "Las preguntas frecuentes de la web",
+       "texto": "La sección todavía no está hecha. Cuando nos pases las preguntas y las respuestas, la armamos nosotros."
+      },
+      {
+       "nombre": "La clave de la cuenta admin",
+       "texto": "Sigue siendo la de prueba. Cambiala antes de cargar gente de verdad."
+      }
+     ]
+    }
+   ],
+   "avisos": [
+    "Los mails a las clientas todavía no salen. Sin el dominio verificado, el servicio de correo los entrega solo a nuestra casilla. Lo que sí les llega es el aviso en la campana de su portal y en el celular, que van por otro camino: eso cubre el vencimiento y la renovación. La deuda va solo por mail, así que esa la avisás vos hasta que se destrabe.",
+    "Mercado Pago no está conectado. No hay pago online ni link de pago hasta que cargues la cuenta del estudio en Configuración. El cartel de esa sección te dice en qué estado está.",
+    "Los diez clientes que dicen \"Prueba\" no son reales: los dejamos para probar, y ensucian los números del tablero. No los podés sacar vos —el sistema no borra clientas— así que avisanos cuando quieras arrancar de verdad y los sacamos nosotros de una.",
+    "Nada impide poner dos clases a la misma hora en la misma sala, ni asignar una profesora fuera de su turno. Cuando cargues la grilla de Embarazadas, revisá a ojo las dos cosas contra la grilla de Reformer."
+   ]
+  }
+ ]
+}

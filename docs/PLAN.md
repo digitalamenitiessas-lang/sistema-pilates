@@ -1419,6 +1419,169 @@ En Configuración, al lado del porcentaje, ahora avisa que **los descuentos se
 publican en la web y los recargos no**: quien lo edita toca los dos lados, que
 es justamente el punto.
 
+### ✅ Seis funciones le contestaban a quien no debía (16/09) — `0057`
+
+Salió de probar el portal con la sesión real de un alumno. Todas
+`security definer` —se saltean las políticas a propósito, lo necesitan para
+cruzar tablas— y con el EXECUTE que Supabase le da por defecto a todo el mundo.
+Ninguna preguntaba adentro quién llamaba. `caja_control()` de la `0020` sí lo
+hace, y fue el molde.
+
+**Lo que se ejerció**, con el token de un alumno y con la anon key:
+
+| Función | Antes | Qué devolvía |
+| --- | --- | --- |
+| `liquidacion()` | 200, 3 filas | nombre de cada profesora, clases dictadas y montos |
+| `consumo_control()` | **200 sin sesión** | nombre de clienta, uuid de membresía, contadores |
+| `renovacion_control()` | **200 sin sesión** | nombre, monto cobrado, fecha |
+| `turnos_sin_prioridad()` | 200 | el padrón con día y hora de cada clienta |
+| `recordar_clases_de_hoy()` | granteada | disparar los avisos del día de todo el estudio |
+| `tarifa_vigente()` | granteada | la tarifa de una profesora |
+
+Daban vacío **por casualidad**: no hay tarifas cargadas, no se asignó ningún
+turno fijo y no hay inconsistencias. El día que la clienta use la pantalla de
+Personal, cada alumna podía leer los sueldos.
+
+Las cuatro que el navegador no llama se cerraron con `revoke`, sin tocar su
+cuerpo —verificado una por una quién las llama—. Las dos que la pantalla sí
+llama llevan el candado adentro con `personal.remuneracion`, y pasaron a
+`plpgsql` para poder cortar con un motivo en vez de devolver vacío: una
+liquidación de $0 que miente es peor que un "no tenés acceso".
+
+Un grant por columna no servía: **admin y alumno son el mismo rol de Postgres**
+y lo que los distingue son las políticas, que filtran filas y no columnas.
+
+**El auto-registro** del portal (`/api/portal/registro`) convertía email + DNI
+en credenciales: creaba la cuenta con el mail ya confirmado y la contraseña que
+eligiera quien entrara. Ahora tiene interruptor en `studio_settings`, con
+`solo_admin`, y **nace apagado**; falla cerrado si la clave no está. La clave
+`portal.autoregistro` de la `0012` no servía de interruptor: es tipo 'servicio'
+con `legacy_roles` vacío, así que `can()` le contesta false a todos. Se le
+arregló además el `ilike` del email —donde `_` es comodín, así que
+`m_ria@gmail.com` matcheaba la ficha de `maria@gmail.com`— y el update del
+vínculo, que no miraba cuántas filas tocó.
+
+**Verificado después de correr**: las siete rebotan (400 con motivo las dos del
+candado, 403 las cinco de la reja), la anon key pasó de 200 a 401, el cron
+sigue pudiendo con el service role, y el endpoint devuelve 403 con un email y un
+DNI que hasta ese momento creaban la cuenta.
+
+**Corrió dos veces**: la primera abortó porque el `group_key` del parámetro
+nuevo no existe en la lista cerrada de la `0020`. La envoltura `begin/commit`
+hizo su trabajo y no quedó nada a medias.
+
+### ✅ La profesora ve las reservas de sus clases (16/09) — `0058`
+
+Verificado con la sesión de Ivana: de las 13 reservas del estudio veía las 13, y
+**seis eran de clases que no dicta**, con nombre y apellido de cada clienta.
+
+No era un agujero del motor: es la clave que tenía. `reservas.ver` es la amplia
+y la acotada existe desde la `0012` sin usarse.
+
+**La `0012` ya tenía escrito lo que había que hacer primero.** La ayuda de
+`reservas.ver.propio` decía, textual: *"ANTES de encenderla, arreglar el cálculo
+de cupos de lib/api.ts o las clases aparecen vacías"*. Era exacto: `enrolled` se
+derivaba de las reservas legibles, así que las clases de la otra profesora
+habrían aparecido en 0/8. **No escondidas: mentidas.** Y un cupo falso es peor
+que un cupo escondido, porque quien mira la grilla para saber si entra una
+clienta más necesita el número real.
+
+Ahora sale de `class_occupancy`, la vista de la `0005` que —sin
+`security_invoker`— corre con los permisos del dueño y cuenta todas las
+reservas. Es la misma con la que el portal le muestra "8 lugares libres" a una
+clienta que no ve a las demás.
+
+**Y hubo que corregirlo dos veces.** Arreglar `fetchStudioData` no alcanzó: la
+Agenda recalcula el cupo por semana visible —lo necesita, porque ahí se navega
+de semana en semana— y ese es el número que se dibuja. La primera verificación
+comparó los números antes y después del cambio y daban iguales; **daban iguales
+porque la Agenda nunca usaba el valor que se cambió**. Una prueba que pasa por
+el camino equivocado es peor que no probar.
+
+Encender el grupo Reservas fue el no-op que promete el motor, **verificado clave
+por clave antes de escribir la migración**: en las ocho, la matriz reproducía el
+legado exactamente.
+
+**Verificado después**: la ocupación de las clases ajenas volvió a ser la real
+(lunes 18:00 y 19:00, martes 16:00 y 19:00, sábado 11:00, todas en 1/8) y el pie
+de la agenda volvió de 4 a 9 reservas confirmadas; las nueve coinciden una por
+una con `class_occupancy`. En Reservas pasó de 13 registros a 7, y la única
+profesora que aparece es ella. `perm_diff()` en cero filas.
+
+### ✅ La profesora pasa lista (17/09) — `0059`
+
+Un solo tilde, y no por suerte: la `0058` dejó el grupo Reservas rigiendo, así
+que la matriz manda. En sombra, tildar `reservas.asistencia` no habría hecho
+nada.
+
+Ni una línea de código: las cuatro pantallas que ofrecen pasar lista ya
+preguntaban `can('reservas.asistencia') || canWrite`, y `canWrite` es
+`role in (admin, recepcion)`.
+
+**Ejercido con su token**: 'asistió' 200, 'ausente' 200, 'cancelada' **403**,
+'confirmada' **403**. O sea que puede marcar y corregir, y no puede cancelar ni
+desmarcar.
+
+**Y probarlo encontró un agujero de pantalla.** El botón de deshacer se le
+ofrecía igual —deshacer es volver a 'confirmada', que la restrictiva manda a
+`reservas.editar`— y mostraba el texto interno de Postgres: *"new row violates
+row-level security policy..."*. Dos cosas mal: ofrecer una acción que la base va
+a rechazar, y mostrarle las vísceras del motor a una profesora.
+
+Se arregló sin darle `editar`: quien no puede deshacer **cambia la marca** entre
+presente y ausente, que es lo que la base sí le deja y lo que una lista de
+asistencia más necesita. Y de paso, cualquier rechazo de RLS ahora se traduce a
+"Tu rol no tiene permiso para esta acción" en las 40 pantallas.
+
+Lo que **no** cierra: la permisiva de update no filtra por clase propia. Está
+anotado en §0 con su razón — esa pareja de políticas alcanza también a la
+cancelación de la alumna.
+
+### ✅ A la profesora también se le avisa (17/09) — `0060`
+
+Su campana no sonaba nunca. El camino corto era darle `avisos.ver`, y no servía
+por dos razones que hubo que ir a mirar:
+
+De los avisos de staff cargados, **dos son plata** (`pago_acreditado`,
+`deuda_vencida`) y esa clave es todo o nada. Y sobre todo: los avisos que le
+importan **no existían para el staff**. `avisar_instancia` insertaba una fila por
+ALUMNA reservada, con `audience = 'alumno'`. Nadie le avisaba nunca a la
+profesora que no tenía que venir.
+
+**No era un permiso que faltaba: era un aviso que no existía.**
+
+La tabla sólo sabía dirigirse a una alumna. Se le agregó `teacher_id` y la
+audiencia `'profesor'`, y lee lo suyo con el mismo criterio que la alumna.
+**Sin clave de permiso, a propósito**: que cada uno vea lo suyo es aislamiento,
+no configuración —la razón por la que `my_student_ids` nunca fue configurable—.
+Una clave permitiría apagarle el aviso de que su clase se suspendió, y eso no es
+una preferencia del estudio: es información de su trabajo.
+
+Tres avisos: suspensión a quien la iba a dar, "te asignaron" a la que entra y
+"te reemplazan" a la que sale. El de suspensión a la profesora **no cuelga de
+que alguien haya reservado**, al revés del de las alumnas: le importa igual con
+la sala vacía.
+
+**Cero código.** `fetchNotifications` hace `select('*')` sin filtrar por
+audiencia y `notification_reads` ya se gobierna con `user_id = auth.uid()`.
+
+**Verificado suspendiendo su clase de las 12:00 con ella logueada**: se
+escribieron los dos avisos (el de ella sin la línea de "no se te descuenta", que
+es cosa de la alumna), la campana le marcó **1 sin recargar** —el realtime ya
+estaba— y sigue viendo **0 avisos de staff y 0 de alumnas**. Después se le
+cambió la profesora y salieron los otros dos. Los cinco avisos y la ocurrencia
+quedaron borrados.
+
+**Una sospecha propia que resultó falsa, anotada para no repetirla**: se escribió
+el cálculo de "quién la iba a dar" con un `if` explícito creyendo que nombrar
+`old` en una expresión rompía en los INSERT —que es lo que hace la agenda al
+suspender— y que la `0052` tenía una bomba ahí. Se probó antes de decir nada:
+suspender por INSERT con el trigger viejo devuelve 201. En INSERT `old` es un
+registro nulo y leerle un campo da nulo, sin error.
+
+**De paso**: el nombre de Giuliana tenía un espacio al final y eso salía en el
+aviso que lee la clienta ("la da Giuliana ."). Se corrigió el dato.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
@@ -1477,7 +1640,7 @@ es justamente el punto.
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a **`0056`** ✅. La **`0056` corrió el 16/09** y se verificó moviendo el descuento a -8 y a 0 con la web abierta: la línea siguió al número y desapareció al apagarlo; el dato quedó restaurado en -5. La **`0053` corrió el 15/09**. La **`0052` corrió el 15/09** y se corrigió una redacción; es idempotente. La **`0051` corrió el 15/09** y se corrigió dos veces sobre la marcha —los nombres en castellano y el día en el corte por clase—; es idempotente, todo `create or replace`. La **`0050` corrió el 15/09**, se corrigió la clave foránea del autor y se volvió a correr; es idempotente a propósito. La **`0048` y la `0049` corrieron el 15/09** y se verificaron ejerciéndolas: el cupo rechazó el noveno turno fijo, un pausado quedó fuera de la liberación automática, y el interruptor encendido liberó exactamente uno. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Migraciones aplicadas | `0001` a **`0060`** ✅. La **`0060` corrió el 17/09** y se verificó suspendiendo una clase con la profesora logueada: le llegó a la campana sin recargar y siguió sin ver los avisos de staff. La **`0059` corrió el 17/09**; probarla encontró que la pantalla ofrecía deshacer una marca sin permiso. La **`0058` corrió el 16/09** y hubo que corregir el cupo dos veces: la Agenda tenía su propia cuenta y era la que se veía. La **`0057` corrió el 16/09 en el segundo intento** —la primera abortó por un `group_key` inexistente, y la envoltura `begin/commit` no dejó nada a medias—. La **`0056` corrió el 16/09** y se verificó moviendo el descuento a -8 y a 0 con la web abierta: la línea siguió al número y desapareció al apagarlo; el dato quedó restaurado en -5. La **`0053` corrió el 15/09**. La **`0052` corrió el 15/09** y se corrigió una redacción; es idempotente. La **`0051` corrió el 15/09** y se corrigió dos veces sobre la marcha —los nombres en castellano y el día en el corte por clase—; es idempotente, todo `create or replace`. La **`0050` corrió el 15/09**, se corrigió la clave foránea del autor y se volvió a correr; es idempotente a propósito. La **`0048` y la `0049` corrieron el 15/09** y se verificaron ejerciéndolas: el cupo rechazó el noveno turno fijo, un pausado quedó fuera de la liberación automática, y el interruptor encendido liberó exactamente uno. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
 | Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |
