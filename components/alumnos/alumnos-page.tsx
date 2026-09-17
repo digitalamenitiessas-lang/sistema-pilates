@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Search, Plus, Filter, ChevronRight, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
+import { credencial } from '@/lib/api'
 import type { Student } from '@/lib/types'
 import { FichaAlumno } from './ficha-alumno'
 import { AlumnoFormModal } from './alumno-form-modal'
@@ -17,7 +18,15 @@ const STATUS_CONFIG = {
   sin_membresia: { label: 'Sin membresía', class: 'bg-muted text-muted-foreground' },
 }
 
-function StudentCard({ student, onClick }: { student: Student; onClick: () => void }) {
+function StudentCard({
+  student,
+  cred,
+  onClick,
+}: {
+  student: Student
+  cred: string
+  onClick: () => void
+}) {
   const ms = student.membership
   const statusKey = ms?.status ?? 'sin_membresia'
   const statusCfg = STATUS_CONFIG[statusKey as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.sin_membresia
@@ -40,7 +49,11 @@ function StudentCard({ student, onClick }: { student: Student; onClick: () => vo
               <AlertCircle className="w-3.5 h-3.5 text-aviso-fuerte shrink-0" aria-label="Tiene notas médicas" />
             )}
           </div>
-          <p className="text-xs text-muted-foreground truncate">{student.email}</p>
+          <p className="text-xs text-muted-foreground truncate">
+            {cred && <span className="font-semibold tabular-nums">{cred}</span>}
+            {cred && student.email && ' \u00b7 '}
+            {student.email}
+          </p>
         </div>
         <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary-fuerte transition-colors shrink-0" />
       </div>
@@ -80,7 +93,7 @@ function StudentCard({ student, onClick }: { student: Student; onClick: () => vo
 
 export function AlumnosPage() {
   const { canWrite } = useData()
-  const { students: STUDENTS, reservations: RESERVATIONS, payments: PAYMENTS } = useStudio()
+  const { students: STUDENTS, reservations: RESERVATIONS, payments: PAYMENTS, settings } = useStudio()
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('todos')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -89,10 +102,16 @@ export function AlumnosPage() {
   const selectedStudent = selectedId ? STUDENTS.find((s) => s.id === selectedId) ?? null : null
 
   const filtered = STUDENTS.filter((s) => {
+    const q = search.toLowerCase()
     const matchSearch =
       search === '' ||
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.email.toLowerCase().includes(search.toLowerCase())
+      s.name.toLowerCase().includes(q) ||
+      s.email.toLowerCase().includes(q) ||
+      // Por la credencial armada y por el número pelado: quien escribe
+      // "42" busca a la CF-0042, y quien copia "CF-0042" de algún lado
+      // también tiene que encontrarla.
+      credencial(s.memberNo, settings).toLowerCase().includes(q) ||
+      (s.memberNo != null && String(s.memberNo).includes(q))
 
     const matchStatus =
       filterStatus === 'todos' ||
@@ -210,6 +229,7 @@ export function AlumnosPage() {
               <StudentCard
                 key={student.id}
                 student={student}
+                cred={credencial(student.memberNo, settings)}
                 onClick={() => setSelectedId(student.id)}
               />
             ))}

@@ -244,6 +244,27 @@ export function settingBool(settings: Settings, key: string, fallback = false): 
   return v === undefined || v === '' ? fallback : v === 'true'
 }
 
+/**
+ * El número de credencial, como se muestra (0067).
+ *
+ * En la base es un entero; el prefijo y el relleno los pone el estudio
+ * desde Configuración, porque son un texto y los textos no se escriben en
+ * el código. Se deriva en cada lugar donde se muestra en vez de guardarse
+ * armado: si mañana cambian el prefijo, cambian los de todas, incluidas
+ * las clientas que ya estaban.
+ *
+ * Los dígitos se acotan a 8 — alguien que escriba 500 en Configuración no
+ * puede llenar la pantalla de ceros.
+ */
+export function credencial(
+  memberNo: number | null | undefined,
+  settings: Settings
+): string {
+  if (!memberNo) return ''
+  const digitos = Math.max(0, Math.min(8, Math.trunc(settingNum(settings, 'credencial_digitos', 4))))
+  return `${settingText(settings, 'credencial_prefijo', 'CF-')}${String(memberNo).padStart(digitos, '0')}`
+}
+
 export function settingText(settings: Settings, key: string, fallback = ''): string {
   return settings[key]?.trim() || fallback
 }
@@ -715,6 +736,10 @@ export async function fetchStudioData(): Promise<StudioData> {
     medicacion: privateMap.get(s.id)?.medicacion,
     emergencyContact: privateMap.get(s.id)?.emergencyContact,
     userId: s.user_id ?? null,
+    // `select('*')`, así que antes de la 0067 la columna no viene y esto
+    // queda en null: la pantalla esconde la credencial en vez de inventar
+    // un número.
+    memberNo: s.member_no ?? null,
   }))
 
   const studentName = (id: string) => students.find((s) => s.id === id)?.name ?? '—'

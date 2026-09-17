@@ -344,6 +344,12 @@ export interface Student {
   medicacion?: string
   /** id del usuario de Auth vinculado (acceso al portal), si tiene */
   userId?: string | null
+  /**
+   * El número de credencial (0067). Identifica, no autoriza: se dice en
+   * voz alta en el mostrador y la clienta lo ve en su portal. Es null
+   * mientras la 0067 no haya corrido.
+   */
+  memberNo?: number | null
 }
 
 /** 'regular' se repite cada semana; 'especial' es un evento con su fecha. */

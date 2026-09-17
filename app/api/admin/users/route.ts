@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/mp-server'
 import { esDenegado, exigir } from '@/lib/permisos-server'
 import { enviarMail } from '@/lib/email-server'
 import { mailDeAcceso } from '@/lib/mail-acceso'
+import { urlDelPortal } from '@/lib/estudio'
 
 // Crear y eliminar usuarios requiere la Admin API de Supabase
 // (SUPABASE_SERVICE_ROLE_KEY en el entorno del servidor). Solo un
@@ -214,7 +215,9 @@ export async function POST(request: Request) {
     const { subject, html } = await mailDeAcceso({
       email: String(email).trim(),
       nombre: String(fullName ?? ''),
-      origen: new URL(request.url).origin,
+      // No sale del pedido: es la direccion publica del estudio, y el
+      // pedido puede venir del servidor de desarrollo (0068).
+      origen: await urlDelPortal(new URL(request.url).origin),
     })
     const r = await enviarMail(String(email).trim(), subject, html)
     mailEnviado = r.ok
@@ -321,7 +324,9 @@ export async function PUT(request: Request) {
   const { subject, html } = await mailDeAcceso({
     email: mail,
     nombre: String(ficha.name ?? ''),
-    origen: new URL(request.url).origin,
+    // No sale del pedido: es la direccion publica del estudio, y el
+    // pedido puede venir del servidor de desarrollo (0068).
+    origen: await urlDelPortal(new URL(request.url).origin),
   })
   const r = await enviarMail(mail, subject, html)
   return NextResponse.json({ ok: true, mailEnviado: r.ok, mailMotivo: r.ok ? null : r.motivo })
