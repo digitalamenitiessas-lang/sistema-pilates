@@ -1033,11 +1033,16 @@ async function savePrivateData(
 
 const PAYMENT_GRACE_DAYS = 5
 
+/**
+ * Devuelve el id de la ficha creada, que es lo que hace falta para
+ * seguir: el alta puede terminar creándole el acceso, y para eso hay que
+ * poder nombrar la ficha que se acaba de guardar.
+ */
 export async function createStudent(
   input: NewStudentInput,
   plans: Plan[],
   settings: Settings = {}
-): Promise<void> {
+): Promise<string> {
   const { data: student, error } = await supabase
     .from('students')
     .insert({
@@ -1064,6 +1069,8 @@ export async function createStudent(
   if (input.planId) {
     await assignMembership(student.id, input.planId, plans, settings)
   }
+
+  return student.id as string
 }
 
 export async function updateStudent(id: string, input: Omit<NewStudentInput, 'planId'>): Promise<void> {
