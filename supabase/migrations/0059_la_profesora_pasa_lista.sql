@@ -1,0 +1,96 @@
+-- ============================================================
+-- 0059 — La profesora puede pasar lista
+--
+-- Es lo que falta para que la clase funcione: quien está en la sala es la
+-- que sabe quién vino, y hasta ahora tenía que pedírselo al mostrador.
+--
+-- ES UN SOLO TILDE, Y ESO NO ES CASUALIDAD
+--
+-- La `0058` encendió el grupo Reservas —verificado clave por clave como
+-- no-op— y eso dejó a `reservas.asistencia` en `activo`. En sombra,
+-- tildarla no habría hecho nada: `can()` responde el legado, y el legado
+-- es {admin, recepcion}. Ahora manda la matriz, así que alcanza con esta
+-- fila.
+--
+-- Lo dice la propia ayuda de la clave, escrita en la 0012: "Candidata
+-- número uno a habilitarle a UNA profesora por persona". Acá se le da al
+-- ROL, porque el estudio quiere que las tres pasen lista. Si algún día
+-- quiere una sola, la excepción por persona vive en `user_permissions` y
+-- gana en las dos direcciones.
+--
+-- POR QUÉ NO HACE FALTA TOCAR NI UNA LÍNEA DE CÓDIGO
+--
+-- Las cuatro pantallas que ofrecen pasar lista —el tablero, la agenda, el
+-- modal de asistencia y la lista de reservas— ya preguntan
+-- `can('reservas.asistencia') || canWrite`, y `canWrite` es
+-- `role in (admin, recepcion)`, o sea false para la profesora. Así que hoy
+-- el botón no está y con esta fila aparece solo.
+--
+-- Y LAS DOS POLÍTICAS YA ESTABAN ESCRITAS PARA ESTO
+--
+-- La permisiva de update (`reservas: escribir`, 0013) deja pasar a quien
+-- tenga editar, asistencia o anular. La restrictiva (`anular y asistencia
+-- exigen permiso`) mira el estado que queda: si es 'asistió' o 'ausente'
+-- exige `reservas.asistencia`. O sea que con esta clave la profesora puede
+-- marcar presente y ausente, y NADA más: cancelar sigue pidiendo
+-- `reservas.anular`, y cualquier otro cambio de estado, `reservas.editar`.
+-- Ninguna de las dos la tiene.
+--
+-- LO QUE ESTA MIGRACIÓN NO CIERRA, Y CONVIENE SABERLO
+--
+-- La permisiva de update no filtra por clase propia: mira la clave y nada
+-- más. Así que en teoría una profesora podría marcar asistencia en una
+-- reserva de la clase de otra. En la práctica no tiene por dónde: desde la
+-- 0058 no puede LEER esas reservas, y para escribir una fila hace falta su
+-- uuid, que no es adivinable ni enumerable.
+--
+-- No se cierra acá a propósito. Esa pareja de políticas es la más delicada
+-- del sistema —la restrictiva aplica a TODOS los roles, incluida la
+-- alumna, y "alumno cancela" de la 0005 es literalmente un update a
+-- 'cancelada'—, así que agregarle una rama por clase propia se prueba con
+-- tiempo y no la semana en que el estudio empieza a usar el sistema. Queda
+-- anotado en §0.
+--
+-- Ejecutar completo en el SQL Editor del dashboard de Supabase.
+-- ============================================================
+
+begin;
+
+insert into public.role_permissions (role, clave)
+values ('profesor', 'reservas.asistencia')
+on conflict do nothing;
+
+commit;
+
+-- ============================================================
+-- CÓMO VERIFICAR
+--
+--   -- 1. La matriz, y que la clave rija
+--   select k.clave, k.enforce_mode, array_agg(r.role order by r.role) as roles
+--     from public.permission_keys k
+--     left join public.role_permissions r on r.clave = k.clave
+--    where k.clave = 'reservas.asistencia'
+--    group by k.clave, k.enforce_mode;
+--   → activo · {admin,profesor,recepcion}
+--
+--   -- 2. Y que no se haya movido nada más del grupo
+--   select * from public.perm_diff();
+--   → cero filas
+--
+-- Ejerciéndolo, que es lo que vale:
+--
+--   -- 3. Con la sesión de una PROFESORA, en la Agenda: en una clase suya
+--   --    con alguien anotado tiene que aparecer el botón de pasar lista, y
+--   --    marcar presente tiene que quedar guardado.
+--   -- 4. En la MISMA pantalla no tiene que poder cancelar una reserva:
+--   --    eso sigue siendo `reservas.anular`, que no tiene.
+--   -- 5. Ojo con el contador: marcar ausente NO tiene que hacer
+--   --    desaparecer el botón (`conLista` cuenta las ausentes justamente
+--   --    para poder corregir un error de tipeo), y la ocupación de la clase
+--   --    tiene que seguir saliendo de class_occupancy.
+--
+-- PARA VOLVER ATRÁS
+--
+--   delete from public.role_permissions
+--    where role = 'profesor' and clave = 'reservas.asistencia';
+-- ============================================================
