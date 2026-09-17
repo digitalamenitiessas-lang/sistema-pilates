@@ -166,6 +166,24 @@ export interface HorasTrabajadas {
 }
 
 /**
+ * Un ajuste manual sobre la liquidación (0065, requerimiento 12.6): un
+ * premio, un descuento, la corrección de un mes anterior. Lo que la
+ * fórmula no captura.
+ *
+ * Entra en el período que contiene su `fecha`, igual que las horas. El
+ * `motivo` es obligatorio y lo exige la base, no la pantalla: un ajuste de
+ * sueldo sin explicación es lo que nadie va a poder reconstruir después.
+ */
+export interface AjusteLiquidacion {
+  id: string
+  teacherId: string
+  fecha: string
+  /** Positivo suma, negativo resta. Nunca cero. */
+  monto: number
+  motivo: string
+}
+
+/**
  * La liquidación de un período. **Se deriva, no se guarda**: cada clase
  * se paga con la tarifa que regía el día que se dictó.
  */
@@ -177,6 +195,8 @@ export interface FilaLiquidacion {
   horas: number
   montoHoras: number
   mensual: number
+  /** La suma de los ajustes manuales del período (0065) */
+  ajustes: number
   ausencias: number
   tardanzas: number
   total: number
@@ -195,6 +215,8 @@ export interface LiquidacionCerrada {
   hasta: string
   clases: number
   horas: number
+  /** Los ajustes manuales que entraron en este cierre (0065) */
+  ajustes: number
   /** El congelado al cerrar: lo que se le liquidó */
   total: number
   /**

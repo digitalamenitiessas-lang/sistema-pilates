@@ -28,6 +28,9 @@ import {
   fetchHoras,
   cargarHoras,
   borrarHoras,
+  fetchAjustes,
+  cargarAjuste,
+  borrarAjuste,
   fetchLiquidacion,
   fetchLiquidacionesCerradas,
   cerrarLiquidacion,
@@ -39,6 +42,7 @@ import {
 import { fetchAccounts } from '@/lib/caja-api'
 import type { Account } from '@/lib/types'
 import type {
+  AjusteLiquidacion,
   CondicionPago,
   HorasTrabajadas,
   FilaLiquidacion,
@@ -153,6 +157,7 @@ function Liquidacion({
               <th className="text-right px-4 py-3 font-semibold hidden md:table-cell">Horas</th>
               <th className="text-right px-4 py-3 font-semibold hidden md:table-cell">Por horas</th>
               <th className="text-right px-4 py-3 font-semibold hidden lg:table-cell">Mensual</th>
+              <th className="text-right px-4 py-3 font-semibold hidden lg:table-cell">Ajustes</th>
               <th className="text-right px-4 py-3 font-semibold">Total</th>
               <th className="px-4 py-3" />
             </tr>
@@ -175,6 +180,17 @@ function Liquidacion({
                 <td className="px-4 py-3 text-right tabular-nums text-muted-foreground hidden md:table-cell">{f.horas}</td>
                 <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">{plata(f.montoHoras)}</td>
                 <td className="px-4 py-3 text-right tabular-nums hidden lg:table-cell">{plata(f.mensual)}</td>
+                {/* En cero no se escribe un $0 que no dice nada: un guion se
+                    lee como "acá no hubo ajuste". Y si hubo, el signo importa
+                    más que el color, así que va el número con su menos. */}
+                <td className={cn(
+                  'px-4 py-3 text-right tabular-nums hidden lg:table-cell',
+                  f.ajustes < 0 ? 'text-destructive-fuerte' : f.ajustes > 0 ? 'text-exito-fuerte' : 'text-muted-foreground'
+                )}>
+                  {f.ajustes === 0
+                    ? '—'
+                    : `${f.ajustes < 0 ? '−' : '+'}${plata(Math.abs(f.ajustes))}`}
+                </td>
                 <td className="px-4 py-3 text-right tabular-nums font-bold text-foreground">{plata(f.total)}</td>
                 <td className="px-4 py-3 text-right">
                   {yaCerrada(f.teacherId) ? (
@@ -365,6 +381,189 @@ function Condiciones() {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Ajustes manuales de la liquidación (0065, requerimiento 12.6): un
+ * premio, un descuento, la corrección de un mes anterior. Lo que la
+ * fórmula no captura y antes no tenía dónde ir — la única salida era
+ * tocarle la tarifa, que cambia el pasado de todas las clases de ese día.
+ *
+ * El monto se carga como "suma" o "resta" con un número positivo, y no
+ * escribiendo un menos: un signo que se olvida convierte un descuento en
+ * un premio, y en un sueldo eso se nota tarde.
+ *
+ * El motivo es obligatorio acá y TAMBIÉN en la base (`check btrim(motivo)
+ * <> ''`). El estudio ya tiene dos candados que viven sólo en el
+ * navegador y los dos se esquivan; un ajuste de sueldo sin explicación es
+ * exactamente lo que nadie va a poder reconstruir seis meses después.
+ */
+function Ajustes({ desde, hasta }: { desde: string; hasta: string }) {
+  const { can, canWrite } = useData()
+  const { teachers } = useStudio()
+  const [filas, setFilas] = useState<AjusteLiquidacion[] | null>(null)
+  const [abierto, setAbierto] = useState(false)
+  const [teacherId, setTeacherId] = useState('')
+  const [dia, setDia] = useState(hoyISO())
+  const [signo, setSigno] = useState<'suma' | 'resta'>('suma')
+  const [monto, setMonto] = useState('')
+  const [motivo, setMotivo] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Es plata: la misma clave que las tarifas y la liquidación.
+  const puede = can('personal.remuneracion')
+
+  const cargar = useCallback(() => {
+    fetchAjustes(desde, hasta).then(setFilas).catch(() => setFilas([]))
+  }, [desde, hasta])
+  useEffect(cargar, [cargar])
+
+  const guardar = async () => {
+    setSaving(true)
+    setError(null)
+    try {
+      const n = Math.abs(Number(monto) || 0)
+      await cargarAjuste({
+        teacherId,
+        fecha: dia,
+        monto: signo === 'resta' ? -n : n,
+        motivo,
+      })
+      setAbierto(false)
+      setMonto('')
+      setMotivo('')
+      cargar()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo guardar')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const quitar = async (id: string) => {
+    setError(null)
+    try {
+      await borrarAjuste(id)
+      cargar()
+    } catch (e) {
+      // Acá vive el rechazo del período ya liquidado, con el texto que
+      // escribió la base: dice qué período y qué hacer.
+      setError(e instanceof Error ? e.message : 'No se pudo borrar')
+    }
+  }
+
+  const nombre = (id: string) => teachers.find((t) => t.id === id)?.name ?? '—'
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[11px] text-muted-foreground">
+        Lo que el cálculo no puede saber: un premio, un descuento, la corrección de un mes
+        anterior. Entra en el período que contiene su fecha, y <span className="font-semibold">el
+        motivo es obligatorio</span>. Una vez que el período se cierra, el ajuste no se toca más.
+      </p>
+
+      {filas === null ? (
+        <p className="text-sm text-muted-foreground py-4 text-center">Cargando…</p>
+      ) : filas.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-4 text-center">Sin ajustes en el período</p>
+      ) : (
+        <div className="divide-y divide-border">
+          {filas.map((a) => (
+            <div key={a.id} className="flex items-center gap-3 py-2.5">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-foreground truncate">{nombre(a.teacherId)}</p>
+                <p className="text-[11px] text-muted-foreground truncate">
+                  {fecha(a.fecha)} · {a.motivo}
+                </p>
+              </div>
+              <p
+                className={cn(
+                  'text-sm tabular-nums font-semibold shrink-0',
+                  a.monto < 0 ? 'text-destructive-fuerte' : 'text-exito-fuerte'
+                )}
+              >
+                {a.monto < 0 ? '−' : '+'}
+                {plata(Math.abs(a.monto))}
+              </p>
+              {puede && (
+                <button
+                  onClick={() => quitar(a.id)}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive-fuerte shrink-0"
+                  aria-label="Borrar"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {error && <p className="text-xs text-destructive-fuerte">{error}</p>}
+
+      {!puede ? null : abierto ? (
+        <div className="rounded-xl border border-border bg-muted/40 p-3 space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <select value={teacherId} onChange={(e) => setTeacherId(e.target.value)} className={input}>
+              <option value="">Elegí a quién…</option>
+              {teachers.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+            <input type="date" value={dia} onChange={(e) => setDia(e.target.value)} className={input} />
+            <select
+              value={signo}
+              onChange={(e) => setSigno(e.target.value as 'suma' | 'resta')}
+              className={input}
+            >
+              <option value="suma">Le suma al sueldo</option>
+              <option value="resta">Le resta del sueldo</option>
+            </select>
+            <input
+              type="number"
+              min="0"
+              step="100"
+              value={monto}
+              onChange={(e) => setMonto(e.target.value)}
+              placeholder="Monto"
+              className={input}
+            />
+          </div>
+          <input
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            placeholder="Por qué (obligatorio): premio por cobertura, adelanto, corrección de agosto…"
+            className={cn(input, 'w-full')}
+          />
+          <div className="flex gap-2">
+            <button
+              disabled={saving || !teacherId || !motivo.trim() || !(Number(monto) > 0)}
+              onClick={guardar}
+              className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              Guardar
+            </button>
+            <button
+              onClick={() => setAbierto(false)}
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-muted-foreground hover:bg-muted"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setAbierto(true)}
+          className="w-full py-2 rounded-xl border border-border text-xs font-semibold text-foreground hover:bg-muted flex items-center justify-center gap-1.5"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Cargar un ajuste
+        </button>
+      )}
+    </div>
+  )
+}
 
 function Horas({ desde, hasta }: { desde: string; hasta: string }) {
   const { can, canWrite } = useData()
@@ -975,6 +1174,14 @@ export function PersonalPage() {
             <Horas desde={desde} hasta={hasta} />
           </div>
         </SeccionPlegable>
+
+        {veSueldos && (
+          <SeccionPlegable id="ajustes" titulo="Ajustes manuales" icono={Wallet}>
+            <div className="px-5 py-3">
+              <Ajustes desde={desde} hasta={hasta} />
+            </div>
+          </SeccionPlegable>
+        )}
 
         {veSueldos && (
           <SeccionPlegable id="condiciones" titulo="Condiciones de pago" icono={Users}>
