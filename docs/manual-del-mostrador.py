@@ -113,6 +113,16 @@ S += T('Dar de alta un cliente', [
          'falta el email o falta el DNI, completalos arriba: la contraseña con la que entra <b>es '
          'su documento</b>, así que sin DNI no hay acceso que crear.')
 
+S += T('El número de credencial', [
+    'No hay que hacer nada: cada clienta recibe el suyo cuando se crea su ficha.',
+    'Lo ves en su tarjeta en <b>Clientes</b> y arriba de <b>Datos personales</b> en su ficha. '
+    'Ella lo ve en su portal, al lado del nombre del estudio.',
+    'Sirve para buscarla: escribí el número en el buscador de Clientes y aparece.',
+], aviso='es el número con el que se identifica, y <b>no cambia nunca</b>. No es una '
+         'contraseña ni habilita nada: decirlo en voz alta no tiene ningún riesgo. El formato '
+         'lo eligen ustedes en <b>Configuración → Estudio</b> —el texto de adelante y cuántos '
+         'dígitos— y cambia para todas, también para las que ya estaban.')
+
 S += T('Asignarle o renovarle el plan', [
     'Abrí su ficha → pestaña <b>Membresía</b>.',
     '<b>Asignar membresía</b> si no tiene ninguna, o <b>Renovar membresía</b> si ya la tuvo.',
@@ -216,6 +226,9 @@ S += [tabla([
     ['Si se la olvida',
      '<b>Olvidé mi contraseña</b> en la pantalla de ingreso: le llega un enlace y elige una '
      'nueva. El estudio no interviene.'],
+    ['Cada vez que entra',
+     'Ve su <b>número de credencial</b> al lado del nombre del estudio, arriba. Es con el que '
+     'se identifica y no cambia nunca.'],
 ], [38 * mm, 134 * mm])]
 S += [Spacer(1, 6)]
 S += [Paragraph('<b>Por qué la contraseña es su documento y dura un solo ingreso:</b> así el '

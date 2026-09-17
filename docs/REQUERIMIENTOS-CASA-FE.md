@@ -32,13 +32,30 @@ hallazgos eran agujeros, no faltantes**, y que se descubrieron ejerciendo el
 sistema y no leyéndolo. Tres de ellos venían anotados por escrito en
 migraciones viejas, esperando a que alguien mirara.
 
+La **tarde del 17/09** entraron `0061` a `0068` y se cerró el alta de la
+clienta: se carga con su mail y su documento, el último paso del formulario le
+crea el acceso, le llega el mail con cómo entrar, y al ingresar el sistema le
+exige elegir una contraseña propia. Cada clienta tiene además su número de
+credencial (`0067`), con el formato que el estudio decide desde Configuración.
+
+Y hay una lección de método que conviene no perder: **ese bloque se ejerció en
+producción y no en desarrollo, y ahí estuvo todo lo que encontró**. El mail no
+salía por una variable con comillas que en local no molestaban; el link de los
+mails apuntaba a `localhost`; y el lector de configuración del servidor leía
+una variable que sólo existe en `.env.local`, así que en producción devolvía
+vacío **siempre** — y no se notaba porque su valor de respaldo era casualmente
+el correcto. Ninguno de los tres se ve en la máquina de quien programa.
+
 ### Lo que falta construir
 
 | | Qué | Tamaño |
 |---|---|---|
+| 🔴 | **28 lugares donde una falla se vuelve un booleano y nadie puede saber por qué**, once graves. Salió de barrer el proyecto el 17/09 buscando la forma que tuvo el mail que no salía. Los dos peores no son incomodidades: el proceso diario **inserta la notificación antes de mandar el mail** y sólo cuenta los que salieron (`cron/diario:911`), así que la campana dice "cuota emitida", la clienta no recibió nada y pierde el turno fijo por no renovar; y el webhook de Mercado Pago responde `ok: true` aunque no haya acreditado (`mp/webhook:47`), así que MP no reintenta y el pago queda pendiente para siempre sin un aviso. Después: el `$0` que miente en el tablero si falla `resultado_mensual` (`caja-api:527`), el cupo que vuelve a mentirle a la profesora si `fetchWeekOccupancy` falla (`api:2341`), el mail de "tu membresía venció" saliéndole a quien está al día si falla una lectura (`cron/diario:273`), y el sistema entero sin botones si `mis_permisos` da error (`api:480`) | mediano |
+| 🔴 | **Los avisos `turno_liberado` se tiran a la basura.** No es un silencio: es un bug. En `app/api/cron/diario/route.ts` se arman en la línea 1002, **después** del único insert (línea 898), se cuentan en `evaluated` y no se guardan nunca. El aviso "Turno fijo sin prioridad" no llegó a la campana ni una vez, así que si el interruptor de liberación está encendido, una clienta puede perder su día y su horario fijo sin que el estudio se entere | chico |
+| — | **El pago dentro del alta.** Es lo que falta de la idea del estudio del 17/09: "cuando creamos el cliente, tomamos esos datos, el plan que elige y ponemos **si paga ahí y cómo paga** para que se acredite". Hoy el alta crea la membresía y deja la cuota **pendiente** en Pagos, y cobrarla es un segundo paso en otra pantalla. El manual del mostrador ya lo dice así | chico |
+| — | **Resend como SMTP de Supabase.** "Olvidé mi contraseña" es el único camino que le queda a una clienta que ya eligió su clave y la olvidó, y **no pasa por Resend**: usa el mailer de Supabase, que en el plan gratis manda desde una dirección de Supabase, permite unos pocos por hora y cae en spam. Con el dominio ya verificado es configuración, no desarrollo | chico |
 | **§2** | **Que las reservas del turno fijo se creen solas cada semana.** Es lo último de §2. Ya no depende de ninguna respuesta: Matías definió el 15/09 que manda la cantidad de clases del plan | chico |
 | **§2** | **Ventana de fechas en `fetchStudioData`.** Va en el mismo paso, no después: hoy trae **todas** las reservas sin filtro ni límite en cada ingreso. Con 8 filas no se nota; con turnos fijos reservando cada semana son miles en meses | chico |
-| 🔴 | **`teachers.dni` y `notas_laborales` los lee cualquiera logueado.** Deuda de la `0053`: RLS filtra filas y no columnas, y esas dos quedaron como columnas de `teachers`. Hoy están **vacías**, así que no se filtró nada. Va con tabla satélite (`teacher_private`, el patrón de `student_private`) y toca el formulario. **Hasta que esté, no cargar esos dos campos** | chico |
 | — | **Los otros 40 lugares donde el mensaje de la base no llega a la pantalla.** El mismo arreglo de una línea que el de la `0046`, pero toca todos los módulos y va con su propia verificación. El 17/09 se le puso una red abajo: cualquier rechazo de RLS ahora se traduce a "Tu rol no tiene permiso para esta acción" en vez de mostrar el texto interno de Postgres | mediano |
 | — | **15 acciones siguen pidiendo confirmación con un cartel nativo** (8 `confirm` y 7 `prompt`). Los navegadores embebidos los descartan solos: el botón no hace nada y no hay error. El del portal ya se cambió por uno propio el 17/09; los 15 que quedan son pantallas internas, que se usan en un navegador normal. Los 7 `prompt` son el grupo peor: son la única forma de escribir el motivo de una anulación | mediano |
 | — | **La profesora no ve nada de lo suyo como trabajadora.** No tiene Personal —bien, ahí hay sueldos— pero tampoco puede ver cuántas clases dio en el mes, que es un dato suyo y sin plata | chico |
