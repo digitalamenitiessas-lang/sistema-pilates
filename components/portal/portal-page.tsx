@@ -35,6 +35,8 @@ import {
   type Occupancy,
   credencial,
   cuentaDeDias,
+  settingBool,
+  suerteDeLaReserva,
   enDias,
   settingNum,
   settingText,
@@ -425,6 +427,128 @@ function ConfirmarCancelacion({
   )
 }
 
+/**
+ * Las clases de este plan, una por una.
+ *
+ * Lo pidió el estudio el 17/09 y es el "no" que faltaba del portal: la
+ * clienta veía "te quedan 2" y no cuáles fueron las otras 6, así que no
+ * tenía con qué auditar su propio plan. Cada "¿por qué me quedan 2?"
+ * terminaba en el mostrador.
+ *
+ * El número de arriba es el de la BASE (`classesUsed`), no la suma de
+ * esta lista: la autoridad es el contador y esto lo explica. Si por algo
+ * no coinciden —un ajuste manual en `classes_used_base`— se dice en vez
+ * de disimularlo, porque una lista que no cierra con el número de arriba
+ * es peor que no tener lista.
+ *
+ * Arranca plegada a propósito: es información para cuando surge la duda,
+ * y desplegada empujaría la grilla de reservar, que es para lo que la
+ * clienta entra.
+ */
+function ClasesDelPlan({
+  ms,
+  reservas,
+  suspendidas,
+  ausenciaConsume,
+  hoy,
+}: {
+  ms: Membership
+  reservas: Reservation[]
+  suspendidas: Map<string, string>
+  ausenciaConsume: boolean
+  hoy: string
+}) {
+  const [abierto, setAbierto] = useState(false)
+
+  const filas = useMemo(
+    () =>
+      reservas
+        .filter((r) => r.membershipId === ms.id)
+        .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time))
+        .map((r) => ({
+          r,
+          suerte: suerteDeLaReserva(r, {
+            suspendida: suspendidas.has(`${r.classId}|${r.date}`),
+            ausenciaConsume,
+            hoy,
+          }),
+        })),
+    [reservas, ms.id, suspendidas, ausenciaConsume, hoy]
+  )
+
+  const contadas = filas.filter((f) => f.suerte.conto).length
+  const ajuste = ms.classesUsed - contadas
+  const quedan = Math.max(0, ms.classesTotal - ms.classesUsed)
+
+  return (
+    <div className="bg-card rounded-2xl border border-border overflow-hidden">
+      <button
+        onClick={() => setAbierto((v) => !v)}
+        className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-muted/50 transition-colors"
+      >
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-foreground">Tus clases de este plan</p>
+          <p className="text-xs text-muted-foreground">
+            Usaste {ms.classesUsed} de {ms.classesTotal} · te {quedan === 1 ? 'queda' : 'quedan'}{' '}
+            {quedan}
+          </p>
+        </div>
+        <span className="text-[11px] font-semibold text-primary-fuerte shrink-0">
+          {abierto ? 'Ocultar' : 'Ver el detalle'}
+        </span>
+      </button>
+
+      {abierto && (
+        <div className="px-4 pb-4 pt-1 border-t border-border">
+          {filas.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-3">
+              Todavía no reservaste ninguna clase de este plan.
+            </p>
+          ) : (
+            <div className="divide-y divide-border">
+              {filas.map(({ r, suerte }) => (
+                <div key={r.id} className="py-2.5 flex items-start gap-3">
+                  {/* El punto dice de un vistazo si contó o no. */}
+                  <span
+                    className={cn(
+                      'w-1.5 h-1.5 rounded-full shrink-0 mt-1.5',
+                      suerte.conto ? 'bg-primary' : 'bg-border'
+                    )}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-foreground">
+                      {pretty(r.date)} · {r.time}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground truncate">{r.className}</p>
+                    {suerte.detalle && (
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{suerte.detalle}</p>
+                    )}
+                  </div>
+                  <span
+                    className={cn(
+                      'text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0',
+                      suerte.conto ? 'bg-muted text-foreground' : 'bg-muted text-muted-foreground'
+                    )}
+                  >
+                    {suerte.etiqueta}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <p className="text-[11px] text-muted-foreground mt-3">
+            Los puntos llenos son las clases que te contaron: {contadas} de esta lista.
+            {ajuste !== 0 &&
+              ` Y ${ajuste > 0 ? `${ajuste} más` : `${-ajuste} menos`} que el estudio ajustó a mano.`}{' '}
+            La clase se descuenta al reservar, no al venir.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function UpcomingList({
   reservations,
   suspendidas,
@@ -566,6 +690,13 @@ export function PortalPage() {
         )
         .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)),
     [reservations, me, today]
+  )
+
+  // Todas las suyas, de cualquier estado: el historial necesita las
+  // pasadas y las canceladas, que `myUpcoming` deja afuera.
+  const misReservas = useMemo(
+    () => reservations.filter((r) => r.studentId === me?.id),
+    [reservations, me]
   )
 
   const misPagos = useMemo(
@@ -949,6 +1080,19 @@ export function PortalPage() {
             </p>
           )}
         </section>
+
+        {/* El detalle del contador, plegado. Va acá y no al final: la duda
+            "¿por qué me quedan 2?" nace mirando el plan de arriba, y al
+            final de la grilla de reservar nadie llega. */}
+        {ms && (
+          <ClasesDelPlan
+            ms={ms}
+            reservas={misReservas}
+            suspendidas={suspendidas}
+            ausenciaConsume={settingBool(settings, 'absence_consumes_class', true)}
+            hoy={today}
+          />
+        )}
 
         {/* Reservar */}
         <section>
