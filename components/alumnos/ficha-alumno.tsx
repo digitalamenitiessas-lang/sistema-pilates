@@ -279,8 +279,9 @@ function CancelarMembresiaModal({
               className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors resize-none"
             />
             <p className="text-[11px] text-muted-foreground mt-1">
-              Queda escrito en la cuota anulada. Es lo que alguien va a leer en tres meses cuando se
-              pregunte por qué falta ese mes.
+              Queda escrito en la ficha y en la cuota anulada, y sale en el reporte de membresías
+              canceladas. Es lo que alguien va a leer en tres meses cuando se pregunte por qué
+              falta ese mes.
             </p>
           </div>
 

@@ -763,6 +763,27 @@ export async function fetchStudioData(): Promise<StudioData> {
     // vez de encolarse— la que primero se pierde, igual que membresia_para.
     if (cubreHoy(m) && (!cubreHoy(previa) || m.endDate < previa.endDate)) {
       latestMembership.set(m.studentId, m)
+      continue
+    }
+    if (cubreHoy(previa)) continue
+
+    // Si NINGUNA cubre hoy, queda elegir la menos equivocada, y acá había
+    // un agujero que abrió la 0069: una cancelada podía ganar sólo por
+    // venir primero en la lista. La ficha mostraba "FE FLOW · Cancelada ·
+    // 8 disponibles" mientras el cartel de arriba anunciaba el período
+    // correcto que arranca el mes que viene. Dos verdades distintas en la
+    // misma pantalla, y la de la tarjeta prometía clases que la base no
+    // deja usar.
+    const viva = (x: Membership) => x.status !== 'cancelada'
+    if (viva(m) && !viva(previa)) {
+      latestMembership.set(m.studentId, m)
+      continue
+    }
+    // Entre dos que no cubren hoy y ninguna está cancelada, la que arranca
+    // antes: es la próxima que va a regir, y es la que el estudio quiere
+    // ver. Entre dos canceladas, la más reciente.
+    if (viva(m) === viva(previa) && m.startDate < previa.startDate) {
+      latestMembership.set(m.studentId, m)
     }
   }
 
