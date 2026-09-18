@@ -561,19 +561,36 @@ function UpcomingList({
   suspendidas,
   onCancel,
   busyId,
+  alReservar,
 }: {
   reservations: Reservation[]
   /** clase|fecha de los días que el estudio suspendió, con su motivo */
   suspendidas: Map<string, string>
   onCancel: (r: Reservation) => void
   busyId: string | null
+  /**
+   * Lleva a la pestaña de Reservar. Antes el vacío decía "¡Elegí una acá
+   * abajo!" y era verdad: la grilla estaba abajo, en la misma página. Con
+   * las pestañas dejó de estarlo, así que el texto mandaba a mirar un
+   * lugar que ya no existe — y quien no tiene nada reservado es justo
+   * quien necesita el camino.
+   */
+  alReservar?: () => void
 }) {
   const { disciplines } = useStudio()
   if (reservations.length === 0) {
     return (
-      <p className="text-xs text-muted-foreground text-center py-4">
-        No tenés clases reservadas. ¡Elegí una acá abajo!
-      </p>
+      <div className="text-center py-6">
+        <p className="text-xs text-muted-foreground">Todavía no reservaste ninguna clase.</p>
+        {alReservar && (
+          <button
+            onClick={alReservar}
+            className="mt-3 px-5 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity"
+          >
+            Ver los horarios
+          </button>
+        )}
+      </div>
     )
   }
   return (
@@ -627,6 +644,34 @@ function UpcomingList({
       })}
     </div>
   )
+}
+
+/**
+ * Por qué no puede reservar, en un solo lugar.
+ *
+ * Este texto vivía adentro de la sección Reservar, que con la página
+ * scrolleada alcanzaba: la clienta veía la tarjeta del plan y, más abajo,
+ * el motivo. Con las pestañas, Inicio es lo primero que abre y mostraba
+ * la tarjeta con un rótulo —"Empieza después", "Vencida"— y ninguna
+ * explicación de qué hacer.
+ *
+ * Así que se dice en los dos lugares y sale de una sola función, para que
+ * no se desincronicen el día que cambie una de las dos.
+ *
+ * El orden de las ramas importa: 'futura' va antes que las clases porque
+ * a quien pagó adelantado no se le puede decir que está vencida ni que
+ * gastó un plan que todavía no empezó.
+ */
+function motivoSinReservar(
+  ms: Membership | undefined,
+  clasesQueQuedan: number
+): string | null {
+  if (!ms) return 'Necesitás una membresía activa para reservar.'
+  if (ms.status === 'futura')
+    return `Tu plan arranca el ${pretty(ms.startDate)}: desde ese día podés reservar. Para una clase de antes, consultá en recepción.`
+  if (clasesQueQuedan === 0)
+    return 'Usaste todas las clases de tu plan. Consultá en recepción para renovar.'
+  return 'Tu membresía está vencida o suspendida. Consultá en recepción.'
 }
 
 /**
@@ -1192,6 +1237,15 @@ export function PortalPage() {
 
         {pestana === 'inicio' && <MembershipCard student={me} />}
 
+        {/* El motivo, pegado a la tarjeta. Inicio es lo primero que abre y
+            sin esto la clienta ve un rótulo —"Vencida", "Empieza
+            después"— y nada que le diga qué hacer. */}
+        {pestana === 'inicio' && !canBook && (
+          <div className="bg-muted rounded-2xl px-4 py-3 -mt-2">
+            <p className="text-xs text-muted-foreground">{motivoSinReservar(ms, classesLeft)}</p>
+          </div>
+        )}
+
         {/* La renovación, como una invitación y no como un reclamo. Va
             pegada a la tarjeta del plan porque es su continuación: arriba
             dice cuándo vence, acá cómo sigue. */}
@@ -1332,6 +1386,7 @@ export function PortalPage() {
               suspendidas={suspendidas}
               onCancel={cancel}
               busyId={busyId}
+              alReservar={() => setPestana('reservar')}
             />
             {myUpcoming.length > 2 && (
               <button
@@ -1341,14 +1396,7 @@ export function PortalPage() {
                 Ver las {myUpcoming.length} que tenés reservadas
               </button>
             )}
-            {myUpcoming.length === 0 && (
-              <button
-                onClick={() => setPestana('reservar')}
-                className="w-full mt-2 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
-              >
-                Reservar una clase
-              </button>
-            )}
+
           </section>
         )}
 
@@ -1359,7 +1407,13 @@ export function PortalPage() {
             <CalendarDays className="w-4 h-4 text-primary-fuerte" />
             Tus próximas clases
           </h2>
-          <UpcomingList reservations={myUpcoming} suspendidas={suspendidas} onCancel={cancel} busyId={busyId} />
+          <UpcomingList
+            reservations={myUpcoming}
+            suspendidas={suspendidas}
+            onCancel={cancel}
+            busyId={busyId}
+            alReservar={() => setPestana('reservar')}
+          />
           {/* La regla, a la vista y no recién al apretar Cancelar. Sale del
               mismo parámetro que usa la base, así que si el estudio lo
               cambia, esto cambia. Sólo si hay algo que cancelar. */}
@@ -1376,6 +1430,14 @@ export function PortalPage() {
         {/* El detalle del contador, plegado. Va acá y no al final: la duda
             "¿por qué me quedan 2?" nace mirando el plan de arriba, y al
             final de la grilla de reservar nadie llega. */}
+        {/* Sin membresía no hay contador que explicar, y la pestaña no
+            puede quedar muda: se dice por qué está vacía. */}
+        {pestana === 'clases' && !ms && (
+          <p className="text-xs text-muted-foreground text-center">
+            Cuando tengas un plan activo, acá vas a ver cuántas clases usaste y cuáles fueron.
+          </p>
+        )}
+
         {pestana === 'clases' && ms && (
           <ClasesDelPlan
             ms={ms}
@@ -1397,16 +1459,7 @@ export function PortalPage() {
           {!canBook && (
             <div className="bg-muted rounded-2xl px-4 py-3 mb-3">
               <p className="text-xs text-muted-foreground">
-                {/* La rama de 'futura' va antes que la de las clases: a quien
-                    pagó adelantado no se le puede decir que está vencida ni
-                    que gastó un plan que todavía no empezó. */}
-                {!ms
-                  ? 'Necesitás una membresía activa para reservar.'
-                  : ms.status === 'futura'
-                  ? `Tu plan arranca el ${pretty(ms.startDate)}: desde ese día podés reservar. Para una clase de antes, consultá en recepción.`
-                  : classesLeft === 0
-                  ? 'Usaste todas las clases de tu plan. Consultá en recepción para renovar.'
-                  : 'Tu membresía está vencida o suspendida. Consultá en recepción.'}
+                {motivoSinReservar(ms, classesLeft)}
               </p>
             </div>
           )}
