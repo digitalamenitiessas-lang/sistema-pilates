@@ -105,7 +105,19 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString('es-AR')
 }
 
-export function NotificationsBell({ onNavigate }: { onNavigate?: (page: PageKey) => void }) {
+export function NotificationsBell({
+  onNavigate,
+  sinInterruptor = false,
+}: {
+  onNavigate?: (page: PageKey) => void
+  /**
+   * El portal de la clienta tiene el interruptor de avisos en su pestaña
+   * de Perfil, que es donde una persona lo busca. Ofrecerlo también acá
+   * serían dos lugares para el mismo switch. En el sistema de gestión, en
+   * cambio, no hay Perfil: ahí la campana sigue siendo el único lugar.
+   */
+  sinInterruptor?: boolean
+}) {
   const { session } = useData()
   const userId = session?.user.id
   const [open, setOpen] = useState(false)
@@ -253,7 +265,7 @@ export function NotificationsBell({ onNavigate }: { onNavigate?: (page: PageKey)
           {/* El interruptor es el mismo que usa el Perfil de la clienta
               (`avisos-en-este-celu.tsx`): una sola lógica de push, dos
               lugares donde se prende. */}
-          <AvisosEnEsteCelu variante="panel" />
+          {!sinInterruptor && <AvisosEnEsteCelu variante="panel" />}
         </div>
       )}
     </div>

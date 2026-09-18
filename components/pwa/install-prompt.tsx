@@ -14,6 +14,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { Share, SquarePlus, Smartphone, X } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { esIos, eventoGuardado, forzandoIos, instalar, suscribirse, yaInstalada } from '@/lib/instalacion'
 
 const STORAGE_KEY = 'pwa-install-prompt'
@@ -88,7 +89,20 @@ export function useEventoDeInstalacion(): boolean {
   )
 }
 
-export function InstallPrompt() {
+export function InstallPrompt({
+  conBarraAbajo = false,
+}: {
+  /**
+   * El portal de la clienta tiene una barra de pestañas fija abajo, y el
+   * cartel en `bottom-4` la tapaba entera: se veían las etiquetas
+   * cortadas detrás. Con esto se levanta por encima.
+   *
+   * No se saca el cartel del portal aunque el Perfil ya ofrezca instalar:
+   * el cartel es cómo se enteran las que nunca van a entrar a Perfil, y
+   * el Perfil es el camino para las que lo descartaron.
+   */
+  conBarraAbajo?: boolean
+} = {}) {
   const [mode, setMode] = useState<'ask' | 'ios-steps' | null>(null)
   const [ios, setIos] = useState(false)
   const hayDialogo = useEventoDeInstalacion()
@@ -156,7 +170,12 @@ export function InstallPrompt() {
   if (mode === 'ios-steps') return <PasosIos onClose={() => dismiss('done')} />
 
   return (
-    <div className="fixed bottom-4 inset-x-4 sm:inset-x-auto sm:right-4 sm:max-w-sm z-[70]">
+    <div
+      className={cn(
+        'fixed inset-x-4 sm:inset-x-auto sm:right-4 sm:max-w-sm z-[70]',
+        conBarraAbajo ? 'bottom-24' : 'bottom-4'
+      )}
+    >
       <div className="bg-card rounded-2xl shadow-2xl border border-border p-4 flex items-start gap-3">
         <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
           <Smartphone className="w-5 h-5 text-primary-foreground" />

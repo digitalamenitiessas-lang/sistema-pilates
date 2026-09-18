@@ -39,8 +39,8 @@ export function InstalarEnElCelu() {
 
   if (entorno.instalada) {
     return (
-      <div className="flex items-center gap-3 px-4 py-3.5">
-        <CheckCircle2 className="w-4 h-4 text-exito-fuerte shrink-0" />
+      <div className="flex items-start gap-3 px-4 py-3.5">
+        <CheckCircle2 className="w-4 h-4 text-exito-fuerte shrink-0 mt-0.5" />
         <span className="min-w-0">
           <span className="block text-sm font-medium text-foreground">Ya la tenés instalada</span>
           <span className="block text-[11px] text-muted-foreground mt-0.5">
@@ -73,9 +73,9 @@ export function InstalarEnElCelu() {
       <button
         onClick={alTocar}
         disabled={!enIos && !hayDialogo}
-        className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-muted/50 transition-colors disabled:hover:bg-transparent disabled:cursor-default"
+        className="w-full flex items-start gap-3 px-4 py-3.5 text-left hover:bg-muted/50 transition-colors disabled:hover:bg-transparent disabled:cursor-default"
       >
-        <Smartphone className="w-4 h-4 text-primary-fuerte shrink-0" />
+        <Smartphone className="w-4 h-4 text-primary-fuerte shrink-0 mt-0.5" />
         <span className="flex-1 min-w-0">
           <span className="block text-sm font-medium text-foreground">
             Agregala a tu pantalla de inicio

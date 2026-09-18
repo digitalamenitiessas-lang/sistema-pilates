@@ -4,16 +4,21 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   BookOpen,
   CalendarDays,
+  CalendarPlus,
   CheckCircle2,
+  ChevronDown,
+  ClipboardList,
   ChevronLeft,
   ChevronRight,
   Clock,
   CreditCard,
+  Home,
   KeyRound,
   Loader2,
   LogOut,
   MapPin,
   RefreshCw,
+  User,
   X,
   XCircle,
 } from 'lucide-react'
@@ -23,6 +28,8 @@ import { supabase } from '@/lib/supabase'
 import { useData, useStudio } from '@/lib/data-context'
 import { disciplineStyle } from '@/lib/disciplines'
 import { NotificationsBell } from '@/components/layout/notifications-bell'
+import { AvisosEnEsteCelu } from '@/components/pwa/avisos-en-este-celu'
+import { InstalarEnElCelu } from '@/components/pwa/instalar-en-el-celu'
 import {
   addDays,
   mondayOf,
@@ -622,6 +629,250 @@ function UpcomingList({
   )
 }
 
+/**
+ * La pestaña de Perfil.
+ *
+ * Reúne lo que estaba repartido: los datos de la clienta (que hasta ahora
+ * no veía en ningún lado), su credencial, y las tres acciones que vivían
+ * como iconos sueltos en el header — donde nadie las encontraba— más las
+ * dos que no existían: activar los avisos en este teléfono e instalar la
+ * app.
+ *
+ * Los datos son SOLO DE LECTURA, decisión del estudio (18/09): los carga
+ * el mostrador y hay una sola fuente de verdad. Por eso el pie dice a
+ * dónde ir si algo está mal, en vez de ofrecer un lápiz que no existe.
+ */
+function TabPerfil({
+  me,
+  credencial: cred,
+  onCambiarClave,
+  onSalir,
+}: {
+  me: Student
+  credencial: string
+  onCambiarClave: () => void
+  onSalir: () => void
+}) {
+  const [abierta, setAbierta] = useState(false)
+
+  const datos: { etiqueta: string; valor: string }[] = [
+    { etiqueta: 'Nombre', valor: me.name },
+    { etiqueta: 'Email', valor: me.email || '—' },
+    { etiqueta: 'Teléfono', valor: me.phone || '—' },
+    { etiqueta: 'Documento', valor: me.dni || '—' },
+    {
+      etiqueta: 'Fecha de nacimiento',
+      valor: me.birthdate ? new Date(`${me.birthdate}T00:00`).toLocaleDateString('es-AR') : '—',
+    },
+    {
+      etiqueta: 'Cliente desde',
+      valor: new Date(`${me.joinDate}T00:00`).toLocaleDateString('es-AR'),
+    },
+  ]
+
+  return (
+    <div className="space-y-4">
+      {/* Quién es */}
+      <div className="bg-card rounded-2xl border border-border p-5 flex items-center gap-4">
+        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+          <span className="text-primary-fuerte font-bold text-lg">{me.avatar}</span>
+        </div>
+        <div className="min-w-0">
+          <p className="text-base font-bold text-foreground truncate">{me.name}</p>
+          {cred && (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Credencial <span className="font-bold tabular-nums text-foreground/70">{cred}</span>
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Sus datos */}
+      <div className="bg-card rounded-2xl border border-border overflow-hidden">
+        <button
+          onClick={() => setAbierta((v) => !v)}
+          aria-expanded={abierta}
+          className="w-full px-4 py-3.5 flex items-center gap-3 text-left hover:bg-muted/50 transition-colors"
+        >
+          <User className="w-4 h-4 text-primary-fuerte shrink-0" />
+          <span className="flex-1 text-sm font-semibold text-foreground">Información personal</span>
+          <ChevronDown
+            className={cn(
+              'w-4 h-4 text-muted-foreground transition-transform shrink-0',
+              abierta && 'rotate-180'
+            )}
+          />
+        </button>
+        {abierta && (
+          <div className="px-4 pb-4 pt-1 border-t border-border divide-y divide-border">
+            {datos.map(({ etiqueta, valor }) => (
+              <div key={etiqueta} className="py-2.5 flex items-baseline justify-between gap-3">
+                <span className="text-[11px] text-muted-foreground uppercase tracking-wide shrink-0">
+                  {etiqueta}
+                </span>
+                <span className="text-sm text-foreground text-right min-w-0 break-words">{valor}</span>
+              </div>
+            ))}
+            <p className="text-[11px] text-muted-foreground pt-2.5">
+              Si algo de esto está mal, avisanos en el estudio y lo corregimos.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Su teléfono */}
+      <div className="bg-card rounded-2xl border border-border overflow-hidden divide-y divide-border">
+        <AvisosEnEsteCelu variante="fila" />
+        <InstalarEnElCelu />
+      </div>
+
+      {/* Su cuenta */}
+      <div className="bg-card rounded-2xl border border-border overflow-hidden divide-y divide-border">
+        <button
+          onClick={onCambiarClave}
+          className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-muted/50 transition-colors"
+        >
+          <KeyRound className="w-4 h-4 text-primary-fuerte shrink-0" />
+          <span className="text-sm font-medium text-foreground">Cambiar mi contraseña</span>
+        </button>
+        <button
+          onClick={onSalir}
+          className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-destructive/10 text-destructive-fuerte transition-colors"
+        >
+          <LogOut className="w-4 h-4 shrink-0" />
+          <span className="text-sm font-medium">Cerrar sesión</span>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Las cuatro pestañas del portal.
+ *
+ * El portal era una sola página que se scrolleaba: el plan arriba, las
+ * clases en el medio y la grilla de reservar al final. Funcionaba, pero
+ * no se sentía una app, y lo que estaba al final lo encontraba sólo quien
+ * scrolleaba hasta ahí. El estudio pidió que se navegue con una barra
+ * abajo (18/09).
+ */
+type Pestana = 'inicio' | 'reservar' | 'clases' | 'pagos' | 'perfil'
+
+/**
+ * Cinco, y en este orden a propósito: `inicio` queda en el medio, que es
+ * donde va el botón redondo elevado. Con cuatro pestañas no hay centro y
+ * el diseño no cierra.
+ */
+const PESTANAS: { key: Pestana; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
+  { key: 'reservar', label: 'Reservar', Icon: CalendarPlus },
+  { key: 'clases', label: 'Mis clases', Icon: ClipboardList },
+  { key: 'inicio', label: 'Inicio', Icon: Home },
+  { key: 'pagos', label: 'Pagos', Icon: CreditCard },
+  { key: 'perfil', label: 'Perfil', Icon: User },
+]
+
+/**
+ * La barra fija de abajo.
+ *
+ * `role="tablist"` y `aria-selected` no son adorno: sin eso, un lector de
+ * pantalla lee cuatro botones sueltos y no sabe cuál está activo.
+ *
+ * El `padding` con `env(safe-area-inset-bottom)` es para el iPhone. Vale
+ * cero mientras el viewport no tenga `viewport-fit: cover` —que no lo
+ * tiene, a propósito: ponerlo afecta TODA la app, incluido el panel del
+ * mostrador, y hay que verificar pantalla por pantalla antes—. Queda
+ * escrito para que el día que se haga, la barra ya esté lista.
+ */
+function BarraPestanas({
+  activa,
+  onCambiar,
+  pendientes,
+}: {
+  activa: Pestana
+  onCambiar: (p: Pestana) => void
+  /** Cuántas clases tiene reservadas, para el globito de "Mis clases". */
+  pendientes: number
+}) {
+  return (
+    <nav
+      role="tablist"
+      aria-label="Secciones"
+      className="fixed bottom-0 inset-x-0 z-40 bg-card/95 backdrop-blur-md border-t border-border overflow-visible"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
+      <div className="max-w-lg mx-auto flex items-end">
+        {PESTANAS.map(({ key, label, Icon }) => {
+          const esta = activa === key
+          const centro = key === 'inicio'
+
+          // El botón redondo del medio: el de Inicio se dibuja elevado,
+          // como en las apps que la clienta ya usa.
+          if (centro) {
+            return (
+              <button
+                key={key}
+                role="tab"
+                aria-selected={esta}
+                aria-current={esta ? 'page' : undefined}
+                onClick={() => onCambiar(key)}
+                className="flex-1 flex flex-col items-center -mt-5"
+              >
+                <span
+                  className={cn(
+                    'w-14 h-14 rounded-full flex items-center justify-center border-4 border-background transition-colors',
+                    esta
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-card text-muted-foreground border-background ring-1 ring-border'
+                  )}
+                >
+                  <Icon className="w-6 h-6" />
+                </span>
+                <span
+                  className={cn(
+                    'text-[10px] pb-2 pt-0.5',
+                    esta ? 'font-semibold text-primary-fuerte' : 'text-muted-foreground'
+                  )}
+                >
+                  {label}
+                </span>
+              </button>
+            )
+          }
+
+          return (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={esta}
+              aria-current={esta ? 'page' : undefined}
+              onClick={() => onCambiar(key)}
+              className={cn(
+                'flex-1 flex flex-col items-center gap-0.5 py-2.5 transition-colors relative',
+                esta ? 'text-primary-fuerte' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <span className="relative">
+                <Icon className="w-5 h-5" />
+                {key === 'clases' && pendientes > 0 && (
+                  <span className="absolute -top-1 -right-2 min-w-4 h-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+                    {pendientes}
+                  </span>
+                )}
+              </span>
+              <span className={cn('text-[10px] leading-tight text-center', esta && 'font-semibold')}>
+                {label}
+              </span>
+              {/* La línea de arriba marca la activa incluso para quien no
+                  distingue el color. */}
+              {esta && <span className="absolute top-0 inset-x-3 h-0.5 rounded-full bg-primary-fuerte" />}
+            </button>
+          )
+        })}
+      </div>
+    </nav>
+  )
+}
+
 export function PortalPage() {
   const { profile, refresh, signOut } = useData()
   const { students, classes, reservations, payments, disciplines, occurrences, settings, memberships } =
@@ -630,6 +881,22 @@ export function PortalPage() {
   // Con RLS, el cliente solo recibe su propia ficha
   const me = students.find((s) => s.userId === profile?.id) ?? students[0] ?? null
 
+  /**
+   * Con qué pestaña abre: `?t=reservar` entra directo.
+   *
+   * Se lee SOLO al montar y después manda el estado local, que es la misma
+   * convención que ya usa el sistema de gestión con `?p=` (ver
+   * `app/sistema/page.tsx`). No se empuja historial por cada cambio de
+   * pestaña a propósito: haría que el botón "atrás" de Android camine por
+   * las pestañas visitadas, que confunde más de lo que ayuda. El costo es
+   * que "atrás" desde una pestaña cierra la app instalada — igual que
+   * hoy, y que en la mayoría de las apps nativas.
+   */
+  const [pestana, setPestana] = useState<Pestana>(() => {
+    if (typeof window === 'undefined') return 'inicio'
+    const t = new URLSearchParams(window.location.search).get('t')
+    return PESTANAS.some((p) => p.key === t) ? (t as Pestana) : 'inicio'
+  })
   const [weekOffset, setWeekOffset] = useState(0)
   const [day, setDay] = useState(Math.min((new Date().getDay() + 6) % 7, 5))
   const [occupancy, setOccupancy] = useState<Map<string, Occupancy>>(new Map())
@@ -881,22 +1148,10 @@ export function PortalPage() {
               sea los suyos con `audience = 'alumno'`. El aislamiento no
               depende de este componente ni de un filtro en la consulta: lo
               decide la base. */}
-          <NotificationsBell />
-          <button
-            onClick={() => setShowChangePassword(true)}
-            aria-label="Cambiar contraseña"
-            title="Cambiar contraseña"
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          >
-            <KeyRound className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => signOut()}
-            aria-label="Cerrar sesión"
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+          {/* El interruptor de avisos no va acá: vive en el Perfil, que es
+              donde una persona lo busca. Dos lugares para el mismo switch
+              sería peor que uno. */}
+          <NotificationsBell sinInterruptor />
         </div>
       </header>
 
@@ -921,7 +1176,9 @@ export function PortalPage() {
         />
       )}
 
-      <main className="max-w-lg mx-auto px-4 py-5 space-y-6 pb-16">
+      {/* El `pb-28` deja pasar la barra fija: sin eso, el último bloque de
+          cada pestaña queda abajo de ella y no se puede tocar. */}
+      <main className="max-w-lg mx-auto px-4 py-5 space-y-6 pb-28">
         {notice && (
           <div
             className={cn(
@@ -933,12 +1190,12 @@ export function PortalPage() {
           </div>
         )}
 
-        <MembershipCard student={me} />
+        {pestana === 'inicio' && <MembershipCard student={me} />}
 
         {/* La renovación, como una invitación y no como un reclamo. Va
             pegada a la tarjeta del plan porque es su continuación: arriba
             dice cuándo vence, acá cómo sigue. */}
-        {misRenovaciones.length > 0 && (
+        {pestana === 'inicio' && misRenovaciones.length > 0 && (
           <div className="bg-info-suave border border-info/40 rounded-2xl p-4">
             <p className="text-xs font-bold text-info-fuerte mb-2 flex items-center gap-1.5">
               <RefreshCw className="w-3.5 h-3.5" />
@@ -1012,7 +1269,7 @@ export function PortalPage() {
         )}
 
         {/* Deudas destacadas */}
-        {myDebts.length > 0 && (
+        {pestana === 'inicio' && myDebts.length > 0 && (
           <div className="bg-aviso-suave border border-aviso/40 rounded-2xl p-4">
             <p className="text-xs font-bold text-aviso-fuerte mb-2 flex items-center gap-1.5">
               <CreditCard className="w-3.5 h-3.5" />
@@ -1062,7 +1319,41 @@ export function PortalPage() {
           </div>
         )}
 
-        {/* Próximas clases */}
+        {/* En Inicio, sólo las dos que siguen y un camino al resto: es un
+            resumen, no la lista. La lista completa vive en Mis clases. */}
+        {pestana === 'inicio' && (
+          <section>
+            <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+              <CalendarDays className="w-4 h-4 text-primary-fuerte" />
+              Tus próximas clases
+            </h2>
+            <UpcomingList
+              reservations={myUpcoming.slice(0, 2)}
+              suspendidas={suspendidas}
+              onCancel={cancel}
+              busyId={busyId}
+            />
+            {myUpcoming.length > 2 && (
+              <button
+                onClick={() => setPestana('clases')}
+                className="w-full mt-2 py-2 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors"
+              >
+                Ver las {myUpcoming.length} que tenés reservadas
+              </button>
+            )}
+            {myUpcoming.length === 0 && (
+              <button
+                onClick={() => setPestana('reservar')}
+                className="w-full mt-2 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+              >
+                Reservar una clase
+              </button>
+            )}
+          </section>
+        )}
+
+        {/* Mis clases: la lista entera, con su regla, y el detalle del plan */}
+        {pestana === 'clases' && (
         <section>
           <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
             <CalendarDays className="w-4 h-4 text-primary-fuerte" />
@@ -1080,11 +1371,12 @@ export function PortalPage() {
             </p>
           )}
         </section>
+        )}
 
         {/* El detalle del contador, plegado. Va acá y no al final: la duda
             "¿por qué me quedan 2?" nace mirando el plan de arriba, y al
             final de la grilla de reservar nadie llega. */}
-        {ms && (
+        {pestana === 'clases' && ms && (
           <ClasesDelPlan
             ms={ms}
             reservas={misReservas}
@@ -1095,6 +1387,7 @@ export function PortalPage() {
         )}
 
         {/* Reservar */}
+        {pestana === 'reservar' && (
         <section>
           <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
             <Clock className="w-4 h-4 text-primary-fuerte" />
@@ -1258,7 +1551,10 @@ export function PortalPage() {
           </div>
         </section>
 
+        )}
+
         {/* Historial de pagos */}
+        {pestana === 'pagos' && (
         <section>
           <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
             <CreditCard className="w-4 h-4 text-primary-fuerte" />
@@ -1323,10 +1619,23 @@ export function PortalPage() {
           )}
         </section>
 
+        )}
+
+        {pestana === 'perfil' && (
+          <TabPerfil
+            me={me}
+            credencial={miCredencial}
+            onCambiarClave={() => setShowChangePassword(true)}
+            onSalir={() => signOut()}
+          />
+        )}
+
         <p className="text-center text-[10px] text-muted-foreground pt-2">
           ¿Dudas? Escribinos por WhatsApp o consultá en recepción.
         </p>
       </main>
+
+      <BarraPestanas activa={pestana} onCambiar={setPestana} pendientes={myUpcoming.length} />
     </div>
   )
 }

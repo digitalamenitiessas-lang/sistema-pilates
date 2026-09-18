@@ -75,9 +75,9 @@ export function AvisosEnEsteCelu({
         <button
           onClick={alternar}
           disabled={estado === 'busy'}
-          className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-muted/50 transition-colors disabled:opacity-60"
+          className="w-full flex items-start gap-3 px-4 py-3.5 text-left hover:bg-muted/50 transition-colors disabled:opacity-60"
         >
-          <Icono className={cn('w-4 h-4 text-primary-fuerte shrink-0', estado === 'busy' && 'animate-spin')} />
+          <Icono className={cn('w-4 h-4 text-primary-fuerte shrink-0 mt-0.5', estado === 'busy' && 'animate-spin')} />
           <span className="flex-1 min-w-0">
             <span className="block text-sm font-medium text-foreground">{texto}</span>
             <span className="block text-[11px] text-muted-foreground mt-0.5">
