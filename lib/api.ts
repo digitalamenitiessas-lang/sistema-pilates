@@ -1228,6 +1228,37 @@ export async function cancelarMembresia(
   }
 }
 
+/**
+ * Deshacer una asignación equivocada (0071).
+ *
+ * NO es cancelar. Cancelar deja el período en la historia con su motivo,
+ * que es lo que corresponde cuando una clienta se va. Esto borra, y sólo
+ * la base decide si se puede: sin clases usadas, sin reservas hechas
+ * contra ese período y sin la cuota cobrada. Si algo de eso pasó,
+ * rechaza con su texto y eso es lo que hay que mostrar.
+ *
+ * La cuota se va con el período. Hacerlo desde el navegador con un
+ * `delete` la dejaría viva y sin período —`payments.membership_id` es
+ * `on delete set null`—, o sea una deuda de algo que no existe.
+ */
+export async function eliminarMembresia(
+  membershipId: string
+): Promise<{ plan: string; desde: string; hasta: string; cuotasBorradas: number; montoBorrado: number }> {
+  const { data, error } = await supabase.rpc('eliminar_membresia', { p_id: membershipId })
+  if (error?.code === '42883' || error?.code === 'PGRST202') {
+    throw new Error('Para deshacer una asignación falta correr la migración 0071.')
+  }
+  if (error) throw errorDeLaBase(error, 'No se pudo eliminar la membresía')
+  const f = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | undefined
+  return {
+    plan: String(f?.plan ?? '—'),
+    desde: String(f?.desde ?? ''),
+    hasta: String(f?.hasta ?? ''),
+    cuotasBorradas: Number(f?.cuotas_borradas ?? 0),
+    montoBorrado: Number(f?.monto_borrado ?? 0),
+  }
+}
+
 export async function setMembershipAutoRenew(membershipId: string, autoRenew: boolean): Promise<void> {
   const { error } = await supabase
     .from('memberships')

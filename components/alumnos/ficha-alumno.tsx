@@ -28,6 +28,7 @@ import { useData } from '@/lib/data-context'
 import {
   credencial,
   cancelarMembresia,
+  eliminarMembresia,
   createSystemUser,
   reenviarAcceso,
   setMembershipAutoRenew,
@@ -147,6 +148,131 @@ function ReenviarAcceso({ student }: { student: Student }) {
           {motivo}
         </p>
       )}
+    </div>
+  )
+}
+
+/**
+ * Deshacer una asignación equivocada (0071).
+ *
+ * Es el hermano de cancelar y no lo mismo, y el cartel tiene que dejarlo
+ * clarísimo: esto BORRA y no queda rastro. Sirve para el dedazo —le
+ * asignaron FE FLOW y era FE START— y no para dar de baja a una clienta,
+ * que es lo que hace cancelar.
+ *
+ * No pide motivo, a propósito: no hay nada que explicar en tres meses,
+ * porque no va a quedar ninguna fila que alguien encuentre y se pregunte
+ * por qué. Pedir un motivo para algo que se borra es teatro.
+ *
+ * Quién puede: lo decide la base con `membresias.eliminar` y con las tres
+ * condiciones materiales (sin clases usadas, sin reservas, sin cobrar).
+ * La pantalla esconde el botón cuando sabe que no corresponde, pero la
+ * que rechaza es la base.
+ */
+function DeshacerMembresiaModal({
+  membresia,
+  cuota,
+  onClose,
+}: {
+  membresia: Membership
+  cuota?: Payment
+  onClose: () => void
+}) {
+  const { refresh } = useData()
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const confirmar = async () => {
+    setSaving(true)
+    setError(null)
+    try {
+      await eliminarMembresia(membresia.id)
+      await refresh()
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo deshacer')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/20 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="bg-card rounded-2xl shadow-2xl w-full max-w-md border border-border max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <div>
+            <h2 className="text-base font-bold text-foreground">Deshacer la asignación</h2>
+            <p className="text-xs text-muted-foreground">{membresia.planName}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          <div className="rounded-xl bg-muted px-3.5 py-3">
+            <p className="text-sm text-foreground">
+              {fecha(membresia.startDate)} — {fecha(membresia.endDate)}
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Sin clases usadas y sin reservas hechas contra este período.
+            </p>
+          </div>
+
+          <p className="text-sm text-foreground">
+            Se borra el período{' '}
+            {cuota ? (
+              <>
+                y su cuota de{' '}
+                <span className="font-bold">${cuota.amount.toLocaleString('es-AR')}</span>
+              </>
+            ) : (
+              'y no tiene cuota que borrar'
+            )}
+            . <span className="font-semibold">No queda rastro de ninguno de los dos.</span>
+          </p>
+
+          <p className="text-xs text-muted-foreground bg-muted rounded-xl px-3 py-2.5">
+            Esto es para cuando te equivocaste de plan al cargarlo. Si la clienta se va o decidió
+            no seguir, usá <span className="font-semibold">Cancelar</span>: ahí el período queda en
+            su ficha con el motivo, y aparece en el reporte de cancelaciones.
+          </p>
+
+          {error && (
+            <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">
+              {error}
+            </p>
+          )}
+        </div>
+
+        <div className="flex gap-3 px-6 py-4 border-t border-border">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors"
+          >
+            No borrar
+          </button>
+          <button
+            type="button"
+            onClick={confirmar}
+            disabled={saving}
+            className="flex-1 py-2.5 rounded-xl bg-destructive-fuerte text-white text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            {saving ? 'Borrando...' : 'Borrar el período'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -639,6 +765,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
   const [showAssignPlan, setShowAssignPlan] = useState(false)
   const [showPortalAccess, setShowPortalAccess] = useState(false)
   const [aCancelar, setACancelar] = useState<Membership | null>(null)
+  const [aDeshacer, setADeshacer] = useState<Membership | null>(null)
   const [savingAutoRenew, setSavingAutoRenew] = useState(false)
   const ms = student.membership
   // El formato lo pone el estudio en Configuración, así que se deriva acá
@@ -1462,6 +1589,21 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                         {/* Una vencida no se cancela: no hay nada que sacar
                             del medio ni cuota que anular. Una cancelada
                             tampoco, obvio. */}
+                        {/* Las dos condiciones que la base va a exigir
+                            igual (0071). Se preguntan acá para no ofrecer
+                            un botón que va a fallar — esconderlo no es la
+                            protección, la protección es la función. */}
+                        {canWrite &&
+                          m.classesUsed === 0 &&
+                          !reservations.some((r) => r.membershipId === m.id) &&
+                          !payments.some((p) => p.membershipId === m.id && p.status === 'pagado') && (
+                            <button
+                              onClick={() => setADeshacer(m)}
+                              className="shrink-0 px-2.5 py-1 rounded-lg border border-border text-[11px] font-semibold text-muted-foreground hover:bg-destructive/10 hover:text-destructive-fuerte transition-colors"
+                            >
+                              Deshacer
+                            </button>
+                          )}
                         {canWrite && m.status !== 'cancelada' && m.status !== 'vencida' && (
                           <button
                             onClick={() => setACancelar(m)}
@@ -1484,6 +1626,13 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
       {showAssignPlan && <AsignarPlanModal student={student} onClose={() => setShowAssignPlan(false)} />}
       {showPortalAccess && (
         <PortalAccessModal student={student} onClose={() => setShowPortalAccess(false)} />
+      )}
+      {aDeshacer && (
+        <DeshacerMembresiaModal
+          membresia={aDeshacer}
+          cuota={payments.find((p) => p.membershipId === aDeshacer.id && p.status !== 'anulado')}
+          onClose={() => setADeshacer(null)}
+        />
       )}
       {aCancelar && (
         <CancelarMembresiaModal
