@@ -2652,10 +2652,40 @@ async function pushApi(body: object, method: 'POST' | 'DELETE'): Promise<void> {
   }
 }
 
+/**
+ * El service worker, con un límite de paciencia.
+ *
+ * `navigator.serviceWorker.ready` es una promesa que **no resuelve nunca**
+ * si el registro falló: no se rechaza, se queda esperando. Y el registro
+ * se hace con un `catch` vacío (`install-prompt.tsx`), así que un `/sw.js`
+ * que no se pudo registrar dejaba el botón de "Activar avisos" girando
+ * para siempre, sin éxito, sin error y sin nada que mirar. Lo encontró el
+ * barrido de silencios del 17/09.
+ *
+ * Diez segundos es mucho más de lo que tarda un registro que va a andar, y
+ * mucho menos que "para siempre".
+ */
+async function serviceWorkerListo(): Promise<ServiceWorkerRegistration> {
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              'No se pudo preparar este dispositivo para los avisos. Recargá la página y probá de nuevo.'
+            )
+          ),
+        10_000
+      )
+    ),
+  ])
+}
+
 /** true si este dispositivo ya está suscripto a push. */
 export async function getPushSubscription(): Promise<PushSubscription | null> {
   if (!pushSupported()) return null
-  const reg = await navigator.serviceWorker.ready
+  const reg = await serviceWorkerListo()
   return reg.pushManager.getSubscription()
 }
 
@@ -2666,7 +2696,7 @@ export async function enablePush(): Promise<void> {
   if (permission !== 'granted') {
     throw new Error('Permiso de notificaciones denegado')
   }
-  const reg = await navigator.serviceWorker.ready
+  const reg = await serviceWorkerListo()
   const subscription =
     (await reg.pushManager.getSubscription()) ??
     (await reg.pushManager.subscribe({

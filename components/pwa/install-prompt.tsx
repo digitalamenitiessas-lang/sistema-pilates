@@ -1,68 +1,145 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Share, SquarePlus, Smartphone, X } from 'lucide-react'
-
 // Invitación post-login a instalar la app en el teléfono.
-// iOS no tiene prompt nativo de instalación: ahí mostramos los pasos
-// (Compartir → Agregar a inicio). En Android/Chrome usamos el evento
-// beforeinstallprompt y el diálogo del sistema. La respuesta se
-// recuerda en localStorage para no insistir en cada visita.
+//
+// iOS no tiene diálogo nativo de instalación: ahí se muestran los pasos
+// (Compartir → Agregar a inicio). En Android/Chrome se usa el evento
+// beforeinstallprompt y el diálogo del sistema. La respuesta se recuerda
+// en localStorage para no insistir en cada visita.
+//
+// La detección del evento NO vive acá desde el 18/09: está en
+// `lib/instalacion.ts`, porque el Perfil de la clienta también ofrece
+// instalar la app y esa pestaña se monta mucho después de que el evento
+// se disparó. Acá queda el cartel, que es una decisión de interfaz.
+
+import { useEffect, useState, useSyncExternalStore } from 'react'
+import { Share, SquarePlus, Smartphone, X } from 'lucide-react'
+import { esIos, eventoGuardado, forzandoIos, instalar, suscribirse, yaInstalada } from '@/lib/instalacion'
 
 const STORAGE_KEY = 'pwa-install-prompt'
 
-type BeforeInstallPromptEvent = Event & {
-  prompt: () => Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
-}
-
-function isStandalone(): boolean {
+/**
+ * Los pasos de Safari, que se muestran igual desde el cartel y desde el
+ * Perfil. Es lo único que iOS nos deja hacer: no hay diálogo que abrir.
+ */
+export function PasosIos({ onClose }: { onClose: () => void }) {
   return (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    (navigator as unknown as { standalone?: boolean }).standalone === true
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-4 bg-foreground/20 backdrop-blur-sm">
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm border border-border max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h2 className="text-base font-bold text-foreground">Agregala a tu inicio</h2>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
+            aria-label="Cerrar"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="px-5 py-5 space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Desde Safari, seguí estos pasos (te lleva 10 segundos):
+          </p>
+          <ol className="space-y-3">
+            <li className="flex items-start gap-3">
+              <span className="w-6 h-6 rounded-full bg-primary/10 text-primary-fuerte text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
+              <p className="text-sm text-foreground">
+                Tocá el botón <strong>Compartir</strong>{' '}
+                <Share className="w-4 h-4 inline text-primary-fuerte" /> en la barra de abajo del
+                navegador.
+              </p>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="w-6 h-6 rounded-full bg-primary/10 text-primary-fuerte text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
+              <p className="text-sm text-foreground">
+                Deslizá hacia abajo y elegí <strong>&quot;Agregar a inicio&quot;</strong>{' '}
+                <SquarePlus className="w-4 h-4 inline text-primary-fuerte" />.
+              </p>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="w-6 h-6 rounded-full bg-primary/10 text-primary-fuerte text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
+              <p className="text-sm text-foreground">
+                Tocá <strong>&quot;Agregar&quot;</strong> arriba a la derecha. Listo: vas a ver el
+                ícono del estudio junto a tus apps.
+              </p>
+            </li>
+          </ol>
+          <p className="text-xs text-muted-foreground">
+            Si estás en otro navegador, abrí esta página en Safari primero.
+          </p>
+          <button
+            onClick={onClose}
+            className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+          >
+            ¡Listo!
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
-function isIos(): boolean {
-  // iPadOS se presenta como Mac, pero con pantalla táctil
-  return (
-    /iphone|ipad|ipod/i.test(navigator.userAgent) ||
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+/** Si hay un diálogo de instalación esperando, y se entera cuando llega. */
+export function useEventoDeInstalacion(): boolean {
+  return useSyncExternalStore(
+    suscribirse,
+    () => eventoGuardado() !== null,
+    () => false
   )
 }
 
 export function InstallPrompt() {
   const [mode, setMode] = useState<'ask' | 'ios-steps' | null>(null)
   const [ios, setIos] = useState(false)
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null)
+  const hayDialogo = useEventoDeInstalacion()
 
+  // El service worker, que además es lo que habilita los avisos push.
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {})
+    if (!('serviceWorker' in navigator)) return
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      // No se traga en silencio: sin service worker no hay push, y hasta
+      // el 18/09 eso dejaba el botón de "Activar avisos" girando para
+      // siempre. El límite de espera está en `lib/api.ts`; el motivo, acá.
+      console.error('[pwa] no se pudo registrar el service worker:', err)
+    })
+  }, [])
+
+  // A quién se le ofrece el cartel. En iOS hay una espera corta para no
+  // tapar la pantalla en el primer segundo.
+  useEffect(() => {
+    const debugIos = forzandoIos()
+    if (!debugIos && yaInstalada()) return
+    try {
+      if (!debugIos && localStorage.getItem(STORAGE_KEY)) return
+    } catch {
+      // Sin localStorage —modo privado— se ofrece igual: insistir de más
+      // es mejor que no ofrecerlo nunca.
     }
-
-    // Preview manual: localStorage.setItem('pwa-debug','ios') fuerza el
-    // flujo de iOS desde cualquier dispositivo (para probar/demostrar).
-    const debugIos = localStorage.getItem('pwa-debug') === 'ios'
-    if (!debugIos && (isStandalone() || localStorage.getItem(STORAGE_KEY))) return
-
-    if (debugIos || isIos()) {
+    if (debugIos || esIos()) {
       setIos(true)
       const t = setTimeout(() => setMode('ask'), 1500)
       return () => clearTimeout(t)
     }
-
-    const onPrompt = (e: Event) => {
-      e.preventDefault()
-      setDeferred(e as BeforeInstallPromptEvent)
-      setMode('ask')
-    }
-    window.addEventListener('beforeinstallprompt', onPrompt)
-    return () => window.removeEventListener('beforeinstallprompt', onPrompt)
   }, [])
 
+  // En Android el cartel aparece cuando llega el evento, no antes.
+  useEffect(() => {
+    if (!hayDialogo || ios) return
+    if (yaInstalada()) return
+    try {
+      if (localStorage.getItem(STORAGE_KEY)) return
+    } catch {
+      /* ver arriba */
+    }
+    setMode('ask')
+  }, [hayDialogo, ios])
+
   const dismiss = (remember: 'dismissed' | 'done') => {
-    localStorage.setItem(STORAGE_KEY, remember)
+    try {
+      localStorage.setItem(STORAGE_KEY, remember)
+    } catch {
+      /* sin localStorage no se recuerda, y el cartel vuelve la próxima */
+    }
     setMode(null)
   }
 
@@ -71,71 +148,12 @@ export function InstallPrompt() {
       setMode('ios-steps')
       return
     }
-    if (deferred) {
-      await deferred.prompt()
-      const { outcome } = await deferred.userChoice
-      dismiss(outcome === 'accepted' ? 'done' : 'dismissed')
-    }
+    const r = await instalar()
+    if (r !== 'sin-dialogo') dismiss(r === 'accepted' ? 'done' : 'dismissed')
   }
 
   if (!mode) return null
-
-  if (mode === 'ios-steps') {
-    return (
-      <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-4 bg-foreground/20 backdrop-blur-sm">
-        <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm border border-border max-h-[90vh] overflow-y-auto">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <h2 className="text-base font-bold text-foreground">Agregala a tu inicio</h2>
-            <button
-              onClick={() => dismiss('done')}
-              className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
-              aria-label="Cerrar"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="px-5 py-5 space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Desde Safari, seguí estos pasos (te lleva 10 segundos):
-            </p>
-            <ol className="space-y-3">
-              <li className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary-fuerte text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
-                <p className="text-sm text-foreground">
-                  Tocá el botón <strong>Compartir</strong>{' '}
-                  <Share className="w-4 h-4 inline text-primary-fuerte" /> en la barra de abajo del
-                  navegador.
-                </p>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary-fuerte text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
-                <p className="text-sm text-foreground">
-                  Deslizá hacia abajo y elegí <strong>&quot;Agregar a inicio&quot;</strong>{' '}
-                  <SquarePlus className="w-4 h-4 inline text-primary-fuerte" />.
-                </p>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary-fuerte text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
-                <p className="text-sm text-foreground">
-                  Tocá <strong>&quot;Agregar&quot;</strong> arriba a la derecha. Listo: vas a ver
-                  el ícono del estudio junto a tus apps.
-                </p>
-              </li>
-            </ol>
-            <p className="text-xs text-muted-foreground">
-              Si estás en otro navegador, abrí esta página en Safari primero.
-            </p>
-            <button
-              onClick={() => dismiss('done')}
-              className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
-            >
-              ¡Listo!
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  if (mode === 'ios-steps') return <PasosIos onClose={() => dismiss('done')} />
 
   return (
     <div className="fixed bottom-4 inset-x-4 sm:inset-x-auto sm:right-4 sm:max-w-sm z-[70]">

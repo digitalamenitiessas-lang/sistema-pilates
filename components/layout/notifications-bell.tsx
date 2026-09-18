@@ -2,21 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  Bell, BellRing, BellOff, CreditCard, UserPlus, CalendarClock, AlertTriangle,
-  Loader2, Smartphone, RefreshCw, RefreshCwOff, Wallet, Scale, Coins,
+  Bell, BellRing, CreditCard, UserPlus, CalendarClock, AlertTriangle,
+  Loader2, RefreshCw, RefreshCwOff, Wallet, Scale, Coins,
   CalendarCheck, CalendarOff, UserCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useData } from '@/lib/data-context'
-import {
-  fetchNotifications,
-  markNotificationsRead,
-  pushSupported,
-  getPushSubscription,
-  enablePush,
-  disablePush,
-} from '@/lib/api'
+import { fetchNotifications, markNotificationsRead } from '@/lib/api'
+import { AvisosEnEsteCelu } from '@/components/pwa/avisos-en-este-celu'
 import type { AppNotification, NotificationType } from '@/lib/types'
 import type { PageKey } from './sidebar'
 
@@ -118,35 +112,7 @@ export function NotificationsBell({ onNavigate }: { onNavigate?: (page: PageKey)
   const [items, setItems] = useState<AppNotification[]>([])
   const [loading, setLoading] = useState(true)
   const [available, setAvailable] = useState(true)
-  // Push: 'off' | 'on' | 'busy' | 'unsupported'
-  const [pushState, setPushState] = useState<'off' | 'on' | 'busy' | 'unsupported'>('unsupported')
-  const [pushError, setPushError] = useState<string | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!pushSupported()) return
-    getPushSubscription()
-      .then((sub) => setPushState(sub ? 'on' : 'off'))
-      .catch(() => setPushState('off'))
-  }, [])
-
-  const togglePush = async () => {
-    setPushError(null)
-    const prev = pushState
-    setPushState('busy')
-    try {
-      if (prev === 'on') {
-        await disablePush()
-        setPushState('off')
-      } else {
-        await enablePush()
-        setPushState('on')
-      }
-    } catch (err) {
-      setPushState(prev)
-      setPushError(err instanceof Error ? err.message : 'No se pudo cambiar el estado')
-    }
-  }
 
   const reload = useCallback(async () => {
     if (!userId) return
@@ -284,27 +250,10 @@ export function NotificationsBell({ onNavigate }: { onNavigate?: (page: PageKey)
             )}
           </div>
 
-          {pushState !== 'unsupported' && (
-            <div className="px-4 py-3 border-t border-border bg-muted/40">
-              <button
-                onClick={togglePush}
-                disabled={pushState === 'busy'}
-                className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-border bg-card text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors disabled:opacity-60"
-              >
-                {pushState === 'busy' ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : pushState === 'on' ? (
-                  <BellOff className="w-3.5 h-3.5" />
-                ) : (
-                  <Smartphone className="w-3.5 h-3.5" />
-                )}
-                {pushState === 'on'
-                  ? 'Desactivar avisos en este dispositivo'
-                  : 'Activar avisos en este dispositivo'}
-              </button>
-              {pushError && <p className="text-[11px] text-destructive-fuerte mt-1.5 text-center">{pushError}</p>}
-            </div>
-          )}
+          {/* El interruptor es el mismo que usa el Perfil de la clienta
+              (`avisos-en-este-celu.tsx`): una sola lógica de push, dos
+              lugares donde se prende. */}
+          <AvisosEnEsteCelu variante="panel" />
         </div>
       )}
     </div>
