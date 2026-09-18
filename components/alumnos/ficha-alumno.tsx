@@ -169,10 +169,20 @@ function ReenviarAcceso({ student }: { student: Student }) {
 function CancelarMembresiaModal({
   membresia,
   cuota,
+  encolada,
   onClose,
 }: {
   membresia: Membership
   cuota?: Payment
+  /**
+   * El período que arranca DESPUÉS de este, si hay. Importa porque
+   * cancelar no lo adelanta: las fechas de un período se calculan cuando
+   * se asigna y no se recalculan nunca más. Matías se topó con esto el
+   * 18/09 —canceló el que corría y el siguiente siguió arrancando el día
+   * después de que el cancelado terminaba, con un hueco en el medio— y
+   * era imposible de anticipar desde la pantalla.
+   */
+  encolada?: Membership
   onClose: () => void
 }) {
   const { refresh } = useData()
@@ -237,6 +247,15 @@ function CancelarMembresiaModal({
           ) : (
             <p className="text-sm text-muted-foreground">
               Este período no tiene una cuota pendiente para anular.
+            </p>
+          )}
+
+          {encolada && (
+            <p className="text-xs text-aviso-fuerte bg-aviso-suave rounded-xl px-3 py-2">
+              Tiene otro período encolado que arranca el{' '}
+              <span className="font-semibold">{fecha(encolada.startDate)}</span>, y cancelar este{' '}
+              <span className="font-semibold">no lo adelanta</span>: entre hoy y esa fecha se queda
+              sin plan. Si querés que empiece antes, cancelá los dos y asignale el plan de nuevo.
             </p>
           )}
 
@@ -1471,6 +1490,9 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
           cuota={payments.find(
             (p) => p.membershipId === aCancelar.id && (p.status === 'pendiente' || p.status === 'vencido')
           )}
+          encolada={misMembresias
+            .filter((m) => m.status !== 'cancelada' && m.startDate > aCancelar.endDate)
+            .sort((a, b) => a.startDate.localeCompare(b.startDate))[0]}
           onClose={() => setACancelar(null)}
         />
       )}

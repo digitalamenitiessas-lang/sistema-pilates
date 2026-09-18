@@ -9,6 +9,7 @@ import { descargarCsv, nombreArchivo, type Columna } from '@/lib/export'
 import {
   reporteAltas,
   reporteAsistencias,
+  reporteCancelaciones,
   reporteCobros,
   reporteDeudas,
   reporteEgresos,
@@ -163,6 +164,28 @@ const REPORTES: Array<Reporte<any>> = [
       { titulo: 'Estado', valor: (f) => f.estado },
     ],
     totalizar: (filas) => `${filas.length}`,
+  },
+  {
+    key: 'cancelaciones',
+    nombre: 'Membresías canceladas',
+    grupo: 'Clientes',
+    descripcion: 'Las que se dieron de baja, con su motivo y quién la pidió',
+    cargar: reporteCancelaciones,
+    columnas: [
+      { titulo: 'Cancelada el', valor: (f) => f.fecha, render: (f) => (f.fecha ? fecha(f.fecha) : 'sin fecha') },
+      { titulo: 'Cliente', valor: (f) => f.alumna },
+      { titulo: 'Plan', valor: (f) => f.plan },
+      { titulo: 'Período', valor: (f) => f.desde, render: (f) => `${fecha(f.desde)} — ${fecha(f.hasta)}` },
+      {
+        titulo: 'Clases',
+        valor: (f) => `${f.usadas}/${f.total}`,
+        alinearDerecha: true,
+        render: (f) => `${f.usadas}/${f.total}`,
+      },
+      { titulo: 'Motivo', valor: (f) => f.motivo },
+    ],
+    totalizar: (filas) =>
+      `${filas.length} ${filas.length === 1 ? 'cancelación' : 'cancelaciones'}`,
   },
   {
     key: 'asistencias',
