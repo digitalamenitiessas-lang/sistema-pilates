@@ -228,15 +228,20 @@ function DeshacerMembresiaModal({
             </p>
           </div>
 
+          {/* Se nombra la cuota incluso si ya está anulada: la función la
+              borra igual, y tiene que hacerlo — dejarla la convertiría en
+              una cuota anulada sin período, porque la clave ajena la deja
+              viva con `membership_id` en nulo. El cartel decía "no tiene
+              cuota que borrar" en ese caso y no era cierto. */}
           <p className="text-sm text-foreground">
             Se borra el período{' '}
             {cuota ? (
               <>
-                y su cuota de{' '}
+                y su cuota{cuota.status === 'anulado' ? ' ya anulada' : ''} de{' '}
                 <span className="font-bold">${cuota.amount.toLocaleString('es-AR')}</span>
               </>
             ) : (
-              'y no tiene cuota que borrar'
+              'y no tiene ninguna cuota asociada'
             )}
             . <span className="font-semibold">No queda rastro de ninguno de los dos.</span>
           </p>
@@ -1630,7 +1635,9 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
       {aDeshacer && (
         <DeshacerMembresiaModal
           membresia={aDeshacer}
-          cuota={payments.find((p) => p.membershipId === aDeshacer.id && p.status !== 'anulado')}
+          // Cualquier cuota del período menos una cobrada, que bloquea el
+          // borrado y nunca llega a este cartel.
+          cuota={payments.find((p) => p.membershipId === aDeshacer.id && p.status !== 'pagado')}
           onClose={() => setADeshacer(null)}
         />
       )}
