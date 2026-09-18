@@ -763,6 +763,27 @@ export async function fetchStudioData(): Promise<StudioData> {
     // vez de encolarse— la que primero se pierde, igual que membresia_para.
     if (cubreHoy(m) && (!cubreHoy(previa) || m.endDate < previa.endDate)) {
       latestMembership.set(m.studentId, m)
+      continue
+    }
+    if (cubreHoy(previa)) continue
+
+    // Si NINGUNA cubre hoy, queda elegir la menos equivocada, y acá había
+    // un agujero que abrió la 0069: una cancelada podía ganar sólo por
+    // venir primero en la lista. La ficha mostraba "FE FLOW · Cancelada ·
+    // 8 disponibles" mientras el cartel de arriba anunciaba el período
+    // correcto que arranca el mes que viene. Dos verdades distintas en la
+    // misma pantalla, y la de la tarjeta prometía clases que la base no
+    // deja usar.
+    const viva = (x: Membership) => x.status !== 'cancelada'
+    if (viva(m) && !viva(previa)) {
+      latestMembership.set(m.studentId, m)
+      continue
+    }
+    // Entre dos que no cubren hoy y ninguna está cancelada, la que arranca
+    // antes: es la próxima que va a regir, y es la que el estudio quiere
+    // ver. Entre dos canceladas, la más reciente.
+    if (viva(m) === viva(previa) && m.startDate < previa.startDate) {
+      latestMembership.set(m.studentId, m)
     }
   }
 
@@ -1204,6 +1225,37 @@ export async function cancelarMembresia(
     hasta: String(f?.hasta ?? ''),
     clasesUsadas: Number(f?.clases_usadas ?? 0),
     cuotaAnulada: Number(f?.cuota_anulada ?? 0),
+  }
+}
+
+/**
+ * Deshacer una asignación equivocada (0071).
+ *
+ * NO es cancelar. Cancelar deja el período en la historia con su motivo,
+ * que es lo que corresponde cuando una clienta se va. Esto borra, y sólo
+ * la base decide si se puede: sin clases usadas, sin reservas hechas
+ * contra ese período y sin la cuota cobrada. Si algo de eso pasó,
+ * rechaza con su texto y eso es lo que hay que mostrar.
+ *
+ * La cuota se va con el período. Hacerlo desde el navegador con un
+ * `delete` la dejaría viva y sin período —`payments.membership_id` es
+ * `on delete set null`—, o sea una deuda de algo que no existe.
+ */
+export async function eliminarMembresia(
+  membershipId: string
+): Promise<{ plan: string; desde: string; hasta: string; cuotasBorradas: number; montoBorrado: number }> {
+  const { data, error } = await supabase.rpc('eliminar_membresia', { p_id: membershipId })
+  if (error?.code === '42883' || error?.code === 'PGRST202') {
+    throw new Error('Para deshacer una asignación falta correr la migración 0071.')
+  }
+  if (error) throw errorDeLaBase(error, 'No se pudo eliminar la membresía')
+  const f = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | undefined
+  return {
+    plan: String(f?.plan ?? '—'),
+    desde: String(f?.desde ?? ''),
+    hasta: String(f?.hasta ?? ''),
+    cuotasBorradas: Number(f?.cuotas_borradas ?? 0),
+    montoBorrado: Number(f?.monto_borrado ?? 0),
   }
 }
 
@@ -2652,10 +2704,40 @@ async function pushApi(body: object, method: 'POST' | 'DELETE'): Promise<void> {
   }
 }
 
+/**
+ * El service worker, con un límite de paciencia.
+ *
+ * `navigator.serviceWorker.ready` es una promesa que **no resuelve nunca**
+ * si el registro falló: no se rechaza, se queda esperando. Y el registro
+ * se hace con un `catch` vacío (`install-prompt.tsx`), así que un `/sw.js`
+ * que no se pudo registrar dejaba el botón de "Activar avisos" girando
+ * para siempre, sin éxito, sin error y sin nada que mirar. Lo encontró el
+ * barrido de silencios del 17/09.
+ *
+ * Diez segundos es mucho más de lo que tarda un registro que va a andar, y
+ * mucho menos que "para siempre".
+ */
+async function serviceWorkerListo(): Promise<ServiceWorkerRegistration> {
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              'No se pudo preparar este dispositivo para los avisos. Recargá la página y probá de nuevo.'
+            )
+          ),
+        10_000
+      )
+    ),
+  ])
+}
+
 /** true si este dispositivo ya está suscripto a push. */
 export async function getPushSubscription(): Promise<PushSubscription | null> {
   if (!pushSupported()) return null
-  const reg = await navigator.serviceWorker.ready
+  const reg = await serviceWorkerListo()
   return reg.pushManager.getSubscription()
 }
 
@@ -2666,7 +2748,7 @@ export async function enablePush(): Promise<void> {
   if (permission !== 'granted') {
     throw new Error('Permiso de notificaciones denegado')
   }
-  const reg = await navigator.serviceWorker.ready
+  const reg = await serviceWorkerListo()
   const subscription =
     (await reg.pushManager.getSubscription()) ??
     (await reg.pushManager.subscribe({

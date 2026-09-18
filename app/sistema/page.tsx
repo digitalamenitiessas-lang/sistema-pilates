@@ -124,7 +124,7 @@ function AppShell() {
     return (
       <>
         <PortalPage />
-        <InstallPrompt />
+        <InstallPrompt conBarraAbajo />
       </>
     )
   }

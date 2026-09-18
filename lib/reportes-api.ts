@@ -229,6 +229,61 @@ export interface FilaMembresia {
   estado: string
 }
 
+export interface FilaCancelacion {
+  fecha: string
+  alumna: string
+  plan: string
+  desde: string
+  hasta: string
+  usadas: number
+  total: number
+  motivo: string
+}
+
+/**
+ * Las membresías que se cancelaron, con su motivo.
+ *
+ * Lo pidió el estudio el 18/09: "en reportes, que creo debería ver todo lo
+ * que pasa, no me sale por ejemplo eso, que se canceló la membresía y el
+ * motivo". Los 13 reportes que había eran de plata y de ocupación:
+ * ninguno contaba la vida de una membresía.
+ *
+ * El período del filtro se aplica sobre CUÁNDO SE CANCELÓ (`updated_at`),
+ * no sobre las fechas del plan: la pregunta es "qué se canceló este mes".
+ * Las canceladas antes de la 0070 no tienen esa fecha —la función no la
+ * sellaba—, así que se cuelan sólo si se piden sin filtro y se muestran
+ * como lo que son: sin fecha y sin motivo registrado.
+ */
+export async function reporteCancelaciones(r: Rango): Promise<FilaCancelacion[]> {
+  const { data, error } = await supabase
+    .from('memberships')
+    .select(
+      'start_date, end_date, classes_used, classes_total, updated_at, cancel_motivo, students(name), plans(name)'
+    )
+    .eq('status', 'cancelada')
+    .order('updated_at', { ascending: false, nullsFirst: false })
+  // Sin la 0070 la columna no existe: el reporte abre vacío en vez de
+  // tumbar la pantalla.
+  if (error?.code === '42703') return []
+  if (error) throw error
+
+  return (data ?? [])
+    .map((m) => ({
+      fecha: m.updated_at ? String(m.updated_at).slice(0, 10) : '',
+      alumna: nombreDe(m.students) || '—',
+      plan: nombreDe(m.plans) || '—',
+      desde: m.start_date,
+      hasta: m.end_date,
+      usadas: m.classes_used,
+      total: m.classes_total,
+      motivo: m.cancel_motivo || 'sin motivo registrado',
+    }))
+    // El filtro se hace acá y no en la consulta para no perder las que no
+    // tienen fecha: son las de antes de la 0070 y el estudio tiene que
+    // poder verlas.
+    .filter((f) => !f.fecha || (f.fecha >= r.desde && f.fecha <= r.hasta))
+}
+
 /** Membresías que vencen en el período: para renovar y para recuperar. */
 export async function reporteMembresias(r: Rango): Promise<FilaMembresia[]> {
   const { data, error } = await supabase
@@ -257,14 +312,21 @@ export async function reporteMembresias(r: Rango): Promise<FilaMembresia[]> {
     // las filas de la base sin el paquete del estudio, así que no tiene a
     // mano la ventana de aviso y tampoco distingue "por vencer": para
     // llamar y renovar, eso es vigente.
+    // 'cancelada' va primero y junto con 'suspendida' (0069/0070). Sin
+    // esta rama una cancelada caía en la lógica de fechas y salía
+    // **'vigente'**: el estudio la iba a llamar para renovar un período
+    // que se canceló. Lo encontró Matías el 18/09 mirando este reporte
+    // justo después de cancelar uno.
     estado:
-      m.status === 'suspendida'
-        ? 'suspendida'
-        : m.end_date < hoy
-          ? 'vencida'
-          : m.start_date > hoy
-            ? 'futura'
-            : 'vigente',
+      m.status === 'cancelada'
+        ? 'cancelada'
+        : m.status === 'suspendida'
+          ? 'suspendida'
+          : m.end_date < hoy
+            ? 'vencida'
+            : m.start_date > hoy
+              ? 'futura'
+              : 'vigente',
   }))
 }
 
