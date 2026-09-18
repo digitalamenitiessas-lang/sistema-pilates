@@ -180,6 +180,12 @@ function MembershipCard({ student }: { student: Student }) {
       ? { label: 'Vencida', class: 'bg-destructive-suave text-destructive-fuerte' }
       : ms.status === 'futura'
       ? { label: 'Empieza después', class: 'bg-info-suave text-info-fuerte' }
+      // 'cancelada' (0069) tiene su propio rótulo: caía en el `else` y la
+      // clienta leía "Suspendida", que es otra cosa — suspendida sugiere
+      // que vuelve. El estado existe desde que el estudio puede cancelar
+      // un período, y este `else` es de cuando no existía.
+      : ms.status === 'cancelada'
+      ? { label: 'Cancelada', class: 'bg-muted text-muted-foreground' }
       : { label: 'Suspendida', class: 'bg-muted text-muted-foreground' }
 
   return (
@@ -669,6 +675,10 @@ function motivoSinReservar(
   if (!ms) return 'Necesitás una membresía activa para reservar.'
   if (ms.status === 'futura')
     return `Tu plan arranca el ${pretty(ms.startDate)}: desde ese día podés reservar. Para una clase de antes, consultá en recepción.`
+  // Antes que las clases: una cancelada puede tener clases sin usar, y
+  // decirle "usaste todas" sería mentirle dos veces.
+  if (ms.status === 'cancelada')
+    return 'Tu plan se dio de baja. Consultá en recepción para volver a activarlo.'
   if (clasesQueQuedan === 0)
     return 'Usaste todas las clases de tu plan. Consultá en recepción para renovar.'
   return 'Tu membresía está vencida o suspendida. Consultá en recepción.'
