@@ -1473,7 +1473,13 @@ export interface NewPaymentInput {
   membershipId?: string
   concept: string
   amount: number
-  method: 'efectivo' | 'transferencia' | 'tarjeta'
+  /**
+   * El `code` del catálogo (`payment_methods`), no una de tres palabras.
+   * Hasta la 0074 la base tenía su propio CHECK con cuatro valores, y esta
+   * unión era su copia: agregar un medio desde Configuración obligaba a
+   * tocar el código. Quien manda ahora es el catálogo.
+   */
+  method: string
 }
 
 /** Registra un cobro; devuelve el número de comprobante asignado. */
@@ -1531,7 +1537,8 @@ export async function voidPayment(paymentId: string, motivo: string): Promise<vo
  */
 export async function collectPayment(
   paymentId: string,
-  method: 'efectivo' | 'transferencia' | 'tarjeta',
+  /** El `code` del catálogo; lo valida la base contra `payment_methods`. */
+  method: string,
   amount?: number
 ): Promise<number> {
   const cambios: Record<string, unknown> = {

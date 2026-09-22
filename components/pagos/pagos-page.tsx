@@ -24,28 +24,56 @@ import {
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { registerPayment, collectPayment, createMpLink, syncMpPayments, voidPayment, precioConAjuste, settingText, esOferta, hoyISO } from '@/lib/api'
-import type { Payment, Student } from '@/lib/types'
+import type { Payment, PaymentMethod, Student } from '@/lib/types'
 
 type FilterStatus = 'todos' | 'pagado' | 'pendiente' | 'renovacion' | 'vencido'
-type Method = 'efectivo' | 'transferencia' | 'tarjeta'
-type AnyMethod = Method | 'mercadopago'
 
-const METHOD_ICON: Record<AnyMethod, React.ComponentType<{ className?: string }>> = {
+/**
+ * El medio de pago es el `code` del catálogo, no una de cuatro palabras.
+ *
+ * Hasta acá eran tres uniones de TypeScript y tres objetos de cuatro
+ * claves escritos a mano. La 0020 dejó anotado por qué eso bloqueaba todo
+ * lo demás: «payments.method sigue con su CHECK de cuatro valores.
+ * Cambiarlo por una FK al catálogo es correcto y está pendiente, pero HOY
+ * rompería la pantalla de Pagos: METHOD_ICON / METHOD_LABEL /
+ * METHOD_COLORS son objetos de cuatro claves escritos a mano y un código
+ * desconocido deja el icono en undefined, que en React es una pantalla en
+ * blanco. Primero se derivan del catálogo en el front, después la FK, en
+ * su propia migración.»
+ *
+ * Esto es ese "primero". Nada acá indexa un objeto con un código: se
+ * busca en el catálogo y hay un valor por defecto para lo que no está, así
+ * que un medio nuevo se dibuja solo y uno que ya no exista no rompe la
+ * pantalla de una clienta que pagó con él el año pasado.
+ */
+type Method = string
+
+/**
+ * El icono es decoración y el catálogo no guarda ninguno, así que los
+ * cuatro conocidos conservan el suyo y el resto usa el genérico. Un medio
+ * nuevo se ve bien desde el primer día sin que nadie cargue nada.
+ */
+const ICONO_CONOCIDO: Record<string, React.ComponentType<{ className?: string }>> = {
   efectivo: Banknote,
   transferencia: Smartphone,
   tarjeta: CreditCard,
   mercadopago: Wallet,
 }
 
-const METHOD_LABEL: Record<AnyMethod, string> = {
-  efectivo: 'Efectivo',
-  transferencia: 'Transferencia',
-  tarjeta: 'Tarjeta',
-  mercadopago: 'Mercado Pago',
+function iconoDeMedio(code: string | null | undefined): React.ComponentType<{ className?: string }> {
+  return (code && ICONO_CONOCIDO[code]) || DollarSign
 }
 
-// Métodos que se registran a mano (MP se acredita solo)
-const MANUAL_METHODS: Method[] = ['efectivo', 'transferencia', 'tarjeta']
+/**
+ * El nombre lo pone el estudio desde Configuración, así que sale del
+ * catálogo. Si el código no está —un medio borrado, o la migración del
+ * catálogo sin correr— se muestra el código crudo: feo, pero cierto, y
+ * mucho mejor que un `undefined` en la fila de un cobro real.
+ */
+function nombreDeMedio(code: string | null | undefined, medios: PaymentMethod[]): string {
+  if (!code) return '—'
+  return medios.find((m) => m.code === code)?.name ?? code
+}
 
 /** El `T00:00` evita que un ISO suelto se lea como UTC y muestre el día anterior. */
 const fechaCorta = (iso: string) => new Date(`${iso}T00:00`).toLocaleDateString('es-AR')
@@ -81,11 +109,23 @@ export function paymentReminderLink(payment: Payment, phone: string): string | n
   return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
 }
 
-const METHOD_COLORS: Record<AnyMethod, string> = {
+/**
+ * El color de la barra de "cobrado por medio". Los cuatro de siempre
+ * mantienen el suyo —el celeste de Mercado Pago es el de su marca— y un
+ * medio nuevo toma uno de la paleta por su posición, de forma estable: el
+ * mismo medio siempre el mismo color, sin guardar nada.
+ */
+const COLOR_CONOCIDO: Record<string, string> = {
   transferencia: '#9AA08C',
   efectivo: '#B79B72',
   tarjeta: '#847164',
   mercadopago: '#009EE3',
+}
+
+const PALETA_MEDIOS = ['#7D9B76', '#C4735A', '#D4A854', '#9B6E8E', '#5E8FA8', '#B8956A']
+
+function colorDeMedio(code: string, indice: number): string {
+  return COLOR_CONOCIDO[code] ?? PALETA_MEDIOS[indice % PALETA_MEDIOS.length]
 }
 
 function PaymentStatusBadge({ pago }: { pago: Payment }) {
@@ -132,25 +172,59 @@ function PaymentStatusBadge({ pago }: { pago: Payment }) {
   )
 }
 
+/**
+ * Los medios que se cobran a mano: activos y manuales.
+ *
+ * `isManual = false` es Mercado Pago, que lo acredita la integración y no
+ * se elige desde el mostrador — la misma regla que estaba escrita a mano
+ * en `MANUAL_METHODS`, ahora leída de donde el estudio la configura.
+ *
+ * Hoy esto devuelve exactamente Efectivo, Transferencia y Tarjeta: las
+ * mismas tres de siempre. La diferencia es que cuando el estudio agregue
+ * Débito, aparece solo.
+ */
+function mediosParaCobrar(medios: PaymentMethod[]): PaymentMethod[] {
+  return medios
+    .filter((m) => m.active && m.isManual)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+}
+
 function MethodPicker({ value, onChange }: { value: Method | null; onChange: (m: Method) => void }) {
+  const { data } = useData()
+  const medios = mediosParaCobrar(data?.paymentMethods ?? [])
+
+  // Sin medios no hay cobro posible, y el motivo importa: puede ser que el
+  // estudio los apagó a todos, o que quien mira no tiene permiso sobre el
+  // catálogo —y una tabla sin permiso devuelve cero filas, no un error—.
+  // Antes esto era imposible porque la lista estaba en el código; ahora
+  // que sale de la base, callar dejaría tres botones que no están sin
+  // ninguna explicación.
+  if (medios.length === 0) {
+    return (
+      <p className="text-xs text-aviso-fuerte bg-aviso-suave rounded-xl px-3 py-2.5">
+        No hay medios de pago para cobrar a mano. Se cargan en Configuración → Medios de pago.
+      </p>
+    )
+  }
+
   return (
-    <div className="grid grid-cols-3 gap-2">
-      {MANUAL_METHODS.map((m) => {
-        const Icon = METHOD_ICON[m]
+    <div className={cn('grid gap-2', medios.length >= 4 ? 'grid-cols-4' : 'grid-cols-3')}>
+      {medios.map((m) => {
+        const Icon = iconoDeMedio(m.code)
         return (
           <button
-            key={m}
+            key={m.code}
             type="button"
-            onClick={() => onChange(m)}
+            onClick={() => onChange(m.code)}
             className={cn(
               'flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-medium transition-all',
-              value === m
+              value === m.code
                 ? 'border-primary bg-primary/5 text-primary-fuerte'
                 : 'border-border text-muted-foreground hover:border-primary/40'
             )}
           >
             <Icon className="w-4 h-4" />
-            {METHOD_LABEL[m]}
+            <span className="text-center leading-tight">{m.name}</span>
           </button>
         )
       })}
@@ -344,7 +418,7 @@ export function RegistrarPagoModal({
                     <span className={aCobrar < deLista ? 'text-exito-fuerte' : 'text-aviso-fuerte'}>
                       ({aCobrar < deLista ? 'descuento' : 'recargo'} del{' '}
                       {Math.abs(ajuste).toLocaleString('es-AR')}% por{' '}
-                      {METHOD_LABEL[method as Method].toLowerCase()})
+                      {nombreDeMedio(method, paymentMethods).toLowerCase()})
                     </span>
                   </p>
                 )}
@@ -449,7 +523,7 @@ export function CobrarModal({ payment, onClose }: { payment: Payment; onClose: (
                     <span className={diferencia < 0 ? 'text-exito-fuerte' : 'text-aviso-fuerte'}>
                       {diferencia < 0 ? 'descuento' : 'recargo'} del{' '}
                       {Math.abs(ajuste).toLocaleString('es-AR')}% por pagar con{' '}
-                      {METHOD_LABEL[method as Method].toLowerCase()}
+                      {nombreDeMedio(method, paymentMethods).toLowerCase()}
                     </span>
                   </p>
                 )}
@@ -709,7 +783,7 @@ function AnularCobroModal({
 
 export function PagosPage() {
   const { refresh, canWrite, can } = useData()
-  const { payments: PAYMENTS, monthlyRevenue, mpConfigured, students } = useStudio()
+  const { payments: PAYMENTS, monthlyRevenue, mpConfigured, students, paymentMethods } = useStudio()
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('todos')
   const [showRegistrar, setShowRegistrar] = useState(false)
@@ -777,14 +851,25 @@ export function PagosPage() {
   // distintas, y contando pagos parecían lo mismo.
   const paidWithMethod = PAYMENTS.filter((p) => p.status === 'pagado' && p.method)
   const totalWithMethod = paidWithMethod.reduce((a, p) => a + p.amount, 0)
-  const methodDistribution = (Object.keys(METHOD_LABEL) as AnyMethod[])
-    .map((m) => {
+  // Las barras salen del catálogo, no de cuatro claves escritas acá. Y se
+  // suman también los códigos que el catálogo ya no tiene —un medio dado
+  // de baja, o renombrado por otro lado— porque esa plata se cobró: si no
+  // entrara en ninguna barra, los porcentajes no cerrarían en 100 y nadie
+  // sabría dónde fue a parar.
+  const codigosCobrados = new Set(paidWithMethod.map((p) => p.method as string))
+  const delCatalogo = [...paymentMethods].sort((a, b) => a.sortOrder - b.sortOrder)
+  const sueltos = [...codigosCobrados].filter((c) => !paymentMethods.some((m) => m.code === c))
+  const methodDistribution = [
+    ...delCatalogo.map((m) => ({ code: m.code, label: m.name })),
+    ...sueltos.map((c) => ({ code: c, label: c })),
+  ]
+    .map((m, i) => {
       const monto = paidWithMethod
-        .filter((p) => p.method === m)
+        .filter((p) => p.method === m.code)
         .reduce((a, p) => a + p.amount, 0)
       return {
-        label: METHOD_LABEL[m],
-        color: METHOD_COLORS[m],
+        label: m.label,
+        color: colorDeMedio(m.code, i),
         monto,
         pct: totalWithMethod ? Math.round((monto / totalWithMethod) * 100) : 0,
       }
@@ -970,7 +1055,7 @@ export function PagosPage() {
                     </tr>
                   ) : (
                     filtered.map((p) => {
-                      const MethodIcon = p.method ? METHOD_ICON[p.method] : DollarSign
+                      const MethodIcon = iconoDeMedio(p.method)
                       return (
                         <tr key={p.id} className="hover:bg-muted/30 transition-colors">
                           <td className="px-4 py-3">
@@ -1003,7 +1088,7 @@ export function PagosPage() {
                             {p.method ? (
                               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                 <MethodIcon className="w-3.5 h-3.5" />
-                                {METHOD_LABEL[p.method]}
+                                {nombreDeMedio(p.method, paymentMethods)}
                               </div>
                             ) : (
                               <span className="text-xs text-muted-foreground/50">—</span>
