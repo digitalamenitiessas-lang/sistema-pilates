@@ -47,7 +47,9 @@ export interface FilaCobro {
 export async function reporteCobros(r: Rango): Promise<FilaCobro[]> {
   const { data, error } = await supabase
     .from('payments')
-    .select('paid_date, concept, amount, method, receipt_number, students(name), accounts(name)')
+    .select(
+      'paid_date, concept, amount, method, receipt_number, students(name), accounts(name), payment_methods(name)'
+    )
     .eq('status', 'pagado')
     .gte('paid_date', r.desde)
     .lte('paid_date', r.hasta)
@@ -57,7 +59,14 @@ export async function reporteCobros(r: Rango): Promise<FilaCobro[]> {
     fecha: p.paid_date,
     alumna: nombreDe(p.students) || '—',
     concepto: p.concept || 'Cobro',
-    medio: p.method ?? '',
+    // El NOMBRE del medio y no su código. Hasta acá esta columna mostraba
+    // `payments.method` crudo, y con los cuatro de siempre no se notaba
+    // porque sus códigos se leen igual que sus nombres ("efectivo",
+    // "transferencia"). Desde la 0074 el estudio crea los suyos, y ahí el
+    // código es un slug: "Débito Macro" se guarda `debito_macro` y el
+    // reporte lo mostraba así. Si el medio ya no está en el catálogo queda
+    // el código, que es feo pero cierto.
+    medio: nombreDe(p.payment_methods) || p.method || '',
     cuenta: nombreDe(p.accounts) || '',
     comprobante: p.receipt_number ? String(p.receipt_number).padStart(6, '0') : '',
     monto: Number(p.amount),
