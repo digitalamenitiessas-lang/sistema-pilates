@@ -987,7 +987,6 @@ export function PortalPage() {
   const ms = me?.membership
   const miCredencial = credencial(me?.memberNo, settings)
   const classesLeft = ms ? ms.classesTotal - ms.classesUsed : 0
-  const canBook = !!ms && (ms.status === 'activa' || ms.status === 'por vencer') && classesLeft > 0
 
   // Las fechas que el estudio suspendió, con su motivo, para las clases
   // que le importan a este cliente.
@@ -1044,6 +1043,57 @@ export function PortalPage() {
     () => memberships.filter((m) => m.studentId === me?.id),
     [memberships, me]
   )
+
+  /**
+   * Qué período le paga una clase de ese día. Es el mismo criterio que
+   * `membresia_para` en la base: el que cubre la FECHA DE LA CLASE, no el
+   * que corre hoy.
+   *
+   * Existe desde el 22/09 por un pedido con fecha: el estudio abre el 29
+   * y quiere cargar esta semana a las clientas que arrancan ese día, con
+   * su plan corriendo desde el 29 — y que ya puedan reservar sus clases
+   * de esa semana. Antes el portal tenía UN permiso global (`canBook`)
+   * basado en el estado de hoy, así que un plan que arranca el 29 no la
+   * dejaba reservar nada, ni siquiera una clase del 30. La base sí la
+   * habría dejado: la pantalla era más estricta que la regla.
+   */
+  const membresiaParaFecha = (fecha: string) =>
+    misMembresias.find(
+      (m) =>
+        m.status !== 'cancelada' &&
+        m.status !== 'suspendida' &&
+        m.startDate <= fecha &&
+        m.endDate >= fecha
+    )
+
+  /**
+   * El día en que le arranca el próximo período, si todavía no empezó.
+   * Es lo que la grilla le dice en las clases anteriores a esa fecha.
+   */
+  const proximoInicio = misMembresias
+    .filter((m) => m.status !== 'cancelada' && m.startDate > today)
+    .map((m) => m.startDate)
+    .sort()[0]
+
+  /** Si puede reservar una clase de ese día: período que la cubra y clases. */
+  const puedeReservarEl = (fecha: string) => {
+    const m = membresiaParaFecha(fecha)
+    return !!m && m.classesTotal - m.classesUsed > 0
+  }
+
+  /**
+   * Si tiene con qué reservar ALGO, hoy o más adelante. Gobierna el cartel
+   * que explica por qué no puede, no el botón de cada clase — ese es
+   * `puedeReservarEl`, que mira la fecha.
+   */
+  const canBook =
+    misMembresias.some(
+      (m) =>
+        m.status !== 'cancelada' &&
+        m.status !== 'suspendida' &&
+        m.endDate >= today &&
+        m.classesTotal - m.classesUsed > 0
+    ) || (!!ms && (ms.status === 'activa' || ms.status === 'por vencer') && classesLeft > 0)
   const yaResuelta = (renuevaId?: string | null) => {
     const vieja = misMembresias.find((m) => m.id === renuevaId)
     return !!vieja && misMembresias.some((m) => m.startDate > vieja.endDate)
@@ -1586,7 +1636,16 @@ export function PortalPage() {
                           {reservaCerrada(c.date, c.time, ahora) ? 'Ya empezó' : 'Cerró la reserva'}
                         </span>
                       ) : null
-                    ) : !canBook ? null : !c.bookable ? (
+                    ) : !puedeReservarEl(c.date) ? (
+                      // Con un plan que arranca más adelante, decir la
+                      // fecha es más útil que no mostrar nada: es la
+                      // diferencia entre "no puedo" y "todavía no".
+                      proximoInicio && c.date < proximoInicio ? (
+                        <span className="text-[10px] font-semibold text-muted-foreground text-right leading-tight block max-w-[92px]">
+                          Desde el {pretty(proximoInicio)}
+                        </span>
+                      ) : null
+                    ) : !c.bookable ? (
                       <span className="text-[10px] font-semibold text-muted-foreground text-right leading-tight block max-w-[92px]">
                         Reservás en recepción
                       </span>

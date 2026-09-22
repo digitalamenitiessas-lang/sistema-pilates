@@ -974,6 +974,7 @@ export async function GET(request: Request) {
   // ------------------------------------------------------------
   let turnosVencidos = 0
   let turnosLiberados = 0
+  let turnosAvisados = 0
   let turnosError: string | undefined
 
   {
@@ -997,9 +998,25 @@ export async function GET(request: Request) {
       }>
       turnosVencidos = lista.length
 
+      // ── EL BUG QUE ESTO ARREGLA (18/09) ──────────────────────────
+      //
+      // Estos avisos se empujaban a `rows`, que ya se había insertado 100
+      // líneas más arriba: se armaban, se contaban en `evaluated` y se
+      // tiraban a la basura. El aviso "Turno fijo sin prioridad" **nunca
+      // llegó a la campana del mostrador, ni una vez** — y es el que
+      // avisa que un horario fijo quedó sin dueño y se le puede dar a
+      // otra. Si el interruptor de liberación está encendido, una clienta
+      // podía perder su día y su horario sin que nadie en el estudio se
+      // enterara.
+      //
+      // Van en su propio array y se insertan acá, con la misma función
+      // idempotente: el dedupe por `slot_id` hace que dos corridas el
+      // mismo día no avisen dos veces.
+      const avisosDeTurnos: NotificationRow[] = []
+
       for (const t of lista) {
         const cuando = `${DIAS_GRILLA[t.day_of_week] ?? '—'} ${String(t.start_time).slice(0, 5)}`
-        rows.push({
+        avisosDeTurnos.push({
           type: 'turno_liberado',
           title: 'Turno fijo sin prioridad',
           body: `${t.student_name} perdió la prioridad sobre ${cuando}${
@@ -1013,6 +1030,14 @@ export async function GET(request: Request) {
           // vence de nuevo, porque entonces es otro `slot_id`.
           dedupe_key: `turno-sin-prioridad-${t.slot_id}`,
         })
+      }
+
+      const guardados = await insertarAvisos(avisosDeTurnos)
+      turnosAvisados = guardados.creados.length
+      // Si la base los rechaza se dice, en vez de que el resumen informe
+      // los turnos vencidos como si alguien los hubiera visto.
+      if (guardados.error) {
+        turnosError = `los turnos vencieron pero no se pudo avisar: ${guardados.error}`
       }
 
       // La función mira el interruptor por su cuenta y devuelve 0 si está
@@ -1071,6 +1096,10 @@ export async function GET(request: Request) {
         ? `no se pudieron leer las membresías: ${renewError.message}`
         : undefined,
     salteadas,
+    // Cuántos de los turnos vencidos llegaron de verdad a la campana. Si
+    // `turnosVencidos` es mayor que esto y no hay error, es que ya estaban
+    // avisados de una corrida anterior — que es lo correcto.
+    turnosAvisados,
     ofertasCaducadas,
     caducarSalteado: caducarError ?? undefined,
     recordatorios: { escalones: recordatorios, nuevos: nuevas.porVencer },

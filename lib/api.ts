@@ -1076,6 +1076,8 @@ export interface NewStudentInput {
   cirugias?: string
   medicacion?: string
   planId?: string
+  /** Desde qué día rige el plan elegido en el alta. Por defecto, hoy. */
+  planDesde?: string
 }
 
 /**
@@ -1162,7 +1164,7 @@ export async function createStudent(
   })
 
   if (input.planId) {
-    await assignMembership(student.id, input.planId, plans, settings)
+    await assignMembership(student.id, input.planId, plans, settings, input.planDesde)
   }
 
   return student.id as string
@@ -1275,11 +1277,51 @@ export async function setMembershipAutoRenew(membershipId: string, autoRenew: bo
  * viaje a la base por cada alta. Con el objeto vacío cae al default, que es
  * lo mismo que hacía antes de que el parámetro existiera.
  */
+/**
+ * Hasta cuándo rige un plan que arranca tal día. Espeja `vigencia_hasta`
+ * (0037): meses de calendario si el plan los tiene, y si no, días. El
+ * último día es INCLUSIVE, son días de uso — arrancar el 29/09 con un
+ * plan de un mes llega hasta el 28/10, no hasta el 29.
+ *
+ * Se repite acá para poder mostrar el período ANTES de asignar. La que
+ * manda sigue siendo la base: esto es para que quien carga vea lo que va
+ * a pasar, no para decidirlo.
+ */
+export function vigenciaHasta(desde: string, plan: Plan): string {
+  if (plan.durationMonths > 0) {
+    const [y, m, d] = desde.split('-').map(Number)
+    // Postgres RECORTA el día al último del mes destino: 31/01 + 1 mes es
+    // el 28/02, no el 3 de marzo. El Date de JS hace lo contrario —
+    // desborda al mes siguiente— así que había que clampear a mano. Sin
+    // esto la pantalla le mostraba al estudio un período que la base no
+    // iba a guardar: arrancar el 31/08 decía "hasta el 30/09" cuando la
+    // base pone 29/09.
+    const mes = m - 1 + plan.durationMonths
+    const ultimoDelMes = new Date(y, mes + 1, 0).getDate()
+    const fin = new Date(y, mes, Math.min(d, ultimoDelMes))
+    fin.setDate(fin.getDate() - 1)
+    return localISO(fin)
+  }
+  return addDays(desde, plan.durationDays - 1)
+}
+
 export async function assignMembership(
   studentId: string,
   planId: string,
   plans: Plan[],
-  settings: Settings = {}
+  settings: Settings = {},
+  /**
+   * Desde qué día rige. Por defecto hoy, que es el caso normal.
+   *
+   * Existe porque el estudio abre el 29/09 y necesita cargar esta semana
+   * a las clientas que arrancan ese día (pedido del 22/09). El caso
+   * general es el mismo: alguien que se anota el jueves y empieza el
+   * lunes no tiene por qué perder cuatro días de vigencia.
+   *
+   * Ojo: si ya tiene un período vivo, el trigger `membresia_fechas`
+   * ENCOLA y esta fecha se ignora. La pantalla lo dice antes de guardar.
+   */
+  desde?: string
 ): Promise<void> {
   const plan = plans.find((p) => p.id === planId)
   if (!plan) throw new Error('Plan inexistente')
@@ -1293,14 +1335,16 @@ export async function assignMembership(
   // vigencia_hasta —la única que puede regir sin la 0036, que es la que
   // trajo duration_months—: son días de USO y end_date es inclusivo, así
   // que 7 días arrancando el 20 llegan hasta el 26 y no hasta el 27.
-  const start = hoyISO()
+  const start = desde || hoyISO()
   const { data: membership, error } = await supabase
     .from('memberships')
     .insert({
       student_id: studentId,
       plan_id: planId,
       start_date: start,
-      end_date: addDays(start, plan.durationDays - 1),
+      // La base la recalcula con `vigencia_hasta`; esto es el respaldo
+      // para cuando la 0036 no corrió, y ahora usa la misma cuenta.
+      end_date: vigenciaHasta(start, plan),
       classes_total: plan.classCount,
       classes_used: 0,
       price: plan.price,

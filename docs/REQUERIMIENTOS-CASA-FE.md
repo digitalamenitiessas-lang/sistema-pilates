@@ -8,7 +8,7 @@
 > **¿Buscás qué falta? Está en la §0, acá abajo.** Es la única lista al día; el
 > resto del documento es el análisis y la historia.
 
-## 0. LO QUE FALTA — la lista viva  ·  al 17/09/2026
+## 0. LO QUE FALTA — la lista viva  ·  al 22/09/2026
 
 > **Esta es la única lista al día.** Las secciones de abajo son el análisis y la
 > historia de cómo se llegó acá, y varias quedaron viejas a propósito: son la
@@ -46,12 +46,32 @@ una variable que sólo existe en `.env.local`, así que en producción devolvía
 vacío **siempre** — y no se notaba porque su valor de respaldo era casualmente
 el correcto. Ninguno de los tres se ve en la máquina de quien programa.
 
+Del **18 al 22/09** entraron `0069` a `0073`. Tres cosas que el sistema no
+sabía decir: que algo **se termina** (cancelar una membresía dejaba de
+existir: sin cuándo, sin quién, sin por qué, y Reportes no mostraba ninguna),
+que algo **fue un error** (deshacer una asignación equivocada, que no es lo
+mismo que cancelarla, y que sólo se permite si no dejó huella), y que algo
+**todavía no empezó** — el estudio abre el **29/09** y está dando de alta
+ahora a las clientas que arrancan ese día, así que la membresía tiene fecha de
+inicio y el portal habilita la reserva por fecha: eligen plan hoy, reservan
+del 29 en adelante.
+
+Y dos de seguridad. La `0072` cerró que **una clienta podía devolverse las
+clases que ya había perdido** reescribiendo `cancel_kind` en sus propias
+reservas; salió de una revisión y se reprodujo antes de arreglarla, porque un
+hallazgo que nadie ejerció es una hipótesis. La `0073` es el segundo barrido
+de la familia de la `0057`: cinco funciones `definer` contestaban con la llave
+pública —**una de ellas escribe** en `memberships`—, los dos reportes de
+ocupación le contestaban a cualquier cuenta logueada incluida una clienta, y
+`class_occupancy` se leía sin sesión. Las seis cerradas y verificadas el 22/09
+ejerciendo lo que podía romperse: los cinco cortes de Ocupación dan los mismos
+números y el descuento de clases sigue andando.
+
 ### Lo que falta construir
 
 | | Qué | Tamaño |
 |---|---|---|
 | 🔴 | **28 lugares donde una falla se vuelve un booleano y nadie puede saber por qué**, once graves. Salió de barrer el proyecto el 17/09 buscando la forma que tuvo el mail que no salía. Los dos peores no son incomodidades: el proceso diario **inserta la notificación antes de mandar el mail** y sólo cuenta los que salieron (`cron/diario:911`), así que la campana dice "cuota emitida", la clienta no recibió nada y pierde el turno fijo por no renovar; y el webhook de Mercado Pago responde `ok: true` aunque no haya acreditado (`mp/webhook:47`), así que MP no reintenta y el pago queda pendiente para siempre sin un aviso. Después: el `$0` que miente en el tablero si falla `resultado_mensual` (`caja-api:527`), el cupo que vuelve a mentirle a la profesora si `fetchWeekOccupancy` falla (`api:2341`), el mail de "tu membresía venció" saliéndole a quien está al día si falla una lectura (`cron/diario:273`), y el sistema entero sin botones si `mis_permisos` da error (`api:480`) | mediano |
-| 🔴 | **Los avisos `turno_liberado` se tiran a la basura.** No es un silencio: es un bug. En `app/api/cron/diario/route.ts` se arman en la línea 1002, **después** del único insert (línea 898), se cuentan en `evaluated` y no se guardan nunca. El aviso "Turno fijo sin prioridad" no llegó a la campana ni una vez, así que si el interruptor de liberación está encendido, una clienta puede perder su día y su horario fijo sin que el estudio se entere | chico |
 | — | **El pago dentro del alta.** Es lo que falta de la idea del estudio del 17/09: "cuando creamos el cliente, tomamos esos datos, el plan que elige y ponemos **si paga ahí y cómo paga** para que se acredite". Hoy el alta crea la membresía y deja la cuota **pendiente** en Pagos, y cobrarla es un segundo paso en otra pantalla. El manual del mostrador ya lo dice así | chico |
 | — | **Resend como SMTP de Supabase.** "Olvidé mi contraseña" es el único camino que le queda a una clienta que ya eligió su clave y la olvidó, y **no pasa por Resend**: usa el mailer de Supabase, que en el plan gratis manda desde una dirección de Supabase, permite unos pocos por hora y cae en spam. Con el dominio ya verificado es configuración, no desarrollo | chico |
 | **§2** | **Que las reservas del turno fijo se creen solas cada semana.** Es lo último de §2. Ya no depende de ninguna respuesta: Matías definió el 15/09 que manda la cantidad de clases del plan | chico |
@@ -79,9 +99,16 @@ el correcto. Ninguno de los tres se ve en la máquina de quien programa.
 Salió de probar el portal con una sesión real el 16/09. Ninguno rompe nada:
 son cosas que la clienta esperaría poder hacer y hoy pasan por el mostrador.
 
+Dos filas se fueron de esta tabla entre el 19 y el 22/09. El portal pasó a ser
+una app con **cinco pestañas abajo** —Reservar · Mis clases · Inicio · Pagos ·
+Perfil—, y ahí entró **el historial del mes**, que era lo que le faltaba para
+poder auditar su propio contador: ahora ve contra qué clases se le fue
+descontando el plan, no sólo cuántas le quedan. También ve **cuántos días** le
+faltan y no sólo la fecha de vencimiento, y los avisos y el "agregar al
+inicio" quedaron dentro de Perfil.
+
 | | |
 |---|---|
-| **No ve el historial** | El portal muestra lo que viene y nunca lo que pasó, así que no puede auditar contra qué clases se le fue descontando el plan. Ve "te quedan 3" y no cuáles fueron las otras |
 | **No puede tomar el lugar que se liberó** | El aviso de la `0052` le dice "entrá a reservarlo" y en el portal encuentra el renglón "En espera" sin ningún botón. La base sí lo permitiría |
 | **El recupero no existe del lado de ella** | Desde el 17/09 el cartel de cancelar le dice cuántas recuperaciones le quedan y hasta cuándo, pero pedirla sigue siendo ir al mostrador |
 | **El turno fijo es invisible** | Quien tiene turno fijo ve lo mismo que quien no: reserva a mano cada semana su horario de siempre y no ve hasta cuándo conserva la prioridad. La `0048` promete por escrito que ve el motivo si se lo liberan, y no hay dónde |

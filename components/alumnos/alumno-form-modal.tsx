@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { X, Loader2, Smartphone } from 'lucide-react'
 import { useData } from '@/lib/data-context'
-import { createStudent, createSystemUser, updateStudent } from '@/lib/api'
+import { createStudent, createSystemUser, hoyISO, updateStudent, vigenciaHasta } from '@/lib/api'
 import type { Student } from '@/lib/types'
 
 interface AlumnoFormModalProps {
@@ -31,6 +31,14 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
   const [medicacion, setMedicacion] = useState(student?.medicacion ?? '')
   const [planId, setPlanId] = useState('')
   /**
+   * Desde qué día corre el plan que se elige en el alta. Por defecto hoy.
+   *
+   * El estudio abre el 29/09 y carga las clientas la semana anterior
+   * (pedido del 22/09): sin esto, el plan les empezaba a correr el día
+   * que las cargan y perdían la semana de antes.
+   */
+  const [planDesde, setPlanDesde] = useState(hoyISO())
+  /**
    * El acceso, como último paso del alta (pedido del estudio, 17/09).
    *
    * Antes era un segundo viaje: se cargaba la ficha, se entraba a ella y
@@ -47,6 +55,10 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
   const [aviso, setAviso] = useState<string | null>(null)
 
   const isEdit = !!student
+  const planElegido = plans.find((p) => p.id === planId)
+  /** El `T00:00` evita que un ISO suelto se lea como UTC y muestre el día anterior. */
+  const fechaCorta = (iso: string) =>
+    new Date(`${iso}T00:00`).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
 
   // El acceso necesita las dos cosas: el mail es el usuario y el
   // documento es la contraseña inicial.
@@ -78,7 +90,7 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
       }
 
       const studentId = await createStudent(
-        { ...input, planId: planId || undefined },
+        { ...input, planId: planId || undefined, planDesde: planId ? planDesde : undefined },
         plans,
         settings
       )
@@ -240,9 +252,22 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
                 ))}
               </select>
               {planId && (
-                <p className="text-[11px] text-muted-foreground mt-1.5">
-                  Se crea la membresía desde hoy y queda la deuda generada en Pagos (si el plan no es gratuito).
-                </p>
+                <>
+                  <label className={`${labelClass} mt-3`}>Arranca el</label>
+                  <input
+                    type="date"
+                    value={planDesde}
+                    onChange={(e) => setPlanDesde(e.target.value)}
+                    className={inputClass}
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1.5">
+                    {planElegido && planDesde
+                      ? `Vigente del ${fechaCorta(planDesde)} al ${fechaCorta(vigenciaHasta(planDesde, planElegido))} — el último día se usa.`
+                      : 'Se crea la membresía desde ese día.'}{' '}
+                    {planDesde > hoyISO() && 'Hasta esa fecha no va a poder reservar. '}
+                    La deuda queda generada en Pagos (si el plan no es gratuito).
+                  </p>
+                </>
               )}
             </div>
           )}
