@@ -312,7 +312,8 @@ function deriveMembershipStatus(
   status: string,
   endDate: string,
   warningDays: number = EXPIRY_WARNING_DAYS,
-  startDate?: string
+  startDate?: string,
+  esPrueba = false
 ): Membership['status'] {
   if (status === 'suspendida') return 'suspendida'
   // Antes que cualquier cosa derivada de las fechas: una cancelada (0069)
@@ -328,7 +329,25 @@ function deriveMembershipStatus(
   // clase que la base va a rechazar: el motor de la 0029 descuenta de la
   // membresía que cubre la fecha de la clase, y esta todavía no cubre nada.
   if (startDate && startDate > today) return 'futura'
-  if (endDate <= addDays(today, warningDays)) return 'por vencer'
+  // Un pase de prueba nunca está "por vencer", y no es una excepción
+  // cosmética: "por vencer" quiere decir "esto se termina y hay que
+  // renovarlo", y un pase regalado no se renueva — se termina porque para
+  // eso se dio. El discriminador es `is_trial` y no la duración, igual que
+  // en la 0037: lo que define a un pase no es que dure poco, es que sea un
+  // pase.
+  //
+  // Sin esto, un pase de 3 días nace amarillo: la ventana de aviso son 5
+  // días por defecto, o sea más larga que el pase entero, así que el
+  // estado se enciende el día que se asigna y no se apaga nunca. Treinta
+  // pases de la apertura son treinta alertas de vencimiento que no
+  // significan nada, en el tablero, en la ficha, en el listado y en el
+  // portal de cada clienta.
+  //
+  // Pasa a 'activa', que es un estado que ya aceptan todos los lugares que
+  // aceptaban 'por vencer' (el `canBook` del portal, el `correHoy` de la
+  // ficha, la cuenta de activas del tablero): por eso el cambio no le saca
+  // nada a nadie.
+  if (!esPrueba && endDate <= addDays(today, warningDays)) return 'por vencer'
   return 'activa'
 }
 
@@ -708,6 +727,12 @@ export async function fetchStudioData(): Promise<StudioData> {
     isTrial: p.is_trial,
   }))
 
+  // Cuáles planes son pases de prueba, para que el estado derivado lo sepa.
+  // Se arma del catálogo que ya se trajo y no de una columna en la
+  // membresía: el plan es el que define si algo es un pase, y si mañana el
+  // estudio marca uno más, las membresías que ya existen lo heredan solas.
+  const planesDePrueba = new Set(plans.filter((p) => p.isTrial).map((p) => p.id))
+
   const memberships: Membership[] = (membershipsRes.data ?? []).map((m) => ({
     id: m.id,
     studentId: m.student_id,
@@ -717,7 +742,13 @@ export async function fetchStudioData(): Promise<StudioData> {
     endDate: m.end_date,
     classesTotal: m.classes_total,
     classesUsed: m.classes_used,
-    status: deriveMembershipStatus(m.status, m.end_date, warningDays, m.start_date),
+    status: deriveMembershipStatus(
+      m.status,
+      m.end_date,
+      warningDays,
+      m.start_date,
+      planesDePrueba.has(m.plan_id)
+    ),
     price: Number(m.price),
     autoRenew: m.auto_renew ?? true,
     // Llega solo con el select('*'), y queda en undefined mientras la
@@ -1014,7 +1045,17 @@ function buildAlerts(
         message: `Membresía vence el ${m.endDate}`,
         studentId: m.studentId, studentName: name(m.studentId),
       })
-    } else if (m.status === 'activa' && m.classesTotal - m.classesUsed <= 1) {
+    } else if (
+      m.status === 'activa' &&
+      m.classesTotal - m.classesUsed <= 1 &&
+      // "Solo le queda 1 clase" sobre un plan de UNA clase no es quedarse
+      // corto: es no haberla usado todavía. Sin esta condición, sacar el
+      // pase de prueba de 'por vencer' lo manda derecho a esta rama y el
+      // tablero se vuelve a llenar, ahora de otro color: cada pase nacería
+      // con su alerta el día que se asigna. Quedarse SIN clases (left = 0)
+      // sí es noticia para cualquier plan, incluido un pase usado.
+      (m.classesTotal - m.classesUsed === 0 || m.classesTotal > 1)
+    ) {
       const left = m.classesTotal - m.classesUsed
       alerts.push({
         id: `mc-${m.id}`, type: 'warning',
