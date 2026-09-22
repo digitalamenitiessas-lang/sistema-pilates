@@ -8,7 +8,7 @@
 > **¿Buscás qué falta? Está en la §0, acá abajo.** Es la única lista al día; el
 > resto del documento es el análisis y la historia.
 
-## 0. LO QUE FALTA — la lista viva  ·  al 22/09/2026
+## 0. LO QUE FALTA — la lista viva  ·  al 22/09/2026 (tarde)
 
 > **Esta es la única lista al día.** Las secciones de abajo son el análisis y la
 > historia de cómo se llegó acá, y varias quedaron viejas a propósito: son la
@@ -67,11 +67,24 @@ ocupación le contestaban a cualquier cuenta logueada incluida una clienta, y
 ejerciendo lo que podía romperse: los cinco cortes de Ocupación dan los mismos
 números y el descuento de clases sigue andando.
 
+La **tarde del 22/09** entró la `0074` y con ella el módulo de caja pasó a
+ser configurable: el estudio puede **crear sus cuentas** —el cajón, los
+bancos, las billeteras— y decirle a cada medio de pago a cuál va su plata,
+desde Configuración. El modelo estaba entero en la base desde la `0020` y
+no había por dónde tocarlo; el muro era un CHECK en `payments.method` con
+cuatro valores escritos, que hacía que crear un medio nuevo no sirviera
+para cobrar. Ahora manda el catálogo. Verificado cobrando con un "Débito"
+creado desde la pantalla, cuya plata fue sola a la cuenta "Macro".
+
 ### Lo que falta construir
 
 | | Qué | Tamaño |
 |---|---|---|
 | 🔴 | **28 lugares donde una falla se vuelve un booleano y nadie puede saber por qué**, once graves. Salió de barrer el proyecto el 17/09 buscando la forma que tuvo el mail que no salía. Los dos peores no son incomodidades: el proceso diario **inserta la notificación antes de mandar el mail** y sólo cuenta los que salieron (`cron/diario:911`), así que la campana dice "cuota emitida", la clienta no recibió nada y pierde el turno fijo por no renovar; y el webhook de Mercado Pago responde `ok: true` aunque no haya acreditado (`mp/webhook:47`), así que MP no reintenta y el pago queda pendiente para siempre sin un aviso. Después: el `$0` que miente en el tablero si falla `resultado_mensual` (`caja-api:527`), el cupo que vuelve a mentirle a la profesora si `fetchWeekOccupancy` falla (`api:2341`), el mail de "tu membresía venció" saliéndole a quien está al día si falla una lectura (`cron/diario:273`), y el sistema entero sin botones si `mis_permisos` da error (`api:480`) | mediano |
+| 🔴 | **La plata "diferida" figura disponible el mismo día.** `payment_methods.liquidacion` distingue lo que acredita al toque (efectivo, transferencia) de lo que no (tarjeta, Mercado Pago), y **no la lee nadie**: ni el tipo `PaymentMethod` la trae. Así que el saldo de "Tarjetas a acreditar" dice que hay plata que el posnet todavía no depositó, y no hay ningún paso de acreditación ni pantalla para barrerla al banco. Salió del relevamiento del 22/09 | mediano |
+| 🔴 | **"A imputar" acusa y no se puede vaciar.** Un cobro con un medio sin cuenta cae en la cuenta transitoria —eso está bien, es visible y no se pierde— pero **no hay pantalla para imputarlo ni para reasignarle la cuenta a un cobro ya hecho**, y la cuenta está excluida del modal de movimientos, así que ni con una transferencia manual se la puede vaciar. El tablero la denuncia y no lleva a ningún lado | mediano |
+| — | **Una cuenta dada de baja sigue mostrando su saldo.** La vista `account_balances` no filtra por `active` y `fetchBalances` descarta la columna, así que aparece en Caja, en el tablero y en el selector de movimientos como si estuviera viva | chico |
+| — | **El arqueo sabe de una sola caja**: toma la primera con `arquea = true` y sobre esa abre, cierra y lista el día. Con dos cajas —el mostrador y una de la profesora, por ejemplo— la segunda no se puede arquear, y la pantalla no lo dice | mediano |
 | — | **El pago dentro del alta.** Es lo que falta de la idea del estudio del 17/09: "cuando creamos el cliente, tomamos esos datos, el plan que elige y ponemos **si paga ahí y cómo paga** para que se acredite". Hoy el alta crea la membresía y deja la cuota **pendiente** en Pagos, y cobrarla es un segundo paso en otra pantalla. El manual del mostrador ya lo dice así | chico |
 | — | **Resend como SMTP de Supabase.** "Olvidé mi contraseña" es el único camino que le queda a una clienta que ya eligió su clave y la olvidó, y **no pasa por Resend**: usa el mailer de Supabase, que en el plan gratis manda desde una dirección de Supabase, permite unos pocos por hora y cae en spam. Con el dominio ya verificado es configuración, no desarrollo | chico |
 | **§2** | **Que las reservas del turno fijo se creen solas cada semana.** Es lo último de §2. Ya no depende de ninguna respuesta: Matías definió el 15/09 que manda la cantidad de clases del plan | chico |

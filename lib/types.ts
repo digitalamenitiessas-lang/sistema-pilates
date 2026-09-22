@@ -432,7 +432,14 @@ export interface Payment {
   date: string
   dueDate: string
   status: PaymentStatus
-  method?: 'efectivo' | 'transferencia' | 'tarjeta' | 'mercadopago'
+  /**
+   * El `code` del medio con el que se cobró, tal como está en
+   * `payment_methods`. Texto libre y no una unión de cuatro: el catálogo
+   * lo edita el estudio, y un cobro viejo tiene que poder seguir
+   * mostrándose aunque ese medio ya no exista. Para el nombre que se
+   * muestra, se busca en el catálogo — el código crudo no es para leer.
+   */
+  method?: string
   receiptNumber?: number | null
   mpLink?: string | null
   /**

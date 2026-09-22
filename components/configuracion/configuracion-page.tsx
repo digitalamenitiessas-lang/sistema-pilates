@@ -29,6 +29,7 @@ import {
   RotateCcw,
   ChevronsUpDown,
   ChevronsDownUp,
+  Landmark,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
@@ -69,7 +70,17 @@ import {
   type TeacherInput,
   type DisciplineInput,
 } from '@/lib/api'
+import {
+  fetchAccounts,
+  createAccount,
+  updateAccount,
+  deactivateAccount,
+  setMethodAccount,
+  type AccountInput,
+} from '@/lib/caja-api'
 import type {
+  Account,
+  AccountKind,
   Discipline,
   DisciplineItem,
   PermissionKey,
@@ -1523,7 +1534,367 @@ function DisciplinesSection() {
   )
 }
 
-function PaymentMethodsSection() {
+/**
+ * Los tipos de cuenta, con el nombre que usa quien atiende y no el de la
+ * base. 'transitoria' no está: es de la cuenta "A imputar", que la crea el
+ * sistema y nadie más.
+ */
+const TIPOS_DE_CUENTA: Array<{ kind: AccountKind; label: string; ayuda: string }> = [
+  { kind: 'caja', label: 'Caja', ayuda: 'Plata en el cajón, que se cuenta a mano al cerrar' },
+  { kind: 'banco', label: 'Banco', ayuda: 'Una cuenta bancaria del estudio' },
+  { kind: 'billetera', label: 'Billetera virtual', ayuda: 'Mercado Pago, Ualá, Cuenta DNI' },
+  { kind: 'pasarela', label: 'Tarjetas a acreditar', ayuda: 'Lo que el posnet todavía no depositó' },
+]
+
+const NOMBRE_TIPO: Record<AccountKind, string> = {
+  caja: 'Caja',
+  banco: 'Banco',
+  billetera: 'Billetera',
+  pasarela: 'Tarjetas',
+  transitoria: 'Del sistema',
+}
+
+function CuentaFormModal({
+  cuenta,
+  onClose,
+  onSaved,
+}: {
+  cuenta?: Account
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [name, setName] = useState(cuenta?.name ?? '')
+  const [kind, setKind] = useState<AccountKind>(cuenta?.kind ?? 'banco')
+  const [arquea, setArquea] = useState(cuenta?.arquea ?? false)
+  const [bankName, setBankName] = useState(cuenta?.bankName ?? '')
+  const [cbu, setCbu] = useState(cuenta?.cbu ?? '')
+  const [alias, setAlias] = useState(cuenta?.alias ?? '')
+  const [holder, setHolder] = useState(cuenta?.holder ?? '')
+  const [notes, setNotes] = useState(cuenta?.notes ?? '')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const esCaja = kind === 'caja'
+  const tipo = TIPOS_DE_CUENTA.find((t) => t.kind === kind)
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    setError(null)
+    const input: AccountInput = {
+      name,
+      kind,
+      // Arquear es contar la plata con la mano, y eso sólo se puede hacer
+      // con la que está en el cajón. Se fuerza acá en vez de confiar en el
+      // tilde: una cuenta de banco marcada para arquear le pediría a la
+      // encargada que cuente un saldo que no puede tocar.
+      arquea: esCaja ? arquea : false,
+      bankName,
+      cbu,
+      alias,
+      holder,
+      notes,
+    }
+    try {
+      if (cuenta) await updateAccount(cuenta.id, input)
+      else await createAccount(input)
+      onSaved()
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar la cuenta')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/20 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={submit}
+        className="bg-card rounded-2xl border border-border w-full max-w-md max-h-[90vh] overflow-y-auto"
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h2 className="font-bold text-foreground">
+            {cuenta ? 'Editar cuenta' : 'Nueva cuenta'}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground"
+            aria-label="Cerrar"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          <div>
+            <label className={labelClass}>Nombre *</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              autoFocus
+              placeholder="Cuenta Macro"
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label className={labelClass}>Tipo</label>
+            <select
+              value={kind}
+              onChange={(e) => setKind(e.target.value as AccountKind)}
+              className={inputClass}
+            >
+              {TIPOS_DE_CUENTA.map((t) => (
+                <option key={t.kind} value={t.kind}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+            {tipo && <p className="text-[11px] text-muted-foreground mt-1.5">{tipo.ayuda}</p>}
+          </div>
+
+          {esCaja && (
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={arquea}
+                onChange={(e) => setArquea(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span className="text-xs text-foreground">
+                Se arquea al cerrar el día
+                <span className="block text-[11px] text-muted-foreground">
+                  Al cerrar, el sistema pide contar la plata y asienta la diferencia.
+                </span>
+              </span>
+            </label>
+          )}
+
+          {!esCaja && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass}>Banco</label>
+                  <input value={bankName} onChange={(e) => setBankName(e.target.value)} className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>Titular</label>
+                  <input value={holder} onChange={(e) => setHolder(e.target.value)} className={inputClass} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass}>CBU</label>
+                  <input value={cbu} onChange={(e) => setCbu(e.target.value)} className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>Alias</label>
+                  <input value={alias} onChange={(e) => setAlias(e.target.value)} className={inputClass} />
+                </div>
+              </div>
+            </>
+          )}
+
+          <div>
+            <label className={labelClass}>Notas</label>
+            <input value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass} />
+          </div>
+
+          {error && <p className="text-xs text-destructive-fuerte">{error}</p>}
+        </div>
+
+        <div className="flex gap-2 px-5 py-4 border-t border-border">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-muted transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={saving || !name.trim()}
+            className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 disabled:opacity-40 transition-opacity"
+          >
+            {saving ? 'Guardando…' : cuenta ? 'Guardar' : 'Crear cuenta'}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+/**
+ * Las cuentas del estudio: dónde está la plata.
+ *
+ * Existía la tabla, existían las funciones en `lib/caja-api.ts` desde la
+ * 0020 y no las llamaba nadie: las cinco cuentas que sembró esa migración
+ * eran las únicas cinco que podía haber, y agregar la del banco nuevo era
+ * entrar al SQL Editor. Esto es la pantalla que faltaba.
+ *
+ * La de baja es en dos pasos y con un cartel propio, no con `window.confirm`:
+ * los carteles nativos los descarta solo el navegador embebido y el botón
+ * parece muerto.
+ */
+function CuentasSection({
+  cuentas,
+  recargar,
+}: {
+  cuentas: Account[]
+  recargar: () => Promise<void>
+}) {
+  // `caja.cuentas` y no el rol crudo: es la clave que exige la base para
+  // crear y editar una cuenta (0020:195-202), y su grupo RIGE desde que se
+  // encendió Caja. O sea que recepción —que tiene `caja.ver` pero no
+  // `caja.cuentas`— ve la lista y no puede tocarla. Mostrarle los botones
+  // sería ofrecerle una acción que la base va a rechazar.
+  const { can } = useData()
+  const puedeEditar = can('caja.cuentas')
+  const [showForm, setShowForm] = useState(false)
+  const [editing, setEditing] = useState<Account | undefined>()
+  const [confirmando, setConfirmando] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const darDeBaja = async (c: Account) => {
+    setBusy(true)
+    setError(null)
+    try {
+      await deactivateAccount(c.id)
+      await recargar()
+      setConfirmando(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo dar de baja')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <SeccionPlegable
+        id="cuentas"
+        icono={Landmark}
+        colorIcono="bg-primary/10 text-primary-fuerte"
+        titulo="Cuentas"
+        ayuda="Dónde queda la plata: el cajón, los bancos, las billeteras"
+        resumen={<Conteo n={cuentas.length} singular="cuenta" plural="cuentas" />}
+        accion={
+          puedeEditar ? (
+            <button
+              onClick={() => {
+                setEditing(undefined)
+                setShowForm(true)
+              }}
+              className="w-8 h-8 rounded-xl bg-primary/10 text-primary-fuerte flex items-center justify-center hover:bg-primary/20 transition-colors"
+              aria-label="Nueva cuenta"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          ) : undefined
+        }
+      >
+        <div className="px-5 py-4 space-y-2">
+          <p className="text-[11px] text-muted-foreground pb-1">
+            Cada medio de pago manda su plata a una cuenta, y el saldo de cada una
+            se ve en Caja. Las cuentas <strong>no se borran</strong>: se dan de
+            baja, así los cobros que ya entraron siguen teniendo dónde estar.
+          </p>
+
+          {cuentas.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              Sin cuentas a la vista. Puede ser que falte correr la migración 0020,
+              o que tu rol no tenga permiso para ver la caja — una tabla sin
+              permiso vuelve vacía, no da error.
+            </p>
+          )}
+
+          {!puedeEditar && cuentas.length > 0 && (
+            <p className="text-[11px] text-muted-foreground">
+              Tu rol puede ver las cuentas pero no modificarlas.
+            </p>
+          )}
+
+          {cuentas.map((c) => (
+            <div key={c.id} className="flex items-center gap-2 rounded-xl border border-border px-3 py-2">
+              <span className="flex-1 text-sm text-foreground truncate">{c.name}</span>
+              <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full shrink-0">
+                {NOMBRE_TIPO[c.kind]}
+              </span>
+              {c.arquea && (
+                <span className="text-[10px] text-primary-fuerte bg-primary/10 px-2 py-0.5 rounded-full shrink-0">
+                  se arquea
+                </span>
+              )}
+              {/* La cuenta del sistema ("A imputar") no se toca: la base la
+                  blinda con un trigger, y la pantalla no ofrece lo que la
+                  base va a rechazar. */}
+              {puedeEditar && !c.isSystem && (
+                confirmando === c.id ? (
+                  <>
+                    <span className="text-[11px] text-aviso-fuerte shrink-0">¿Darla de baja?</span>
+                    <button
+                      disabled={busy}
+                      onClick={() => darDeBaja(c)}
+                      className="px-2 h-7 rounded-lg bg-destructive/10 text-destructive-fuerte text-[11px] font-semibold hover:bg-destructive/20"
+                    >
+                      Sí
+                    </button>
+                    <button
+                      onClick={() => setConfirmando(null)}
+                      className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground"
+                      aria-label="No dar de baja"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => {
+                        setEditing(c)
+                        setShowForm(true)
+                      }}
+                      className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground"
+                      aria-label={`Editar ${c.name}`}
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setConfirmando(c.id)}
+                      className="w-7 h-7 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive-fuerte"
+                      aria-label={`Dar de baja ${c.name}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )
+              )}
+            </div>
+          ))}
+
+          {error && <p className="text-xs text-destructive-fuerte">{error}</p>}
+        </div>
+      </SeccionPlegable>
+
+      {showForm && (
+        <CuentaFormModal
+          cuenta={editing}
+          onClose={() => setShowForm(false)}
+          onSaved={recargar}
+        />
+      )}
+    </>
+  )
+}
+
+function PaymentMethodsSection({ cuentas }: { cuentas: Account[] }) {
   const { refresh, canWrite } = useData()
   const { paymentMethods } = useStudio()
   const [newName, setNewName] = useState('')
@@ -1551,7 +1922,7 @@ function PaymentMethodsSection() {
       icono={Wallet}
       colorIcono="bg-primary/10 text-primary-fuerte"
       titulo="Medios de pago"
-      ayuda="Con los que se puede cobrar, y qué le hace cada uno al precio"
+      ayuda="Con los que se puede cobrar, a qué cuenta va cada uno y qué le hace al precio"
       resumen={
         <Conteo
           n={paymentMethods.filter((m) => m.active).length}
@@ -1572,6 +1943,10 @@ function PaymentMethodsSection() {
         <p className="text-[11px] text-muted-foreground pb-1">
           Los <strong>descuentos</strong> se publican en la web, debajo de los
           planes. Los recargos no.
+        </p>
+        <p className="text-[11px] text-muted-foreground pb-1">
+          La <strong>cuenta</strong> es a dónde entra la plata cobrada con ese
+          medio. Las cuentas se cargan arriba, en su propia sección.
         </p>
         {paymentMethods.length === 0 && (
           <p className="text-xs text-muted-foreground">
@@ -1617,6 +1992,47 @@ function PaymentMethodsSection() {
                 {!m.isManual && (
                   <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
                     automático
+                  </span>
+                )}
+                {/* A qué cuenta va la plata de este medio. Es el
+                    `default_account_id` que la 0020 dejó en la tabla y que
+                    hasta hoy no tenía dónde configurarse: la base ya imputa
+                    el cobro sola leyendo esta columna, así que con elegir
+                    acá alcanza para que la caja lo refleje.
+
+                    Un medio sin cuenta no pierde la plata: cae en "A
+                    imputar", que es visible y corregible. Por eso la opción
+                    vacía existe y lo dice. */}
+                {canWrite && cuentas.length > 0 && (
+                  <select
+                    value={m.defaultAccountId ?? ''}
+                    disabled={busy}
+                    onChange={(e) => {
+                      const id = e.target.value || null
+                      if (id !== (m.defaultAccountId ?? null)) {
+                        run(() => setMethodAccount(m.code, id))
+                      }
+                    }}
+                    className="shrink-0 max-w-[9rem] px-2 py-1 rounded-lg border border-border bg-background text-xs text-foreground outline-none focus:border-primary"
+                    aria-label={`Cuenta de ${m.name}`}
+                  >
+                    <option value="">Sin cuenta (a imputar)</option>
+                    {cuentas
+                      // Un medio que acredita una integración no puede ir a
+                      // una caja que se arquea: la plata no está en el
+                      // cajón. La base lo rechaza con un trigger; acá
+                      // directamente no se ofrece.
+                      .filter((c) => !c.isSystem && (m.isManual || !c.arquea))
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                  </select>
+                )}
+                {!canWrite && m.defaultAccountId && (
+                  <span className="text-[11px] text-muted-foreground shrink-0 truncate max-w-[9rem]">
+                    {cuentas.find((c) => c.id === m.defaultAccountId)?.name ?? '—'}
                   </span>
                 )}
                 {/* El ajuste se edita acá mismo: es un número y esto es su
@@ -1918,6 +2334,30 @@ function PermisosSection() {
 export function ConfiguracionPage() {
   const { settingsMeta } = useStudio()
 
+  // Las cuentas no viajan en el paquete del estudio —son del módulo de
+  // Caja— así que se leen acá una sola vez y se bajan a las dos secciones
+  // que las necesitan: la que las administra y la que le asigna una a cada
+  // medio de pago. Si cada una las leyera por su cuenta, crear una cuenta
+  // no la haría aparecer en el selector de al lado hasta recargar.
+  //
+  // Se piden las activas nomás: una cuenta dada de baja no tiene que poder
+  // elegirse como destino de un medio.
+  const [cuentas, setCuentas] = useState<Account[]>([])
+  const recargarCuentas = async () => {
+    // Sin permiso sobre `accounts` la consulta vuelve vacía, no con error
+    // (RLS filtra filas). La sección lo dice con su propio cartel en vez
+    // de mostrar una lista vacía sin explicación.
+    try {
+      setCuentas(await fetchAccounts())
+    } catch {
+      setCuentas([])
+    }
+  }
+  useEffect(() => {
+    void recargarCuentas()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Los grupos salen del catálogo, no de una lista escrita acá: cuando un
   // módulo nuevo agrega sus parámetros con un INSERT, su sección aparece
   // sola. 'estudio' va aparte porque tiene su propio encabezado.
@@ -1952,7 +2392,8 @@ export function ConfiguracionPage() {
 
         <BloqueDeSecciones icono={Shapes} titulo="Catálogos">
           <DisciplinesSection />
-          <PaymentMethodsSection />
+          <CuentasSection cuentas={cuentas} recargar={recargarCuentas} />
+          <PaymentMethodsSection cuentas={cuentas} />
         </BloqueDeSecciones>
 
         <BloqueDeSecciones icono={Users} titulo="Equipo y espacios">

@@ -1742,6 +1742,75 @@ trigger `membresia_fechas` encola el nuevo detrás y la fecha elegida no se
 respetaría — y decirlo es mejor que dejar elegir algo que la base va a
 ignorar.
 
+### ✅ Las cuentas y los medios de pago se administran desde el sistema (22/09) — `0074` **corrida y verificada**
+
+Lo pidió Matías: *"necesito poder crear cuentas, como efectivo,
+transferencia, credito, y ligarla a un metodo de pago ... que se vea
+reflejado en la caja los montos de las cuentas, y esas serian opciones de
+pago cuando me pagan"*.
+
+**Casi todo estaba construido y no se podía tocar.** El modelo entero vivía
+en la base desde la `0020`: `accounts` con su tipo y sus datos bancarios,
+`payment_methods.default_account_id`, y un trigger que imputa cada cobro a
+la cuenta de su medio. Hasta las funciones estaban escritas en
+`lib/caja-api.ts` —`createAccount`, `updateAccount`, `setMethodAccount`— y
+**no las llamaba nadie**. Las cinco cuentas que sembró esa migración eran
+las únicas cinco que podía haber.
+
+**El muro que había atrás.** `payments.method` tenía un CHECK con los
+cuatro valores escritos en la base (`0002:37-39`). O sea que el botón
+"Nuevo medio de pago" —que existe desde la `0011`— creaba una fila que
+después **no servía para cobrar**: la palabra no estaba en la lista y el
+INSERT rebotaba. Estaba anotado como deuda en dos migraciones.
+
+**Y el orden lo dejó escrito la `0020`**, que es lo que evitó romper la
+pantalla de Pagos: *"Primero se derivan del catálogo en el front, después
+la FK, en su propia migración"*. Los tres objetos de cuatro claves
+escritos a mano (`METHOD_ICON`, `METHOD_LABEL`, `METHOD_COLORS`) dejaban
+el icono en `undefined` con un código desconocido, y eso en React es una
+pantalla en blanco. Se hizo en ese orden.
+
+Quedó: el nombre sale del catálogo, el icono tiene uno genérico para lo
+que no conoce, el color se deriva de una paleta por posición, y los medios
+que se ofrecen al cobrar son los activos y manuales — que hoy dan las
+mismas tres de siempre. Los mismos cuatro valores estaban copiados además
+en `lib/types.ts` y en dos firmas de `lib/api.ts`.
+
+**La pantalla que faltaba.** Configuración → Catálogos suma **Cuentas**,
+con el tipo en las palabras del mostrador, los datos bancarios cuando
+corresponde, y "se arquea" ofrecido sólo para una caja —contar la plata
+con la mano no se puede hacer con un saldo de banco—. Y cada medio de pago
+tiene su **selector de cuenta**. Dos cosas no se ofrecen porque la base las
+rechaza: la cuenta "A imputar" no muestra botones, y a un medio automático
+no se le ofrecen las cuentas que se arquean. El permiso es
+`can('caja.cuentas')`, que RIGE: recepción ve la lista y no la toca.
+
+**Verificado ejerciendo el circuito entero**, con la sesión de admin y
+después de correr la `0074`:
+
+- Un cobro con un medio inventado rebota con **`23503`** —clave ajena— y
+  no con `23514`, que sería el CHECK viejo.
+- Se creó la cuenta "Macro" y apareció al instante en los selectores.
+- Se creó el medio "Débito" y se le asignó esa cuenta.
+- El selector de cobro pasó de tres opciones a **cuatro**, con Débito.
+- Se cobraron $70.000 con Débito: **entró** —antes la base lo rechazaba— y
+  la plata fue sola a Cuenta Macro, que en Caja quedó en **$70.000 · 1
+  movimiento** con el resto en cero.
+
+Todo revertido: la cuota volvió a `pendiente` campo por campo contra la
+foto previa, y se borraron el medio, la cuenta y el sello del cobrador.
+
+**De paso**: el comprobante salió `00000002`. El bloque que devuelve
+`receipt_seq` no se había aplicado al borrar la ficha de prueba, así que
+el 1 estaba consumido desde antes.
+
+**Lo que este bloque NO toca**, y quedó relevado aparte: la plata
+`diferida` (tarjeta, Mercado Pago) figura disponible el mismo día aunque
+no haya acreditado; "A imputar" acusa y no se puede vaciar —no hay
+pantalla para reasignar un cobro—; una cuenta dada de baja sigue
+mostrando su saldo; y el arqueo sabe de una sola caja. Mercado Pago no se
+tocó: el webhook y los links quedan como estaban.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
@@ -1810,7 +1879,7 @@ ignorar.
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a **`0073`** ✅. La **`0073` corrió el 22/09** y se verificó de las dos maneras que hacían falta: las seis puertas cerradas con la llave pública, y con sesión de admin los cinco cortes de Ocupación dando los mismos números y el descuento de clases todavía andando (se reservó una clase, `classes_used` pasó de 3 a 4, se borró la reserva y volvió a 3). La **`0072` corrió el 22/09**; el agujero que cierra se reprodujo antes de escribir el arreglo. La **`0071` corrió el 19/09** y se verificó por los tres rechazos, que es lo que importa de esa función. La **`0070` y la `0069` corrieron el 18/09**. La **`0068` a la `0061` corrieron el 17/09**. La **`0060` corrió el 17/09** y se verificó suspendiendo una clase con la profesora logueada: le llegó a la campana sin recargar y siguió sin ver los avisos de staff. La **`0059` corrió el 17/09**; probarla encontró que la pantalla ofrecía deshacer una marca sin permiso. La **`0058` corrió el 16/09** y hubo que corregir el cupo dos veces: la Agenda tenía su propia cuenta y era la que se veía. La **`0057` corrió el 16/09 en el segundo intento** —la primera abortó por un `group_key` inexistente, y la envoltura `begin/commit` no dejó nada a medias—. La **`0056` corrió el 16/09** y se verificó moviendo el descuento a -8 y a 0 con la web abierta: la línea siguió al número y desapareció al apagarlo; el dato quedó restaurado en -5. La **`0053` corrió el 15/09**. La **`0052` corrió el 15/09** y se corrigió una redacción; es idempotente. La **`0051` corrió el 15/09** y se corrigió dos veces sobre la marcha —los nombres en castellano y el día en el corte por clase—; es idempotente, todo `create or replace`. La **`0050` corrió el 15/09**, se corrigió la clave foránea del autor y se volvió a correr; es idempotente a propósito. La **`0048` y la `0049` corrieron el 15/09** y se verificaron ejerciéndolas: el cupo rechazó el noveno turno fijo, un pausado quedó fuera de la liberación automática, y el interruptor encendido liberó exactamente uno. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Migraciones aplicadas | `0001` a **`0074`** ✅. La **`0074` corrió el 22/09** y se verificó ejerciendo lo que venía a habilitar: un medio inventado rebota con `23503` (clave ajena) y no con `23514` (el CHECK viejo), y con la cuenta "Macro" y el medio "Débito" creados desde Configuración se cobraron $70.000 que fueron solos a esa cuenta. Todo revertido. La **`0073` corrió el 22/09** y se verificó de las dos maneras que hacían falta: las seis puertas cerradas con la llave pública, y con sesión de admin los cinco cortes de Ocupación dando los mismos números y el descuento de clases todavía andando (se reservó una clase, `classes_used` pasó de 3 a 4, se borró la reserva y volvió a 3). La **`0072` corrió el 22/09**; el agujero que cierra se reprodujo antes de escribir el arreglo. La **`0071` corrió el 19/09** y se verificó por los tres rechazos, que es lo que importa de esa función. La **`0070` y la `0069` corrieron el 18/09**. La **`0068` a la `0061` corrieron el 17/09**. La **`0060` corrió el 17/09** y se verificó suspendiendo una clase con la profesora logueada: le llegó a la campana sin recargar y siguió sin ver los avisos de staff. La **`0059` corrió el 17/09**; probarla encontró que la pantalla ofrecía deshacer una marca sin permiso. La **`0058` corrió el 16/09** y hubo que corregir el cupo dos veces: la Agenda tenía su propia cuenta y era la que se veía. La **`0057` corrió el 16/09 en el segundo intento** —la primera abortó por un `group_key` inexistente, y la envoltura `begin/commit` no dejó nada a medias—. La **`0056` corrió el 16/09** y se verificó moviendo el descuento a -8 y a 0 con la web abierta: la línea siguió al número y desapareció al apagarlo; el dato quedó restaurado en -5. La **`0053` corrió el 15/09**. La **`0052` corrió el 15/09** y se corrigió una redacción; es idempotente. La **`0051` corrió el 15/09** y se corrigió dos veces sobre la marcha —los nombres en castellano y el día en el corte por clase—; es idempotente, todo `create or replace`. La **`0050` corrió el 15/09**, se corrigió la clave foránea del autor y se volvió a correr; es idempotente a propósito. La **`0048` y la `0049` corrieron el 15/09** y se verificaron ejerciéndolas: el cupo rechazó el noveno turno fijo, un pausado quedó fuera de la liberación automática, y el interruptor encendido liberó exactamente uno. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
 | Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |
