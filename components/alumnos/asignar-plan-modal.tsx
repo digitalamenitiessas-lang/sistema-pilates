@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { X, Loader2, BookOpen } from 'lucide-react'
 import { cn, cuantoDura } from '@/lib/utils'
 import { useData } from '@/lib/data-context'
-import { assignMembership, addDays, hoyISO } from '@/lib/api'
+import { assignMembership, addDays, hoyISO, vigenciaHasta } from '@/lib/api'
 import type { Membership, Student } from '@/lib/types'
 
 interface AsignarPlanModalProps {
@@ -27,6 +27,15 @@ export function AsignarPlanModal({ student, onClose }: AsignarPlanModalProps) {
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /**
+   * Desde qué día rige. Por defecto hoy, que es el caso normal.
+   *
+   * Lo pidió el estudio el 22/09 con una fecha concreta: abren el 29 y
+   * quieren cargar esta semana a las clientas que arrancan ese día, para
+   * que el plan les corra desde el 29 y no pierdan la semana que el
+   * estudio está cerrado.
+   */
+  const [desde, setDesde] = useState(hoyISO())
 
   const hoy = hoyISO()
   /** El `T00:00` evita que un ISO suelto se lea como UTC y muestre el día anterior. */
@@ -59,6 +68,10 @@ export function AsignarPlanModal({ student, onClose }: AsignarPlanModalProps) {
     )
     .reduce<Membership | null>((max, m) => (max === null || m.endDate > max.endDate ? m : max), null)
   const arranca = plan && !plan.isTrial && ultima ? addDays(ultima.endDate, 1) : null
+  /** El día que va a regir de verdad: el encolado le gana a la fecha elegida. */
+  const arranqueReal = arranca ?? desde
+  const seEncola = !!arranca
+  const hasta = plan ? vigenciaHasta(arranqueReal, plan) : null
 
   // El encolado alcanza también al cambio de plan, y eso sigue sin resolver
   // a propósito (lo explica la 0037): hace falta que el estudio decida qué
@@ -71,7 +84,7 @@ export function AsignarPlanModal({ student, onClose }: AsignarPlanModalProps) {
     setSaving(true)
     setError(null)
     try {
-      await assignMembership(student.id, planId, plans, settings)
+      await assignMembership(student.id, planId, plans, settings, desde)
       await refresh()
       onClose()
     } catch (err) {
@@ -160,6 +173,35 @@ export function AsignarPlanModal({ student, onClose }: AsignarPlanModalProps) {
             </p>
           )}
 
+          {plan && (
+            <div className="rounded-xl border border-border px-3.5 py-3">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
+                Arranca el
+              </label>
+              <input
+                type="date"
+                value={desde}
+                disabled={seEncola}
+                onChange={(e) => setDesde(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary transition-colors disabled:opacity-50"
+              />
+              {seEncola ? (
+                <p className="text-[11px] text-aviso-fuerte mt-1.5">
+                  No se puede elegir: ya tiene un período asignado, así que este se encola detrás y
+                  arranca el {fecha(arranqueReal)}.
+                </p>
+              ) : (
+                hasta && (
+                  <p className="text-[11px] text-muted-foreground mt-1.5">
+                    Va a estar vigente del <span className="font-semibold">{fecha(arranqueReal)}</span>{' '}
+                    al <span className="font-semibold">{fecha(hasta)}</span> — el último día se usa.
+                    {desde > hoy && ' Hasta esa fecha no va a poder reservar.'}
+                  </p>
+                )
+              )}
+            </div>
+          )}
+
           {plans.length > 0 && (
             <p className="text-[11px] text-muted-foreground pt-1">
               {!plan
@@ -168,6 +210,8 @@ export function AsignarPlanModal({ student, onClose }: AsignarPlanModalProps) {
                 ? 'El pase de prueba arranca hoy: no se encola detrás de lo que ya tenga.'
                 : arranca && ultima
                 ? `La membresía arranca el ${fecha(arranca)}, el día siguiente al último período que ya tiene asignado (termina el ${fecha(ultima.endDate)}): pagar antes no le corta el mes.`
+                : desde > hoy
+                ? `La membresía arranca el ${fecha(desde)}, así que hasta ese día no puede reservar.`
                 : 'La membresía arranca hoy.'}{' '}
               Si el plan tiene precio, la deuda queda generada en Pagos para cobrarla.
             </p>
