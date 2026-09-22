@@ -308,6 +308,34 @@ export function settingText(settings: Settings, key: string, fallback = ''): str
   return settings[key]?.trim() || fallback
 }
 
+/**
+ * El desempate entre dos períodos que cubren la misma fecha: cuál le paga
+ * la clase.
+ *
+ * Es el `order by (m.classes_used >= m.classes_total), m.end_date` de
+ * `membresia_para` (0037), y está acá una sola vez porque hasta hoy cada
+ * pantalla tenía el suyo: la ficha ordenaba por `end_date`, el portal
+ * hacía un `.find()` sobre una lista ordenada al revés, y la base miraba
+ * el saldo primero. Tres respuestas para una pregunta que tiene una.
+ *
+ * El síntoma era concreto y del uso real, no hipotético: la clienta toma
+ * su clase de prueba el martes, le gusta, paga ese día y se le asigna el
+ * plan. El pase queda agotado pero VIVO —muere por fecha, no por uso—,
+ * así que los dos períodos cubren los días siguientes. Como el pase vence
+ * antes, la ficha mostraba el pase y decía "0 clases restantes" el mismo
+ * día que el mostrador le cobró el plan, mientras la base ya estaba
+ * descontando del plan nuevo. El número que se veía era el único que
+ * mentía.
+ *
+ * Agotada va última: en Postgres `false` ordena antes que `true`, y acá
+ * 0 antes que 1. Entre dos con saldo, la que primero se pierde — que es
+ * lo que la 0029 quería, no desperdiciar la que vence antes.
+ */
+export function ordenDeCobro(a: Membership, b: Membership): number {
+  const agotada = (m: Membership) => (m.classesUsed >= m.classesTotal ? 1 : 0)
+  return agotada(a) - agotada(b) || a.endDate.localeCompare(b.endDate)
+}
+
 function deriveMembershipStatus(
   status: string,
   endDate: string,
@@ -791,8 +819,12 @@ export async function fetchStudioData(): Promise<StudioData> {
     }
     // La que cubre hoy manda. Entre dos que cubren hoy —posible desde la
     // 0037, que dejó a los pases de prueba arrancar el día que se compran en
-    // vez de encolarse— la que primero se pierde, igual que membresia_para.
-    if (cubreHoy(m) && (!cubreHoy(previa) || m.endDate < previa.endDate)) {
+    // vez de encolarse— desempata `ordenDeCobro`, que es el criterio de
+    // `membresia_para`: primero la que tiene clases, y entre esas la que
+    // primero se pierde. Acá decía "igual que membresia_para" y comparaba
+    // sólo el `end_date`, así que un pase agotado le ganaba al plan que la
+    // base ya estaba usando.
+    if (cubreHoy(m) && (!cubreHoy(previa) || ordenDeCobro(m, previa) < 0)) {
       latestMembership.set(m.studentId, m)
       continue
     }
@@ -1610,7 +1642,7 @@ export function membresiaQueCubre(
         date >= m.startDate &&
         date <= m.endDate
     )
-    .sort((a, b) => a.endDate.localeCompare(b.endDate))[0]
+    .sort(ordenDeCobro)[0]
 }
 
 /**
