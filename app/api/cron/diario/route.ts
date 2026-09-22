@@ -333,6 +333,11 @@ export async function GET(request: Request) {
   let ofertasYaEstaban = 0
   const ofertasFallidas: string[] = []
   const salteadas = { planApagado: 0, planSinPrecio: 0, planDePrueba: 0, clientaInactiva: 0 }
+  // Los pases de prueba que los bloques 2 y 3 dejaron pasar de largo. Van
+  // contados y no en silencio: cero salteados y no haber mirado se parecen
+  // demasiado, y el día que alguien dude de si el filtro está puesto, el
+  // JSON de la corrida lo contesta sin leer código.
+  const pruebasSalteadas = { porVencer: 0, vencida: 0 }
   // Las que se emitieron en ESTA corrida: el bloque 2 no le manda dos mails
   // el mismo día a la misma clienta si el estudio configuró el día de la
   // cuota y un escalón de recordatorio en el mismo número.
@@ -578,13 +583,31 @@ export async function GET(request: Request) {
   const maxAnticipacion = recordatorios[0] ?? 0
   const { data: porVencer } = await admin
     .from('memberships')
-    .select('id, end_date, student_id, students(name, email, active, user_id), plans(name)')
+    .select(
+      'id, end_date, student_id, students(name, email, active, user_id), plans(name, is_trial)'
+    )
     .eq('status', 'activa')
     .gte('end_date', today)
     .lte('end_date', addDaysISO(today, maxAnticipacion))
 
   for (const m of porVencer ?? []) {
     if (tienePeriodoPosterior(m)) continue
+    // Un pase de prueba no se recuerda que vence, porque no hay nada que
+    // renovar: se regaló una clase y se termina el día que se dijo. Sin
+    // este corte, a quien vino a probar GRATIS le llegaba por campana,
+    // push y mail "Tu membresía vence el 30/09 · para seguir reservando
+    // hay que renovarla" — un mail de cobranza a alguien que todavía no
+    // es clienta, y con un pase de 3 días le llegaba casi todos los días.
+    //
+    // El bloque 1 ya saltea los pases con esta misma condición desde que
+    // existe; lo que faltaba era que la consulta de acá trajera la
+    // columna. Por eso el aviso al mostrador también se corta: no es que
+    // el estudio se pierda algo, es que "vence y no se renovó" no
+    // describe lo que le pasa a un regalo.
+    if ((m.plans as unknown as { is_trial?: boolean } | null)?.is_trial) {
+      pruebasSalteadas.porVencer++
+      continue
+    }
     const faltan = diasEntre(today, m.end_date)
     // Los escalones vienen de mayor a menor, así que los que ya llegaron son
     // los que anticipan más de lo que falta, y el último de esos es el de
@@ -690,13 +713,27 @@ export async function GET(request: Request) {
 
   const { data: expired } = await admin
     .from('memberships')
-    .select('id, end_date, student_id, students(name, email, active, user_id), plans(name)')
+    .select(
+      'id, end_date, student_id, students(name, email, active, user_id), plans(name, is_trial)'
+    )
     .eq('status', 'activa')
     .lt('end_date', today)
     .gte('end_date', addDaysISO(today, -renewalCatchupDays))
 
   for (const m of expired ?? []) {
     if (tienePeriodoPosterior(m)) continue // renovada (recién o antes): no es noticia
+    // Lo mismo que en el bloque 2, y acá el texto era peor: "tu membresía
+    // venció y no se renovó ... los días y horarios que venías usando
+    // quedan disponibles para quien los reserve primero" le sale a alguien
+    // que vino una vez, gratis, y no venía usando ningún horario.
+    //
+    // Que el pase terminó sin comprar sí es información comercial, pero es
+    // OTRO aviso con otras palabras y otro momento, no este. Mientras no
+    // exista, callar es mejor que decirlo mal.
+    if ((m.plans as unknown as { is_trial?: boolean } | null)?.is_trial) {
+      pruebasSalteadas.vencida++
+      continue
+    }
     const student = m.students as unknown as StudentRef | null
     const plan = (m.plans as unknown as { name: string } | null)?.name ?? 'membresía'
     const oferta = ofertas.get(m.id)
@@ -1096,6 +1133,7 @@ export async function GET(request: Request) {
         ? `no se pudieron leer las membresías: ${renewError.message}`
         : undefined,
     salteadas,
+    pruebasSalteadas,
     // Cuántos de los turnos vencidos llegaron de verdad a la campana. Si
     // `turnosVencidos` es mayor que esto y no hay error, es que ya estaban
     // avisados de una corrida anterior — que es lo correcto.

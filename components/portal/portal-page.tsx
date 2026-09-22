@@ -48,6 +48,7 @@ import {
   settingNum,
   settingText,
   esOferta,
+  ordenDeCobro,
 } from '@/lib/api'
 import type { Discipline, Membership, Reservation, Student } from '@/lib/types'
 
@@ -1058,13 +1059,22 @@ export function PortalPage() {
    * habría dejado: la pantalla era más estricta que la regla.
    */
   const membresiaParaFecha = (fecha: string) =>
-    misMembresias.find(
-      (m) =>
-        m.status !== 'cancelada' &&
-        m.status !== 'suspendida' &&
-        m.startDate <= fecha &&
-        m.endDate >= fecha
-    )
+    misMembresias
+      .filter(
+        (m) =>
+          m.status !== 'cancelada' &&
+          m.status !== 'suspendida' &&
+          m.startDate <= fecha &&
+          m.endDate >= fecha
+      )
+      // Ordenar y no `.find()`: la lista viene por end_date DESCENDENTE, así
+      // que el primero que coincidía era el que vence MÁS TARDE — un tercer
+      // criterio, distinto del de la ficha y del de la base. Con el pase de
+      // prueba agotado y el plan recién comprado cubriendo los mismos días,
+      // eso le habilitaba o le negaba el botón según cuál cayera primero.
+      // `ordenDeCobro` es el de `membresia_para`: primero la que tiene
+      // clases, y entre esas la que primero se pierde.
+      .sort(ordenDeCobro)[0]
 
   /**
    * El día en que le arranca el próximo período, si todavía no empezó.

@@ -308,11 +308,64 @@ export function settingText(settings: Settings, key: string, fallback = ''): str
   return settings[key]?.trim() || fallback
 }
 
+/**
+ * El desempate entre dos períodos que cubren la misma fecha: cuál le paga
+ * la clase.
+ *
+ * Es el `order by (m.classes_used >= m.classes_total), m.end_date` de
+ * `membresia_para` (0037), y está acá una sola vez porque hasta hoy cada
+ * pantalla tenía el suyo: la ficha ordenaba por `end_date`, el portal
+ * hacía un `.find()` sobre una lista ordenada al revés, y la base miraba
+ * el saldo primero. Tres respuestas para una pregunta que tiene una.
+ *
+ * El síntoma era concreto y del uso real, no hipotético: la clienta toma
+ * su clase de prueba el martes, le gusta, paga ese día y se le asigna el
+ * plan. El pase queda agotado pero VIVO —muere por fecha, no por uso—,
+ * así que los dos períodos cubren los días siguientes. Como el pase vence
+ * antes, la ficha mostraba el pase y decía "0 clases restantes" el mismo
+ * día que el mostrador le cobró el plan, mientras la base ya estaba
+ * descontando del plan nuevo. El número que se veía era el único que
+ * mentía.
+ *
+ * Agotada va última: en Postgres `false` ordena antes que `true`, y acá
+ * 0 antes que 1. Entre dos con saldo, la que primero se pierde — que es
+ * lo que la 0029 quería, no desperdiciar la que vence antes.
+ */
+/**
+ * ¿Ese período cubre esa fecha? El mismo filtro que `membresia_para`.
+ *
+ * Ojo con el estado, que es donde esto se venía escribiendo mal: en la
+ * base `memberships.status` es una columna GUARDADA y sólo puede ser
+ * 'activa', 'suspendida' o 'cancelada'. En el navegador, en cambio,
+ * `status` es DERIVADO y además puede ser 'por vencer', 'vencida' o
+ * 'futura'. Pedirle `status === 'activa'` a un objeto de acá no es la
+ * traducción del `status = 'activa'` de allá: deja afuera a una
+ * membresía al día que entró en sus últimos días.
+ *
+ * Por eso se pregunta por lo que NO es. Y las fechas no hacen falta
+ * chequearlas contra 'vencida' ni 'futura': si la fecha cae adentro del
+ * rango, esos dos estados no pueden darse para esa fecha.
+ */
+export function cubreLaFecha(m: Membership, fecha: string): boolean {
+  return (
+    m.status !== 'suspendida' &&
+    m.status !== 'cancelada' &&
+    m.startDate <= fecha &&
+    m.endDate >= fecha
+  )
+}
+
+export function ordenDeCobro(a: Membership, b: Membership): number {
+  const agotada = (m: Membership) => (m.classesUsed >= m.classesTotal ? 1 : 0)
+  return agotada(a) - agotada(b) || a.endDate.localeCompare(b.endDate)
+}
+
 function deriveMembershipStatus(
   status: string,
   endDate: string,
   warningDays: number = EXPIRY_WARNING_DAYS,
-  startDate?: string
+  startDate?: string,
+  esPrueba = false
 ): Membership['status'] {
   if (status === 'suspendida') return 'suspendida'
   // Antes que cualquier cosa derivada de las fechas: una cancelada (0069)
@@ -328,7 +381,25 @@ function deriveMembershipStatus(
   // clase que la base va a rechazar: el motor de la 0029 descuenta de la
   // membresía que cubre la fecha de la clase, y esta todavía no cubre nada.
   if (startDate && startDate > today) return 'futura'
-  if (endDate <= addDays(today, warningDays)) return 'por vencer'
+  // Un pase de prueba nunca está "por vencer", y no es una excepción
+  // cosmética: "por vencer" quiere decir "esto se termina y hay que
+  // renovarlo", y un pase regalado no se renueva — se termina porque para
+  // eso se dio. El discriminador es `is_trial` y no la duración, igual que
+  // en la 0037: lo que define a un pase no es que dure poco, es que sea un
+  // pase.
+  //
+  // Sin esto, un pase de 3 días nace amarillo: la ventana de aviso son 5
+  // días por defecto, o sea más larga que el pase entero, así que el
+  // estado se enciende el día que se asigna y no se apaga nunca. Treinta
+  // pases de la apertura son treinta alertas de vencimiento que no
+  // significan nada, en el tablero, en la ficha, en el listado y en el
+  // portal de cada clienta.
+  //
+  // Pasa a 'activa', que es un estado que ya aceptan todos los lugares que
+  // aceptaban 'por vencer' (el `canBook` del portal, el `correHoy` de la
+  // ficha, la cuenta de activas del tablero): por eso el cambio no le saca
+  // nada a nadie.
+  if (!esPrueba && endDate <= addDays(today, warningDays)) return 'por vencer'
   return 'activa'
 }
 
@@ -708,6 +779,12 @@ export async function fetchStudioData(): Promise<StudioData> {
     isTrial: p.is_trial,
   }))
 
+  // Cuáles planes son pases de prueba, para que el estado derivado lo sepa.
+  // Se arma del catálogo que ya se trajo y no de una columna en la
+  // membresía: el plan es el que define si algo es un pase, y si mañana el
+  // estudio marca uno más, las membresías que ya existen lo heredan solas.
+  const planesDePrueba = new Set(plans.filter((p) => p.isTrial).map((p) => p.id))
+
   const memberships: Membership[] = (membershipsRes.data ?? []).map((m) => ({
     id: m.id,
     studentId: m.student_id,
@@ -717,7 +794,13 @@ export async function fetchStudioData(): Promise<StudioData> {
     endDate: m.end_date,
     classesTotal: m.classes_total,
     classesUsed: m.classes_used,
-    status: deriveMembershipStatus(m.status, m.end_date, warningDays, m.start_date),
+    status: deriveMembershipStatus(
+      m.status,
+      m.end_date,
+      warningDays,
+      m.start_date,
+      planesDePrueba.has(m.plan_id)
+    ),
     price: Number(m.price),
     autoRenew: m.auto_renew ?? true,
     // Llega solo con el select('*'), y queda en undefined mientras la
@@ -744,13 +827,7 @@ export async function fetchStudioData(): Promise<StudioData> {
   // descontar; pero puede quedar como último recurso abajo, que es lo que
   // hace que un cliente con una sola membresía suspendida siga mostrando la
   // suya en vez de parecer que nunca compró nada.
-  const cubreHoy = (m: Membership) =>
-    m.status !== 'suspendida' &&
-    // Y la cancelada tampoco compite (0069): la base no la va a elegir para
-    // descontar, porque `membresia_para` filtra por status = 'activa'.
-    m.status !== 'cancelada' &&
-    m.startDate <= hoy &&
-    m.endDate >= hoy
+  const cubreHoy = (m: Membership) => cubreLaFecha(m, hoy)
   const latestMembership = new Map<string, Membership>()
   for (const m of memberships) {
     const previa = latestMembership.get(m.studentId)
@@ -760,8 +837,12 @@ export async function fetchStudioData(): Promise<StudioData> {
     }
     // La que cubre hoy manda. Entre dos que cubren hoy —posible desde la
     // 0037, que dejó a los pases de prueba arrancar el día que se compran en
-    // vez de encolarse— la que primero se pierde, igual que membresia_para.
-    if (cubreHoy(m) && (!cubreHoy(previa) || m.endDate < previa.endDate)) {
+    // vez de encolarse— desempata `ordenDeCobro`, que es el criterio de
+    // `membresia_para`: primero la que tiene clases, y entre esas la que
+    // primero se pierde. Acá decía "igual que membresia_para" y comparaba
+    // sólo el `end_date`, así que un pase agotado le ganaba al plan que la
+    // base ya estaba usando.
+    if (cubreHoy(m) && (!cubreHoy(previa) || ordenDeCobro(m, previa) < 0)) {
       latestMembership.set(m.studentId, m)
       continue
     }
@@ -1014,7 +1095,17 @@ function buildAlerts(
         message: `Membresía vence el ${m.endDate}`,
         studentId: m.studentId, studentName: name(m.studentId),
       })
-    } else if (m.status === 'activa' && m.classesTotal - m.classesUsed <= 1) {
+    } else if (
+      m.status === 'activa' &&
+      m.classesTotal - m.classesUsed <= 1 &&
+      // "Solo le queda 1 clase" sobre un plan de UNA clase no es quedarse
+      // corto: es no haberla usado todavía. Sin esta condición, sacar el
+      // pase de prueba de 'por vencer' lo manda derecho a esta rama y el
+      // tablero se vuelve a llenar, ahora de otro color: cada pase nacería
+      // con su alerta el día que se asigna. Quedarse SIN clases (left = 0)
+      // sí es noticia para cualquier plan, incluido un pase usado.
+      (m.classesTotal - m.classesUsed === 0 || m.classesTotal > 1)
+    ) {
       const left = m.classesTotal - m.classesUsed
       alerts.push({
         id: `mc-${m.id}`, type: 'warning',
@@ -1549,30 +1640,6 @@ export async function deactivatePlan(id: string): Promise<void> {
 }
 
 /**
- * Qué membresía paga una clase de ese día.
- *
- * Espeja `membresia_para` de la 0029: la del día de la CLASE y no la de
- * hoy, y si hay más de una, la que vence antes — se usa primero la que
- * primero se pierde. Acá es solo para que la pantalla ofrezca lo mismo
- * que la base va a aceptar; quien decide sigue siendo la base.
- */
-export function membresiaQueCubre(
-  memberships: Membership[],
-  studentId: string,
-  date: string
-): Membership | undefined {
-  return memberships
-    .filter(
-      (m) =>
-        m.studentId === studentId &&
-        m.status === 'activa' &&
-        date >= m.startDate &&
-        date <= m.endDate
-    )
-    .sort((a, b) => a.endDate.localeCompare(b.endDate))[0]
-}
-
-/**
  * Las clases que perdió y puede reponer en la fecha pedida (0046).
  *
  * Espeja `recupero_elegible`: se recupera lo que consumió y no usó —
@@ -1599,24 +1666,56 @@ export function clasesRecuperables(
   const tope = settingsMeta.find((s) => s.key === 'recovery_max')
   if (!tope?.rige) return []
 
-  const mem = membresiaQueCubre(memberships, studentId, date)
-  if (!mem) return []
-
   const laAusenciaConsume = settingBool(settings, 'absence_consumes_class', true)
   const yaRepuestas = new Set(
     reservations.map((r) => r.recoversReservationId).filter(Boolean) as string[]
   )
+  const periodo = new Map(memberships.map((m) => [m.id, m]))
 
   return reservations
-    .filter(
-      (r) =>
-        r.studentId === studentId &&
-        r.membershipId === mem.id &&
-        !r.recoversReservationId &&
-        !yaRepuestas.has(r.id) &&
-        ((r.status === 'cancelada' && r.cancelKind === 'fuera de plazo') ||
-          (r.status === 'ausente' && laAusenciaConsume))
-    )
+    .filter((r) => {
+      if (r.studentId !== studentId) return false
+      // `membership_id is not null` de `recupero_elegible`: una clase que
+      // nadie pagó —una excepción autorizada— no se repone.
+      if (!r.membershipId) return false
+      if (r.recoversReservationId) return false // un recupero no se recupera
+      if (yaRepuestas.has(r.id)) return false
+
+      // LA PREGUNTA ES POR EL PERÍODO DE LA CLASE PERDIDA, NO POR EL DE HOY.
+      //
+      // Así lo dice la 0046 al insertar: toma `v_rec.membership_id` —el
+      // período que PAGÓ la clase perdida— y exige que la fecha del
+      // recupero caiga entre su inicio y su fin. Las clases no se
+      // acumulan de un mes al otro, así que reponerla fuera de su
+      // membresía sería revivir una clase vencida.
+      //
+      // Acá se resolvía al revés: se buscaba el período que cubre la
+      // fecha y se ofrecían sólo las clases de ESE período. Daba lo mismo
+      // mientras hubiera un solo período por fecha, y fallaba en dos
+      // casos que sí pasan:
+      //
+      //   · El período estaba por vencer. El filtro pedía
+      //     `status === 'activa'` sobre el estado DERIVADO, y en los
+      //     últimos cinco días ese estado es 'por vencer'. O sea que el
+      //     recupero no se ofrecía justo en la última semana del plan
+      //     —cuando más se lo necesita—, sin ningún error: el botón
+      //     simplemente no estaba. 'activa' ahí era un error de
+      //     categoría: en la base es la columna guardada, que sólo puede
+      //     ser 'activa', 'suspendida' o 'cancelada'.
+      //
+      //   · Dos períodos cubrían la misma fecha. Con un pase de prueba y
+      //     una mensualidad conviviendo, se elegía uno y las clases
+      //     perdidas del otro desaparecían de la lista, aunque la base
+      //     las hubiera aceptado.
+      const m = periodo.get(r.membershipId)
+      if (!m) return false
+      if (date < m.startDate || date > m.endDate) return false
+
+      return (
+        (r.status === 'cancelada' && r.cancelKind === 'fuera de plazo') ||
+        (r.status === 'ausente' && laAusenciaConsume)
+      )
+    })
     .sort((a, b) => b.date.localeCompare(a.date))
 }
 
