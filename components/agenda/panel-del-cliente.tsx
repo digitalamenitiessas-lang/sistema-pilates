@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { AsignarPlanModal } from '@/components/alumnos/asignar-plan-modal'
 import { RegistrarPagoModal, CobrarModal } from '@/components/pagos/pagos-page'
-import { esOferta, moverVencimiento, hoyISO } from '@/lib/api'
+import { esOferta, moverVencimiento, hoyISO, cubreLaFecha, ordenDeCobro } from '@/lib/api'
 import type { Student, Payment } from '@/lib/types'
 
 /** El `T00:00` evita que un ISO suelto se lea como UTC y muestre el día anterior. */
@@ -124,13 +124,22 @@ export function PanelDelCliente({ student }: { student: Student }) {
   const [moviendo, setMoviendo] = useState(false)
 
   // La que manda es la misma que elige la base para cobrar la clase de
-  // hoy: activa, vigente hoy, y si hay más de una la que vence antes.
+  // hoy, y ahora de verdad: `cubreLaFecha` + `ordenDeCobro`, que es el
+  // `order by (classes_used >= classes_total), end_date` de
+  // `membresia_para`.
+  //
+  // Acá había dos errores encima del mismo comentario. El grave era pedir
+  // `status === 'activa'` sobre el estado DERIVADO: en los últimos cinco
+  // días del plan ese estado es 'por vencer', así que este panel le decía
+  // **"Sin membresía vigente"** y le ofrecía "Asignar plan" a una clienta
+  // al día — en la pantalla donde el mostrador la tiene parada adelante,
+  // y justo en la semana en que hay que renovarle. El otro era ordenar
+  // sólo por vencimiento, que con un pase de prueba agotado conviviendo
+  // con la mensualidad mostraba el pase y "0 de 1".
   const hoy = hoyISO()
   const vigente = memberships
-    .filter(
-      (m) => m.studentId === student.id && m.status === 'activa' && hoy >= m.startDate && hoy <= m.endDate
-    )
-    .sort((a, b) => a.endDate.localeCompare(b.endDate))[0]
+    .filter((m) => m.studentId === student.id && cubreLaFecha(m, hoy))
+    .sort(ordenDeCobro)[0]
 
   // Deuda de verdad, no la oferta de renovación: esa cobra un período que
   // todavía no existe —lo crea el pago— así que no se puede exigir (0041).
