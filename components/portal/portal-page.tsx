@@ -1411,10 +1411,25 @@ export function PortalPage() {
               <div key={p.id} className="flex items-center justify-between gap-2 py-1.5">
                 <div className="min-w-0">
                   <p className="text-xs font-semibold text-aviso-fuerte truncate">{p.planName}</p>
+                  {/* "Pagala hasta el" y no "Vence", que es la palabra que
+                      esta misma pantalla usa cinco líneas más arriba para la
+                      MEMBRESÍA. Dos "vence" con dos significados distintos a
+                      la vista al mismo tiempo: arriba el 22/10 —hasta cuándo
+                      puede entrenar— y acá el 28/09 —hasta cuándo tiene para
+                      pagar—. Matías lo leyó como la fecha de la membresía y
+                      creyó que el plan le duraba una semana; una clienta lo
+                      va a leer igual. El plazo sale de `payment_grace_days`,
+                      así que la distancia entre las dos fechas la elige el
+                      estudio y puede ser cualquiera.
+
+                      Las ofertas de renovación de más abajo ya decían "hasta
+                      el X": esto las alcanza, no inventa una redacción. */}
                   <p className="text-[10px] text-aviso-fuerte">
                     {empiezaDespues && periodo
-                      ? `Del período que empieza el ${pretty(periodo.startDate)} · vence ${pretty(p.dueDate)}`
-                      : `Vence ${pretty(p.dueDate)}`}
+                      ? `Del período que empieza el ${pretty(periodo.startDate)} · pagala hasta el ${pretty(p.dueDate)}`
+                      : p.dueDate >= today
+                      ? `Pagala hasta el ${pretty(p.dueDate)}`
+                      : `El plazo venció el ${pretty(p.dueDate)}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -1733,7 +1748,9 @@ export function PortalPage() {
                         ? p.dueDate >= today
                           ? `Renovación · hasta el ${pretty(p.dueDate)}`
                           : `Renovación · el plazo venció el ${pretty(p.dueDate)}`
-                        : `Vence ${pretty(p.dueDate)}`}
+                        : p.dueDate >= today
+                        ? `Pagala hasta el ${pretty(p.dueDate)}`
+                        : `El plazo venció el ${pretty(p.dueDate)}`}
                     </p>
                   </div>
                   <p
