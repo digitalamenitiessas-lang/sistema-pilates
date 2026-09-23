@@ -30,6 +30,8 @@ import {
   ChevronsUpDown,
   ChevronsDownUp,
   Landmark,
+  Tag,
+  Send,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
@@ -66,9 +68,16 @@ import {
   setRolePermission,
   clearUserPermission,
   setUserPermission,
+  fetchPromociones,
+  createPromocion,
+  updatePromocion,
+  setPromocionRige,
+  deactivatePromocion,
+  anunciarPromocion,
   type MpAccountInfo,
   type TeacherInput,
   type DisciplineInput,
+  type PromocionInput,
 } from '@/lib/api'
 import {
   fetchAccounts,
@@ -87,6 +96,7 @@ import type {
   PermissionMatrix,
   Profile,
   Role,
+  Promocion,
   SettingGroup,
   StudioSetting,
   Teacher,
@@ -1894,6 +1904,571 @@ function CuentasSection({
   )
 }
 
+// ---------------------------------------------------------------
+// Promociones (0079)
+// ---------------------------------------------------------------
+
+/** Cómo se lee una promoción de un vistazo, sin abrirla. */
+function comoSeLee(p: Promocion): string {
+  const cuanto = p.tipo === 'porcentaje' ? `${p.valor}%` : `$${p.valor.toLocaleString('es-AR')}`
+  const cuando =
+    p.ventana === 'fechas' && p.desde && p.hasta
+      ? `del ${p.desde.slice(8, 10)}/${p.desde.slice(5, 7)} al ${p.hasta.slice(8, 10)}/${p.hasta.slice(5, 7)}`
+      : p.ventana === 'dias_mes' && p.diaDesde && p.diaHasta
+        ? p.diaDesde === p.diaHasta
+          ? `el día ${p.diaDesde} de cada mes`
+          : `del ${p.diaDesde} al ${p.diaHasta} de cada mes`
+        : 'siempre'
+  return `${cuanto} · ${cuando}`
+}
+
+function PromocionFormModal({
+  promo,
+  onClose,
+  onSaved,
+}: {
+  promo?: Promocion
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const { plans } = useStudio()
+  const [nombre, setNombre] = useState(promo?.nombre ?? '')
+  const [tipo, setTipo] = useState<'porcentaje' | 'monto'>(promo?.tipo ?? 'porcentaje')
+  const [valor, setValor] = useState(String(promo?.valor ?? ''))
+  const [ventana, setVentana] = useState<'siempre' | 'fechas' | 'dias_mes'>(promo?.ventana ?? 'siempre')
+  const [desde, setDesde] = useState(promo?.desde ?? '')
+  const [hasta, setHasta] = useState(promo?.hasta ?? '')
+  const [diaDesde, setDiaDesde] = useState(String(promo?.diaDesde ?? 1))
+  const [diaHasta, setDiaHasta] = useState(String(promo?.diaHasta ?? 10))
+  const [codigo, setCodigo] = useState(promo?.codigo ?? '')
+  const [usosMax, setUsosMax] = useState(promo?.usosMax != null ? String(promo.usosMax) : '')
+  const [usosPorCliente, setUsosPorCliente] = useState(
+    promo?.usosPorCliente != null ? String(promo.usosPorCliente) : ''
+  )
+  const [planes, setPlanes] = useState<string[]>(promo?.planes ?? [])
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const num = Number(valor)
+  const valorValido =
+    valor.trim() !== '' && num > 0 && (tipo !== 'porcentaje' || num <= 100)
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    setError(null)
+    const input: PromocionInput = {
+      nombre,
+      tipo,
+      valor: num,
+      ventana,
+      desde,
+      hasta,
+      diaDesde: Number(diaDesde),
+      diaHasta: Number(diaHasta),
+      codigo,
+      // Vacío es "sin tope", que no es lo mismo que cero: cero sería una
+      // promo que no se puede usar nunca.
+      usosMax: usosMax.trim() === '' ? null : Number(usosMax),
+      usosPorCliente: usosPorCliente.trim() === '' ? null : Number(usosPorCliente),
+      planes,
+    }
+    try {
+      if (promo) await updatePromocion(promo.id, input)
+      else await createPromocion(input)
+      onSaved()
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar la promoción')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/20 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={submit}
+        className="bg-card rounded-2xl border border-border w-full max-w-md max-h-[90vh] overflow-y-auto"
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h2 className="font-bold text-foreground">
+            {promo ? 'Editar promoción' : 'Nueva promoción'}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground"
+            aria-label="Cerrar"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          <div>
+            <label className={labelClass}>Nombre *</label>
+            <input
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              required
+              autoFocus
+              placeholder="Pago temprano"
+              className={inputClass}
+            />
+            <p className="text-[11px] text-muted-foreground mt-1.5">
+              Lo va a ver la clienta en el mail y en el comprobante.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>Descuento</label>
+              <select
+                value={tipo}
+                onChange={(e) => setTipo(e.target.value as 'porcentaje' | 'monto')}
+                className={inputClass}
+              >
+                <option value="porcentaje">Porcentaje</option>
+                <option value="monto">Monto fijo</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelClass}>{tipo === 'porcentaje' ? '% *' : '$ *'}</label>
+              <input
+                type="number"
+                inputMode="decimal"
+                min={tipo === 'porcentaje' ? 1 : 1}
+                max={tipo === 'porcentaje' ? 100 : undefined}
+                value={valor}
+                onChange={(e) => setValor(e.target.value)}
+                required
+                placeholder={tipo === 'porcentaje' ? '20' : '10000'}
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelClass}>Cuándo vale</label>
+            <select
+              value={ventana}
+              onChange={(e) => setVentana(e.target.value as typeof ventana)}
+              className={inputClass}
+            >
+              <option value="siempre">Siempre</option>
+              <option value="dias_mes">Ciertos días de cada mes</option>
+              <option value="fechas">Entre dos fechas</option>
+            </select>
+          </div>
+
+          {ventana === 'dias_mes' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>Del día</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={diaDesde}
+                  onChange={(e) => setDiaDesde(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Al día</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={diaHasta}
+                  onChange={(e) => setDiaHasta(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          )}
+
+          {ventana === 'fechas' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>Desde</label>
+                <input
+                  type="date"
+                  value={desde}
+                  onChange={(e) => setDesde(e.target.value)}
+                  required
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Hasta</label>
+                <input
+                  type="date"
+                  value={hasta}
+                  onChange={(e) => setHasta(e.target.value)}
+                  required
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className={labelClass}>Código</label>
+            <input
+              value={codigo}
+              onChange={(e) => setCodigo(e.target.value)}
+              placeholder="AMIGA"
+              className={cn(inputClass, 'uppercase')}
+            />
+            <p className="text-[11px] text-muted-foreground mt-1.5">
+              <strong>Vacío = automática:</strong> se aplica sola al cobrar, sin
+              que nadie la pida. Con código hay que escribirlo en el cobro, así
+              que sirve para lo que se reparte a algunas y no a todas.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>Usos en total</label>
+              <input
+                type="number"
+                min={1}
+                value={usosMax}
+                onChange={(e) => setUsosMax(e.target.value)}
+                placeholder="sin tope"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Por clienta</label>
+              <input
+                type="number"
+                min={1}
+                value={usosPorCliente}
+                onChange={(e) => setUsosPorCliente(e.target.value)}
+                placeholder="sin tope"
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelClass}>Planes</label>
+            {/* Ninguno tildado = todos. Se dice con todas las letras porque
+                una lista vacía se lee igual de bien como "ninguno". */}
+            <p className="text-[11px] text-muted-foreground mb-2">
+              Sin tildar ninguno vale para <strong>todos</strong> los planes.
+            </p>
+            <div className="space-y-1.5 max-h-40 overflow-y-auto">
+              {plans.map((pl) => (
+                <label key={pl.id} className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={planes.includes(pl.id)}
+                    onChange={(e) =>
+                      setPlanes((prev) =>
+                        e.target.checked ? [...prev, pl.id] : prev.filter((x) => x !== pl.id)
+                      )
+                    }
+                  />
+                  <span className="text-xs text-foreground">{pl.name}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {error && <p className="text-xs text-destructive-fuerte">{error}</p>}
+        </div>
+
+        <div className="flex gap-2 px-5 py-4 border-t border-border">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-muted transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={saving || !nombre.trim() || !valorValido}
+            className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 disabled:opacity-40 transition-opacity"
+          >
+            {saving ? 'Guardando…' : promo ? 'Guardar' : 'Crear promoción'}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+/**
+ * Las promociones del estudio.
+ *
+ * Nacen APAGADAS y la pantalla lo dice: una promo cargada a medias no
+ * puede empezar a descontar sola mientras se la termina de escribir. El
+ * mismo criterio que los permisos en sombra.
+ *
+ * El aviso por mail también es un botón aparte, y por el mismo motivo al
+ * revés: un mail al padrón entero no se deshace, así que no puede ser un
+ * efecto secundario de apretar "Crear".
+ */
+function PromocionesSection() {
+  const { can } = useData()
+  const puedeEditar = can('promos.administrar')
+  const [promos, setPromos] = useState<Promocion[]>([])
+  const [showForm, setShowForm] = useState(false)
+  const [editing, setEditing] = useState<Promocion | undefined>()
+  const [confirmando, setConfirmando] = useState<string | null>(null)
+  const [anunciando, setAnunciando] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [resultado, setResultado] = useState<string | null>(null)
+
+  const recargar = async () => {
+    try {
+      setPromos(await fetchPromociones())
+    } catch {
+      setPromos([])
+    }
+  }
+  useEffect(() => {
+    void recargar()
+  }, [])
+
+  const alternarRige = async (p: Promocion) => {
+    setBusy(true)
+    setError(null)
+    try {
+      await setPromocionRige(p.id, !p.rige)
+      await recargar()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo cambiar el estado')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const darDeBaja = async (p: Promocion) => {
+    setBusy(true)
+    setError(null)
+    try {
+      await deactivatePromocion(p.id)
+      await recargar()
+      setConfirmando(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo dar de baja')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const anunciar = async (p: Promocion, prueba: boolean) => {
+    setBusy(true)
+    setError(null)
+    setResultado(null)
+    try {
+      const data = await anunciarPromocion(p.id, prueba)
+      if (prueba) {
+        setResultado('Te mandamos la prueba a tu mail. Mirala antes de anunciarla.')
+      } else {
+        setResultado(
+          `Anunciada: ${data.enviados} de ${data.conMail} mails salieron` +
+            (data.enCampana ? `, y ${data.enCampana} avisos en el portal` : '') +
+            '.' +
+            (data.motivo ? ` No salieron todos: ${data.motivo}` : '') +
+            (data.aviso ? ` ${data.aviso}` : '')
+        )
+        setAnunciando(null)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo enviar')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const vivas = promos.filter((p) => p.active)
+
+  return (
+    <>
+      <SeccionPlegable
+        id="promociones"
+        icono={Tag}
+        colorIcono="bg-primary/10 text-primary-fuerte"
+        titulo="Promociones"
+        ayuda="Descuentos y cupones: cuánto, cuándo y para quién"
+        resumen={<Conteo n={vivas.length} singular="promoción" plural="promociones" />}
+        accion={
+          puedeEditar ? (
+            <button
+              onClick={() => {
+                setEditing(undefined)
+                setShowForm(true)
+              }}
+              className="w-8 h-8 rounded-xl bg-primary/10 text-primary-fuerte flex items-center justify-center hover:bg-primary/20 transition-colors"
+              aria-label="Nueva promoción"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          ) : undefined
+        }
+      >
+        <div className="px-5 py-4 space-y-2">
+          <p className="text-[11px] text-muted-foreground pb-1">
+            El descuento se aplica <strong>al cobrar la cuota</strong>, y lo
+            calcula la base: la pantalla no puede cobrar otra cosa. Una promo
+            reemplaza al ajuste del medio de pago, no se suman.
+          </p>
+
+          {vivas.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              Todavía no hay promociones. Si acabás de correr la migración 0079 y
+              no ves nada, es porque ninguna se creó aún — no es un error.
+            </p>
+          )}
+
+          {!puedeEditar && vivas.length > 0 && (
+            <p className="text-[11px] text-muted-foreground">
+              Tu rol puede ver las promociones pero no modificarlas.
+            </p>
+          )}
+
+          {vivas.map((p) => (
+            <div key={p.id} className="rounded-xl border border-border px-3 py-2 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <span className="flex-1 text-sm text-foreground truncate">{p.nombre}</span>
+                {p.codigo && (
+                  <span className="text-[10px] font-mono text-primary-fuerte bg-primary/10 px-2 py-0.5 rounded-full shrink-0">
+                    {p.codigo}
+                  </span>
+                )}
+                {!p.rige && (
+                  <span className="text-[10px] text-aviso-fuerte bg-aviso/15 px-2 py-0.5 rounded-full shrink-0">
+                    no rige
+                  </span>
+                )}
+                {puedeEditar && (
+                  confirmando === p.id ? (
+                    <>
+                      <span className="text-[11px] text-aviso-fuerte shrink-0">¿Darla de baja?</span>
+                      <button
+                        disabled={busy}
+                        onClick={() => darDeBaja(p)}
+                        className="px-2 h-7 rounded-lg bg-destructive/10 text-destructive-fuerte text-[11px] font-semibold hover:bg-destructive/20"
+                      >
+                        Sí
+                      </button>
+                      <button
+                        onClick={() => setConfirmando(null)}
+                        className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground"
+                        aria-label="No dar de baja"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {p.rige && (
+                        <button
+                          onClick={() => {
+                            setResultado(null)
+                            setAnunciando(anunciando === p.id ? null : p.id)
+                          }}
+                          className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground"
+                          aria-label={`Avisar por mail: ${p.nombre}`}
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          setEditing(p)
+                          setShowForm(true)
+                        }}
+                        className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground"
+                        aria-label={`Editar ${p.nombre}`}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setConfirmando(p.id)}
+                        className="w-7 h-7 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive-fuerte"
+                        aria-label={`Dar de baja ${p.nombre}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  )
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-muted-foreground flex-1">{comoSeLee(p)}</span>
+                {puedeEditar && (
+                  <button
+                    disabled={busy}
+                    onClick={() => alternarRige(p)}
+                    className={cn(
+                      'text-[11px] font-semibold px-2 h-6 rounded-lg transition-colors disabled:opacity-40',
+                      p.rige
+                        ? 'bg-exito/15 text-exito-fuerte hover:bg-exito/25'
+                        : 'bg-muted text-muted-foreground hover:bg-border'
+                    )}
+                  >
+                    {p.rige ? 'Descontando' : 'Encender'}
+                  </button>
+                )}
+              </div>
+
+              {anunciando === p.id && (
+                <div className="rounded-lg bg-muted/60 p-2.5 space-y-2">
+                  <p className="text-[11px] text-foreground">
+                    Les llega un mail a todas las clientas activas con mail
+                    cargado, y un aviso en el portal a todas. <strong>Esto no se
+                    deshace</strong>, así que conviene mandarse la prueba primero.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      disabled={busy}
+                      onClick={() => anunciar(p, true)}
+                      className="flex-1 h-8 rounded-lg border border-border text-[11px] font-semibold text-foreground hover:bg-card disabled:opacity-40"
+                    >
+                      Probar conmigo
+                    </button>
+                    <button
+                      disabled={busy}
+                      onClick={() => anunciar(p, false)}
+                      className="flex-1 h-8 rounded-lg bg-primary text-primary-foreground text-[11px] font-semibold hover:opacity-90 disabled:opacity-40"
+                    >
+                      {busy ? 'Enviando…' : 'Avisarles a todas'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {resultado && <p className="text-xs text-exito-fuerte">{resultado}</p>}
+          {error && <p className="text-xs text-destructive-fuerte">{error}</p>}
+        </div>
+      </SeccionPlegable>
+
+      {showForm && (
+        <PromocionFormModal
+          promo={editing}
+          onClose={() => setShowForm(false)}
+          onSaved={recargar}
+        />
+      )}
+    </>
+  )
+}
+
 function PaymentMethodsSection({ cuentas }: { cuentas: Account[] }) {
   const { refresh, canWrite } = useData()
   const { paymentMethods } = useStudio()
@@ -2394,6 +2969,7 @@ export function ConfiguracionPage() {
           <DisciplinesSection />
           <CuentasSection cuentas={cuentas} recargar={recargarCuentas} />
           <PaymentMethodsSection cuentas={cuentas} />
+          <PromocionesSection />
         </BloqueDeSecciones>
 
         <BloqueDeSecciones icono={Users} titulo="Equipo y espacios">

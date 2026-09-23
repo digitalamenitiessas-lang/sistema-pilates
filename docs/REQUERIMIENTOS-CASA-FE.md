@@ -8,7 +8,7 @@
 > **¿Buscás qué falta? Está en la §0, acá abajo.** Es la única lista al día; el
 > resto del documento es el análisis y la historia.
 
-## 0. LO QUE FALTA — la lista viva  ·  al 22/09/2026 (tarde)
+## 0. LO QUE FALTA — la lista viva  ·  al 23/09/2026
 
 > **Esta es la única lista al día.** Las secciones de abajo son el análisis y la
 > historia de cómo se llegó acá, y varias quedaron viejas a propósito: son la
@@ -76,6 +76,27 @@ cuatro valores escritos, que hacía que crear un medio nuevo no sirviera
 para cobrar. Ahora manda el catálogo. Verificado cobrando con un "Débito"
 creado desde la pantalla, cuya plata fue sola a la cuenta "Macro".
 
+El **23/09** entraron `0075` a `0080`, y son cinco cosas del lado de la
+clienta más una del mostrador:
+
+- **La devolución por cancelar tiene tope** (`0076`): con más de 3 horas la
+  clase vuelve, pero sólo 2 veces por mes; de ahí en más se pierde. Lo
+  difícil no era la regla sino **dónde contarla**: en la vista de consumo
+  se podía reciclar el cupo infinito —cancelar, reservar, cancelar—, así
+  que la decisión **se sella al cancelar**, con un tercer valor de
+  `cancel_kind`. El tope nace sin regir. El recupero quedó apagado.
+- **La clienta elige su horario fijo** (`0077`, `0078`): al reservar le
+  pregunta si es por esta vez o fijo, y si es fijo le completa el período.
+  **En la renovación vuelve a elegir.** El límite lo dice su plan.
+- **Promociones y cupones** (`0079`, `0080`): el estudio crea sus
+  descuentos desde Configuración —porcentaje o monto, siempre / entre
+  fechas / ciertos días del mes, con o sin código, con topes de uso
+  totales y por clienta—, y **el monto pasa a calcularlo la base**. Ahí
+  está lo importante: hasta hoy el precio lo decidía el navegador, y con
+  topes de uso eso no se puede hacer cumplir. Y el anuncio por mail a las
+  clientas activas **es un botón, no un efecto de crearla**: un mail al
+  padrón entero no se deshace.
+
 ### Lo que falta construir
 
 | | Qué | Tamaño |
@@ -93,6 +114,8 @@ creado desde la pantalla, cuya plata fue sola a la cuenta "Macro".
 | — | **15 acciones siguen pidiendo confirmación con un cartel nativo** (8 `confirm` y 7 `prompt`). Los navegadores embebidos los descartan solos: el botón no hace nada y no hay error. El del portal ya se cambió por uno propio el 17/09; los 15 que quedan son pantallas internas, que se usan en un navegador normal. Los 7 `prompt` son el grupo peor: son la única forma de escribir el motivo de una anulación | mediano |
 | — | **La profesora no ve nada de lo suyo como trabajadora.** No tiene Personal —bien, ahí hay sueldos— pero tampoco puede ver cuántas clases dio en el mes, que es un dato suyo y sin plata | chico |
 | — | **Marcar asistencia no filtra por clase propia en la base.** La permisiva de update mira la clave y no el `class_id`, así que en teoría una profesora podría marcar en la clase de otra; en la práctica no tiene por dónde, porque desde la `0058` no lee esas filas y para escribir hace falta el uuid. No se cerró con la `0059` a propósito: esa pareja de políticas es la más delicada del sistema —la restrictiva alcanza también a la cancelación de la alumna— y se prueba con tiempo | chico |
+| — | **El cupón no se puede usar desde el portal.** La clienta que recibe un código sólo puede canjearlo en el mostrador: el pago por Mercado Pago no pasa por `cobrar_cuota()`, así que el link se arma con el precio de lista. Falta también publicar las promociones vigentes en la web y el reporte de uso | mediano |
+| — | **`reactivar_reserva` no revalida el saldo de clases.** Lo hace en el INSERT y no en el UPDATE, así que volver a una reserva cancelada puede pasar por encima del contador. Viene de antes, pero el turno fijo lo dispara más seguido: reserva de a siete fechas | chico |
 | **§1** | Cambio de horario por fecha. La tabla lo soporta desde la `0018`; falta la pantalla | chico |
 | — | Foto del comprobante de gasto (primer uso de Storage) · avisos de caja en el proceso diario | chico |
 | — | **Fichaje de entrada y salida** de las profesoras. Se apoya en `staff_work_logs` sin rehacer nada, pero necesita que tengan cuenta | chico |
@@ -124,7 +147,7 @@ inicio" quedaron dentro de Perfil.
 |---|---|
 | **No puede tomar el lugar que se liberó** | El aviso de la `0052` le dice "entrá a reservarlo" y en el portal encuentra el renglón "En espera" sin ningún botón. La base sí lo permitiría |
 | **El recupero no existe del lado de ella** | Desde el 17/09 el cartel de cancelar le dice cuántas recuperaciones le quedan y hasta cuándo, pero pedirla sigue siendo ir al mostrador |
-| **El turno fijo es invisible** | Quien tiene turno fijo ve lo mismo que quien no: reserva a mano cada semana su horario de siempre y no ve hasta cuándo conserva la prioridad. La `0048` promete por escrito que ve el motivo si se lo liberan, y no hay dónde |
+| ✅ **El turno fijo lo elige y lo ve** | `0077` y `0078` (23/09). Al reservar le pregunta si es por esta vez o fijo; si es fijo le completa el período, y lo ve en Inicio con hasta cuándo lo conserva y un botón para soltarlo. **En la renovación vuelve a elegir** |
 | **Los domingos no existen** | La base admite `day_of_week = 6`; el portal tiene seis días y recorta el índice a 5 |
 | **Un pago en mostrador no le avisa nada** | `pago_acreditado` es de staff, y el mail "Recibimos tu pago" sale solo por el camino de Mercado Pago |
 | **No puede corregir ni un dato propio** | Ni el teléfono. Y sus datos de salud le viajan al navegador aunque la pantalla no los use |
@@ -292,7 +315,7 @@ De las 10 prioridades que la clienta puso en la página 16, las **1, 2, 3, 4, 9 
 |---|---|---|---|
 | 1 · Agenda, clases, reservas, asistencias | 🟡 | Grilla semanal, ABM de clases, reserva por recepción, cupo por trigger, estados de asistencia | Disciplinas como catálogo editable; clases especiales/talleres con fecha puntual; 5 campos de la clase (descripción, nivel, precio, requisitos, sede); que la profesora pueda marcar asistencia y agregar alumnas; cancelación dentro/fuera de plazo y clase recuperada; auditoría de quién registró |
 | 2 · Planes, membresías, medios de pago | 🟡 | ABM de planes, membresías con clases usadas/disponibles, 4 medios de pago, renovación automática | Tres precios por plan según medio de pago; congelar membresía; historial de la membresía |
-| 3 · Cupones de descuento | 🔴 | Nada | Todo: catálogo de cupones, validación, control de usos, aplicación al cobro y al link de MP, reporte |
+| 3 · Cupones de descuento | 🟡 | Catálogo, validación, topes de uso, aplicación al cobro y anuncio por mail (`0079`, `0080`) | Cupón desde el portal · publicarlos en la web · reporte de uso · aplicarlos al link de Mercado Pago |
 | 4 · Beneficios, regalos y gift cards | 🔴 | Nada | Todo: beneficios de marcas aliadas, regalar clases/descuentos, extender membresía, gift cards, historial por alumna |
 | 5 · Ficha integral de la clienta | 🟡 | Ficha con datos, membresía, reservas, pagos, notas médicas protegidas por rol | Datos físicos (estatura, peso, talles); salud en campos separados (lesiones, embarazo, cirugías, medicación); contacto de emergencia editable; bitácora de observaciones con autor y fecha; bloque de deuda con cobro desde la ficha; pagos parciales |
 | 6 · Segmentación y seguimiento | 🟡 | Filtros por activa / por vencer / vencida / sin membresía | Baja de alumna con motivo y fecha; lista de “por recuperar” con estado de contacto; recuperadas; renovadas; cumpleaños del mes con beneficio asignado |

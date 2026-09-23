@@ -293,6 +293,28 @@ export interface Membership {
  * No es una reserva ni un montón de reservas. Las reservas de cada
  * fecha, cuando existan, se apoyan en esto — no al revés.
  */
+/** Una promoción del catálogo (0079). El monto lo resuelve la base. */
+export interface Promocion {
+  id: string
+  nombre: string
+  tipo: 'porcentaje' | 'monto'
+  valor: number
+  ventana: 'siempre' | 'fechas' | 'dias_mes'
+  desde: string | null
+  hasta: string | null
+  diaDesde: number | null
+  diaHasta: number | null
+  /** Null = automática: se aplica sola. Con código, hay que escribirlo. */
+  codigo: string | null
+  usosMax: number | null
+  usosPorCliente: number | null
+  /** Vacío = todos los planes. */
+  planes: string[]
+  active: boolean
+  /** Cargada pero sin regir todavía: no descuenta nada. */
+  rige: boolean
+}
+
 export interface FixedSlot {
   id: string
   studentId: string

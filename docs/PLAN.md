@@ -1811,6 +1811,91 @@ pantalla para reasignar un cobro—; una cuenta dada de baja sigue
 mostrando su saldo; y el arqueo sabe de una sola caja. Mercado Pago no se
 tocó: el webhook y los links quedan como estaban.
 
+### ✅ El día se lee entero, y el cobro dice de dónde sale el monto (22-23/09) — `0075`
+
+`account_ledger` mostraba el código del medio (`efectivo`) y no su
+nombre, y Caja no tenía dónde ver el día completo. Ahora el libro del día
+cruza todas las cuentas, el cierre muestra el desglose por medio y el
+total del turno, y el modal de cobro dice **por qué** ese número: el
+precio de lista tachado al lado del que se cobra, y el ajuste en su
+propio recuadro. Salió de que Matías cobró $80.750 sobre una cuota de
+$85.000 y no encontró de dónde salía la diferencia.
+
+### ✅ La devolución por cancelar tiene tope (23/09) — `0076` **corrida y verificada**
+
+La regla que dictó el estudio: cancelar con más de 3 horas devuelve la
+clase, **pero sólo 2 veces por mes**. De ahí en más —o cancelando tarde,
+o no yendo— la clase se pierde, y no hay recupero desde el mostrador.
+
+Lo que costó decidir fue **dónde se cuenta**. Contarlo en
+`consumo_contadas` —la vista que dice cuántas clases lleva usadas—
+parecía lo natural y es un agujero: esa vista lee **estado actual**, así
+que cancelar, volver a reservar y cancelar de nuevo reciclaba el cupo
+para siempre. Y `cancelled_at` lo escribe la clienta. Entonces la
+decisión **se sella en el momento de cancelar**: el trigger cuenta las
+devoluciones ya dadas en esa membresía y escribe `cancel_kind` con el
+tercer valor nuevo, `'en plazo sin cupo'` — canceló a tiempo, pero la
+clase no vuelve. Escrito una vez, no recalculable después.
+
+El tope vive en `cancel_free_max` y **nace sin regir**: el sistema se
+comporta como antes hasta que el estudio lo enciende. El recupero se
+apagó con dos updates, el valor **y** el `rige`.
+
+### ✅ La clienta elige su horario fijo (23/09) — `0077` y `0078` **corridas y verificadas**
+
+Al reservar por primera vez un horario, el portal le pregunta si es por
+esta vez o si lo quiere fijo; si lo quiere fijo, le completa el resto del
+período con ese día y hora. **En la renovación vuelve a elegir**: un
+turno fijo que se hereda solo es un turno que nadie sabe cuándo se soltó.
+La `0078` le pone el límite que dice su plan (`weekly_frequency`), con un
+trigger y no con una validación de pantalla.
+
+Y el turno fijo dejó de ser invisible: se ve en Inicio, con hasta cuándo
+lo conserva y un botón para soltarlo.
+
+### ✅ Promociones y cupones (23/09) — `0079` y `0080`
+
+Lo pidió el estudio: "poder crear descuentos: por ejemplo los diez
+primeros días del mes tanto por ciento, tal cupón, tantas limitaciones de
+uso, y que lo gestione desde admin".
+
+**La decisión que ordena todo: el monto pasa a calcularlo la base.** Antes
+lo decidía el navegador —`precioConAjuste` no tenía equivalente en la
+base, `payments.amount` no tenía ningún CHECK y `collectPayment` era un
+update directo—, y con promociones, cupones y topes de uso eso ya no se
+puede hacer cumplir: cualquiera con la consola abierta se cobraba lo que
+quisiera. Ahora cobra `cobrar_cuota()`, que resuelve la promo, aplica el
+redondeo una sola vez y escribe `precio_lista`, `promocion_id` y
+`descuento` junto al monto. Esas tres columnas son nuevas porque
+`payments.amount` **se pisa al cobrar**: sin ellas, el precio de lista se
+perdía y nadie podía reconstruir de dónde salió la diferencia.
+
+Una promo **reemplaza** al ajuste del medio de pago, no se suma: son dos
+motivos distintos para tocar el mismo precio y aplicarlos juntos descuenta
+dos veces. Lo decidió Matías el 23/09.
+
+Sin código es **automática** —se aplica sola a quien cumpla—; con código
+hay que escribirlo al cobrar, y eso es lo que la hace repartible. Los
+topes son dos y distintos: cuántas veces en total y cuántas por clienta.
+
+La `0080` agrega el tipo de aviso `promocion`, que es lo único que la
+base necesita para que el anuncio exista. **El envío es un botón, no un
+trigger**: un mail a todo el padrón no se deshace, y una promo recién
+cargada se corrige dos o tres veces antes de quedar como va. Por eso
+también hay un "probar conmigo" que manda uno solo, y por eso sólo se
+puede anunciar una promo que ya rige — anunciar un descuento que la base
+todavía no aplica es prometer algo que el mostrador va a tener que
+desdecir.
+
+**Verificado el 23/09 por el camino de la pantalla**, no por la función:
+promo del 20 al 25 de cada mes al 15%, creada desde Configuración, nacida
+apagada, encendida a mano. El modal de cobro de una cuota de $85.000
+mostró $72.250 antes de elegir medio; al elegir efectivo (−5%) siguió en
+$72.250 y lo dijo con todas las letras. La base guardó `amount` 72.250,
+`precio_lista` 85.000, `descuento` 12.750 y de qué promo salió. La prueba
+del mail volvió 200. Todo revertido después: el pago, sus satélites y la
+promo borrados, contando las filas que volvieron.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
