@@ -46,6 +46,7 @@ import {
   suerteDeLaReserva,
   enDias,
   settingNum,
+  settingRige,
   settingText,
   esOferta,
   ordenDeCobro,
@@ -311,33 +312,33 @@ function MembershipCard({
 function suerteDeLaClase(
   reserva: Reservation,
   reservas: Reservation[],
-  membresias: Membership[],
   horasDePlazo: number,
-  tope: number
+  /** El tope de devoluciones del período, o null si el estudio no lo activó. */
+  tope: number | null
 ): {
-  caso: 'vuelve' | 'no-consume' | 'se-pierde'
-  tope: number
-  restantes: number
-  hastaCuando: string | null
+  caso: 'vuelve' | 'no-consume' | 'se-pierde' | 'sin-cupo'
+  restantes: number | null
 } {
   const enPlazo = cancelacionEnPlazo(reserva.date, reserva.time, horasDePlazo)
-  const hechas = reserva.membershipId
-    ? reservas.filter(
-        (r) =>
-          r.membershipId === reserva.membershipId &&
-          r.recoversReservationId != null &&
-          r.status !== 'cancelada'
-      ).length
-    : 0
-  return {
-    caso: enPlazo ? 'vuelve' : !reserva.membershipId ? 'no-consume' : 'se-pierde',
-    tope,
-    restantes: Math.max(0, tope - hechas),
-    // El recupero tiene que caer dentro del período que pagó la clase, así
-    // que el vencimiento es parte del aviso: con el período por cerrarse,
-    // "te quedan 2" sin fecha es una promesa que no se puede usar.
-    hastaCuando: membresias.find((m) => m.id === reserva.membershipId)?.endDate ?? null,
-  }
+  if (!reserva.membershipId) return { caso: 'no-consume', restantes: null }
+  if (!enPlazo) return { caso: 'se-pierde', restantes: null }
+  // Sin tope configurado, cancelar a tiempo siempre devuelve — que es
+  // como se comportó el sistema hasta la 0076 y como sigue hasta que el
+  // estudio encienda el parámetro.
+  if (tope === null) return { caso: 'vuelve', restantes: null }
+
+  // La misma cuenta que hace la base al sellar (0076): las canceladas de
+  // ESTE período que quedaron marcadas 'en plazo'. Se cuentan las que ya
+  // están selladas, no las que "parecen" en plazo — el sello es el que
+  // decide, y es lo único que la clienta no puede escribir.
+  const devueltas = reservas.filter(
+    (r) =>
+      r.membershipId === reserva.membershipId &&
+      r.status === 'cancelada' &&
+      r.cancelKind === 'en plazo'
+  ).length
+  const restantes = Math.max(0, tope - devueltas)
+  return { caso: restantes > 0 ? 'vuelve' : 'sin-cupo', restantes }
 }
 
 /**
@@ -371,7 +372,7 @@ function ConfirmarCancelacion({
   onConfirmar: () => void
 }) {
   const plazo = `${horasDePlazo} ${horasDePlazo === 1 ? 'hora' : 'horas'}`
-  const { caso, tope, restantes, hastaCuando } = suerte
+  const { caso, restantes } = suerte
 
   return (
     <div
@@ -430,6 +431,23 @@ function ConfirmarCancelacion({
             </div>
           )}
 
+          {/* EL CASO QUE NO EXISTÍA (0076): avisó a tiempo, pero ya gastó
+              sus devoluciones del período. No es lo mismo que llegar tarde
+              —hizo todo bien— así que se le dice por qué, con el número. */}
+          {caso === 'sin-cupo' && (
+            <div className="rounded-xl bg-aviso-suave px-4 py-3">
+              <p className="text-sm font-semibold text-aviso-fuerte">
+                Esta clase no vuelve a tu plan
+              </p>
+              <p className="text-xs text-aviso-fuerte/90 mt-1">
+                Avisás a tiempo, pero ya usaste tus devoluciones de este plan.
+              </p>
+              <p className="text-xs text-aviso-fuerte/90 mt-2">
+                Podés cancelar igual: el lugar queda libre para otra.
+              </p>
+            </div>
+          )}
+
           {caso === 'se-pierde' && (
             <div className="rounded-xl bg-destructive/10 px-3.5 py-3">
               <p className="text-sm font-semibold text-destructive-fuerte">
@@ -439,29 +457,15 @@ function ConfirmarCancelacion({
                 El plazo para recuperarla era hasta {plazo} antes de que empiece.
               </p>
 
-              {/* La salida. Antes el cartel rojo terminaba acá y era un
-                  callejón: le decía que la perdía y no que el estudio
-                  puede reponérsela. El tope y las usadas son las de la
-                  base, no un número escrito a mano. */}
-              {tope <= 0 ? (
-                <p className="text-xs text-destructive-fuerte/90 mt-2">
-                  Si no podés venir, avisale al estudio igual.
-                </p>
-              ) : restantes > 0 ? (
-                <p className="text-xs text-destructive-fuerte/90 mt-2">
-                  <strong className="font-semibold">Pero se puede recuperar:</strong> el
-                  estudio repone hasta {tope} {tope === 1 ? 'clase' : 'clases'} por
-                  período y te {restantes === 1 ? 'queda' : 'quedan'} {restantes}.
-                  Pedila en recepción
-                  {hastaCuando ? ` antes del ${pretty(hastaCuando)}` : ''}.
-                </p>
-              ) : (
-                <p className="text-xs text-destructive-fuerte/90 mt-2">
-                  Ya usaste {tope === 1 ? 'la recuperación' : `las ${tope} recuperaciones`}{' '}
-                  de este período, así que esta no se puede reponer. Avisale al estudio
-                  igual.
-                </p>
-              )}
+              {/* Antes acá se le ofrecía el recupero del estudio. Se
+                  apagó con la 0076 por decisión del estudio —una clase
+                  perdida no se repone— así que prometerlo sería mandarla
+                  a recepción a pedir algo que le van a negar. Queda lo
+                  único cierto y útil: que avise igual, porque el lugar
+                  se libera para otra. */}
+              <p className="text-xs text-destructive-fuerte/90 mt-2">
+                Si no podés venir, avisá igual: el lugar queda libre para otra.
+              </p>
             </div>
           )}
 
@@ -980,7 +984,7 @@ function BarraPestanas({
 
 export function PortalPage() {
   const { profile, refresh, signOut } = useData()
-  const { students, classes, reservations, payments, disciplines, occurrences, settings, memberships } =
+  const { students, classes, reservations, payments, disciplines, occurrences, settings, settingsMeta, memberships } =
     useStudio()
 
   // Con RLS, el cliente solo recibe su propia ficha
@@ -1217,11 +1221,37 @@ export function PortalPage() {
 
   const horasDeCancelacion = settingNum(settings, 'cancel_hours', 3)
   // El mismo default que la base (0046): sin la clave, dos por período.
-  const topeDeRecuperos = settingNum(settings, 'recovery_max', 2)
+  /**
+   * El tope de devoluciones (0076), o null si el estudio no lo encendió.
+   *
+   * `null` y no un número por defecto, a propósito: con un 2 escrito acá,
+   * el portal empezaría a decirle a la clienta "te quedan 0 devoluciones"
+   * antes de que la migración corra o antes de que el estudio active la
+   * regla. El default vive en la base, no en el navegador.
+   */
+  const topeDevoluciones = settingRige(settingsMeta, 'cancel_free_max')
+    ? settingNum(settings, 'cancel_free_max', 0)
+    : null
+
+  /**
+   * Cuántas devoluciones le quedan en el período que corre hoy.
+   *
+   * Es el dato con el que decide, y hasta ahora no estaba en ninguna
+   * pantalla: se enteraba cuando cancelaba y la clase no volvía. Se cuenta
+   * sobre el período que cubre hoy, que es el mismo que le va a pagar la
+   * clase que está por cancelar.
+   */
+  const devolucionesRestantes = (() => {
+    if (topeDevoluciones === null || !ms) return null
+    const devueltas = reservations.filter(
+      (r) => r.membershipId === ms.id && r.status === 'cancelada' && r.cancelKind === 'en plazo'
+    ).length
+    return Math.max(0, topeDevoluciones - devueltas)
+  })()
 
   // `reservations` ya son sólo las suyas: RLS no le manda las de nadie más.
   const suerteDe = (r: Reservation) =>
-    suerteDeLaClase(r, reservations, misMembresias, horasDeCancelacion, topeDeRecuperos)
+    suerteDeLaClase(r, reservations, horasDeCancelacion, topeDevoluciones)
 
   // Antes esto arrancaba con un `window.confirm`. Los navegadores
   // embebidos lo descartan solos —devuelven "no" sin mostrar nada—, así
@@ -1245,10 +1275,16 @@ export function PortalPage() {
       flash(
         'ok',
         suerte.caso === 'vuelve'
-          ? 'Reserva cancelada. La clase volvió a tu plan.'
-          : suerte.caso === 'se-pierde' && suerte.tope > 0 && suerte.restantes > 0
-          ? 'Reserva cancelada. Pedile la recuperación al estudio.'
-          : 'Reserva cancelada.'
+          ? suerte.restantes !== null && suerte.restantes - 1 === 0
+            ? 'Reserva cancelada. La clase volvió a tu plan: era tu última devolución de este plan.'
+            : suerte.restantes !== null
+              ? `Reserva cancelada. La clase volvió a tu plan y te ${
+                  suerte.restantes - 1 === 1 ? 'queda' : 'quedan'
+                } ${suerte.restantes - 1}.`
+              : 'Reserva cancelada. La clase volvió a tu plan.'
+          : suerte.caso === 'sin-cupo'
+            ? 'Reserva cancelada. Esta no volvió: ya habías usado tus devoluciones.'
+            : 'Reserva cancelada.'
       )
     } catch (err) {
       setACancelar(null)
@@ -1553,9 +1589,23 @@ export function PortalPage() {
               cambia, esto cambia. Sólo si hay algo que cancelar. */}
           {myUpcoming.length > 0 && (
             <p className="text-[11px] text-muted-foreground mt-2.5 px-1">
+              {/* La regla completa, que hasta la 0076 era media: el plazo
+                  sin el tope prometía devoluciones ilimitadas. Cuando el
+                  estudio no tiene tope encendido, el texto vuelve a ser el
+                  de antes — que ahí sí es toda la verdad. */}
               Podés cancelar hasta {horasDeCancelacion}{' '}
               {horasDeCancelacion === 1 ? 'hora' : 'horas'} antes de que empiece la clase
-              y se te devuelve al plan. Después de ese plazo, la clase se consume.
+              y se te devuelve al plan
+              {topeDevoluciones !== null
+                ? `, hasta ${topeDevoluciones} ${
+                    topeDevoluciones === 1 ? 'vez' : 'veces'
+                  } por plan${
+                    devolucionesRestantes !== null
+                      ? ` (te ${devolucionesRestantes === 1 ? 'queda' : 'quedan'} ${devolucionesRestantes})`
+                      : ''
+                  }`
+                : ''}
+              . Después de ese plazo, o pasadas esas devoluciones, la clase se consume.
             </p>
           )}
         </section>

@@ -284,6 +284,22 @@ export function settingBool(settings: Settings, key: string, fallback = false): 
 }
 
 /**
+ * ¿Ese parámetro ya rige?
+ *
+ * Un número puede estar cargado y todavía no aplicarse: es el patrón que
+ * estrenó `recovery_max` en la 0046 y que usa `cancel_free_max` (0076).
+ * La pantalla tiene que preguntarlo antes de contarle la regla a nadie,
+ * porque el valor existe desde que la migración corre y la regla recién
+ * desde que el estudio la enciende.
+ *
+ * Falso cuando la clave no está: si la migración no corrió, la regla no
+ * rige. Es el default seguro — deja el comportamiento anterior intacto.
+ */
+export function settingRige(meta: StudioSetting[], key: string): boolean {
+  return meta.find((s) => s.key === key)?.rige === true
+}
+
+/**
  * El número de credencial, como se muestra (0067).
  *
  * En la base es un entero; el prefijo y el relleno los pone el estudio
@@ -2003,9 +2019,21 @@ export function suerteDeLaReserva(
     return { conto: false, etiqueta: 'Excepción', detalle: 'Entró por excepción y no se descontó de ningún plan' }
   }
   if (r.status === 'cancelada') {
-    return r.cancelKind === 'fuera de plazo'
-      ? { conto: true, etiqueta: 'Cancelada tarde', detalle: 'Fuera del plazo, así que la clase se perdió' }
-      : { conto: false, etiqueta: 'Cancelada', detalle: 'Cancelaste a tiempo y la clase volvió a tu plan' }
+    // Tres clasificaciones desde la 0076, no dos. La del medio es la que
+    // no existía: avisó a tiempo, pero ya había gastado sus devoluciones
+    // del período. Sin esta rama caía en el `else` y la pantalla le decía
+    // "la clase volvió a tu plan" sobre una clase que se le cobró.
+    if (r.cancelKind === 'fuera de plazo') {
+      return { conto: true, etiqueta: 'Cancelada tarde', detalle: 'Fuera del plazo, así que la clase se perdió' }
+    }
+    if (r.cancelKind === 'en plazo sin cupo') {
+      return {
+        conto: true,
+        etiqueta: 'Cancelada sin devolución',
+        detalle: 'Avisaste a tiempo, pero ya habías usado tus devoluciones de este plan',
+      }
+    }
+    return { conto: false, etiqueta: 'Cancelada', detalle: 'Cancelaste a tiempo y la clase volvió a tu plan' }
   }
   if (r.status === 'asistió') return { conto: true, etiqueta: 'Viniste' }
   if (r.status === 'ausente') {
@@ -2038,6 +2066,11 @@ export function formaDeLaReserva(
   if (r.overrideReason) return { texto: 'Excepción autorizada', tono: 'aviso' }
   if (r.status === 'cancelada' && r.cancelKind === 'fuera de plazo')
     return { texto: 'Fuera de plazo · perdió la clase', tono: 'aviso' }
+  // La tercera de la 0076. El mostrador tiene que poder distinguirla de
+  // la de arriba con la clienta enfrente: acá no llegó tarde, avisó bien
+  // y aun así la perdió — y si reclama, la respuesta es otra.
+  if (r.status === 'cancelada' && r.cancelKind === 'en plazo sin cupo')
+    return { texto: 'En plazo · sin devoluciones, perdió la clase', tono: 'aviso' }
   if (r.status === 'cancelada' && r.cancelKind === 'en plazo')
     return { texto: 'En plazo · se le devolvió', tono: 'neutro' }
   return null
