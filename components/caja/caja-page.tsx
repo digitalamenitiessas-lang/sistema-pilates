@@ -843,17 +843,40 @@ export function CajaPage() {
                         eso el efectivo suele coincidir con el monto y el
                         resto no: la transferencia nunca pasó por el cajón. */}
                     {Object.keys(a.totalesPorMedio).length > 0 && (
-                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
-                        {Object.entries(a.totalesPorMedio)
-                          .sort((x, y) => y[1] - x[1])
-                          .map(([code, monto]) => (
-                            <span key={code} className="text-[11px] text-muted-foreground">
-                              {paymentMethods.find((m) => m.code === code)?.name ?? code}{' '}
-                              <span className="font-semibold text-foreground/70 tabular-nums">
-                                {plata(monto)}
+                      <div className="mt-1.5">
+                        {/* El total primero: es la pregunta ("¿cuánto
+                            entró?") y el desglose es la respuesta larga.
+
+                            "Cobrado en el turno" y no "del día", que sería
+                            falso: la base suma los cobros entre la apertura
+                            y el cierre, y un turno puede abarcar varios días
+                            —el que cerramos venía del 18/09—. Y "cobrado" y
+                            no "entró", porque `totales_por_medio` suma sólo
+                            `payments`: los gastos pagados en el turno no
+                            están acá. */}
+                        <p className="text-[11px] text-foreground">
+                          Cobrado en el turno{' '}
+                          <span className="font-bold tabular-nums">
+                            {plata(Object.values(a.totalesPorMedio).reduce((t, n) => t + n, 0))}
+                          </span>
+                        </p>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                          {Object.entries(a.totalesPorMedio)
+                            .sort((x, y) => y[1] - x[1])
+                            .map(([code, monto]) => (
+                              <span key={code} className="text-[11px] text-muted-foreground">
+                                {/* 'sin_medio' lo arma la propia base cuando
+                                    un cobro no tiene medio cargado. No es un
+                                    code del catálogo, así que se traduce acá. */}
+                                {code === 'sin_medio'
+                                  ? 'Sin medio'
+                                  : paymentMethods.find((m) => m.code === code)?.name ?? code}{' '}
+                                <span className="font-semibold text-foreground/70 tabular-nums">
+                                  {plata(monto)}
+                                </span>
                               </span>
-                            </span>
-                          ))}
+                            ))}
+                        </div>
                       </div>
                     )}
                   </div>
