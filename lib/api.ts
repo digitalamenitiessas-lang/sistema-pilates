@@ -1823,6 +1823,92 @@ function sinTurnosFijos(error: { code?: string } | null): boolean {
   return error?.code === '42P01' || error?.code === 'PGRST205'
 }
 
+/**
+ * Las fechas de esa clase, semana a semana, desde mañana hasta que
+ * termina el período.
+ *
+ * "Desde mañana" y no desde hoy: la clase de hoy ya la acaba de reservar
+ * —es lo que disparó la pregunta— y volver a ofrecerla sería contarla dos
+ * veces. El día de la semana sale de la clase y no de la fecha reservada,
+ * porque es el mismo dato con el que la base valida (`reserva_en_hora`).
+ */
+export function fechasDelTurno(diaDeLaSemana: number, desde: string, hasta: string): string[] {
+  const fechas: string[] = []
+  // `mondayOf` usa la misma convención que `class_sessions.day_of_week`:
+  // 0 es lunes. Mezclarlas corre la grilla un día entero.
+  let f = addDays(mondayOf(desde), diaDeLaSemana)
+  // Si esa semana ya pasó, se arranca en la siguiente.
+  if (f < desde) f = addDays(f, 7)
+  while (f <= hasta) {
+    fechas.push(f)
+    f = addDays(f, 7)
+  }
+  return fechas
+}
+
+/**
+ * El turno fijo que la clienta se da a sí misma (0077).
+ *
+ * Va por función y no escribiendo `fixed_slots`: su política de insert
+ * pide `turnos.asignar`, que es del mostrador. La función valida que la
+ * clase se repita, que tenga membresía vigente y que no lo tenga ya, y
+ * cada rechazo viene con el texto que ella lee.
+ */
+export async function tomarTurnoFijoPropio(classId: string): Promise<string> {
+  const { data, error } = await supabase.rpc('turno_fijo_propio', { p_class: classId })
+  if (error) {
+    if (error.code === 'PGRST202') {
+      throw new Error('Para elegir tu horario fijo falta correr la migración 0077.')
+    }
+    throw errorDeLaBase(error, 'No se pudo tomar el horario fijo')
+  }
+  return data as string
+}
+
+export async function soltarTurnoFijoPropio(slotId: string): Promise<void> {
+  const { error } = await supabase.rpc('soltar_turno_fijo_propio', { p_slot: slotId })
+  if (error) {
+    if (error.code === 'PGRST202') {
+      throw new Error('Para dejar tu horario fijo falta correr la migración 0077.')
+    }
+    throw errorDeLaBase(error, 'No se pudo dejar el horario fijo')
+  }
+}
+
+/**
+ * Reserva las fechas del turno, una por una, y cuenta qué pasó con cada
+ * una.
+ *
+ * De a una y no en lote a propósito: cada fecha pasa por `consumir_clase`
+ * con sus reglas —membresía que cubra ESA fecha, saldo, cupo, disciplina—
+ * y una que no entra no tiene por qué arrastrar a las demás. La semana
+ * que está completa se saltea con su motivo, y la clienta ve qué quedó
+ * reservado y qué no.
+ *
+ * Se corta al primer "sin clases": una vez agotado el plan, las que
+ * siguen van a fallar todas por lo mismo y repetir el mismo error cuatro
+ * veces no le dice nada nuevo.
+ */
+export async function reservarFechasDelTurno(
+  studentId: string,
+  classId: string,
+  fechas: string[]
+): Promise<{ hechas: string[]; fallaron: Array<{ fecha: string; motivo: string }> }> {
+  const hechas: string[] = []
+  const fallaron: Array<{ fecha: string; motivo: string }> = []
+  for (const fecha of fechas) {
+    try {
+      await createReservation(studentId, classId, fecha, 'confirmada')
+      hechas.push(fecha)
+    } catch (err) {
+      const motivo = err instanceof Error ? err.message : 'No se pudo reservar'
+      fallaron.push({ fecha, motivo })
+      if (/clases de su plan|clases del plan/i.test(motivo)) break
+    }
+  }
+  return { hechas, fallaron }
+}
+
 export async function asignarTurnoFijo(studentId: string, classId: string): Promise<void> {
   const { error } = await supabase
     .from('fixed_slots')

@@ -22,7 +22,7 @@ import {
   X,
   XCircle,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, DIAS } from '@/lib/utils'
 import { Sello } from '@/components/layout/logotipo'
 import { supabase } from '@/lib/supabase'
 import { useData, useStudio } from '@/lib/data-context'
@@ -48,6 +48,10 @@ import {
   settingNum,
   settingRige,
   settingText,
+  fechasDelTurno,
+  tomarTurnoFijoPropio,
+  soltarTurnoFijoPropio,
+  reservarFechasDelTurno,
   esOferta,
   ordenDeCobro,
   hoyISO,
@@ -982,9 +986,160 @@ function BarraPestanas({
   )
 }
 
+/**
+ * La hoja que ofrece convertir la reserva recién hecha en horario fijo.
+ *
+ * NÚMEROS, NO PROMESAS. Le dice cuántas fechas le quedan hasta que vence
+ * su período y cuántas clases del plan le consume, porque las dos cosas
+ * pueden no coincidir: un mes de cinco lunes contra un plan de cuatro
+ * clases deja la quinta afuera, y eso tiene que estar dicho ANTES y no
+ * fallar solo en la última semana. Es el primer motivo que la 0048 anotó
+ * para no materializar reservas a ciegas.
+ *
+ * Hoja de la página y no `window.confirm`: el portal ya tuvo que sacar
+ * ese cartel del flujo de cancelar, porque el navegador de Instagram
+ * —por donde entran las clientas— lo descarta solo y el botón parece
+ * muerto.
+ */
+function OfrecerTurnoFijo({
+  clase,
+  fechas,
+  clasesLibres,
+  trabajando,
+  resultado,
+  onCerrar,
+  onAceptar,
+}: {
+  clase: { title: string; time: string; dayOfWeek: number }
+  fechas: string[]
+  clasesLibres: number
+  trabajando: boolean
+  resultado: { hechas: string[]; fallaron: Array<{ fecha: string; motivo: string }> } | null
+  onCerrar: () => void
+  onAceptar: () => void
+}) {
+  // El mismo arreglo que la grilla y que `class_sessions.day_of_week`:
+  // 0 es lunes. Es la convención del proyecto desde la 0001.
+  const dia = DIAS[clase.dayOfWeek]?.toLowerCase() ?? 'ese día'
+  // Lo que la base va a dejar entrar: el plan corta antes que el
+  // calendario cuando no alcanza.
+  const entran = Math.min(fechas.length, clasesLibres)
+  const sobran = fechas.length - entran
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-foreground/20 backdrop-blur-sm"
+      onClick={trabajando ? undefined : onCerrar}
+    >
+      <div
+        className="bg-card rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-sm border border-border max-h-[85vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-5 py-4 border-b border-border">
+          <p className="text-xs text-exito-fuerte font-semibold">¡Reserva confirmada!</p>
+          <h2 className="text-base font-bold text-foreground mt-0.5">
+            ¿Venís todos los {dia} a las {clase.time}?
+          </h2>
+        </div>
+
+        {resultado ? (
+          <div className="px-5 py-4 space-y-2">
+            <p className="text-sm font-semibold text-foreground">
+              {resultado.hechas.length === 0
+                ? 'No se pudo reservar ninguna fecha'
+                : `Te anotamos ${resultado.hechas.length} ${
+                    resultado.hechas.length === 1 ? 'clase más' : 'clases más'
+                  }`}
+            </p>
+            {resultado.hechas.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {resultado.hechas.map((f) => pretty(f)).join(' · ')}
+              </p>
+            )}
+            {/* Lo que no entró, con el motivo de la base. Un lote que
+                falla de a una necesita decir cuál y por qué: el toast de
+                arriba aguanta una reserva, no cuatro. */}
+            {resultado.fallaron.length > 0 && (
+              <div className="rounded-xl bg-aviso-suave px-3 py-2.5 space-y-1">
+                {resultado.fallaron.map((f) => (
+                  <p key={f.fecha} className="text-[11px] text-aviso-fuerte">
+                    <span className="font-semibold">{pretty(f.fecha)}:</span> {f.motivo}
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="px-5 py-4 space-y-3">
+            <p className="text-sm text-foreground">
+              Si lo hacés fijo, te guardamos ese horario y te anotamos las clases que te quedan
+              hasta que vence tu plan.
+            </p>
+            <div className="rounded-xl bg-muted px-4 py-3 space-y-1">
+              <p className="text-sm font-semibold text-foreground">
+                {entran === 0
+                  ? 'No te quedan clases en el plan'
+                  : `${entran} ${entran === 1 ? 'clase más' : 'clases más'}: ${fechas
+                      .slice(0, entran)
+                      .map((f) => pretty(f))
+                      .join(' · ')}`}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {entran > 0 &&
+                  `Te descuenta ${entran} ${entran === 1 ? 'clase' : 'clases'} del plan, y te ${
+                    clasesLibres - entran === 1 ? 'queda' : 'quedan'
+                  } ${clasesLibres - entran} para otros días.`}
+              </p>
+              {/* El mes que no entra en el plan, dicho antes. */}
+              {sobran > 0 && (
+                <p className="text-[11px] text-aviso-fuerte">
+                  {sobran === 1
+                    ? 'Una fecha queda afuera porque no te alcanzan las clases del plan.'
+                    : `${sobran} fechas quedan afuera porque no te alcanzan las clases del plan.`}
+                </p>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              El horario queda tuyo hasta que vence el plan. Cuando renueves, volvés a elegir.
+            </p>
+          </div>
+        )}
+
+        <div className="flex gap-2 px-5 py-4 border-t border-border">
+          {resultado ? (
+            <button
+              onClick={onCerrar}
+              className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
+            >
+              Listo
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={onCerrar}
+                disabled={trabajando}
+                className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-40"
+              >
+                Solo esta vez
+              </button>
+              <button
+                onClick={onAceptar}
+                disabled={trabajando || entran === 0}
+                className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40"
+              >
+                {trabajando ? 'Anotándote…' : 'Hacerlo fijo'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function PortalPage() {
   const { profile, refresh, signOut } = useData()
-  const { students, classes, reservations, payments, disciplines, occurrences, settings, settingsMeta, memberships } =
+  const { students, classes, reservations, payments, disciplines, occurrences, settings, settingsMeta, memberships, turnosFijos } =
     useStudio()
 
   // Con RLS, el cliente solo recibe su propia ficha
@@ -1205,6 +1360,32 @@ export function PortalPage() {
     setTimeout(() => setNotice(null), 3500)
   }
 
+  /**
+   * Mis horarios fijos vivos. RLS ya filtra los míos, pero el portal
+   * igual pregunta por la ficha: `turnosFijos` es del paquete del estudio
+   * y con una sesión de staff traería los de todas.
+   */
+  const misTurnos = turnosFijos.filter((t) => t.studentId === me?.id && t.estado !== 'liberado')
+
+  /**
+   * Hasta dónde se llena: el fin del período que corre hoy.
+   *
+   * Y no `prioridad_hasta`, que suma los días de gracia y el período que
+   * tenga encolado: eso se pasa de lo que la clienta pidió —"el mes que
+   * tiene"— y le reservaría clases de un plan que todavía no empezó.
+   */
+  const finDelPeriodo = ms && ms.status !== 'futura' ? ms.endDate : null
+
+  /**
+   * La clase recién reservada sobre la que se ofrece el horario fijo.
+   *
+   * La pregunta va DESPUÉS de reservar y no antes: reservar hoy es un
+   * toque, y meterle una confirmación adelante se la cobra a todas,
+   * incluida la que sólo quería esa clase. Si cierra la hoja sin elegir,
+   * se queda con la reserva que pidió — no hay nada a medias.
+   */
+  const [ofrecerFijo, setOfrecerFijo] = useState<{ classId: string; date: string } | null>(null)
+
   const book = async (classId: string, date: string, waitlist: boolean) => {
     if (!me) return
     setBusyId(classId)
@@ -1212,10 +1393,73 @@ export function PortalPage() {
       await createReservation(me.id, classId, date, waitlist ? 'lista de espera' : 'confirmada')
       await refresh()
       flash('ok', waitlist ? 'Quedaste en lista de espera' : '¡Reserva confirmada!')
+      // Sólo para las de la grilla: un taller tiene fecha propia y no se
+      // repite (la base lo rechaza igual, 0077). Y no se ofrece dos veces
+      // el mismo horario.
+      const cls = classes.find((c) => c.id === classId)
+      if (
+        !waitlist &&
+        cls &&
+        cls.kind !== 'especial' &&
+        !misTurnos.some((t) => t.classId === classId)
+      ) {
+        setOfrecerFijo({ classId, date })
+      }
     } catch (err) {
       flash('error', err instanceof Error ? err.message : 'No se pudo reservar')
     } finally {
       setBusyId(null)
+    }
+  }
+
+  const [fijando, setFijando] = useState(false)
+  const [soltando, setSoltando] = useState<string | null>(null)
+
+  const soltarFijo = async (slotId: string) => {
+    setSoltando(slotId)
+    try {
+      await soltarTurnoFijoPropio(slotId)
+      await refresh()
+      flash('ok', 'Dejaste ese horario fijo. Las clases que ya reservaste siguen en pie.')
+    } catch (err) {
+      flash('error', err instanceof Error ? err.message : 'No se pudo dejar el horario')
+    } finally {
+      setSoltando(null)
+    }
+  }
+
+  const [resultadoFijo, setResultadoFijo] = useState<{
+    hechas: string[]
+    fallaron: Array<{ fecha: string; motivo: string }>
+  } | null>(null)
+
+  /**
+   * Toma el horario fijo y reserva las fechas que quedan.
+   *
+   * El orden importa: primero el turno —si el cupo fijo de esa clase está
+   * lleno, la base lo rechaza con su mensaje y no se reservó nada— y
+   * después las fechas, de a una. Al revés le dejaría reservas hechas
+   * sobre un horario que nunca fue suyo.
+   */
+  const hacerFijo = async () => {
+    if (!me || !ofrecerFijo) return
+    const cls = classes.find((c) => c.id === ofrecerFijo.classId)
+    if (!cls) return
+    setFijando(true)
+    try {
+      await tomarTurnoFijoPropio(ofrecerFijo.classId)
+      const r = await reservarFechasDelTurno(
+        me.id,
+        ofrecerFijo.classId,
+        fechasDelTurno(cls.dayOfWeek, addDays(ofrecerFijo.date, 1), finDelPeriodo ?? ofrecerFijo.date)
+      )
+      await refresh()
+      setResultadoFijo(r)
+    } catch (err) {
+      flash('error', err instanceof Error ? err.message : 'No se pudo tomar el horario')
+      setOfrecerFijo(null)
+    } finally {
+      setFijando(false)
     }
   }
 
@@ -1366,6 +1610,25 @@ export function PortalPage() {
         />
       )}
 
+      {ofrecerFijo && me && finDelPeriodo && (() => {
+        const cls = classes.find((c) => c.id === ofrecerFijo.classId)
+        if (!cls) return null
+        return (
+          <OfrecerTurnoFijo
+            clase={cls}
+            fechas={fechasDelTurno(cls.dayOfWeek, addDays(ofrecerFijo.date, 1), finDelPeriodo)}
+            clasesLibres={ms ? Math.max(0, ms.classesTotal - ms.classesUsed) : 0}
+            trabajando={fijando}
+            resultado={resultadoFijo}
+            onCerrar={() => {
+              setOfrecerFijo(null)
+              setResultadoFijo(null)
+            }}
+            onAceptar={hacerFijo}
+          />
+        )
+      })()}
+
       {showChangePassword && (
         <ChangePasswordModal
           onClose={() => setShowChangePassword(false)}
@@ -1391,6 +1654,47 @@ export function PortalPage() {
         )}
 
         {pestana === 'inicio' && <MembershipCard student={me} misMembresias={misMembresias} />}
+
+        {/* EL HORARIO FIJO, que hasta acá era invisible.
+            La 0048 le promete por escrito a la clienta que va a leer el
+            motivo si el estudio se lo libera o se lo pausa, y no había
+            dónde: el dato viajaba en el paquete y el portal no lo miraba.
+            Ahora está acá, con el motivo cuando lo hay y con la salida
+            para dejarlo. */}
+        {pestana === 'inicio' &&
+          misTurnos.map((t) => (
+            <section key={t.id} className="bg-card rounded-2xl border border-border p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">Tu horario fijo</p>
+                  <p className="text-sm font-bold text-foreground">
+                    {DIAS[t.dayOfWeek] ?? '—'} a las {t.time}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {t.classTitle}
+                    {finDelPeriodo ? ` · lo conservás hasta el ${pretty(finDelPeriodo)}` : ''}
+                  </p>
+                  {t.estado === 'pausado' && (
+                    <p className="text-[11px] text-aviso-fuerte mt-1.5">
+                      En pausa{t.motivo ? `: ${t.motivo}` : ''}. Lo seguís conservando.
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => soltarFijo(t.id)}
+                  disabled={soltando === t.id}
+                  className="shrink-0 px-3 py-1.5 rounded-lg border border-border text-[11px] font-semibold text-muted-foreground hover:text-destructive-fuerte hover:border-destructive/40 disabled:opacity-40"
+                >
+                  {soltando === t.id ? '…' : 'Dejarlo'}
+                </button>
+              </div>
+              {/* Dejarlo no cancela lo ya reservado: cada clase tiene su
+                  propio plazo, y borrarlas desde acá lo saltearía. */}
+              <p className="text-[10px] text-muted-foreground mt-2">
+                Si lo dejás, las clases que ya tenés reservadas siguen en pie.
+              </p>
+            </section>
+          ))}
 
         {/* El motivo, pegado a la tarjeta. Inicio es lo primero que abre y
             sin esto la clienta ve un rótulo —"Vencida", "Empieza
