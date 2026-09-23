@@ -1139,7 +1139,7 @@ function OfrecerTurnoFijo({
 
 export function PortalPage() {
   const { profile, refresh, signOut } = useData()
-  const { students, classes, reservations, payments, disciplines, occurrences, settings, settingsMeta, memberships, turnosFijos } =
+  const { students, classes, reservations, payments, disciplines, occurrences, settings, settingsMeta, memberships, turnosFijos, plans } =
     useStudio()
 
   // Con RLS, el cliente solo recibe su propia ficha
@@ -1377,6 +1377,20 @@ export function PortalPage() {
   const finDelPeriodo = ms && ms.status !== 'futura' ? ms.endDate : null
 
   /**
+   * Cuántos horarios fijos le tocan, según su plan (0078).
+   *
+   * `weekly_frequency` es el tope y cero significa sin tope — un plan que
+   * no declara su frecuencia no limita nada. Null cuando no hay plan a la
+   * vista: ahí la pantalla no promete ni niega, y la base decide.
+   */
+  const topeDeTurnos = (() => {
+    if (!ms) return null
+    const plan = plans.find((p) => p.id === ms.planId)
+    return plan && plan.weeklyFrequency > 0 ? plan.weeklyFrequency : null
+  })()
+  const llegoAlTope = topeDeTurnos !== null && misTurnos.length >= topeDeTurnos
+
+  /**
    * La clase recién reservada sobre la que se ofrece el horario fijo.
    *
    * La pregunta va DESPUÉS de reservar y no antes: reservar hoy es un
@@ -1397,11 +1411,16 @@ export function PortalPage() {
       // repite (la base lo rechaza igual, 0077). Y no se ofrece dos veces
       // el mismo horario.
       const cls = classes.find((c) => c.id === classId)
+      // Y no se ofrece si ya llegó al tope de su plan (0078): la base lo
+      // va a rechazar con el nombre del plan, y ofrecer algo que va a
+      // fallar es peor que no ofrecerlo. El que ya tiene lo ve en Inicio,
+      // con la salida para dejarlo y tomar otro.
       if (
         !waitlist &&
         cls &&
         cls.kind !== 'especial' &&
-        !misTurnos.some((t) => t.classId === classId)
+        !misTurnos.some((t) => t.classId === classId) &&
+        !llegoAlTope
       ) {
         setOfrecerFijo({ classId, date })
       }
@@ -1692,6 +1711,12 @@ export function PortalPage() {
                   propio plazo, y borrarlas desde acá lo saltearía. */}
               <p className="text-[10px] text-muted-foreground mt-2">
                 Si lo dejás, las clases que ya tenés reservadas siguen en pie.
+                {topeDeTurnos !== null &&
+                  ` Tu plan es de ${topeDeTurnos} ${
+                    topeDeTurnos === 1 ? 'vez' : 'veces'
+                  } por semana, así que podés tener ${topeDeTurnos} ${
+                    topeDeTurnos === 1 ? 'horario fijo' : 'horarios fijos'
+                  }.`}
               </p>
             </section>
           ))}
