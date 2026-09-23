@@ -119,10 +119,36 @@ function ClassCard({ cls, onClick }: { cls: WeekClass; onClick: () => void }) {
             }}
           />
         </div>
-        {/* El conteo es un dato, no un estado: en el color de la
-            disciplina quedaba en 2.7:1. El color ya lo lleva la barra. */}
-        <span className="text-[10px] font-medium text-muted-foreground">
-          {cls.enrolled}/{cls.capacity}
+        {/* CUÁNTAS HAY ANOTADAS, que es lo que se mira de un vistazo.
+            Lo pidió Matías el 23/09: "necesito que esté un poco más
+            visible la cantidad de alumnos que están por clase".
+
+            Estaba en 10px y en gris de texto secundario, del mismo tamaño
+            que la hora y la profesora. Con doce clases por día y seis
+            días a la vista, el dato que se busca al abrir la Agenda
+            quedaba perdido entre los que ya se saben.
+
+            El número de anotadas crece y va en el color del texto; el
+            cupo queda chico y atenuado, porque es el mismo en todas las
+            clases y no aporta a la comparación. Y toma color cuando pasa
+            algo: ámbar cuando está por llenarse, rojo cuando se llenó.
+
+            Lo que NO se hace es pintarlo del color de la disciplina, que
+            es lo que había antes de que alguien lo midiera: sobre el
+            fondo de la tarjeta quedaba en 2.7:1. El color de la
+            disciplina lo lleva la barra, que es decoración. */}
+        <span
+          className={cn(
+            'text-sm font-bold tabular-nums leading-none shrink-0',
+            pct >= 100
+              ? 'text-destructive-fuerte'
+              : pct >= 80
+                ? 'text-aviso-fuerte'
+                : 'text-foreground'
+          )}
+        >
+          {cls.enrolled}
+          <span className="text-[10px] font-medium text-muted-foreground">/{cls.capacity}</span>
         </span>
       </div>
       {cls.waitlist > 0 && (
