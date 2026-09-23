@@ -400,6 +400,18 @@ export function CajaPage() {
   const [sesion, setSesion] = useState<CashSession | null>(null)
   const [dia, setDia] = useState<{ ingresos: number; egresos: number; neto: number } | null>(null)
   const [libro, setLibro] = useState<LedgerEntry[]>([])
+  /**
+   * El libro del día de TODAS las cuentas, que es otra pregunta que la de
+   * `libro` —ése es el cajón y nada más—.
+   *
+   * La pestaña Movimientos mostraba `libro`, o sea exactamente lo mismo
+   * que "Caja de hoy". Con tres cobros del día —uno en efectivo, uno por
+   * transferencia y uno con tarjeta— mostraba UNO y los otros dos no
+   * estaban en ninguna pantalla: el resumen del día del estudio no se
+   * podía ver en ningún lado. Lo encontró Matías el 23/09 registrando
+   * cobros de verdad.
+   */
+  const [libroDelDia, setLibroDelDia] = useState<LedgerEntry[]>([])
   const [arqueos, setArqueos] = useState<CashSession[]>([])
   const [problemas, setProblemas] = useState<CajaProblema[]>([])
   const [cargando, setCargando] = useState(true)
@@ -440,14 +452,52 @@ export function CajaPage() {
 
   // La caja arqueable: es la que se cuenta con la mano.
   const cajaPrincipal = useMemo(() => saldos.find((s) => s.arquea) ?? null, [saldos])
+
+  /**
+   * Lo que se movió hoy, cuenta por cuenta, sobre el libro entero.
+   *
+   * Se arma agrupando el libro y no leyendo una vista nueva: la vista
+   * `caja_dia` existe pero es por cuenta, y pedirla una vez por cuenta
+   * sería una consulta por cada una. Acá los datos ya están.
+   *
+   * Sólo entran las cuentas que tuvieron movimiento: una lista con seis
+   * ceros y un número esconde el número.
+   */
+  const resumenDelDia = useMemo(() => {
+    const por = new Map<string, { accountId: string; name: string; ingresos: number; egresos: number; movimientos: number }>()
+    for (const e of libroDelDia) {
+      const prev = por.get(e.accountId) ?? {
+        accountId: e.accountId,
+        name: saldos.find((c) => c.accountId === e.accountId)?.name ?? 'Sin cuenta',
+        ingresos: 0,
+        egresos: 0,
+        movimientos: 0,
+      }
+      if (e.sentido === 'ingreso') prev.ingresos += e.monto
+      else prev.egresos += e.monto
+      prev.movimientos += 1
+      por.set(e.accountId, prev)
+    }
+    const filas = [...por.values()]
+      .map((f) => ({ ...f, neto: f.ingresos - f.egresos }))
+      .sort((a, b) => b.neto - a.neto)
+    return { filas, neto: filas.reduce((t, f) => t + f.neto, 0) }
+  }, [libroDelDia, saldos])
   const hoy = hoyISO()
 
   const cargar = useCallback(async () => {
     setError(null)
     try {
-      const [b, ctrl] = await Promise.all([fetchBalances(), fetchCajaControl()])
+      const [b, ctrl, todo] = await Promise.all([
+        fetchBalances(),
+        fetchCajaControl(),
+        // Sin `accountId`: el libro entero del día. `fetchLedger` sólo
+        // filtra por cuenta si se la pasan.
+        fetchLedger({ desde: hoy, hasta: hoy }),
+      ])
       setSaldos(b)
       setProblemas(ctrl)
+      setLibroDelDia(todo)
 
       const caja = b.find((x) => x.arquea)
       if (caja) {
@@ -693,19 +743,62 @@ export function CajaPage() {
 
       {/* ── Movimientos ── */}
       {tab === 'movimientos' && (
-        <div className="bg-card rounded-2xl border border-border overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
-            <h3 className="text-sm font-bold text-foreground">Hoy</h3>
-            {puedeOperar && (
-              <button
-                onClick={() => setNuevoMov(true)}
-                className="text-xs font-semibold text-primary-fuerte flex items-center gap-1.5"
-              >
-                <ArrowRightLeft className="w-3.5 h-3.5" /> Nuevo movimiento
-              </button>
-            )}
+        <div className="space-y-4">
+          {/* EL RESUMEN DEL DÍA, que es lo que esta pestaña no daba.
+              "Caja de hoy" contesta cuánto hay en el cajón —y hace bien en
+              mirar sólo el efectivo, porque es lo que se cuenta con la
+              mano—. Lo que faltaba era la otra pregunta: cuánto entró hoy
+              EN TOTAL y por dónde. Se arma sobre el libro entero, así que
+              una cuenta nueva aparece sola. */}
+          {resumenDelDia.filas.length > 0 && (
+            <div className="bg-card rounded-2xl border border-border overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-border">
+                <h3 className="text-sm font-bold text-foreground">Resumen de hoy</h3>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Todo lo que se movió hoy, cuenta por cuenta
+                </p>
+              </div>
+              <div className="divide-y divide-border">
+                {resumenDelDia.filas.map((f) => (
+                  <div key={f.accountId} className="px-5 py-3 flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-foreground truncate">{f.name}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {f.movimientos} {f.movimientos === 1 ? 'movimiento' : 'movimientos'}
+                        {f.egresos > 0 && ` · entró ${plata(f.ingresos)}, salió ${plata(f.egresos)}`}
+                      </p>
+                    </div>
+                    <Monto
+                      n={f.neto}
+                      className={cn(
+                        'text-sm font-semibold shrink-0',
+                        f.neto >= 0 ? 'text-exito-fuerte' : 'text-destructive-fuerte'
+                      )}
+                    />
+                  </div>
+                ))}
+                <div className="px-5 py-3 flex items-center gap-3 bg-muted/40">
+                  <p className="flex-1 text-sm font-bold text-foreground">Total del día</p>
+                  <Monto n={resumenDelDia.neto} className="text-sm font-bold shrink-0" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-card rounded-2xl border border-border overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
+              <h3 className="text-sm font-bold text-foreground">Movimientos de hoy</h3>
+              {puedeOperar && (
+                <button
+                  onClick={() => setNuevoMov(true)}
+                  className="text-xs font-semibold text-primary-fuerte flex items-center gap-1.5"
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5" /> Nuevo movimiento
+                </button>
+              )}
+            </div>
+            <LibroLista entradas={libroDelDia} cuentas={saldos} />
           </div>
-          <LibroLista entradas={libro} />
         </div>
       )}
 
@@ -798,7 +891,19 @@ export function CajaPage() {
   )
 }
 
-function LibroLista({ entradas }: { entradas: LedgerEntry[] }) {
+/**
+ * `cuentas` sólo se pasa cuando la lista mezcla varias: ahí cada renglón
+ * dice a cuál entró la plata. En la de "Caja de hoy" se omite, porque
+ * repetir "Caja del mostrador" en cada línea de una lista que ya es del
+ * mostrador es ruido.
+ */
+function LibroLista({
+  entradas,
+  cuentas,
+}: {
+  entradas: LedgerEntry[]
+  cuentas?: AccountBalance[]
+}) {
   if (entradas.length === 0) {
     return (
       <p className="px-5 py-10 text-center text-sm text-muted-foreground">
@@ -824,6 +929,8 @@ function LibroLista({ entradas }: { entradas: LedgerEntry[] }) {
               {new Date(e.at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
               {e.contraparte && ` · ${e.contraparte}`}
               {e.medio && ` · ${e.medio}`}
+              {cuentas &&
+                ` · ${cuentas.find((c) => c.accountId === e.accountId)?.name ?? 'sin cuenta'}`}
             </p>
           </div>
           <span
