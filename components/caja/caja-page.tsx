@@ -16,7 +16,7 @@ import {
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useData } from '@/lib/data-context'
+import { useData, useStudio } from '@/lib/data-context'
 import { hoyISO } from '@/lib/api'
 import {
   abrirCaja,
@@ -395,6 +395,10 @@ function diasAbierta(fechaISO: string): number | null {
 
 export function CajaPage() {
   const { can, canWrite } = useData()
+  // Para escribir "Efectivo" y no "efectivo": las claves de
+  // `totalesPorMedio` son los `code` del catálogo, que desde la 0074 los
+  // crea el estudio y pueden ser slugs como `debito_macro`.
+  const { paymentMethods } = useStudio()
   const [tab, setTab] = useState<Tab>('caja')
   const [saldos, setSaldos] = useState<AccountBalance[]>([])
   const [sesion, setSesion] = useState<CashSession | null>(null)
@@ -826,6 +830,32 @@ export function CajaPage() {
                         `Cerrada ${new Date(a.closedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`}
                       {a.notas && ` · ${a.notas}`}
                     </p>
+
+                    {/* EL DESGLOSE POR MEDIO.
+                        La base lo venía guardando desde la 0020 —el cierre
+                        calcula `totales_por_medio` y lo sella en la fila— y
+                        no se mostraba en ninguna pantalla. Era el resumen
+                        del día ya escrito y nadie podía leerlo.
+
+                        Va acá y no en el cajón: el número grande de la
+                        derecha es lo que se contó con la mano, y esto es
+                        TODO lo que entró en el turno, por dónde entró. Por
+                        eso el efectivo suele coincidir con el monto y el
+                        resto no: la transferencia nunca pasó por el cajón. */}
+                    {Object.keys(a.totalesPorMedio).length > 0 && (
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+                        {Object.entries(a.totalesPorMedio)
+                          .sort((x, y) => y[1] - x[1])
+                          .map(([code, monto]) => (
+                            <span key={code} className="text-[11px] text-muted-foreground">
+                              {paymentMethods.find((m) => m.code === code)?.name ?? code}{' '}
+                              <span className="font-semibold text-foreground/70 tabular-nums">
+                                {plata(monto)}
+                              </span>
+                            </span>
+                          ))}
+                      </div>
+                    )}
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-semibold text-foreground tabular-nums">
