@@ -49,6 +49,7 @@ import {
   settingText,
   esOferta,
   ordenDeCobro,
+  hoyISO,
 } from '@/lib/api'
 import type { Discipline, Membership, Reservation, Student } from '@/lib/types'
 
@@ -156,7 +157,13 @@ function ChangePasswordModal({ onClose, onDone }: { onClose: () => void; onDone:
   )
 }
 
-function MembershipCard({ student }: { student: Student }) {
+function MembershipCard({
+  student,
+  misMembresias,
+}: {
+  student: Student
+  misMembresias: Membership[]
+}) {
   const ms = student.membership
   if (!ms) {
     return (
@@ -172,6 +179,18 @@ function MembershipCard({ student }: { student: Student }) {
 
   const left = ms.classesTotal - ms.classesUsed
   const pct = Math.min(100, Math.round((ms.classesUsed / ms.classesTotal) * 100))
+  /** Los demás períodos que todavía valen: los que cubren hoy y los que
+   *  arrancan después. No los vencidos — eso es historia, no saldo. */
+  const hoy = hoyISO()
+  const otros = misMembresias
+    .filter(
+      (m) =>
+        m.id !== ms.id &&
+        m.status !== 'cancelada' &&
+        m.status !== 'suspendida' &&
+        m.endDate >= hoy
+    )
+    .sort((a, b) => a.endDate.localeCompare(b.endDate))
   const statusCfg =
     ms.status === 'activa'
       ? { label: 'Activa', class: 'bg-exito-suave text-exito-fuerte' }
@@ -237,6 +256,36 @@ function MembershipCard({ student }: { student: Student }) {
           ? `Arranca ${enDias(ms.startDate)}`
           : `Activa desde el ${pretty(ms.startDate)} · ${cuentaDeDias(ms.endDate)}`}
       </p>
+
+      {/* LOS OTROS PERÍODOS.
+          La tarjeta muestra UNO —el que le paga la próxima clase— y hasta
+          acá los demás eran invisibles. Con la clase de prueba eso pasa
+          siempre: la clienta entra con FE FIRST, la usa, compra un plan, y
+          de un momento a otro la tarjeta cambia de nombre y de número sin
+          que nada explique qué pasó. Matías lo probó así el 23/09 y su
+          pregunta fue exactamente ésa: "ya usé la clase gratis, entonces no
+          entiendo si reservo o no".
+          Se listan los que cubren hoy o arrancan después; los vencidos no,
+          que para eso está el historial de Mis clases. */}
+      {otros.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-border space-y-1">
+          {otros.map((o) => {
+            const quedan = o.classesTotal - o.classesUsed
+            return (
+              <p key={o.id} className="text-[11px] text-muted-foreground flex items-baseline gap-1.5">
+                <span className="font-semibold text-foreground/70">{o.planName}</span>
+                <span>
+                  {o.status === 'futura'
+                    ? `arranca el ${pretty(o.startDate)}`
+                    : quedan === 0
+                    ? `ya la usaste · vale hasta el ${pretty(o.endDate)}`
+                    : `te ${quedan === 1 ? 'queda' : 'quedan'} ${quedan} · hasta el ${pretty(o.endDate)}`}
+                </span>
+              </p>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -1305,7 +1354,7 @@ export function PortalPage() {
           </div>
         )}
 
-        {pestana === 'inicio' && <MembershipCard student={me} />}
+        {pestana === 'inicio' && <MembershipCard student={me} misMembresias={misMembresias} />}
 
         {/* El motivo, pegado a la tarjeta. Inicio es lo primero que abre y
             sin esto la clienta ve un rótulo —"Vencida", "Empieza
@@ -1411,10 +1460,25 @@ export function PortalPage() {
               <div key={p.id} className="flex items-center justify-between gap-2 py-1.5">
                 <div className="min-w-0">
                   <p className="text-xs font-semibold text-aviso-fuerte truncate">{p.planName}</p>
+                  {/* "Pagala hasta el" y no "Vence", que es la palabra que
+                      esta misma pantalla usa cinco líneas más arriba para la
+                      MEMBRESÍA. Dos "vence" con dos significados distintos a
+                      la vista al mismo tiempo: arriba el 22/10 —hasta cuándo
+                      puede entrenar— y acá el 28/09 —hasta cuándo tiene para
+                      pagar—. Matías lo leyó como la fecha de la membresía y
+                      creyó que el plan le duraba una semana; una clienta lo
+                      va a leer igual. El plazo sale de `payment_grace_days`,
+                      así que la distancia entre las dos fechas la elige el
+                      estudio y puede ser cualquiera.
+
+                      Las ofertas de renovación de más abajo ya decían "hasta
+                      el X": esto las alcanza, no inventa una redacción. */}
                   <p className="text-[10px] text-aviso-fuerte">
                     {empiezaDespues && periodo
-                      ? `Del período que empieza el ${pretty(periodo.startDate)} · vence ${pretty(p.dueDate)}`
-                      : `Vence ${pretty(p.dueDate)}`}
+                      ? `Del período que empieza el ${pretty(periodo.startDate)} · pagala hasta el ${pretty(p.dueDate)}`
+                      : p.dueDate >= today
+                      ? `Pagala hasta el ${pretty(p.dueDate)}`
+                      : `El plazo venció el ${pretty(p.dueDate)}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -1733,7 +1797,9 @@ export function PortalPage() {
                         ? p.dueDate >= today
                           ? `Renovación · hasta el ${pretty(p.dueDate)}`
                           : `Renovación · el plazo venció el ${pretty(p.dueDate)}`
-                        : `Vence ${pretty(p.dueDate)}`}
+                        : p.dueDate >= today
+                        ? `Pagala hasta el ${pretty(p.dueDate)}`
+                        : `El plazo venció el ${pretty(p.dueDate)}`}
                     </p>
                   </div>
                   <p
