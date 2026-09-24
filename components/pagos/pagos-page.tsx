@@ -189,7 +189,12 @@ function mediosParaCobrar(medios: PaymentMethod[]): PaymentMethod[] {
     .sort((a, b) => a.sortOrder - b.sortOrder)
 }
 
-function MethodPicker({ value, onChange }: { value: Method | null; onChange: (m: Method) => void }) {
+/**
+ * Exportado para el alta: cobrar dentro del alta no puede significar una
+ * segunda lista de medios de pago. Es el mismo catálogo, con el mismo
+ * cartel cuando no hay ninguno.
+ */
+export function MethodPicker({ value, onChange }: { value: Method | null; onChange: (m: Method) => void }) {
   const { data } = useData()
   const medios = mediosParaCobrar(data?.paymentMethods ?? [])
 

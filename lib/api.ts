@@ -1276,7 +1276,10 @@ export async function createStudent(
   input: NewStudentInput,
   plans: Plan[],
   settings: Settings = {}
-): Promise<string> {
+  // Devuelve también la cuota, para que el alta pueda cobrarla en el acto
+  // (pedido del estudio del 17/09). `paymentId` es null si no se asignó
+  // plan o si el plan es gratuito.
+): Promise<{ id: string; paymentId: string | null }> {
   const { data: student, error } = await supabase
     .from('students')
     .insert({
@@ -1300,11 +1303,12 @@ export async function createStudent(
     medicacion: input.medicacion || undefined,
   })
 
+  let paymentId: string | null = null
   if (input.planId) {
-    await assignMembership(student.id, input.planId, plans, settings, input.planDesde)
+    paymentId = await assignMembership(student.id, input.planId, plans, settings, input.planDesde)
   }
 
-  return student.id as string
+  return { id: student.id as string, paymentId }
 }
 
 export async function updateStudent(id: string, input: Omit<NewStudentInput, 'planId'>): Promise<void> {
@@ -1459,7 +1463,10 @@ export async function assignMembership(
    * ENCOLA y esta fecha se ignora. La pantalla lo dice antes de guardar.
    */
   desde?: string
-): Promise<void> {
+  // Devuelve el id de la cuota que quedó pendiente, o null si el plan es
+  // gratuito. Antes no devolvía nada y el alta no tenía cómo cobrarla sin
+  // salir a buscarla: el que la crea es el único que sabe cuál es.
+): Promise<string | null> {
   const plan = plans.find((p) => p.id === planId)
   if (!plan) throw new Error('Plan inexistente')
 
@@ -1499,7 +1506,7 @@ export async function assignMembership(
     // con fecha, se cae a hoy, que es el arranque que se pidió.
     const inicio: string = membership?.start_date ?? start
     const desde = inicio > start ? inicio : start
-    const { error: payError } = await supabase.from('payments').insert({
+    const { data: cuota, error: payError } = await supabase.from('payments').insert({
       student_id: studentId,
       membership_id: membership.id,
       concept: plan.name,
@@ -1509,9 +1516,11 @@ export async function assignMembership(
       // estudio lo cambiaba y la cuota seguía venciendo a los cinco días.
       due_date: addDays(desde, settingNum(settings, 'payment_grace_days', PAYMENT_GRACE_DAYS)),
       status: 'pendiente',
-    })
+    }).select('id').single()
     if (payError) throw payError
+    return (cuota?.id as string) ?? null
   }
+  return null
 }
 
 export interface NewPaymentInput {

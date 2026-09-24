@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { X, Loader2, Smartphone } from 'lucide-react'
 import { useData } from '@/lib/data-context'
-import { createStudent, createSystemUser, hoyISO, updateStudent, vigenciaHasta } from '@/lib/api'
+import { createStudent, createSystemUser, hoyISO, updateStudent, vigenciaHasta, cobrarCuota } from '@/lib/api'
+import { MethodPicker } from '@/components/pagos/pagos-page'
 import type { Student } from '@/lib/types'
 
 interface AlumnoFormModalProps {
@@ -12,7 +13,7 @@ interface AlumnoFormModalProps {
 }
 
 export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
-  const { data, refresh } = useData()
+  const { data, refresh, can } = useData()
   const plans = data?.plans ?? []
   const settings = data?.settings ?? {}
 
@@ -50,6 +51,17 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
    * portal. Se apaga para quien no tiene mail o no lo quiere.
    */
   const [conAcceso, setConAcceso] = useState(true)
+  /**
+   * Con qué paga, si paga acá (pedido del estudio del 17/09: "ponemos si
+   * paga ahí y cómo paga para que se acredite"). Null = no paga ahora y
+   * la cuota queda pendiente en Pagos, que es como funcionaba hasta hoy.
+   *
+   * Apagado por defecto a propósito: el alta tiene que poder terminar sin
+   * plata de por medio —alguien que se anota y paga mañana— y el camino
+   * de siempre no puede volverse el excepcional.
+   */
+  const [metodo, setMetodo] = useState<string | null>(null)
+  const [cupon, setCupon] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
@@ -89,11 +101,36 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
         return
       }
 
-      const studentId = await createStudent(
+      const { id: studentId, paymentId } = await createStudent(
         { ...input, planId: planId || undefined, planDesde: planId ? planDesde : undefined },
         plans,
         settings
       )
+
+      // EL COBRO VA APARTE Y DESPUÉS, igual que el acceso y por el mismo
+      // motivo: la ficha, la membresía y la cuota ya están guardadas. Si el
+      // cobro falla —no tiene permiso, la promo se agotó, la base rechaza—
+      // no se pierde el alta: queda la cuota pendiente, que es exactamente
+      // el estado que tenía este formulario hasta hoy.
+      let cobro: string | null = null
+      if (metodo && paymentId) {
+        try {
+          const r = await cobrarCuota(paymentId, metodo, cupon.trim() || null)
+          cobro =
+            `Cobrado: $${r.cobrado.toLocaleString('es-AR')}` +
+            (r.promo ? ` con "${r.promo}"` : '') +
+            ` · comprobante N° ${String(r.comprobante).padStart(8, '0')}.`
+        } catch (err) {
+          await refresh()
+          setAviso(
+            `El cliente y su plan se crearon bien, pero el cobro no salió: ${
+              err instanceof Error ? err.message : 'error desconocido'
+            } La cuota quedó pendiente en Pagos y se puede cobrar desde ahí.`
+          )
+          setSaving(false)
+          return
+        }
+      }
 
       // El acceso va después y aparte: si falla, la ficha ya está guardada
       // —con su plan y su cuota— y lo único que queda pendiente es el
@@ -113,7 +150,7 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
             // que ir a Vercel, a Resend o a corregir la ficha. Antes este
             // cartel decía sólo "no se pudo enviar" y había que adivinar.
             setAviso(
-              `Cliente creado y acceso creado, pero el mail no salió. ${r.mailMotivo ?? ''}` +
+              `Cliente creado y acceso creado, pero el mail no salió. ${cobro ? `${cobro} ` : ''}${r.mailMotivo ?? ''}` +
                 ` Mientras tanto pasale el acceso a mano: entra con ${email.trim()} y su documento, y al entrar le vamos a pedir que la cambie. También podés reintentar el mail desde su ficha.`
             )
             setSaving(false)
@@ -132,6 +169,14 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
       }
 
       await refresh()
+      // Con cobro no se cierra solo: el número de comprobante es lo único
+      // que la pantalla no vuelve a mostrar sin ir a buscarlo, y es lo que
+      // el mostrador le dice a la clienta que tiene enfrente.
+      if (cobro) {
+        setAviso(`Cliente creado. ${cobro}`)
+        setSaving(false)
+        return
+      }
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo guardar el cliente')
@@ -265,8 +310,79 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
                       ? `Vigente del ${fechaCorta(planDesde)} al ${fechaCorta(vigenciaHasta(planDesde, planElegido))} — el último día se usa.`
                       : 'Se crea la membresía desde ese día.'}{' '}
                     {planDesde > hoyISO() && 'Hasta esa fecha no va a poder reservar. '}
-                    La deuda queda generada en Pagos (si el plan no es gratuito).
+                    {metodo
+                      ? 'Se cobra ahora y queda el comprobante.'
+                      : 'La deuda queda generada en Pagos (si el plan no es gratuito).'}
                   </p>
+
+                  {/* PAGA ACÁ O QUEDA LA DEUDA.
+                      Lo pidió el estudio el 17/09: "cuando creamos el
+                      cliente, tomamos esos datos, el plan que elige y
+                      ponemos si paga ahí y cómo paga para que se acredite".
+                      Hasta hoy el alta dejaba la cuota pendiente y cobrarla
+                      era ir a otra pantalla — doce veces en la primera
+                      semana.
+
+                      Sólo con plan pago, y sólo a quien la base le va a
+                      dejar cobrar: `cobrar_cuota()` exige
+                      `pagos.registrar`, así que ofrecérselo a recepción sin
+                      esa clave sería ofrecer una acción que va a fallar. */}
+                  {planElegido && planElegido.price > 0 && can('pagos.registrar') && (
+                    <div className="rounded-xl border border-border px-3.5 py-3 mt-3 space-y-3">
+                      <label className="flex items-start gap-2.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={metodo !== null}
+                          onChange={(e) => {
+                            setMetodo(e.target.checked ? '' : null)
+                            if (!e.target.checked) setCupon('')
+                          }}
+                          className="mt-0.5"
+                        />
+                        <span className="text-xs text-foreground font-semibold">
+                          Paga ahora
+                          <span className="block font-normal text-[11px] text-muted-foreground">
+                            Sin tildar, la cuota de ${planElegido.price.toLocaleString('es-AR')}{' '}
+                            queda pendiente en Pagos, como hasta hoy.
+                          </span>
+                        </span>
+                      </label>
+
+                      {metodo !== null && (
+                        <>
+                          <div>
+                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+                              Con qué paga
+                            </p>
+                            <MethodPicker
+                              value={metodo || null}
+                              onChange={(m) => setMetodo(m)}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelClass}>Cupón (opcional)</label>
+                            <input
+                              value={cupon}
+                              onChange={(e) => setCupon(e.target.value)}
+                              placeholder="Si trae un código"
+                              className={`${inputClass} uppercase placeholder:normal-case`}
+                            />
+                          </div>
+                          {/* El monto NO se anticipa acá. En el modal de
+                              cobro sí, porque se conoce la cuota; acá
+                              todavía no existe, y un número calculado en
+                              pantalla que después la base corrige es peor
+                              que no mostrar ninguno. El cobrado se dice
+                              cuando vuelve, con su comprobante. */}
+                          <p className="text-[11px] text-muted-foreground">
+                            El monto lo calcula la base al cobrar: puede diferir del precio de
+                            lista por el medio de pago o por una promoción vigente. Te lo decimos
+                            con el comprobante.
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
             </div>
