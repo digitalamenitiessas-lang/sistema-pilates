@@ -1896,6 +1896,28 @@ $72.250 y lo dijo con todas las letras. La base guardó `amount` 72.250,
 del mail volvió 200. Todo revertido después: el pago, sus satélites y la
 promo borrados, contando las filas que volvieron.
 
+### ✅ Las reglas se encienden desde el sistema (24/09) — `0081` **corrida y verificada**
+
+Prender el tope de devoluciones obligó a entrar al SQL Editor: la
+pantalla avisaba que no regía y no tenía con qué prenderlo.
+
+Lo interesante apareció al ir a hacerlo. El plan —un botón al lado de
+cada "Todavía no rige"— habría sido peor que nada: de los seis
+parámetros apagados, **cinco no los lee nadie**. `freeze_max_days`,
+`waitlist_offer_minutes`, `debt_reminder_days` y los dos de adjuntos de
+gastos aparecen sólo en su propia alta y en la lista de la `0024`. Un
+botón junto a "Congelamiento máximo" habría dicho que congelar
+membresías funciona, y no existe.
+
+Porque `rige` tapaba dos cosas: *el código todavía no lo lee* —un hecho
+nuestro— y *el código lo respeta y el estudio decide*. `encendible` marca
+las segundas, que son las únicas con interruptor. Prender va en un paso;
+apagar en dos, porque deja de aplicarse en el momento y nadie lo ve.
+
+Verificado por la pantalla sobre `recovery_max`, que vale 0 y por eso
+prenderla un rato no le cambia nada a nadie: encendida, la base pasó a
+`rige = true`; apagada con su confirmación, volvió. Terminó como empezó.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.

@@ -8,7 +8,7 @@
 > **¿Buscás qué falta? Está en la §0, acá abajo.** Es la única lista al día; el
 > resto del documento es el análisis y la historia.
 
-## 0. LO QUE FALTA — la lista viva  ·  al 23/09/2026
+## 0. LO QUE FALTA — la lista viva  ·  al 24/09/2026
 
 > **Esta es la única lista al día.** Las secciones de abajo son el análisis y la
 > historia de cómo se llegó acá, y varias quedaron viejas a propósito: son la
@@ -96,6 +96,21 @@ clienta más una del mostrador:
   topes de uso eso no se puede hacer cumplir. Y el anuncio por mail a las
   clientas activas **es un botón, no un efecto de crearla**: un mail al
   padrón entero no se deshace.
+
+El **24/09** entró la `0081`, que es chica y salió de un tropiezo. Para
+prender el tope de devoluciones hubo que entrar al SQL Editor: la
+pantalla decía "Todavía no rige" y no tenía con qué prenderlo. Al ir a
+poner el botón apareció que ponerlo en todos habría sido peor —cinco de
+los seis parámetros apagados **no los lee nadie**—, así que `rige` se
+partió en dos: `encendible` marca los que el código ya honra y cuya
+vigencia decide el estudio. Hoy son dos; los otros cinco pasan a avisar
+que la regla no está construida.
+
+**Y quedó rigiendo el tope de dos devoluciones por período**
+(`cancel_free_max`), prendido el 24/09 desde la base. Cancelar con más de
+tres horas devuelve la clase hasta dos veces por mes; de ahí en más se
+pierde. No tuvo efecto retroactivo: no había ninguna cancelación en plazo
+viva cuando se prendió.
 
 ### Lo que falta construir
 
