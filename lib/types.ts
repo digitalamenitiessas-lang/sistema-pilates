@@ -539,6 +539,13 @@ export type NotificationType =
   | 'clase_suspendida'
   | 'clase_cambio_profesora'
   | 'lugar_liberado'
+  /**
+   * El estudio anunció una promoción (0080). Lo manda el botón de
+   * Configuración y no un trigger: un mail al padrón entero no se
+   * deshace, y una promo recién cargada se corrige dos o tres veces
+   * antes de quedar como va.
+   */
+  | 'promocion'
 
 /**
  * Una entrada de la bitácora del cliente (0050). No se edita: si algo
