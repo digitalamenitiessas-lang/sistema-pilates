@@ -1044,6 +1044,8 @@ export async function fetchStudioData(): Promise<StudioData> {
       planName: p.concept,
       amount: Number(p.amount),
       date: p.paid_date ?? '',
+      paidAt: p.paid_at ?? null,
+      createdAt: p.created_at ?? undefined,
       dueDate: p.due_date,
       status: derivePaymentStatus(p.status, p.due_date, renueva),
       method: p.method ?? undefined,

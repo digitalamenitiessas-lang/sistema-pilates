@@ -990,6 +990,35 @@ export function PagosPage() {
   const pendientes = PAYMENTS.filter((p) => p.status === 'pendiente' && !esOferta(p))
   const montoOfertas = ofertas.reduce((a, p) => a + p.amount, 0)
 
+  // EL ORDEN DE LA LISTA.
+  //
+  // Hasta hoy era el de la consulta —`due_date` descendente— y por eso
+  // arriba de todo aparecía una cuota ANULADA del 17/09: vencía en
+  // octubre, y el vencimiento dice cuándo hay que pagar algo, no cuándo
+  // pasó algo. Los dos cobros reales del día quedaban 2° y 5°, separados
+  // por anuladas.
+  //
+  // Y son dos preguntas distintas según qué esté mirando quien filtra:
+  //
+  //   · Todos / Pagado / Anulado -> "¿qué pasó recién?". Lo último arriba.
+  //   · Pendiente / Vencido / Renovación -> "¿a quién hay que ir a
+  //     buscar?". Lo más urgente arriba, que es lo más viejo.
+  //
+  // Un orden único deja siempre una de las dos mal: por fecha de cobro,
+  // las pendientes —que no tienen— caen todas juntas al fondo; por
+  // vencimiento descendente, la deuda más atrasada queda última, que es
+  // exactamente la que hay que reclamar primero. Por eso el orden lo
+  // decide el filtro, y la pantalla lo dice en voz alta debajo: un orden
+  // que cambia solo y no se anuncia se lee como desorden, que es el
+  // problema que esto viene a resolver.
+  const porUrgencia =
+    filterStatus === 'pendiente' || filterStatus === 'vencido' || filterStatus === 'renovacion'
+
+  // Qué fecha representa a cada fila cuando la pregunta es "qué pasó".
+  // El instante y no el día: dos cobros del mismo día son indistinguibles
+  // por el día, y ahí volvía el desorden en chiquito.
+  const cuandoPaso = (p: Payment) => p.paidAt ?? p.createdAt ?? p.dueDate
+
   const filtered = PAYMENTS.filter((p) => {
     const matchSearch =
       search === '' || p.studentName.toLowerCase().includes(search.toLowerCase())
@@ -1002,6 +1031,33 @@ export function PagosPage() {
         ? p.status === 'pendiente' && !esOferta(p)
         : p.status === filterStatus
     return matchSearch && matchStatus
+  })
+  // Copia antes de ordenar: `filter` ya devuelve una nueva, pero dejarlo
+  // dicho evita que mañana alguien ordene PAYMENTS en su lugar y le mueva
+  // la lista a las otras pantallas que derivan del mismo paquete.
+  const ordenados = [...filtered].sort((a, b) => {
+    if (porUrgencia) {
+      // Ascendente: la que vence antes va arriba.
+      return a.dueDate.localeCompare(b.dueDate) || a.studentName.localeCompare(b.studentName)
+    }
+    return (
+      cuandoPaso(b).localeCompare(cuandoPaso(a)) ||
+      // EL EMPATE NO ES UN CASO RARO, ES EL NORMAL.
+      //
+      // `created_at` sale de now(), que en Postgres es el instante de la
+      // TRANSACCIÓN: un insert de varias filas les pone a todas el mismo
+      // valor, hasta el microsegundo. Y el proceso diario emite las cuotas
+      // de renovación exactamente así, en tanda — así que el día que
+      // renueven ocho clientas, esas ocho empatan.
+      //
+      // Sin desempate, `sort` es estable y las deja en el orden en que
+      // vinieron de la consulta, que es el desorden que esto vino a
+      // arreglar. Dentro de la misma tanda manda lo que vence antes, y a
+      // igual vencimiento el nombre: alfabético es lo único que sirve
+      // cuando alguien busca a una persona en la lista.
+      a.dueDate.localeCompare(b.dueDate) ||
+      a.studentName.localeCompare(b.studentName)
+    )
   })
 
   const totalPaid = PAYMENTS.filter((p) => p.status === 'pagado').reduce((a, p) => a + p.amount, 0)
@@ -1160,6 +1216,13 @@ export function PagosPage() {
           ))}
         </div>
 
+        {/* El orden cambia con el filtro, así que se dice. Sin esto, pasar
+            de "Todos" a "Vencido" y ver la lista al revés se lee como que
+            la pantalla hace cualquier cosa. */}
+        <span className="text-[11px] text-muted-foreground w-full sm:w-auto order-last sm:order-none">
+          {porUrgencia ? 'Lo que vence antes, arriba' : 'Lo último que pasó, arriba'}
+        </span>
+
         {canWrite && (
           <button
             onClick={() => setShowRegistrar(true)}
@@ -1211,14 +1274,14 @@ export function PagosPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filtered.length === 0 ? (
+                  {ordenados.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="text-center py-12 text-muted-foreground text-sm">
                         No se encontraron pagos
                       </td>
                     </tr>
                   ) : (
-                    filtered.map((p) => {
+                    ordenados.map((p) => {
                       const MethodIcon = iconoDeMedio(p.method)
                       return (
                         <tr key={p.id} className="hover:bg-muted/30 transition-colors">

@@ -469,7 +469,16 @@ export interface Payment {
   membershipId: string
   planName: string
   amount: number
+  /** El DÍA del cobro, para mostrar. Vacío si no se cobró. */
   date: string
+  /**
+   * El INSTANTE del cobro. Distinto de `date` y por eso existe: dos cobros
+   * del mismo día son indistinguibles por el día, y la lista de Pagos los
+   * mostraba en el orden que quisiera la base. Nulo si no se cobró.
+   */
+  paidAt?: string | null
+  /** Cuándo nació la cuota. El único orden posible para una que no se cobró. */
+  createdAt?: string
   dueDate: string
   status: PaymentStatus
   /**
