@@ -24,6 +24,7 @@ import type {
   UserPermission,
   FixedSlot,
   StudentNote,
+  Promocion,
 } from './types'
 
 // ---------------------------------------------------------------
@@ -269,6 +270,32 @@ export function precioConAjuste(
     case 'ninguno':     return Math.round(bruto * 100) / 100
     // 'cincuenta' es el default y el que deja intacta la lista de precios
     // publicada: sus doce valores son múltiplos de 50.
+    default:            return Math.round(bruto / 50) * 50
+  }
+}
+
+/**
+ * El precio con una promoción aplicada.
+ *
+ * Espeja a `cobrar_cuota()` (0079) para que el número que la pantalla
+ * anticipa sea el que la base va a cobrar. Quien manda es la base —el
+ * monto se escribe allá— y esto es solo la vista previa: si algún día
+ * divergen, gana la base y el comprobante muestra lo que cobró.
+ *
+ * El tope en cero es el mismo que el de allá: un monto fijo más grande
+ * que la cuota no puede dejar una deuda negativa.
+ */
+export function precioConPromo(
+  base: number,
+  tipo: 'porcentaje' | 'monto',
+  valor: number,
+  redondeo: string = 'cincuenta'
+): number {
+  const bruto = Math.max(0, tipo === 'porcentaje' ? base * (1 - valor / 100) : base - valor)
+  switch (redondeo) {
+    case 'cien':        return Math.round(bruto / 100) * 100
+    case 'cien_arriba': return Math.ceil(bruto / 100) * 100
+    case 'ninguno':     return Math.round(bruto * 100) / 100
     default:            return Math.round(bruto / 50) * 50
   }
 }
@@ -716,6 +743,7 @@ export async function fetchStudioData(): Promise<StudioData> {
       // ?? true: si la 0024 no corrió, la columna no viene y todo rige,
       // que es exactamente lo que pasaba antes de que existiera la marca.
       rige: r.rige ?? true,
+      encendible: r.encendible ?? false,
     }))
     settings = Object.fromEntries(settingsMeta.map((r) => [r.key, r.value]))
   } catch {
@@ -1016,6 +1044,8 @@ export async function fetchStudioData(): Promise<StudioData> {
       planName: p.concept,
       amount: Number(p.amount),
       date: p.paid_date ?? '',
+      paidAt: p.paid_at ?? null,
+      createdAt: p.created_at ?? undefined,
       dueDate: p.due_date,
       status: derivePaymentStatus(p.status, p.due_date, renueva),
       method: p.method ?? undefined,
@@ -1246,7 +1276,10 @@ export async function createStudent(
   input: NewStudentInput,
   plans: Plan[],
   settings: Settings = {}
-): Promise<string> {
+  // Devuelve también la cuota, para que el alta pueda cobrarla en el acto
+  // (pedido del estudio del 17/09). `paymentId` es null si no se asignó
+  // plan o si el plan es gratuito.
+): Promise<{ id: string; paymentId: string | null }> {
   const { data: student, error } = await supabase
     .from('students')
     .insert({
@@ -1270,11 +1303,12 @@ export async function createStudent(
     medicacion: input.medicacion || undefined,
   })
 
+  let paymentId: string | null = null
   if (input.planId) {
-    await assignMembership(student.id, input.planId, plans, settings, input.planDesde)
+    paymentId = await assignMembership(student.id, input.planId, plans, settings, input.planDesde)
   }
 
-  return student.id as string
+  return { id: student.id as string, paymentId }
 }
 
 export async function updateStudent(id: string, input: Omit<NewStudentInput, 'planId'>): Promise<void> {
@@ -1429,7 +1463,10 @@ export async function assignMembership(
    * ENCOLA y esta fecha se ignora. La pantalla lo dice antes de guardar.
    */
   desde?: string
-): Promise<void> {
+  // Devuelve el id de la cuota que quedó pendiente, o null si el plan es
+  // gratuito. Antes no devolvía nada y el alta no tenía cómo cobrarla sin
+  // salir a buscarla: el que la crea es el único que sabe cuál es.
+): Promise<string | null> {
   const plan = plans.find((p) => p.id === planId)
   if (!plan) throw new Error('Plan inexistente')
 
@@ -1469,7 +1506,7 @@ export async function assignMembership(
     // con fecha, se cae a hoy, que es el arranque que se pidió.
     const inicio: string = membership?.start_date ?? start
     const desde = inicio > start ? inicio : start
-    const { error: payError } = await supabase.from('payments').insert({
+    const { data: cuota, error: payError } = await supabase.from('payments').insert({
       student_id: studentId,
       membership_id: membership.id,
       concept: plan.name,
@@ -1479,9 +1516,11 @@ export async function assignMembership(
       // estudio lo cambiaba y la cuota seguía venciendo a los cinco días.
       due_date: addDays(desde, settingNum(settings, 'payment_grace_days', PAYMENT_GRACE_DAYS)),
       status: 'pendiente',
-    })
+    }).select('id').single()
     if (payError) throw payError
+    return (cuota?.id as string) ?? null
   }
+  return null
 }
 
 export interface NewPaymentInput {
@@ -1806,6 +1845,226 @@ export async function deleteStudentNote(id: string): Promise<void> {
   if (!data || data.length === 0) {
     throw new Error('No tenés permiso para borrar notas de la bitácora.')
   }
+}
+
+// ---------------------------------------------------------------
+// Promociones (0079)
+//
+// El monto final NO se calcula acá: lo resuelve `cobrar_cuota()` en la
+// base. Estas funciones son el catálogo —crear, editar, encender— y la
+// consulta de qué promo le sirve a una cuota, que es la misma que usa la
+// base para validar. Una sola definición de "aplica".
+// ---------------------------------------------------------------
+
+export interface PromocionInput {
+  nombre: string
+  tipo: 'porcentaje' | 'monto'
+  valor: number
+  ventana: 'siempre' | 'fechas' | 'dias_mes'
+  desde?: string | null
+  hasta?: string | null
+  diaDesde?: number | null
+  diaHasta?: number | null
+  /** Vacío = automática: se aplica sola a quien cumpla. */
+  codigo?: string | null
+  usosMax?: number | null
+  usosPorCliente?: number | null
+  /** Vacío = todos los planes. */
+  planes?: string[]
+}
+
+function sinPromociones(error: { code?: string } | null): boolean {
+  return error?.code === '42P01' || error?.code === 'PGRST205'
+}
+
+function filaDePromo(input: PromocionInput) {
+  return {
+    nombre: input.nombre.trim(),
+    tipo: input.tipo,
+    valor: input.valor,
+    ventana: input.ventana,
+    // Las columnas de la ventana que no corresponden van en nulo, no con
+    // el valor viejo: el CHECK de la 0079 exige que la forma elegida
+    // tenga sus datos, y dejar los de la otra confunde al que después lee
+    // la fila.
+    desde: input.ventana === 'fechas' ? input.desde || null : null,
+    hasta: input.ventana === 'fechas' ? input.hasta || null : null,
+    dia_desde: input.ventana === 'dias_mes' ? input.diaDesde ?? null : null,
+    dia_hasta: input.ventana === 'dias_mes' ? input.diaHasta ?? null : null,
+    // El único texto único que tipea una persona en este sistema. Se
+    // normaliza como el `code` de los medios de pago: sin tildes, sin
+    // espacios, en mayúsculas — que es como se lee un cupón en un cartel.
+    codigo: input.codigo?.trim()
+      ? input.codigo
+          .trim()
+          .toUpperCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^A-Z0-9]+/g, '')
+      : null,
+    usos_max: input.usosMax ?? null,
+    usos_por_cliente: input.usosPorCliente ?? null,
+    planes: input.planes ?? [],
+  }
+}
+
+export async function fetchPromociones(): Promise<Promocion[]> {
+  const { data, error } = await supabase
+    .from('promociones')
+    .select('*')
+    .order('sort_order')
+    .order('created_at', { ascending: false })
+  if (sinPromociones(error)) return []
+  if (error) throw error
+  return (data ?? []).map((p) => ({
+    id: p.id,
+    nombre: p.nombre,
+    tipo: p.tipo,
+    valor: Number(p.valor),
+    ventana: p.ventana,
+    desde: p.desde ?? null,
+    hasta: p.hasta ?? null,
+    diaDesde: p.dia_desde ?? null,
+    diaHasta: p.dia_hasta ?? null,
+    codigo: p.codigo ?? null,
+    usosMax: p.usos_max ?? null,
+    usosPorCliente: p.usos_por_cliente ?? null,
+    planes: p.planes ?? [],
+    active: p.active,
+    rige: p.rige,
+  }))
+}
+
+export async function createPromocion(input: PromocionInput): Promise<string> {
+  const { data, error } = await supabase
+    .from('promociones')
+    .insert(filaDePromo(input))
+    .select('id')
+    .single()
+  if (sinPromociones(error)) {
+    throw new Error('Para usar promociones falta correr la migración 0079.')
+  }
+  if (error?.code === '23505') throw new Error('Ya existe una promoción con ese código.')
+  if (error) throw errorDeLaBase(error, 'No se pudo crear la promoción')
+  return data.id as string
+}
+
+export async function updatePromocion(id: string, input: PromocionInput): Promise<void> {
+  const { error } = await supabase.from('promociones').update(filaDePromo(input)).eq('id', id)
+  if (error?.code === '23505') throw new Error('Ya existe una promoción con ese código.')
+  if (error) throw errorDeLaBase(error, 'No se pudo guardar la promoción')
+}
+
+/** Encenderla es lo que la hace descontar. Nace apagada a propósito. */
+export async function setPromocionRige(id: string, rige: boolean): Promise<void> {
+  const { error } = await supabase.from('promociones').update({ rige }).eq('id', id)
+  if (error) throw errorDeLaBase(error, 'No se pudo cambiar el estado')
+}
+
+/** No se borra: una promoción con cobros hechos los sigue explicando. */
+export async function deactivatePromocion(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('promociones')
+    .update({ active: false, rige: false })
+    .eq('id', id)
+  if (error) throw errorDeLaBase(error, 'No se pudo dar de baja la promoción')
+}
+
+export interface PromoAplicable {
+  id: string
+  nombre: string
+  tipo: 'porcentaje' | 'monto'
+  valor: number
+  codigo: string | null
+  usosRestantes: number | null
+}
+
+/** Qué promociones le sirven HOY a esa cuota. La misma que valida la base. */
+export async function promocionesPara(paymentId: string): Promise<PromoAplicable[]> {
+  const { data, error } = await supabase.rpc('promociones_para', { p_payment: paymentId })
+  if (error) {
+    if (error.code === 'PGRST202') return []
+    throw errorDeLaBase(error, 'No se pudieron leer las promociones')
+  }
+  return (data ?? []).map((p: Record<string, unknown>) => ({
+    id: p.id as string,
+    nombre: p.nombre as string,
+    tipo: p.tipo as 'porcentaje' | 'monto',
+    valor: Number(p.valor),
+    codigo: (p.codigo as string) ?? null,
+    usosRestantes: p.usos_restantes === null ? null : Number(p.usos_restantes),
+  }))
+}
+
+/**
+ * Cobrar una cuota. La cuenta la hace la base (0079).
+ *
+ * Reemplaza al update directo que hacía el navegador: con promociones y
+ * topes de uso, un monto calculado en el cliente no se puede hacer
+ * cumplir. Devuelve lo que efectivamente se aplicó, que es lo que la
+ * pantalla muestra después.
+ */
+export async function cobrarCuota(
+  paymentId: string,
+  method: string,
+  codigo?: string | null
+): Promise<{ comprobante: number; cobrado: number; lista: number; promo: string | null }> {
+  const { data, error } = await supabase.rpc('cobrar_cuota', {
+    p_payment: paymentId,
+    p_method: method,
+    p_codigo: codigo?.trim() ? codigo.trim() : null,
+  })
+  if (error) {
+    if (error.code === 'PGRST202') {
+      throw new Error('Para cobrar con promociones falta correr la migración 0079.')
+    }
+    throw errorDeLaBase(error, 'No se pudo cobrar')
+  }
+  const fila = Array.isArray(data) ? data[0] : data
+  return {
+    comprobante: Number(fila.comprobante),
+    cobrado: Number(fila.cobrado),
+    lista: Number(fila.lista),
+    promo: (fila.promo as string) ?? null,
+  }
+}
+
+export interface ResultadoDelAnuncio {
+  destinatarios: number
+  conMail: number
+  enviados: number
+  enCampana: number
+  aviso: string | null
+  motivo: string | null
+}
+
+/**
+ * Anunciar una promoción por mail a las clientas activas.
+ *
+ * Va por el servidor porque mandar mails necesita la clave de Resend, y
+ * porque leer el padrón entero para escribirle a cada una es algo que la
+ * clienta logueada no puede —ni tiene que poder— hacer desde el navegador.
+ *
+ * `prueba` manda uno solo, al mail de quien aprieta el botón.
+ */
+export async function anunciarPromocion(
+  promocionId: string,
+  prueba = false
+): Promise<ResultadoDelAnuncio & { prueba?: boolean }> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) throw new Error('Sesión expirada, volvé a ingresar')
+
+  const res = await fetch('/api/admin/promos/anunciar', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ promocionId, prueba }),
+  })
+  const json = await res.json().catch(() => null)
+  if (!res.ok) throw new Error(json?.error ?? `Error del servidor (${res.status})`)
+  return json
 }
 
 // ---------------------------------------------------------------
@@ -2640,6 +2899,34 @@ export async function setPaymentMethodActive(code: string, active: boolean): Pro
 // Parámetros del negocio (studio_settings — migración 0011)
 // ---------------------------------------------------------------
 /** Guarda solo las claves que cambiaron. */
+/**
+ * Prender o apagar una regla (0081).
+ *
+ * Aparte de `saveSettings` a propósito: cambiar el VALOR de un parámetro
+ * y cambiar si RIGE son dos decisiones distintas, y la segunda le cambia
+ * el comportamiento al sistema para todas las clientas en el momento en
+ * que se aprieta. Mezclarlas en el guardado por lotes haría que prender
+ * una regla se confunda con corregir un número.
+ *
+ * No hay chequeo de permiso acá: lo exige la política `config: editar`
+ * de la 0013, que pide `can('config.editar')`. Si no lo tiene, la base
+ * devuelve cero filas tocadas y esta función lo dice.
+ */
+export async function setSettingRige(key: string, rige: boolean): Promise<void> {
+  const { data, error } = await supabase
+    .from('studio_settings')
+    .update({ rige })
+    .eq('key', key)
+    .select('key')
+  if (error) throw errorDeLaBase(error, 'No se pudo cambiar la vigencia de la regla')
+  // Un update que no toca ninguna fila vuelve sin error: RLS filtra filas,
+  // no las rechaza. Sin esto, apagar una regla sin permiso se vería como
+  // si hubiera funcionado hasta recargar.
+  if (!data || data.length === 0) {
+    throw new Error('Tu rol no tiene permiso para cambiar la vigencia de esta regla.')
+  }
+}
+
 export async function saveSettings(changes: Record<string, string>): Promise<void> {
   const entries = Object.entries(changes)
   if (!entries.length) return

@@ -91,6 +91,17 @@ export interface StudioSetting {
    * sistema siga andando igual si la migración no corrió.
    */
   rige: boolean
+  /**
+   * true = el código ya honra este parámetro, y que rija o no es decisión
+   * del estudio (0081). Sólo estos llevan interruptor en Configuración.
+   *
+   * Existe porque `rige` tapaba dos cosas distintas: "todavía no lo lee
+   * nadie" —un hecho nuestro— y "está listo y el estudio decide". Ofrecer
+   * el botón en los del primer grupo diría que congelar membresías
+   * funciona, y no existe. Por defecto false: sin la migración no aparece
+   * ningún interruptor y todo queda como estaba.
+   */
+  encendible: boolean
 }
 
 export type MembershipStatus =
@@ -293,6 +304,28 @@ export interface Membership {
  * No es una reserva ni un montón de reservas. Las reservas de cada
  * fecha, cuando existan, se apoyan en esto — no al revés.
  */
+/** Una promoción del catálogo (0079). El monto lo resuelve la base. */
+export interface Promocion {
+  id: string
+  nombre: string
+  tipo: 'porcentaje' | 'monto'
+  valor: number
+  ventana: 'siempre' | 'fechas' | 'dias_mes'
+  desde: string | null
+  hasta: string | null
+  diaDesde: number | null
+  diaHasta: number | null
+  /** Null = automática: se aplica sola. Con código, hay que escribirlo. */
+  codigo: string | null
+  usosMax: number | null
+  usosPorCliente: number | null
+  /** Vacío = todos los planes. */
+  planes: string[]
+  active: boolean
+  /** Cargada pero sin regir todavía: no descuenta nada. */
+  rige: boolean
+}
+
 export interface FixedSlot {
   id: string
   studentId: string
@@ -436,7 +469,16 @@ export interface Payment {
   membershipId: string
   planName: string
   amount: number
+  /** El DÍA del cobro, para mostrar. Vacío si no se cobró. */
   date: string
+  /**
+   * El INSTANTE del cobro. Distinto de `date` y por eso existe: dos cobros
+   * del mismo día son indistinguibles por el día, y la lista de Pagos los
+   * mostraba en el orden que quisiera la base. Nulo si no se cobró.
+   */
+  paidAt?: string | null
+  /** Cuándo nació la cuota. El único orden posible para una que no se cobró. */
+  createdAt?: string
   dueDate: string
   status: PaymentStatus
   /**
@@ -517,6 +559,13 @@ export type NotificationType =
   | 'clase_suspendida'
   | 'clase_cambio_profesora'
   | 'lugar_liberado'
+  /**
+   * El estudio anunció una promoción (0080). Lo manda el botón de
+   * Configuración y no un trigger: un mail al padrón entero no se
+   * deshace, y una promo recién cargada se corrige dos o tres veces
+   * antes de quedar como va.
+   */
+  | 'promocion'
 
 /**
  * Una entrada de la bitácora del cliente (0050). No se edita: si algo

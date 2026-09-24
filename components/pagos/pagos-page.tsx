@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
-import { registerPayment, collectPayment, createMpLink, syncMpPayments, voidPayment, precioConAjuste, settingText, esOferta, hoyISO } from '@/lib/api'
+import { registerPayment, collectPayment, createMpLink, syncMpPayments, voidPayment, precioConAjuste, precioConPromo, settingText, esOferta, hoyISO, promocionesPara, cobrarCuota, type PromoAplicable } from '@/lib/api'
 import type { Payment, PaymentMethod, Student } from '@/lib/types'
 
 type FilterStatus = 'todos' | 'pagado' | 'pendiente' | 'renovacion' | 'vencido'
@@ -189,7 +189,12 @@ function mediosParaCobrar(medios: PaymentMethod[]): PaymentMethod[] {
     .sort((a, b) => a.sortOrder - b.sortOrder)
 }
 
-function MethodPicker({ value, onChange }: { value: Method | null; onChange: (m: Method) => void }) {
+/**
+ * Exportado para el alta: cobrar dentro del alta no puede significar una
+ * segunda lista de medios de pago. Es el mismo catálogo, con el mismo
+ * cartel cuando no hay ninguno.
+ */
+export function MethodPicker({ value, onChange }: { value: Method | null; onChange: (m: Method) => void }) {
   const { data } = useData()
   const medios = mediosParaCobrar(data?.paymentMethods ?? [])
 
@@ -232,7 +237,16 @@ function MethodPicker({ value, onChange }: { value: Method | null; onChange: (m:
   )
 }
 
-function ReceiptSuccess({ receiptNumber, onClose }: { receiptNumber: number; onClose: () => void }) {
+function ReceiptSuccess({
+  receiptNumber,
+  cobrado,
+  onClose,
+}: {
+  receiptNumber: number
+  /** Lo que la base cobró de verdad, no lo que la pantalla anticipó. */
+  cobrado?: number | null
+  onClose: () => void
+}) {
   return (
     <div className="px-6 py-8 flex flex-col items-center text-center">
       <div className="w-14 h-14 rounded-full bg-exito-suave flex items-center justify-center mb-4">
@@ -240,9 +254,14 @@ function ReceiptSuccess({ receiptNumber, onClose }: { receiptNumber: number; onC
       </div>
       <h3 className="text-base font-bold text-foreground mb-1">Pago registrado</h3>
       <p className="text-sm text-muted-foreground mb-1">Comprobante generado automáticamente</p>
-      <p className="text-2xl font-bold text-foreground mb-6">
+      <p className={cn('text-2xl font-bold text-foreground', cobrado == null ? 'mb-6' : 'mb-1')}>
         N° {String(receiptNumber).padStart(8, '0')}
       </p>
+      {cobrado != null && (
+        <p className="text-sm text-muted-foreground mb-6">
+          Se cobraron <strong className="text-foreground">${cobrado.toLocaleString('es-AR')}</strong>
+        </p>
+      )}
       <button
         onClick={onClose}
         className="px-8 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
@@ -477,6 +496,32 @@ export function CobrarModal({ payment, onClose }: { payment: Payment; onClose: (
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [receiptNumber, setReceiptNumber] = useState<number | null>(null)
+  const [cobrado, setCobrado] = useState<number | null>(null)
+
+  // Qué promociones le sirven a ESTA cuota. La pregunta la contesta la
+  // base con la misma función que después valida el cobro: si acá dijera
+  // otra cosa, el mostrador le prometería a la clienta un descuento que
+  // el cobro le va a negar.
+  const [promos, setPromos] = useState<PromoAplicable[]>([])
+  const [codigo, setCodigo] = useState('')
+  useEffect(() => {
+    promocionesPara(payment.id)
+      .then(setPromos)
+      // Sin la 0079 la función no existe y no hay promociones: el cobro
+      // sigue andando con el ajuste del medio, como antes.
+      .catch(() => setPromos([]))
+  }, [payment.id])
+
+  // La automática es la que se aplica sola, sin que nadie la pida. Si hay
+  // más de una gana la que más descuenta, que es lo que hace la base.
+  const automaticas = promos.filter((p) => !p.codigo)
+  const cupones = promos.filter((p) => p.codigo)
+  const cupon = codigo.trim()
+    ? cupones.find((p) => p.codigo === codigo.trim().toUpperCase())
+    : undefined
+  const cuponEscritoYNoSirve = codigo.trim().length > 0 && !cupon
+
+  const redondeo = settingText(settings, 'price_rounding', 'cincuenta')
 
   // El precio de lista es el que quedó en la deuda; el medio de pago lo
   // ajusta (efectivo −5%, tarjeta +25%). Mientras no se elige medio, se
@@ -484,10 +529,28 @@ export function CobrarModal({ payment, onClose }: { payment: Payment; onClose: (
   const ajuste = method
     ? (paymentMethods.find((m) => m.code === method)?.ajustePct ?? 0)
     : 0
-  const redondeo = settingText(settings, 'price_rounding', 'cincuenta')
-  const aCobrar = ajuste === 0
-    ? payment.amount
-    : precioConAjuste(payment.amount, ajuste, redondeo)
+
+  // El cupón escrito le gana a la automática: si alguien se tomó el
+  // trabajo de repartirlo, es porque vale más que lo que hay para todas.
+  // Y la promo REEMPLAZA al ajuste del medio, no se suma: son dos motivos
+  // distintos para tocar el mismo precio, y aplicarlos juntos descuenta
+  // dos veces. Es lo que hace `cobrar_cuota()` y acá solo se espeja.
+  const promoElegida =
+    cupon ??
+    (automaticas.length > 0
+      ? automaticas.reduce((mejor, p) =>
+          precioConPromo(payment.amount, p.tipo, p.valor, redondeo) <
+          precioConPromo(payment.amount, mejor.tipo, mejor.valor, redondeo)
+            ? p
+            : mejor
+        )
+      : undefined)
+
+  const aCobrar = promoElegida
+    ? precioConPromo(payment.amount, promoElegida.tipo, promoElegida.valor, redondeo)
+    : ajuste === 0
+      ? payment.amount
+      : precioConAjuste(payment.amount, ajuste, redondeo)
   const diferencia = aCobrar - payment.amount
 
   const handleSubmit = async () => {
@@ -495,11 +558,33 @@ export function CobrarModal({ payment, onClose }: { payment: Payment; onClose: (
     setSaving(true)
     setError(null)
     try {
-      const n = await collectPayment(payment.id, method, aCobrar)
+      // El monto lo decide la base, no este navegador: acá viaja el medio
+      // y el cupón, y vuelve lo que efectivamente se cobró. Antes se
+      // mandaba el número calculado en pantalla, que con promociones y
+      // topes de uso ya no se puede hacer cumplir.
+      const r = await cobrarCuota(payment.id, method, cupon ? cupon.codigo : null)
       await refresh()
-      setReceiptNumber(n)
+      setCobrado(r.cobrado)
+      setReceiptNumber(r.comprobante)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo registrar el cobro')
+      const msg = err instanceof Error ? err.message : 'No se pudo registrar el cobro'
+      // Si la 0079 todavía no corrió, se cobra como se cobraba. Sin
+      // promociones, pero se cobra: el mostrador no puede quedar sin poder
+      // cobrar porque falte una migración.
+      if (msg.includes('migración 0079')) {
+        try {
+          const n = await collectPayment(payment.id, method, aCobrar)
+          await refresh()
+          setCobrado(aCobrar)
+          setReceiptNumber(n)
+          return
+        } catch (err2) {
+          setError(err2 instanceof Error ? err2.message : msg)
+          setSaving(false)
+          return
+        }
+      }
+      setError(msg)
       setSaving(false)
     }
   }
@@ -514,7 +599,7 @@ export function CobrarModal({ payment, onClose }: { payment: Payment; onClose: (
         onClick={(e) => e.stopPropagation()}
       >
         {receiptNumber !== null ? (
-          <ReceiptSuccess receiptNumber={receiptNumber} onClose={onClose} />
+          <ReceiptSuccess receiptNumber={receiptNumber} cobrado={cobrado} onClose={onClose} />
         ) : (
           <>
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
@@ -553,7 +638,18 @@ export function CobrarModal({ payment, onClose }: { payment: Payment; onClose: (
                     ${aCobrar.toLocaleString('es-AR')}
                   </span>
                 </div>
-                {diferencia !== 0 && (
+                {promoElegida ? (
+                  <p className="text-xs font-semibold mt-2 rounded-lg px-2.5 py-1.5 inline-block bg-exito-suave text-exito-fuerte">
+                    {promoElegida.nombre}
+                    {promoElegida.codigo && (
+                      <span className="font-mono ml-1.5 opacity-80">{promoElegida.codigo}</span>
+                    )}
+                    <span className="block font-normal opacity-80">
+                      Paga ${Math.abs(diferencia).toLocaleString('es-AR')} menos que el precio
+                      de lista{ajuste !== 0 && ', y la promoción reemplaza al ajuste del medio'}
+                    </span>
+                  </p>
+                ) : diferencia !== 0 && (
                   <p
                     className={cn(
                       'text-xs font-semibold mt-2 rounded-lg px-2.5 py-1.5 inline-block',
@@ -587,6 +683,34 @@ export function CobrarModal({ payment, onClose }: { payment: Payment; onClose: (
                 </div>
               )}
 
+              {/* El campo aparece solo si hay algún cupón que esta cuota
+                  podría usar. Ofrecerlo siempre sería invitar a probar
+                  códigos que no existen. */}
+              {cupones.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+                    Cupón
+                  </p>
+                  <input
+                    value={codigo}
+                    onChange={(e) => setCodigo(e.target.value)}
+                    placeholder="Si trae un código, escribilo"
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm text-foreground uppercase placeholder:normal-case placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                  {cuponEscritoYNoSirve && (
+                    <p className="text-[11px] text-aviso-fuerte mt-1.5">
+                      Ese código no se puede usar en esta cuota: puede estar
+                      vencido, agotado o ser de otro plan.
+                    </p>
+                  )}
+                  {cupon?.usosRestantes != null && (
+                    <p className="text-[11px] text-muted-foreground mt-1.5">
+                      Quedan {cupon.usosRestantes} {cupon.usosRestantes === 1 ? 'uso' : 'usos'}.
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
                   Método de pago
@@ -608,7 +732,7 @@ export function CobrarModal({ payment, onClose }: { payment: Payment; onClose: (
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={!method || saving}
+                disabled={!method || saving || cuponEscritoYNoSirve}
                 className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
               >
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -871,6 +995,35 @@ export function PagosPage() {
   const pendientes = PAYMENTS.filter((p) => p.status === 'pendiente' && !esOferta(p))
   const montoOfertas = ofertas.reduce((a, p) => a + p.amount, 0)
 
+  // EL ORDEN DE LA LISTA.
+  //
+  // Hasta hoy era el de la consulta —`due_date` descendente— y por eso
+  // arriba de todo aparecía una cuota ANULADA del 17/09: vencía en
+  // octubre, y el vencimiento dice cuándo hay que pagar algo, no cuándo
+  // pasó algo. Los dos cobros reales del día quedaban 2° y 5°, separados
+  // por anuladas.
+  //
+  // Y son dos preguntas distintas según qué esté mirando quien filtra:
+  //
+  //   · Todos / Pagado / Anulado -> "¿qué pasó recién?". Lo último arriba.
+  //   · Pendiente / Vencido / Renovación -> "¿a quién hay que ir a
+  //     buscar?". Lo más urgente arriba, que es lo más viejo.
+  //
+  // Un orden único deja siempre una de las dos mal: por fecha de cobro,
+  // las pendientes —que no tienen— caen todas juntas al fondo; por
+  // vencimiento descendente, la deuda más atrasada queda última, que es
+  // exactamente la que hay que reclamar primero. Por eso el orden lo
+  // decide el filtro, y la pantalla lo dice en voz alta debajo: un orden
+  // que cambia solo y no se anuncia se lee como desorden, que es el
+  // problema que esto viene a resolver.
+  const porUrgencia =
+    filterStatus === 'pendiente' || filterStatus === 'vencido' || filterStatus === 'renovacion'
+
+  // Qué fecha representa a cada fila cuando la pregunta es "qué pasó".
+  // El instante y no el día: dos cobros del mismo día son indistinguibles
+  // por el día, y ahí volvía el desorden en chiquito.
+  const cuandoPaso = (p: Payment) => p.paidAt ?? p.createdAt ?? p.dueDate
+
   const filtered = PAYMENTS.filter((p) => {
     const matchSearch =
       search === '' || p.studentName.toLowerCase().includes(search.toLowerCase())
@@ -883,6 +1036,33 @@ export function PagosPage() {
         ? p.status === 'pendiente' && !esOferta(p)
         : p.status === filterStatus
     return matchSearch && matchStatus
+  })
+  // Copia antes de ordenar: `filter` ya devuelve una nueva, pero dejarlo
+  // dicho evita que mañana alguien ordene PAYMENTS en su lugar y le mueva
+  // la lista a las otras pantallas que derivan del mismo paquete.
+  const ordenados = [...filtered].sort((a, b) => {
+    if (porUrgencia) {
+      // Ascendente: la que vence antes va arriba.
+      return a.dueDate.localeCompare(b.dueDate) || a.studentName.localeCompare(b.studentName)
+    }
+    return (
+      cuandoPaso(b).localeCompare(cuandoPaso(a)) ||
+      // EL EMPATE NO ES UN CASO RARO, ES EL NORMAL.
+      //
+      // `created_at` sale de now(), que en Postgres es el instante de la
+      // TRANSACCIÓN: un insert de varias filas les pone a todas el mismo
+      // valor, hasta el microsegundo. Y el proceso diario emite las cuotas
+      // de renovación exactamente así, en tanda — así que el día que
+      // renueven ocho clientas, esas ocho empatan.
+      //
+      // Sin desempate, `sort` es estable y las deja en el orden en que
+      // vinieron de la consulta, que es el desorden que esto vino a
+      // arreglar. Dentro de la misma tanda manda lo que vence antes, y a
+      // igual vencimiento el nombre: alfabético es lo único que sirve
+      // cuando alguien busca a una persona en la lista.
+      a.dueDate.localeCompare(b.dueDate) ||
+      a.studentName.localeCompare(b.studentName)
+    )
   })
 
   const totalPaid = PAYMENTS.filter((p) => p.status === 'pagado').reduce((a, p) => a + p.amount, 0)
@@ -1041,6 +1221,13 @@ export function PagosPage() {
           ))}
         </div>
 
+        {/* El orden cambia con el filtro, así que se dice. Sin esto, pasar
+            de "Todos" a "Vencido" y ver la lista al revés se lee como que
+            la pantalla hace cualquier cosa. */}
+        <span className="text-[11px] text-muted-foreground w-full sm:w-auto order-last sm:order-none">
+          {porUrgencia ? 'Lo que vence antes, arriba' : 'Lo último que pasó, arriba'}
+        </span>
+
         {canWrite && (
           <button
             onClick={() => setShowRegistrar(true)}
@@ -1092,14 +1279,14 @@ export function PagosPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filtered.length === 0 ? (
+                  {ordenados.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="text-center py-12 text-muted-foreground text-sm">
                         No se encontraron pagos
                       </td>
                     </tr>
                   ) : (
-                    filtered.map((p) => {
+                    ordenados.map((p) => {
                       const MethodIcon = iconoDeMedio(p.method)
                       return (
                         <tr key={p.id} className="hover:bg-muted/30 transition-colors">

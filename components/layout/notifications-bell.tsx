@@ -5,6 +5,7 @@ import {
   Bell, BellRing, CreditCard, UserPlus, CalendarClock, AlertTriangle,
   Loader2, RefreshCw, RefreshCwOff, Wallet, Scale, Coins,
   CalendarCheck, CalendarOff, UserCheck,
+  Tag,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
@@ -69,6 +70,9 @@ const ESTILOS: Record<NotificationType, EstiloAviso> = {
   clase_suspendida:       { Icon: CalendarOff,   color: 'bg-destructive-suave text-destructive-fuerte', page: 'agenda' },
   clase_cambio_profesora: { Icon: UserCheck,     color: 'bg-info-suave text-info-fuerte',       page: 'agenda' },
   lugar_liberado:         { Icon: CalendarCheck, color: 'bg-aviso-suave text-aviso-fuerte',     page: 'reservas' },
+  // La promoción anunciada (0080). Lleva a Pagos porque lo que hace con
+  // ella es pagar: el descuento se aplica al cobrar la cuota, no antes.
+  promocion:              { Icon: Tag,           color: 'bg-exito-suave text-exito-fuerte',     page: 'pagos' },
 }
 
 /**
