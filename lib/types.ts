@@ -401,7 +401,14 @@ export interface Reservation {
    * contador; fuera de plazo la perdió, y es lo único que se puede
    * recuperar. Nulo si no está cancelada, o si el estudio suspendió.
    */
-  cancelKind?: 'en plazo' | 'fuera de plazo' | null
+  /**
+   * Cómo se clasificó la cancelación. Lo sella la base al cancelar y la
+   * clienta no lo puede escribir (0072). 'en plazo sin cupo' entró con la
+   * 0076: avisó a tiempo pero ya había gastado las devoluciones del
+   * período, así que la clase se cobra igual. Null = el estudio suspendió
+   * la clase.
+   */
+  cancelKind?: 'en plazo' | 'en plazo sin cupo' | 'fuera de plazo' | null
   /**
    * A qué membresía se le cobró esta clase (0029). La sella la base al
    * reservar y no se mueve más: es lo que hace que renovar en el medio

@@ -411,16 +411,33 @@ export function RegistrarPagoModal({
               <div>
                 <label className={labelClass}>Método de pago *</label>
                 <MethodPicker value={method} onChange={setMethod} />
+                {/* Mismo criterio que el modal de cobrar una cuota: el
+                    ajuste del medio no puede quedar en letra chica. Acá
+                    además el número de arriba lo escribe quien cobra, así
+                    que ver los dos juntos —lo que puso y lo que se cobra—
+                    es lo que evita el "¿y esto de dónde salió?". */}
                 {aCobrar !== deLista && (
-                  <p className="text-xs mt-2 bg-muted rounded-xl px-3 py-2 text-foreground">
-                    Se cobra{' '}
-                    <strong className="tabular-nums">${aCobrar.toLocaleString('es-AR')}</strong>{' '}
-                    <span className={aCobrar < deLista ? 'text-exito-fuerte' : 'text-aviso-fuerte'}>
-                      ({aCobrar < deLista ? 'descuento' : 'recargo'} del{' '}
-                      {Math.abs(ajuste).toLocaleString('es-AR')}% por{' '}
-                      {nombreDeMedio(method, paymentMethods).toLowerCase()})
-                    </span>
-                  </p>
+                  <div
+                    className={cn(
+                      'mt-2 rounded-xl px-3 py-2.5',
+                      aCobrar < deLista
+                        ? 'bg-exito-suave text-exito-fuerte'
+                        : 'bg-aviso-suave text-aviso-fuerte'
+                    )}
+                  >
+                    <p className="text-sm font-bold tabular-nums">
+                      <span className="text-muted-foreground line-through font-normal mr-2">
+                        ${deLista.toLocaleString('es-AR')}
+                      </span>
+                      ${aCobrar.toLocaleString('es-AR')}
+                    </p>
+                    <p className="text-xs font-semibold mt-0.5">
+                      {aCobrar < deLista ? '−' : '+'}
+                      {Math.abs(ajuste).toLocaleString('es-AR')}%{' '}
+                      {aCobrar < deLista ? 'de descuento' : 'de recargo'} por{' '}
+                      {nombreDeMedio(method, paymentMethods).toLowerCase()}
+                    </p>
+                  </div>
                 )}
               </div>
 
@@ -514,16 +531,44 @@ export function CobrarModal({ payment, onClose }: { payment: Payment; onClose: (
               <div className="bg-muted rounded-xl p-4">
                 <p className="text-sm font-semibold text-foreground">{payment.studentName}</p>
                 <p className="text-xs text-muted-foreground">{payment.planName}</p>
-                <p className="text-2xl font-bold text-foreground mt-2 tabular-nums">
-                  ${aCobrar.toLocaleString('es-AR')}
-                </p>
+                {/* POR QUÉ ESE NÚMERO Y NO EL DE LA CUOTA.
+                    El monto que se cobra ya viene con el ajuste del medio
+                    —efectivo tiene descuento, tarjeta recargo— y eso estaba
+                    dicho en 11px y en gris, debajo del número. Matías cobró
+                    $80.750 sobre una cuota de $85.000 y no encontró de dónde
+                    salía la diferencia: "solo aparece el monto".
+
+                    Ahora el precio de lista va tachado al lado del que se
+                    cobra, y el ajuste en su propio recuadro con color: verde
+                    si baja, ámbar si sube. Es la misma información, puesta
+                    donde no se pueda pasar por alto — quien cobra tiene que
+                    poder explicárselo a la clienta que tiene enfrente. */}
+                <div className="flex items-baseline gap-2 mt-2 flex-wrap">
+                  {diferencia !== 0 && (
+                    <span className="text-base text-muted-foreground line-through tabular-nums">
+                      ${payment.amount.toLocaleString('es-AR')}
+                    </span>
+                  )}
+                  <span className="text-2xl font-bold text-foreground tabular-nums">
+                    ${aCobrar.toLocaleString('es-AR')}
+                  </span>
+                </div>
                 {diferencia !== 0 && (
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    Precio de lista ${payment.amount.toLocaleString('es-AR')} ·{' '}
-                    <span className={diferencia < 0 ? 'text-exito-fuerte' : 'text-aviso-fuerte'}>
-                      {diferencia < 0 ? 'descuento' : 'recargo'} del{' '}
-                      {Math.abs(ajuste).toLocaleString('es-AR')}% por pagar con{' '}
-                      {nombreDeMedio(method, paymentMethods).toLowerCase()}
+                  <p
+                    className={cn(
+                      'text-xs font-semibold mt-2 rounded-lg px-2.5 py-1.5 inline-block',
+                      diferencia < 0
+                        ? 'bg-exito-suave text-exito-fuerte'
+                        : 'bg-aviso-suave text-aviso-fuerte'
+                    )}
+                  >
+                    {diferencia < 0 ? '−' : '+'}
+                    {Math.abs(ajuste).toLocaleString('es-AR')}%{' '}
+                    {diferencia < 0 ? 'de descuento' : 'de recargo'} por pagar con{' '}
+                    {nombreDeMedio(method, paymentMethods).toLowerCase()}
+                    <span className="block font-normal opacity-80">
+                      {diferencia < 0 ? 'Paga' : 'Paga'} ${Math.abs(diferencia).toLocaleString('es-AR')}{' '}
+                      {diferencia < 0 ? 'menos' : 'más'} que el precio de lista
                     </span>
                   </p>
                 )}
