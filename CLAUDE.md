@@ -14,6 +14,10 @@ varias secciones quedaron viejas a propósito. El anexo
 [`docs/requerimientos-casa-fe-detalle.md`](docs/requerimientos-casa-fe-detalle.md)
 tiene los 178 requerimientos uno por uno.
 [`docs/PLAN.md`](docs/PLAN.md) es el registro de lo construido.
+Mercado Pago tiene documento aparte —[`docs/MERCADO-PAGO.md`](docs/MERCADO-PAGO.md)—
+porque se decidió prenderlo de una sola vez: ahí está el circuito relevado,
+los seis huecos y en qué orden tocarlos. **Si el tema es Mercado Pago, se
+arranca por ahí.**
 
 **Actualizar esos documentos es parte de terminar un bloque**, no un extra.
 
