@@ -233,9 +233,10 @@ export async function GET(request: Request) {
     title: string,
     body: string,
     // La campana saca el ícono y el color del tipo, así que el aviso de que
-    // venció no puede salir con el ícono de "por vencer". Los dos ya están en
-    // el CHECK de la 0023: no se agrega ninguno.
-    type: 'membresia_por_vencer' | 'membresia_vencida' = 'membresia_por_vencer'
+    // venció no puede salir con el ícono de "por vencer". Los tres ya están
+    // en el CHECK —los dos primeros desde la 0023, `deuda_vencida` desde
+    // mucho antes—: no se agrega ninguno.
+    type: 'membresia_por_vencer' | 'membresia_vencida' | 'deuda_vencida' = 'membresia_por_vencer'
   ) => {
     rows.push({
       type,
@@ -865,6 +866,32 @@ export async function GET(request: Request) {
       audience: 'staff',
       dedupe_key: `deuda-${p.id}`,
     })
+
+    // Y a ELLA por el portal, no sólo por mail.
+    //
+    // Este era el único de los cuatro bloques que le avisaba nada más que
+    // por correo: los de membresía por vencer y vencida le ponen la campana
+    // y el push desde la 0052, y este quedó afuera. O sea que a quien no
+    // tiene mail cargado —o cuyo mail rebota— se le vencía la cuota y no se
+    // enteraba por ningún lado, mientras el mostrador sí lo veía.
+    //
+    // Va ANTES del corte por email a propósito, por el mismo motivo que en
+    // el bloque 2: el portal no depende de un dato que la ficha puede no
+    // tener.
+    //
+    // El texto es otro, y tiene que serlo: el de arriba está escrito para
+    // el mostrador —"Fulana debe tanto"— y este para ella. El mismo aviso
+    // contado a dos personas distintas no se cuenta igual.
+    avisarCliente(
+      `deuda-${p.id}`,
+      p.student_id,
+      student?.user_id,
+      'Tenés un pago pendiente',
+      `${p.concept || 'Tu cuota'} · ${formatAmount(p.amount)}, con vencimiento el ${formatDate(p.due_date)}.` +
+        (p.mp_link ? ' Podés pagarla online desde Pagos.' : ' Podés abonarla en el estudio.'),
+      'deuda_vencida'
+    )
+
     if (student?.email) {
       emails.push({
         to: student.email,
