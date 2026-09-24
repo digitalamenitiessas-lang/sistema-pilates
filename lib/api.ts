@@ -743,6 +743,7 @@ export async function fetchStudioData(): Promise<StudioData> {
       // ?? true: si la 0024 no corrió, la columna no viene y todo rige,
       // que es exactamente lo que pasaba antes de que existiera la marca.
       rige: r.rige ?? true,
+      encendible: r.encendible ?? false,
     }))
     settings = Object.fromEntries(settingsMeta.map((r) => [r.key, r.value]))
   } catch {
@@ -2887,6 +2888,34 @@ export async function setPaymentMethodActive(code: string, active: boolean): Pro
 // Parámetros del negocio (studio_settings — migración 0011)
 // ---------------------------------------------------------------
 /** Guarda solo las claves que cambiaron. */
+/**
+ * Prender o apagar una regla (0081).
+ *
+ * Aparte de `saveSettings` a propósito: cambiar el VALOR de un parámetro
+ * y cambiar si RIGE son dos decisiones distintas, y la segunda le cambia
+ * el comportamiento al sistema para todas las clientas en el momento en
+ * que se aprieta. Mezclarlas en el guardado por lotes haría que prender
+ * una regla se confunda con corregir un número.
+ *
+ * No hay chequeo de permiso acá: lo exige la política `config: editar`
+ * de la 0013, que pide `can('config.editar')`. Si no lo tiene, la base
+ * devuelve cero filas tocadas y esta función lo dice.
+ */
+export async function setSettingRige(key: string, rige: boolean): Promise<void> {
+  const { data, error } = await supabase
+    .from('studio_settings')
+    .update({ rige })
+    .eq('key', key)
+    .select('key')
+  if (error) throw errorDeLaBase(error, 'No se pudo cambiar la vigencia de la regla')
+  // Un update que no toca ninguna fila vuelve sin error: RLS filtra filas,
+  // no las rechaza. Sin esto, apagar una regla sin permiso se vería como
+  // si hubiera funcionado hasta recargar.
+  if (!data || data.length === 0) {
+    throw new Error('Tu rol no tiene permiso para cambiar la vigencia de esta regla.')
+  }
+}
+
 export async function saveSettings(changes: Record<string, string>): Promise<void> {
   const entries = Object.entries(changes)
   if (!entries.length) return

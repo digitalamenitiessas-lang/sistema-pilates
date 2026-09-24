@@ -64,6 +64,7 @@ import {
   setPaymentMethodActive,
   setPaymentMethodAjuste,
   saveSettings,
+  setSettingRige,
   fetchPermissionMatrix,
   setRolePermission,
   clearUserPermission,
@@ -1143,6 +1144,10 @@ function SettingsSection({ group }: { group: SettingGroup }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  // Apagar una regla que rige va en dos pasos: deja de aplicarse para
+  // todas las clientas en el momento en que se aprieta, y nadie lo ve
+  // salvo que sepa dónde mirar. Prenderla va en uno.
+  const [apagando, setApagando] = useState<string | null>(null)
 
   const esAdmin = profile?.role === 'admin'
   const valueOf = (s: StudioSetting) => draft[s.key] ?? s.value
@@ -1154,6 +1159,20 @@ function SettingsSection({ group }: { group: SettingGroup }) {
   const set = (key: string, value: string) => {
     setDraft((d) => ({ ...d, [key]: value }))
     setSaved(false)
+  }
+
+  const cambiarVigencia = async (s: StudioSetting, rige: boolean) => {
+    setBusy(true)
+    setError(null)
+    try {
+      await setSettingRige(s.key, rige)
+      await refresh()
+      setApagando(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo cambiar la vigencia')
+    } finally {
+      setBusy(false)
+    }
   }
 
   const save = async () => {
@@ -1203,6 +1222,13 @@ function SettingsSection({ group }: { group: SettingGroup }) {
               {!s.rige && (
                 <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-aviso-suave text-aviso-fuerte">
                   Todavía no rige
+                </span>
+              )}
+              {/* El "Rige" sólo en las encendibles: en las otras treinta y
+                  siete sería ruido, porque no hay nada que decidir. */}
+              {s.rige && s.encendible && (
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-exito-suave text-exito-fuerte">
+                  Rige
                 </span>
               )}
             </label>
@@ -1264,11 +1290,68 @@ function SettingsSection({ group }: { group: SettingGroup }) {
             )}
 
             {s.help && <p className="text-[11px] text-muted-foreground mt-1">{s.help}</p>}
-            {!s.rige && (
+            {/* DOS CARTELES DISTINTOS PARA DOS SITUACIONES DISTINTAS.
+                Hasta la 0081 esto decía lo mismo en los dos casos, y no
+                son lo mismo: uno espera una decisión del estudio y el otro
+                espera que alguien escriba el código. Ofrecer "Encender"
+                en el segundo diría que congelar membresías funciona. */}
+            {!s.rige && !s.encendible && (
               <p className="text-[11px] text-aviso-fuerte mt-1">
                 Se puede dejar cargado, pero el sistema todavía no lo tiene en
-                cuenta. Cuando empiece a regir, el cartel desaparece.
+                cuenta. Esta regla no está construida: prenderla no haría nada.
               </p>
+            )}
+
+            {s.encendible && editable(s) && (
+              <div className="mt-2">
+                {!s.rige ? (
+                  <div className="flex items-start gap-2.5 rounded-xl bg-muted/60 px-3 py-2">
+                    <div className="flex-1">
+                      <p className="text-[11px] text-foreground font-semibold">
+                        Cargada y apagada
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        El sistema la respeta desde que la prendas, y a partir de
+                        ese momento, no para atrás.
+                      </p>
+                    </div>
+                    <button
+                      disabled={busy}
+                      onClick={() => cambiarVigencia(s, true)}
+                      className="shrink-0 h-7 px-3 rounded-lg bg-primary text-primary-foreground text-[11px] font-semibold hover:opacity-90 disabled:opacity-40"
+                    >
+                      Encender
+                    </button>
+                  </div>
+                ) : apagando === s.key ? (
+                  <div className="flex items-center gap-2 rounded-xl bg-aviso-suave px-3 py-2">
+                    <span className="flex-1 text-[11px] text-aviso-fuerte font-semibold">
+                      ¿Apagarla? Deja de aplicarse ya mismo.
+                    </span>
+                    <button
+                      disabled={busy}
+                      onClick={() => cambiarVigencia(s, false)}
+                      className="shrink-0 h-7 px-3 rounded-lg bg-destructive/10 text-destructive-fuerte text-[11px] font-semibold hover:bg-destructive/20 disabled:opacity-40"
+                    >
+                      Sí, apagar
+                    </button>
+                    <button
+                      onClick={() => setApagando(null)}
+                      className="shrink-0 w-7 h-7 rounded-lg hover:bg-card flex items-center justify-center text-muted-foreground"
+                      aria-label="No apagar"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setApagando(s.key)}
+                    className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2"
+                  >
+                    Apagar esta regla
+                  </button>
+                )}
+              </div>
             )}
             {s.soloAdmin && !esAdmin && (
               <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">

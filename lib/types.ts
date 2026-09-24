@@ -91,6 +91,17 @@ export interface StudioSetting {
    * sistema siga andando igual si la migración no corrió.
    */
   rige: boolean
+  /**
+   * true = el código ya honra este parámetro, y que rija o no es decisión
+   * del estudio (0081). Sólo estos llevan interruptor en Configuración.
+   *
+   * Existe porque `rige` tapaba dos cosas distintas: "todavía no lo lee
+   * nadie" —un hecho nuestro— y "está listo y el estudio decide". Ofrecer
+   * el botón en los del primer grupo diría que congelar membresías
+   * funciona, y no existe. Por defecto false: sin la migración no aparece
+   * ningún interruptor y todo queda como estaba.
+   */
+  encendible: boolean
 }
 
 export type MembershipStatus =
