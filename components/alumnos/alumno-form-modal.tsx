@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { X, Loader2, Smartphone } from 'lucide-react'
 import { useData } from '@/lib/data-context'
-import { createStudent, createSystemUser, hoyISO, updateStudent, vigenciaHasta, cobrarCuota } from '@/lib/api'
+import { createStudent, createSystemUser, hoyISO, updateStudent, vigenciaHasta, cobrarCuota, AltaIncompleta } from '@/lib/api'
 import { MethodPicker } from '@/components/pagos/pagos-page'
 import type { Student } from '@/lib/types'
 
@@ -66,6 +66,48 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
   const [error, setError] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
 
+  /**
+   * Lo que este formulario ya creó. Una vez que hay ficha, el botón de
+   * abajo deja de crear clientes: sigue con lo que falte —el cobro, el
+   * acceso— o cierra.
+   *
+   * Antes el alta terminaba con un cartel y el formulario abierto con
+   * "Crear cliente y avisarle" activo: tanto al salir bien con cobro
+   * (para mostrar el comprobante) como ante cualquier falla. Un segundo
+   * clic era otra ficha, otra membresía, otra cuota y otro cobro, y la
+   * base no lo frena porque no hay unicidad por DNI ni por mail.
+   */
+  const [creado, setCreado] = useState<{
+    studentId: string
+    paymentId: string | null
+    /**
+     * Lo que el alta no llegó a guardar (AltaIncompleta), dicho para el
+     * mostrador. Se repite en cada cartel de después y hace que el
+     * formulario no se cierre solo: si no, "Crear el acceso" lo borraba y
+     * cerraba como si todo hubiera salido bien.
+     */
+    falta: string | null
+  } | null>(null)
+  /**
+   * El id de la ficha, elegido acá una sola vez (ver `NewStudentInput.id`).
+   * Sin `randomUUID` —un navegador muy viejo o una página sin https— lo
+   * elige la base, como siempre.
+   */
+  const [idFicha] = useState(() =>
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : undefined
+  )
+  const [cobroHecho, setCobroHecho] = useState(false)
+  const [accesoHecho, setAccesoHecho] = useState(false)
+  /** El texto del cobro ya hecho, para no perderlo en los carteles de después. */
+  const [cobroTexto, setCobroTexto] = useState<string | null>(null)
+  /**
+   * `saving` apaga el botón, pero recién en el render siguiente. Esto
+   * corta en el acto: dos clics seguidos no pueden arrancar dos altas.
+   */
+  const enCurso = useRef(false)
+
   const isEdit = !!student
   const planElegido = plans.find((p) => p.id === planId)
   /** El `T00:00` evita que un ISO suelto se lea como UTC y muestre el día anterior. */
@@ -84,8 +126,39 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
         : null
     : null
 
+  /**
+   * Con la ficha ya creada y sin mail o documento, el acceso no se puede
+   * crear desde acá: los campos están trabados. Sin este corte el tilde
+   * se prendía, pedía "completalo arriba" donde ya no se puede escribir
+   * y de paso apagaba el botón de reintentar el cobro.
+   */
+  const accesoSinDatos = !!creado && (!email.trim() || dniLimpio.length < 6)
+  /** Si se le ofrece cobrar en el alta: plan pago y alguien a quien la base le deja cobrar. */
+  const ofrecePago = !isEdit && !!planElegido && planElegido.price > 0 && can('pagos.registrar')
+  /** Ficha creada con plan pago y sin cuota: el alta quedó a medias antes de generarla. */
+  const sinCuota = ofrecePago && !!creado && !creado.paymentId
+  /**
+   * "Paga ahora" tildado y sin medio. Antes eso pasaba de largo: no
+   * cobraba, el formulario se cerraba como si hubiera salido bien, y la
+   * cuota quedaba pendiente con la clienta creyendo que había pagado.
+   */
+  const faltaMedio = ofrecePago && !sinCuota && metodo === ''
+  /**
+   * Qué le falta al alta ya creada, en el orden en que el botón lo hace.
+   * Con `creado` y nada pendiente, el único botón que queda es "Listo".
+   */
+  const pendiente: 'cobro' | 'acceso' | null = !creado
+    ? null
+    : ofrecePago && metodo !== null && creado.paymentId && !cobroHecho
+      ? 'cobro'
+      : puedeAcceso && !accesoHecho
+        ? 'acceso'
+        : null
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (enCurso.current) return
+    enCurso.current = true
     setSaving(true)
     setError(null)
     try {
@@ -101,69 +174,119 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
         return
       }
 
-      const { id: studentId, paymentId } = await createStudent(
-        { ...input, planId: planId || undefined, planDesde: planId ? planDesde : undefined },
-        plans,
-        settings
-      )
+      // La ficha se crea UNA vez. Si ya está, esto es seguir con lo que
+      // faltó, y volver a llamar a createStudent sería duplicarla.
+      let alta = creado
+      if (!alta) {
+        try {
+          const r = await createStudent(
+            {
+              ...input,
+              id: idFicha,
+              planId: planId || undefined,
+              planDesde: planId ? planDesde : undefined,
+            },
+            plans,
+            settings
+          )
+          alta = { studentId: r.id, paymentId: r.paymentId, falta: null }
+          setCreado(alta)
+        } catch (err) {
+          // La ficha quedó guardada y algo de después no. Desde acá el
+          // formulario ya no crea: lo que falta del alta se completa en la
+          // ficha, y el acceso, si se pidió, todavía se puede crear acá.
+          if (err instanceof AltaIncompleta) {
+            const falta = `${err.message} Completalo desde su ficha.`
+            setCreado({ studentId: err.studentId, paymentId: null, falta })
+            await refresh()
+            setAviso(
+              falta + (puedeAcceso ? ' El acceso todavía no se creó: lo podés crear desde acá.' : '')
+            )
+            return
+          }
+          throw err
+        }
+      }
+      // Lo que quedó sin guardar se sigue diciendo mientras dure el alta.
+      const antes = alta.falta ? `${alta.falta} ` : ''
+      setAviso(alta.falta)
 
       // EL COBRO VA APARTE Y DESPUÉS, igual que el acceso y por el mismo
       // motivo: la ficha, la membresía y la cuota ya están guardadas. Si el
       // cobro falla —no tiene permiso, la promo se agotó, la base rechaza—
       // no se pierde el alta: queda la cuota pendiente, que es exactamente
       // el estado que tenía este formulario hasta hoy.
-      let cobro: string | null = null
-      if (metodo && paymentId) {
+      let cobro = cobroTexto
+      if (metodo && alta.paymentId && !cobroHecho) {
         try {
-          const r = await cobrarCuota(paymentId, metodo, cupon.trim() || null)
+          const r = await cobrarCuota(alta.paymentId, metodo, cupon.trim() || null)
           cobro =
             `Cobrado: $${r.cobrado.toLocaleString('es-AR')}` +
             (r.promo ? ` con "${r.promo}"` : '') +
             ` · comprobante N° ${String(r.comprobante).padStart(8, '0')}.`
+          setCobroHecho(true)
+          setCobroTexto(cobro)
         } catch (err) {
-          await refresh()
-          setAviso(
-            `El cliente y su plan se crearon bien, pero el cobro no salió: ${
-              err instanceof Error ? err.message : 'error desconocido'
-            } La cuota quedó pendiente en Pagos y se puede cobrar desde ahí.`
-          )
-          setSaving(false)
-          return
+          const motivo = err instanceof Error ? err.message : 'error desconocido'
+          // "Ya está cobrada" es que el intento anterior SÍ entró y lo que
+          // se perdió fue la respuesta. No es una falla: el cobro está
+          // hecho, y el texto de la base trae el comprobante.
+          if (/ya está cobrada/i.test(motivo)) {
+            cobro = `${motivo.replace(/\.$/, '')}: el cobro anterior sí había entrado.`
+            setCobroHecho(true)
+            setCobroTexto(cobro)
+          } else {
+            await refresh()
+            setAviso(
+              `${antes}El cliente y su plan se crearon bien, pero el cobro no salió: ${motivo}` +
+                ' Podés reintentarlo acá, o destildar "Paga ahora" y dejar la cuota pendiente en Pagos.' +
+                // El acceso va después del cobro, así que tampoco se hizo.
+                // Sin decirlo, "Cerrar" la dejaba sin acceso y sin mail.
+                (puedeAcceso && !accesoHecho
+                  ? ' El acceso todavía no se creó: sale con el cobro, o con "Crear el acceso" si destildás "Paga ahora".'
+                  : '')
+            )
+            return
+          }
         }
       }
 
       // El acceso va después y aparte: si falla, la ficha ya está guardada
       // —con su plan y su cuota— y lo único que queda pendiente es el
-      // acceso, que se reintenta desde la ficha. Meterlo en el mismo try
-      // sin distinguir haría perder el alta por un mail mal escrito.
-      if (puedeAcceso) {
+      // acceso. Meterlo en el mismo try sin distinguir haría perder el
+      // alta por un mail mal escrito.
+      let accesoRecien = false
+      if (puedeAcceso && !accesoHecho) {
         try {
           const r = await createSystemUser({
             email: email.trim(),
             fullName: name,
             role: 'alumno',
-            studentId,
+            studentId: alta.studentId,
           })
+          // Con la cuenta creada el acceso ya está, salga o no el mail:
+          // pedirlo de nuevo chocaría con la cuenta que existe. El mail se
+          // reenvía desde la ficha.
+          setAccesoHecho(true)
+          accesoRecien = true
           await refresh()
           if (!r.mailEnviado) {
             // El motivo va primero y completo: es lo único que dice si hay
             // que ir a Vercel, a Resend o a corregir la ficha. Antes este
             // cartel decía sólo "no se pudo enviar" y había que adivinar.
             setAviso(
-              `Cliente creado y acceso creado, pero el mail no salió. ${cobro ? `${cobro} ` : ''}${r.mailMotivo ?? ''}` +
+              `${antes}Cliente creado y acceso creado, pero el mail no salió. ${cobro ? `${cobro} ` : ''}${r.mailMotivo ?? ''}` +
                 ` Mientras tanto pasale el acceso a mano: entra con ${email.trim()} y su documento, y al entrar le vamos a pedir que la cambie. También podés reintentar el mail desde su ficha.`
             )
-            setSaving(false)
             return
           }
         } catch (err) {
           await refresh()
           setAviso(
-            `El cliente se creó bien, pero el acceso no: ${
+            `${antes}El cliente se creó bien${cobro ? ` (${cobro})` : ''}, pero el acceso no: ${
               err instanceof Error ? err.message : 'error desconocido'
-            }. Se puede crear desde su ficha.`
+            }. Podés reintentarlo acá o crearlo desde su ficha.`
           )
-          setSaving(false)
           return
         }
       }
@@ -171,15 +294,25 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
       await refresh()
       // Con cobro no se cierra solo: el número de comprobante es lo único
       // que la pantalla no vuelve a mostrar sin ir a buscarlo, y es lo que
-      // el mostrador le dice a la clienta que tiene enfrente.
-      if (cobro) {
-        setAviso(`Cliente creado. ${cobro}`)
-        setSaving(false)
+      // el mostrador le dice a la clienta que tiene enfrente. Con algo sin
+      // guardar tampoco: cerrar solo lo haría pasar por un alta completa.
+      if (cobro || alta.falta) {
+        setAviso(
+          [
+            alta.falta,
+            cobro ? `Cliente creado. ${cobro}` : null,
+            accesoRecien ? 'El acceso quedó creado y le mandamos el mail.' : null,
+          ]
+            .filter(Boolean)
+            .join(' ')
+        )
         return
       }
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo guardar el cliente')
+    } finally {
+      enCurso.current = false
       setSaving(false)
     }
   }
@@ -192,7 +325,10 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/20 backdrop-blur-sm"
-      onClick={onClose}
+      // Mientras guarda no se cierra por ningún lado: cerrar no frena lo
+      // que ya salió hacia la base —la ficha, el cobro, el mail siguen
+      // solos—, sólo esconde cómo terminó.
+      onClick={saving ? undefined : onClose}
     >
       <form
         onSubmit={handleSubmit}
@@ -206,13 +342,18 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
+            disabled={saving}
+            className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground disabled:opacity-40"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         <div className="px-6 py-5 space-y-4 overflow-y-auto">
+          {/* Con la ficha ya creada, los datos quedan trabados: el botón de
+              abajo ya no los guarda, y dejarlos editables haría creer que
+              sí. Se corrigen desde la ficha. */}
+          <fieldset disabled={!!creado} className="space-y-4 min-w-0 disabled:opacity-70">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className={labelClass}>Nombre completo *</label>
@@ -283,11 +424,12 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
               A quién llamar si le pasa algo en clase. Queda protegido como las notas médicas.
             </p>
           </div>
+          </fieldset>
 
           {!isEdit && (
             <div>
               <label className={labelClass}>Asignar plan (opcional)</label>
-              <select value={planId} onChange={(e) => setPlanId(e.target.value)} className={inputClass}>
+              <select value={planId} onChange={(e) => setPlanId(e.target.value)} disabled={!!creado} className={`${inputClass} disabled:opacity-70`}>
                 <option value="">Sin plan por ahora</option>
                 {plans.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -303,16 +445,19 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
                     type="date"
                     value={planDesde}
                     onChange={(e) => setPlanDesde(e.target.value)}
-                    className={inputClass}
+                    disabled={!!creado}
+                    className={`${inputClass} disabled:opacity-70`}
                   />
                   <p className="text-[11px] text-muted-foreground mt-1.5">
                     {planElegido && planDesde
                       ? `Vigente del ${fechaCorta(planDesde)} al ${fechaCorta(vigenciaHasta(planDesde, planElegido))} — el último día se usa.`
                       : 'Se crea la membresía desde ese día.'}{' '}
                     {planDesde > hoyISO() && 'Hasta esa fecha no va a poder reservar. '}
-                    {metodo
-                      ? 'Se cobra ahora y queda el comprobante.'
-                      : 'La deuda queda generada en Pagos (si el plan no es gratuito).'}
+                    {sinCuota
+                      ? 'No se cobró nada: el plan no quedó asignado.'
+                      : metodo
+                        ? 'Se cobra ahora y queda el comprobante.'
+                        : 'La deuda queda generada en Pagos (si el plan no es gratuito).'}
                   </p>
 
                   {/* PAGA ACÁ O QUEDA LA DEUDA.
@@ -327,8 +472,14 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
                       dejar cobrar: `cobrar_cuota()` exige
                       `pagos.registrar`, así que ofrecérselo a recepción sin
                       esa clave sería ofrecer una acción que va a fallar. */}
-                  {planElegido && planElegido.price > 0 && can('pagos.registrar') && (
-                    <div className="rounded-xl border border-border px-3.5 py-3 mt-3 space-y-3">
+                  {ofrecePago && planElegido && !sinCuota && (
+                    // Cobrado, se traba: el cobro ya salió y tocar el medio
+                    // o el cupón no lo cambia. Y sin cuota no hay qué
+                    // cobrar, así que ni se muestra.
+                    <fieldset
+                      disabled={cobroHecho}
+                      className="rounded-xl border border-border px-3.5 py-3 mt-3 space-y-3 min-w-0 disabled:opacity-70"
+                    >
                       <label className="flex items-start gap-2.5 cursor-pointer">
                         <input
                           type="checkbox"
@@ -358,6 +509,12 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
                               value={metodo || null}
                               onChange={(m) => setMetodo(m)}
                             />
+                            {faltaMedio && (
+                              <p className="text-[11px] font-semibold text-aviso-fuerte mt-1.5">
+                                Elegí con qué paga, o destildá &quot;Paga ahora&quot; para dejar la
+                                cuota pendiente.
+                              </p>
+                            )}
                           </div>
                           <div>
                             <label className={labelClass}>Cupón (opcional)</label>
@@ -381,7 +538,7 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
                           </p>
                         </>
                       )}
-                    </div>
+                    </fieldset>
                   )}
                 </>
               )}
@@ -396,6 +553,7 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
                   type="checkbox"
                   checked={conAcceso}
                   onChange={(e) => setConAcceso(e.target.checked)}
+                  disabled={accesoHecho || accesoSinDatos}
                   className="mt-0.5 w-4 h-4 accent-[var(--color-primary)]"
                 />
                 <span className="min-w-0">
@@ -417,6 +575,12 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
                   opción y creale el acceso más adelante desde su ficha.
                 </p>
               )}
+              {accesoSinDatos && !accesoHecho && !conAcceso && (
+                <p className="text-[11px] text-muted-foreground mt-2">
+                  Sin mail o sin documento no se le puede crear desde acá. Se cargan en su ficha y
+                  el acceso se crea desde ahí.
+                </p>
+              )}
             </div>
           )}
 
@@ -430,25 +594,51 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
         </div>
 
         <div className="flex gap-3 px-6 py-4 border-t border-border shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors"
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={saving || !!faltaParaAcceso}
-            className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
-          >
-            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-            {isEdit
-              ? 'Guardar cambios'
-              : puedeAcceso
-                ? 'Crear cliente y avisarle'
-                : 'Crear cliente'}
-          </button>
+          {creado && !pendiente && !saving ? (
+            // Terminado: un solo botón, que cierra. No hay nada que el
+            // formulario pueda volver a guardar sin duplicar. Y recién
+            // cuando terminó de verdad: las banderas se prenden antes del
+            // último refresco, y un "Listo" apretado en ese segundo
+            // cerraba antes del comprobante o del aviso de que el mail no
+            // salió.
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+            >
+              Listo
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={saving}
+                className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                {/* Con la ficha creada, cerrar no deshace nada. */}
+                {creado ? 'Cerrar' : 'Cancelar'}
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !!faltaParaAcceso || faltaMedio}
+                className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isEdit
+                  ? 'Guardar cambios'
+                  : pendiente === 'cobro'
+                    ? 'Cobrar ahora'
+                    : pendiente === 'acceso'
+                      ? 'Crear el acceso'
+                      : creado
+                        ? 'Terminando…'
+                        : puedeAcceso
+                          ? 'Crear cliente y avisarle'
+                          : 'Crear cliente'}
+              </button>
+            </>
+          )}
         </div>
       </form>
     </div>

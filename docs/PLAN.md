@@ -1918,6 +1918,59 @@ Verificado por la pantalla sobre `recovery_max`, que vale 0 y por eso
 prenderla un rato no le cambia nada a nadie: encendida, la base pasó a
 `rige = true`; apagada con su confirmación, volvió. Terminó como empezó.
 
+### ✅ Las dos trampas del cobro en el mostrador (25/09) — sin migración
+
+Salieron de auditar el sistema antes del arranque del lunes 28/09, y las
+dos tocaban plata.
+
+**El "Cobrar" del panel de la Agenda cobraba suelto.** Abría "Registrar
+pago", que inserta un cobro nuevo y no toca ninguna cuota: con la clienta
+parada adelante y la cuota del alta pendiente, la plata entraba y la deuda
+seguía abierta, con mail de cobranza incluido; cobrarla otra vez era
+cobrar dos veces. Con la oferta de renovación era peor, porque el período
+lo crea el pago *de esa cuota* (`0041`). Ahora "Cobrar" abre "Cobrar
+pago" sobre la deuda más vieja o, si no debe, sobre la oferta; el cobro
+suelto queda como "Otro cobro", un link chico para lo que se cobra aparte.
+El formulario del cobro suelto, que en Pagos pasó a llamarse "Otro
+cobro", avisa si el cliente tiene cuotas abiertas —con monto y
+vencimiento— y ofrece "Cobrar esta".
+
+La revisión adversarial del arreglo encontró lo grave: después de
+"Renovar" y cobrar la cuota nueva, la oferta vieja seguía viva hasta el
+proceso diario y el botón volvía a apuntarle. Cobrarla no crea nada y el
+mes se paga dos veces. `ofertaYaResuelta` (`lib/api.ts`) es el mismo
+predicado que `renovar_por_pago`, y "Cobrar pago" se niega a cobrar esas
+ofertas: la guarda va en el modal porque por ahí pasan todos los caminos,
+también la fila de Pagos, que ya tenía el hueco.
+
+**El alta duplicaba.** Terminaba con un cartel y "Crear cliente y
+avisarle" activo, tanto al cobrar bien como ante cualquier falla, y la base
+no tiene unicidad por DNI ni por mail. Ahora el formulario recuerda lo que
+ya creó: el botón nunca vuelve a crear la ficha, sigue con lo que faltó
+("Cobrar ahora", "Crear el acceso") o queda "Listo", recién cuando terminó
+de verdad. Los datos se traban, nada se cierra mientras guarda, y
+`createStudent` avisa con `AltaIncompleta` si la ficha se guardó y lo de
+después no. El id de la ficha lo elige el formulario, así que un reintento
+tras perder la respuesta choca con la clave primaria en vez de duplicar. Y
+"Paga ahora" sin medio elegido ya no cierra como si hubiera cobrado.
+
+Verificado en el navegador con tres altas de prueba, sin mail para que no
+se creara acceso ni saliera correo. El cobro se forzó a fallar con un
+cupón inexistente, así no se gastó un comprobante ni se tocó la caja
+abierta. Reintentar dejó **1 ficha, 1 membresía y 1 cuota** en la base;
+destildar "Paga ahora" dejó un solo botón, "Listo"; mientras guardaba, la
+X y "Cancelar" estaban apagados. El choque de clave primaria se probó
+contra una ficha existente: `23505` sobre `students_pkey`, sin insertar
+nada. En la Agenda, "Cobrar" abrió la cuota de $45.000 y, sin deuda, el
+botón dijo "Otro cobro". `ofertaYaResuelta` se probó aparte con cinco
+casos, sobre el código real. Las tres fichas se borraron; la cascada se
+llevó sus membresías, cuotas y avisos. Las pruebas gastaron números de
+credencial: después de borrarlas hay que devolver la secuencia con
+`select setval('public.member_seq', (select max(member_no) from public.students), true);`.
+
+Queda sin hacer, anotado en §0: la promo limitada a un plan no se aplica a
+la renovación (`promociones_para` no encuentra el plan de la oferta).
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
