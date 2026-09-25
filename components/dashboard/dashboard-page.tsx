@@ -16,7 +16,7 @@ import {
   ClipboardCheck,
   Wallet,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, numeroDeWhatsApp } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { TomarAsistencia } from '@/components/asistencia/tomar-asistencia'
 import { fetchResumenPlata, type ResumenPlata } from '@/lib/caja-api'
@@ -26,7 +26,7 @@ import type { PageKey } from '../layout/sidebar'
 
 /** Link de WhatsApp para avisar al alumno lo que dice la alerta. */
 function alertReminderLink(message: string, name: string, phone: string): string | null {
-  const digits = phone.replace(/\D/g, '')
+  const digits = numeroDeWhatsApp(phone)
   if (!digits) return null
   const text = `¡Hola ${name.split(' ')[0]}! Te escribimos del estudio 🙂 ${message}. Cualquier cosa respondenos por acá.`
   return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`

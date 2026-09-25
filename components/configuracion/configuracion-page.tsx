@@ -32,6 +32,7 @@ import {
   Landmark,
   Tag,
   Send,
+  KeyRound,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
@@ -54,6 +55,7 @@ import {
   setTeacherUser,
   createSystemUser,
   deleteSystemUser,
+  blanquearClaveStaff,
   reactivateSystemUser,
   updateUserRole,
   createDiscipline,
@@ -965,6 +967,13 @@ function UsersSection() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
+  /**
+   * A quién se le está blanqueando la clave, con la temporal que escribe
+   * el admin. Va en la fila y no en un `prompt`: la clave no puede quedar
+   * en un cartel del navegador, y el de Instagram los descarta solos.
+   */
+  const [blanqueo, setBlanqueo] = useState<{ id: string; clave: string; error: string | null } | null>(null)
+  const [blanqueado, setBlanqueado] = useState<string | null>(null)
 
   const load = () => {
     fetchProfiles()
@@ -1003,6 +1012,23 @@ function UsersSection() {
       load()
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'No se pudo dar de baja')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const handleBlanquear = async (u: Profile) => {
+    if (!blanqueo || blanqueo.id !== u.id) return
+    setBusyId(u.id)
+    try {
+      await blanquearClaveStaff(u.id, blanqueo.clave)
+      setBlanqueo(null)
+      setBlanqueado(u.id)
+    } catch (err) {
+      const error = err instanceof Error ? err.message : 'No se pudo blanquear la clave'
+      // Sobre el estado de ahora y sólo si sigue siendo esta fila: si mientras
+      // giraba se abrió otra, el error no la pisa.
+      setBlanqueo((prev) => (prev?.id === u.id ? { ...prev, error } : prev))
     } finally {
       setBusyId(null)
     }
@@ -1073,6 +1099,23 @@ function UsersSection() {
                       </option>
                     ))}
                   </select>
+                  {/* Blanquear la clave: sólo al personal. A una clienta
+                      se le blanquea desde su ficha, donde vuelve a su
+                      documento. */}
+                  {u.active && u.role !== 'alumno' && (
+                    <button
+                      disabled={busyId !== null}
+                      onClick={() => {
+                        setBlanqueado(null)
+                        setBlanqueo(blanqueo?.id === u.id ? null : { id: u.id, clave: '', error: null })
+                      }}
+                      className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                      aria-label={`Blanquear la clave de ${u.email}`}
+                      title="Blanquear la clave"
+                    >
+                      <KeyRound className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                   {u.active ? (
                     <button
                       disabled={busyId === u.id}
@@ -1095,6 +1138,69 @@ function UsersSection() {
                     </button>
                   )}
                 </>
+              )}
+              {blanqueo?.id === u.id && (
+                <form
+                  className="basis-full flex flex-col gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2.5"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    handleBlanquear(u)
+                  }}
+                >
+                  <label htmlFor={`clave-${u.id}`} className="text-xs font-semibold text-foreground">
+                    Clave temporal para {u.fullName || u.email}
+                  </label>
+                  <input
+                    id={`clave-${u.id}`}
+                    type="text"
+                    autoComplete="off"
+                    // El teclado del celular pone mayúscula y agrega un espacio
+                    // al aceptar una sugerencia: la clave quedaría distinta de
+                    // la que se le dicta a la persona.
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    value={blanqueo.clave}
+                    onChange={(e) => setBlanqueo({ ...blanqueo, clave: e.target.value, error: null })}
+                    placeholder="Al menos 8 caracteres"
+                    className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Pasásela en persona. Al entrar con ella le vamos a pedir que elija una propia.
+                  </p>
+                  {blanqueo.clave !== blanqueo.clave.trim() && (
+                    <p className="text-[11px] text-aviso-fuerte">Sacale el espacio del principio o del final.</p>
+                  )}
+                  {blanqueo.error && <p className="text-[11px] text-destructive-fuerte">{blanqueo.error}</p>}
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={
+                        busyId === u.id ||
+                        blanqueo.clave.length < 8 ||
+                        blanqueo.clave !== blanqueo.clave.trim()
+                      }
+                      className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      {busyId === u.id && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      Blanquear
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBlanqueo(null)}
+                      // Mientras corre no cancela nada: el pedido ya salió.
+                      disabled={busyId === u.id}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
+              )}
+              {blanqueado === u.id && (
+                <p className="basis-full text-[11px] text-exito-fuerte bg-exito-suave rounded-lg px-3 py-2">
+                  Listo: entra con esa clave y al entrar elige una nueva.
+                </p>
               )}
             </div>
           )

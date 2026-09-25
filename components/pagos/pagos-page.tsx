@@ -21,7 +21,7 @@ import {
   Ban,
   RefreshCw,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, numeroDeWhatsApp } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { registerPayment, collectPayment, createMpLink, syncMpPayments, voidPayment, precioConAjuste, precioConPromo, settingText, esOferta, ofertaYaResuelta, hoyISO, promocionesPara, cobrarCuota, type PromoAplicable } from '@/lib/api'
 import type { Payment, PaymentMethod, Student } from '@/lib/types'
@@ -80,7 +80,8 @@ const fechaCorta = (iso: string) => new Date(`${iso}T00:00`).toLocaleDateString(
 
 /** Link de WhatsApp con el mensaje de cobranza —o de renovación— ya escrito. */
 export function paymentReminderLink(payment: Payment, phone: string): string | null {
-  const digits = phone.replace(/\D/g, '')
+  // Con el 549 puesto: sin él, un 381… de diez dígitos iba a Serbia.
+  const digits = numeroDeWhatsApp(phone)
   if (!digits) return null
   const firstName = payment.studentName.split(' ')[0]
   const monto = `$${payment.amount.toLocaleString('es-AR')}`
@@ -864,7 +865,7 @@ function MpLinkModal({ payment, onClose }: { payment: Payment; onClose: () => vo
 
   const waHref = (() => {
     if (!link || !student?.phone) return null
-    const digits = student.phone.replace(/\D/g, '')
+    const digits = numeroDeWhatsApp(student.phone)
     if (!digits) return null
     const firstName = student.name.split(' ')[0]
     const text = `Hola ${firstName}! Te paso el link para abonar ${payment.planName} ($${payment.amount.toLocaleString('es-AR')}): ${link}`

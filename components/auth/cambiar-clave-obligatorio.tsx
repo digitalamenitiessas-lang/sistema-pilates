@@ -39,9 +39,16 @@ const labelClass = 'text-xs font-semibold text-muted-foreground uppercase tracki
 export function CambiarClaveObligatorio({
   onListo,
   onSalir,
+  conDocumento = true,
 }: {
   onListo: () => void
   onSalir: () => void
+  /**
+   * Si entró con su documento (clienta) o con una clave temporal que le
+   * dio el admin (staff blanqueado). La pantalla vale para todos los roles
+   * y el texto tiene que decir con qué entró de verdad.
+   */
+  conDocumento?: boolean
 }) {
   const estudio = useNombreDelEstudio()
   const [password, setPassword] = useState('')
@@ -63,7 +70,9 @@ export function CambiarClaveObligatorio({
     if (err) {
       setError(
         /different from the old|should be different/i.test(err.message)
-          ? 'La contraseña nueva tiene que ser distinta a tu documento'
+          ? conDocumento
+            ? 'La contraseña nueva tiene que ser distinta a tu documento'
+            : 'La contraseña nueva tiene que ser distinta a la temporal'
           : err.message || 'No se pudo cambiar la contraseña'
       )
       setSaving(false)
@@ -83,8 +92,9 @@ export function CambiarClaveObligatorio({
           <div>
             <h1 className="text-base font-bold text-foreground">Elegí tu contraseña</h1>
             <p className="text-xs text-muted-foreground mt-1">
-              Entraste con tu documento, que no es un secreto. Elegí una contraseña propia para
-              seguir — es lo único que falta.
+              {conDocumento
+                ? 'Entraste con tu documento, que no es un secreto. Elegí una contraseña propia para seguir — es lo único que falta.'
+                : 'Entraste con una clave temporal. Elegí una contraseña propia para seguir — es lo único que falta.'}
             </p>
           </div>
 

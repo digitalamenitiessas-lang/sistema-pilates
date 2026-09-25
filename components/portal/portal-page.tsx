@@ -1161,15 +1161,64 @@ export function PortalPage() {
     const t = new URLSearchParams(window.location.search).get('t')
     return PESTANAS.some((p) => p.key === t) ? (t as Pestana) : 'inicio'
   })
-  const [weekOffset, setWeekOffset] = useState(0)
-  const [day, setDay] = useState(Math.min((new Date().getDay() + 6) % 7, 5))
+  /**
+   * En qué semana y qué día abre la grilla: el primer día, de acá al sábado
+   * de la semana que viene, en que ella puede reservar alguna clase que
+   * todavía no empezó; si no hay ninguno —sin plan, o un plan que arranca
+   * más adelante—, el primer día con alguna clase por delante.
+   *
+   * Arrancaba siempre en "esta semana, hoy", con el domingo recortado al
+   * sábado. El domingo eso abría la semana que ya terminó, con todo
+   * deshabilitado y sin decir por qué, y lo mismo el sábado pasada la
+   * última clase. El domingo 27/09 es justo el día en que la tanda de la
+   * apertura entra por primera vez, con planes que arrancan el 29: abrir
+   * en el lunes 28 le mostraría otra grilla donde no puede reservar nada.
+   *
+   * Se calcula una vez, al montar: después manda lo que ella toque. Día y
+   * hora salen de UNA lectura del reloj del estudio (`ahoraDelEstudio`),
+   * no del celular, que puede estar en otro huso.
+   */
+  const [arranque] = useState(() => {
+    const { fecha: hoyFecha, hora } = ahoraDelEstudio()
+    const lunes = mondayOf(hoyFecha)
+    const excepcion = (classId: string, fecha: string) =>
+      occurrences.find((o) => o.classId === classId && o.date === fecha)
+    const quedaAlguna = (fecha: string, d: number) =>
+      classes.some((c) => {
+        if (c.dayOfWeek !== d || c.kind === 'especial') return false
+        const exc = excepcion(c.id, fecha)
+        if (exc?.status === 'suspendida') return false
+        return fecha > hoyFecha || (exc?.startTime ?? c.time).slice(0, 5) > hora
+      })
+    const propias = memberships.filter(
+      (m) => m.studentId === me?.id && m.status !== 'cancelada' && m.status !== 'suspendida'
+    )
+    const puedeReservar = (fecha: string) =>
+      propias.some((m) => m.startDate <= fecha && m.endDate >= fecha && m.classesTotal - m.classesUsed > 0)
+
+    const dias: { semana: number; dia: number; fecha: string }[] = []
+    for (let semana = 0; semana <= 1; semana++) {
+      for (let d = 0; d <= 5; d++) {
+        const fecha = addDays(lunes, semana * 7 + d)
+        if (fecha >= hoyFecha && quedaAlguna(fecha, d)) dias.push({ semana, dia: d, fecha })
+      }
+    }
+    const elegido = dias.find((x) => puedeReservar(x.fecha)) ?? dias[0]
+    return elegido
+      ? { weekStart: addDays(lunes, elegido.semana * 7), dia: elegido.dia }
+      : { weekStart: addDays(lunes, 7), dia: 0 }
+  })
+  // La semana como FECHA y no como "cuántas semanas desde hoy": con un
+  // desplazamiento, el portal que quedaba abierto del domingo al lunes
+  // saltaba una semana de más, porque "esta semana" cambiaba sola.
+  const [weekStart, setWeekStart] = useState(arranque.weekStart)
+  const [day, setDay] = useState(arranque.dia)
   const [occupancy, setOccupancy] = useState<Map<string, Occupancy>>(new Map())
   const [busyId, setBusyId] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
   const [showChangePassword, setShowChangePassword] = useState(false)
   const [aCancelar, setACancelar] = useState<Reservation | null>(null)
 
-  const weekStart = addDays(mondayOf(), weekOffset * 7)
 
   // El ahora del estudio, y se refresca solo. Leerlo una vez por render
   // alcanzaba mientras la comparación era por fecha; ahora que también es
@@ -1980,8 +2029,10 @@ export function PortalPage() {
           {/* Navegación de semana */}
           <div className="flex items-center justify-between mb-2.5">
             <button
-              onClick={() => setWeekOffset((w) => Math.max(0, w - 1))}
-              disabled={weekOffset === 0}
+              onClick={() => setWeekStart((w) => addDays(w, -7))}
+              // Hasta la semana cuyo sábado todavía no pasó: más atrás es una
+              // grilla entera deshabilitada, lo que este arranque vino a evitar.
+              disabled={addDays(weekStart, -2) < today}
               aria-label="Semana anterior"
               className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground disabled:opacity-30"
             >
@@ -1991,7 +2042,7 @@ export function PortalPage() {
               Semana del {pretty(weekStart)} al {pretty(addDays(weekStart, 5))}
             </p>
             <button
-              onClick={() => setWeekOffset((w) => w + 1)}
+              onClick={() => setWeekStart((w) => addDays(w, 7))}
               aria-label="Semana siguiente"
               className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground"
             >

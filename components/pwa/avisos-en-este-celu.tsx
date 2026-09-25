@@ -17,9 +17,9 @@
  */
 
 import { useEffect, useState } from 'react'
-import { BellOff, Loader2, Smartphone } from 'lucide-react'
+import { BellOff, BellRing, Loader2, Smartphone } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { pushSupported, getPushSubscription, enablePush, disablePush } from '@/lib/api'
+import { pushSupported, getPushSubscription, enablePush, disablePush, probarAvisoEnEsteDispositivo } from '@/lib/api'
 
 type Estado = 'off' | 'on' | 'busy' | 'unsupported'
 
@@ -34,6 +34,54 @@ export function AvisosEnEsteCelu({
 }) {
   const [estado, setEstado] = useState<Estado>('unsupported')
   const [error, setError] = useState<string | null>(null)
+  /**
+   * La prueba: un aviso que manda el servidor a este dispositivo. Activar
+   * los avisos sólo guarda la suscripción; que lleguen depende de la clave
+   * del servidor y del servicio del teléfono, y hasta que alguien lo prueba
+   * no hay forma de saberlo. El 25/09 no le había llegado ninguno a nadie.
+   */
+  const [prueba, setPrueba] = useState<{ estado: 'mandando' | 'ok' | 'error'; texto: string } | null>(null)
+
+  const probar = async () => {
+    setPrueba({ estado: 'mandando', texto: 'Mandando…' })
+    try {
+      await probarAvisoEnEsteDispositivo()
+      setPrueba({
+        estado: 'ok',
+        texto: 'Listo: tendría que llegarte en unos segundos. Si no llega, avisale a Matías.',
+      })
+    } catch (err) {
+      setPrueba({ estado: 'error', texto: err instanceof Error ? err.message : 'No se pudo mandar la prueba' })
+    }
+  }
+
+  const botonPrueba =
+    estado === 'on' ? (
+      <div className="space-y-1">
+        <button
+          onClick={probar}
+          disabled={prueba?.estado === 'mandando'}
+          className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-border bg-card text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors disabled:opacity-60"
+        >
+          {prueba?.estado === 'mandando' ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <BellRing className="w-3.5 h-3.5" />
+          )}
+          Mandar un aviso de prueba
+        </button>
+        {prueba && prueba.estado !== 'mandando' && (
+          <p
+            className={cn(
+              'text-[11px] text-center',
+              prueba.estado === 'ok' ? 'text-exito-fuerte' : 'text-destructive-fuerte'
+            )}
+          >
+            {prueba.texto}
+          </p>
+        )}
+      </div>
+    ) : null
 
   useEffect(() => {
     if (!pushSupported()) return
@@ -87,6 +135,7 @@ export function AvisosEnEsteCelu({
           </span>
         </button>
         {error && <p className="text-[11px] text-destructive-fuerte px-4 pb-3">{error}</p>}
+        {botonPrueba && <div className="px-4 pb-3">{botonPrueba}</div>}
       </div>
     )
   }
@@ -102,6 +151,7 @@ export function AvisosEnEsteCelu({
         {texto}
       </button>
       {error && <p className="text-[11px] text-destructive-fuerte mt-1.5 text-center">{error}</p>}
+      {botonPrueba && <div className="mt-2">{botonPrueba}</div>}
     </div>
   )
 }

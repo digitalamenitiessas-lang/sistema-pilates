@@ -3174,7 +3174,13 @@ async function adminApi<T>(
   const json = await res.json().catch(() => null)
   if (!res.ok) {
     if (res.status === 401) throw new Error(VENCIDA)
-    throw new Error(json?.error ?? `Error del servidor (${res.status})`)
+    // El código y la respuesta viajan con el error para que la pantalla
+    // decida por ellos y no por el texto: `puedeBlanquear` es lo que hace
+    // aparecer "Blanquear la contraseña".
+    throw Object.assign(new Error(json?.error ?? `Error del servidor (${res.status})`), {
+      status: res.status,
+      datos: json ?? {},
+    })
   }
   return json as T
 }
@@ -3229,6 +3235,40 @@ export async function reenviarAcceso(studentId: string): Promise<ResultadoAcceso
     'PUT'
   )
   return { mailEnviado: Boolean(r?.mailEnviado), mailMotivo: r?.mailMotivo ?? null }
+}
+
+/**
+ * Blanquear la contraseña de una clienta que ya eligió la suya y no puede
+ * entrar: vuelve a ser su documento, con el cambio obligatorio al entrar,
+ * y le llega un mail avisándole a la dirección con la que entra. Deja una
+ * línea en la bitácora; si la base no deja escribirla, no se blanquea.
+ */
+export async function blanquearClaveClienta(
+  studentId: string
+): Promise<ResultadoAcceso & { usuario: string | null; fichaDistinta: string | null }> {
+  const r = await adminApi<{
+    ok: boolean
+    mailEnviado?: boolean
+    mailMotivo?: string | null
+    usuario?: string | null
+    fichaDistinta?: string | null
+  }>({ studentId, forzar: true }, 'PUT')
+  return {
+    mailEnviado: Boolean(r?.mailEnviado),
+    mailMotivo: r?.mailMotivo ?? null,
+    // Con qué mail entra: el de la CUENTA, que el blanqueo no cambia y que
+    // puede no ser el de la ficha.
+    usuario: r?.usuario ?? null,
+    fichaDistinta: r?.fichaDistinta ?? null,
+  }
+}
+
+/**
+ * Blanquear la clave de alguien del staff con una temporal que elige el
+ * admin; al entrar la tiene que cambiar. Sólo admin (`usuarios.crear_staff`).
+ */
+export async function blanquearClaveStaff(userId: string, password: string): Promise<void> {
+  await adminApi<{ ok: boolean }>({ userId, password }, 'PUT')
 }
 
 // ---------------------------------------------------------------
@@ -3399,6 +3439,30 @@ export async function enablePush(): Promise<void> {
       applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!) as BufferSource,
     }))
   await pushApi({ subscription: subscription.toJSON() }, 'POST')
+}
+
+/**
+ * Manda un aviso de prueba a este dispositivo, firmado por el servidor.
+ * Es la única forma de saber si los avisos llegan (ver /api/push/probar):
+ * si falla, el error trae el motivo.
+ */
+export async function probarAvisoEnEsteDispositivo(): Promise<void> {
+  const subscription = await getPushSubscription()
+  if (!subscription) throw new Error('Los avisos no están activos en este dispositivo')
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) throw new Error('Sesión expirada, volvé a ingresar')
+  const res = await fetch('/api/push/probar', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ endpoint: subscription.endpoint }),
+  })
+  if (!res.ok) {
+    const json = await res.json().catch(() => null)
+    throw new Error(json?.error ?? `Error del servidor (${res.status})`)
+  }
 }
 
 /** Da de baja el push de este dispositivo (navegador y servidor). */
