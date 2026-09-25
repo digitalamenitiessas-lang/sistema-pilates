@@ -104,14 +104,18 @@ S += T('Dar de alta un cliente', [
     'email y el DNI hacen falta para el último paso, que es crearle el acceso.',
     'Lo de salud —lesiones, embarazo, cirugías, medicación, contacto de emergencia— si lo '
     'tenés a mano. Se puede completar después.',
-    'En <b>Asignar plan</b> elegí el que lleva: eso le crea la membresía desde hoy y deja la '
-    'cuota generada en <b>Pagos</b>.',
+    'En <b>Asignar plan</b> elegí el que lleva, y en <b>Arranca el</b> la fecha en que empieza '
+    '(viene con la de hoy). Eso le crea la membresía y deja la cuota generada en <b>Pagos</b>.',
+    'Si paga en ese momento, tildá <b>Paga ahora</b> y elegí con qué paga. Sin medio elegido el '
+    'botón no se prende.',
     'Abajo, la casilla <b>Crearle el acceso y avisarle por mail</b> viene marcada. Dejala así.',
-    '<b>Crear cliente y avisarle</b>.',
-], aviso='el alta <b>no cobra</b>: deja la cuota esperando en Pagos. Si pagó en ese momento, '
-         'cobrala ahí —es el paso “Cobrar una cuota”—. Y si la casilla del acceso te avisa que '
-         'falta el email o falta el DNI, completalos arriba: la contraseña con la que entra <b>es '
-         'su documento</b>, así que sin DNI no hay acceso que crear.')
+    '<b>Crear cliente y avisarle</b>. Si cobró, la ventana queda abierta con el monto cobrado y '
+    'el número de comprobante: decíselo y tocá <b>Listo</b>.',
+], aviso='si algo sale a medias —el cobro no pasó, el acceso no se creó— aparece un cartel '
+         'amarillo y el botón cambia a <b>Cobrar ahora</b> o <b>Crear el acceso</b>: hace sólo lo '
+         'que faltó, <b>nunca crea otra ficha</b>. Y si la casilla del acceso te avisa que falta el '
+         'email o falta el DNI, completalos arriba antes de crear: la contraseña con la que entra '
+         '<b>es su documento</b>, así que sin DNI no hay acceso que crear.')
 
 S += T('El número de credencial', [
     'No hay que hacer nada: cada clienta recibe el suyo cuando se crea su ficha.',
@@ -140,7 +144,7 @@ S += T('Cobrar una cuota', [
          'queda guardado es <b>lo que entró de verdad</b>, no el precio de lista.')
 
 S += T('Cobrar algo que no es una cuota', [
-    '<b>Pagos</b> → <b>Registrar pago</b>.',
+    '<b>Pagos</b> → <b>Otro cobro</b>.',
     'Elegí el cliente, escribí el concepto y el monto, y el método.',
     'Confirmá.',
 ])

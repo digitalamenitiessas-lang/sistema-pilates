@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
-import { registerPayment, collectPayment, createMpLink, syncMpPayments, voidPayment, precioConAjuste, precioConPromo, settingText, esOferta, hoyISO, promocionesPara, cobrarCuota, type PromoAplicable } from '@/lib/api'
+import { registerPayment, collectPayment, createMpLink, syncMpPayments, voidPayment, precioConAjuste, precioConPromo, settingText, esOferta, ofertaYaResuelta, hoyISO, promocionesPara, cobrarCuota, type PromoAplicable } from '@/lib/api'
 import type { Payment, PaymentMethod, Student } from '@/lib/types'
 
 type FilterStatus = 'todos' | 'pagado' | 'pendiente' | 'renovacion' | 'vencido'
@@ -289,9 +289,11 @@ export function RegistrarPagoModal({
   student?: Student
 }) {
   const { refresh } = useData()
-  const { students, plans, paymentMethods, settings } = useStudio()
+  const { students, plans, payments, memberships, paymentMethods, settings } = useStudio()
 
   const [studentId, setStudentId] = useState(preseleccionado?.id ?? '')
+  /** La cuota que se eligió saldar desde el aviso de abajo: el modal pasa a ser el de cobrarla. */
+  const [cuota, setCuota] = useState<Payment | null>(null)
   // Con el cliente ya elegido se arranca con su plan cargado, que es lo
   // mismo que hace `applyPlanDefaults` cuando se lo elige a mano.
   const [concept, setConcept] = useState(preseleccionado?.membership?.planName ?? '')
@@ -304,6 +306,29 @@ export function RegistrarPagoModal({
   const [receiptNumber, setReceiptNumber] = useState<number | null>(null)
 
   const selectedStudent = students.find((s) => s.id === studentId)
+
+  /**
+   * Lo que ese cliente tiene sin cobrar: deudas y ofertas de renovación.
+   *
+   * Este formulario crea un cobro suelto y no salda nada. Con una cuota
+   * abierta, cobrar por acá dejaba la plata entrada y la deuda igual de
+   * pendiente —con mail de cobranza incluido—, y una oferta cobrada así
+   * no creaba el período nuevo. Por eso, si hay algo abierto, se dice
+   * arriba de todo y se ofrece cobrarlo por el camino que sí lo salda.
+   *
+   * Sin las ofertas ya resueltas: cobrarlas no crea nada y el mes se
+   * pagaría dos veces (ver `ofertaYaResuelta`).
+   */
+  const abiertas = studentId
+    ? payments
+        .filter(
+          (p) =>
+            p.studentId === studentId &&
+            (p.status === 'pendiente' || p.status === 'vencido') &&
+            !(esOferta(p) && ofertaYaResuelta(p, memberships))
+        )
+        .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+    : []
 
   // El mismo ajuste que aplica Cobrar. Sin esto, el mismo acto comercial
   // daba dos números distintos según por qué botón se entrara: cobrar una
@@ -352,6 +377,10 @@ export function RegistrarPagoModal({
   const labelClass =
     'text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block'
 
+  // El mismo modal que abre el "Cobrar" de la fila, con la misma salida:
+  // así cobrar la cuota desde acá es exactamente cobrarla desde Pagos.
+  if (cuota) return <CobrarModal payment={cuota} onClose={onClose} />
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/20 backdrop-blur-sm"
@@ -366,11 +395,19 @@ export function RegistrarPagoModal({
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
-              <h2 className="text-base font-bold text-foreground">Registrar pago</h2>
+              {/* "Otro cobro" y no "Registrar pago": con ese nombre era el
+                  botón obvio para cobrarle a quien viene a pagar su cuota,
+                  y es justo lo que este formulario no hace. */}
+              <div className="min-w-0">
+                <h2 className="text-base font-bold text-foreground">Otro cobro</h2>
+                <p className="text-[11px] text-muted-foreground">
+                  Algo que no figura como cuota. No salda ninguna ni renueva el plan.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
+                className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -393,6 +430,42 @@ export function RegistrarPagoModal({
                   ))}
                 </select>
               </div>
+
+              {abiertas.length > 0 && (
+                <div className="rounded-xl border border-aviso/50 bg-aviso-suave px-3 py-2.5 space-y-2">
+                  <p className="text-xs font-semibold text-aviso-fuerte">
+                    {abiertas.length === 1
+                      ? 'Tiene una cuota sin cobrar.'
+                      : `Tiene ${abiertas.length} cuotas sin cobrar.`}{' '}
+                    Si viene a pagar eso, cobralo desde acá: un cobro suelto la deja pendiente.
+                  </p>
+                  {/* El monto y la fecha van aparte del concepto, que es lo
+                      único que se corta: con dos cuotas del mismo plan, la
+                      fecha es lo que dice cuál es cuál. */}
+                  {abiertas.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-aviso-fuerte min-w-0 flex-1">
+                        <span className="block truncate">{p.planName || 'Cuota'}</span>
+                        <span className="block tabular-nums">
+                          ${p.amount.toLocaleString('es-AR')} ·{' '}
+                          {esOferta(p)
+                            ? `renovar hasta el ${fechaCorta(p.dueDate)}`
+                            : p.dueDate < hoyISO()
+                              ? `vencida el ${fechaCorta(p.dueDate)}`
+                              : `vence el ${fechaCorta(p.dueDate)}`}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setCuota(p)}
+                        className="shrink-0 px-2.5 py-1 rounded-lg bg-aviso-fuerte text-background text-[11px] font-semibold hover:opacity-90 transition-opacity"
+                      >
+                        Cobrar esta
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <div>
                 <label className={labelClass}>Concepto</label>
@@ -491,7 +564,16 @@ export function RegistrarPagoModal({
 
 export function CobrarModal({ payment, onClose }: { payment: Payment; onClose: () => void }) {
   const { refresh } = useData()
-  const { paymentMethods, settings } = useStudio()
+  const { paymentMethods, settings, memberships } = useStudio()
+  /**
+   * Una oferta de renovación cuyo período ya existe por otro camino (el
+   * mostrador lo asignó con "Renovar"). La base la cobra igual pero no
+   * crea nada (0041): sólo le deja una nota al pago, y el mes queda
+   * cobrado dos veces. La guarda va acá y no en cada botón porque este
+   * modal es por donde pasan todos: la fila de Pagos, el panel de la
+   * Agenda y el "Cobrar esta" del cobro suelto.
+   */
+  const yaResuelta = esOferta(payment) && ofertaYaResuelta(payment, memberships)
   const [method, setMethod] = useState<Method | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -673,7 +755,15 @@ export function CobrarModal({ payment, onClose }: { payment: Payment; onClose: (
               {/* Cobrar una renovación no es cobrar una deuda: es lo que
                   crea el período. Conviene decirlo acá, que es donde
                   alguien duda de si le está cobrando dos veces el mes. */}
-              {esOferta(payment) && (
+              {yaResuelta ? (
+                <div className="rounded-xl border border-aviso/50 bg-aviso-suave px-4 py-3 text-[11px] text-aviso-fuerte space-y-1">
+                  <p className="font-semibold">Esta renovación ya está resuelta: no la cobres.</p>
+                  <p>
+                    El período siguiente ya está asignado y tiene su propia cuota. Cobrar esta no
+                    crea nada y le cobraría el mes dos veces. El proceso diario la anula sola.
+                  </p>
+                </div>
+              ) : esOferta(payment) && (
                 <div className="rounded-xl border border-info/40 bg-info-suave px-4 py-3 text-[11px] text-info-fuerte space-y-1">
                   <p className="font-semibold">Es la renovación del período siguiente.</p>
                   <p>
@@ -732,7 +822,7 @@ export function CobrarModal({ payment, onClose }: { payment: Payment; onClose: (
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={!method || saving || cuponEscritoYNoSirve}
+                disabled={!method || saving || cuponEscritoYNoSirve || yaResuelta}
                 className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
               >
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -1234,7 +1324,7 @@ export function PagosPage() {
             className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity shrink-0"
           >
             <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Registrar pago</span>
+            <span className="hidden sm:inline">Otro cobro</span>
           </button>
         )}
       </div>

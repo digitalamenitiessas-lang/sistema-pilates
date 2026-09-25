@@ -295,7 +295,7 @@
       "Si ya sabés qué plan lleva, elegilo en «Asignar plan (opcional)»; FE FIRST aparece ahí con la aclaración «(prueba)». Si todavía no sabés, dejá «Sin plan por ahora».",
       "Tocá «Crear cliente». Si elegiste un plan, la membresía queda creada desde hoy, y la cuota aparece sola en Pagos siempre que ese plan tenga precio."
      ],
-     "ojo": "Sin Email y DNI cargados, la clienta no puede crearse sola el acceso desde la web: el registro del portal la busca por esos dos datos juntos, y si alguno falta no la encuentra. Si el mail está mal escrito (sin arroba), el navegador no te deja guardar y te avisa arriba del campo. Y si después de tocar «Crear cliente» te aparece un mensaje en rojo, NO vuelvas a tocarlo: la ficha puede haber quedado creada igual y solo falló el plan. Cerrá, buscala en el listado, y si ya está, asignale el plan desde su ficha."
+     "ojo": "Sin Email y DNI cargados, la clienta no puede crearse sola el acceso desde la web: el registro del portal la busca por esos dos datos juntos, y si alguno falta no la encuentra. Si el mail está mal escrito (sin arroba), el navegador no te deja guardar y te avisa arriba del campo. Si después de tocar «Crear cliente» aparece un mensaje en rojo, podés volver a tocarlo: aunque la ficha haya llegado a guardarse, no se crea otra. Si aparece un cartel amarillo, la ficha ya se creó y algo quedó a medias: el botón cambia a «Cobrar ahora» o «Crear el acceso» y hace sólo lo que faltó, sin crear otra ficha. Cuando dice «Listo», ya está todo."
     },
     {
      "titulo": "Corregir datos o cargar una nota médica",
@@ -591,7 +591,7 @@
     },
     {
      "nombre": "La barra de buscar y filtrar",
-     "queMuestra": "El buscador \"Buscar cliente...\", los botones redondos \"Todos\", \"Pagado\", \"Pendiente\" y \"Vencido\" —con \"Renovaciones\" metido entre los dos últimos cuando hay alguna— y, a la derecha, el botón \"Registrar pago\"."
+     "queMuestra": "El buscador \"Buscar cliente...\", los botones redondos \"Todos\", \"Pagado\", \"Pendiente\" y \"Vencido\" —con \"Renovaciones\" metido entre los dos últimos cuando hay alguna— y, a la derecha, el botón \"Otro cobro\"."
     },
     {
      "nombre": "La tira verde de Mercado Pago",
@@ -622,14 +622,14 @@
     {
      "titulo": "Registrar un pago que no figura en la lista",
      "pasos": [
-      "Tocá \"Registrar pago\", arriba a la derecha.",
+      "Tocá \"Otro cobro\", arriba a la derecha.",
       "Elegí la clienta en \"Cliente *\". Si tiene membresía, el sistema completa solo el \"Concepto\" y el \"Monto ($) *\" con el precio de su plan.",
       "Cambiá el \"Concepto\" si hace falta. Podés escribir lo que quieras; si lo dejás vacío se guarda como \"Pago\".",
       "Dejá en el \"Monto ($) *\" el precio de lista, sin descuento ni recargo. Vacío no te deja seguir.",
       "Elegí el \"Método de pago *\". Si el monto cambia, aparece un renglón gris que dice cuánto se cobra y por qué.",
       "Tocá \"Cobrar\" —está apagado hasta que haya cliente y método— y después \"Listo\"."
      ],
-     "ojo": "Esto crea un cobro suelto y nada más: no salda la cuota que la clienta tenga pendiente ni le renueva el mes. Si la cuota ya está en la lista, cobrala con el botón \"Cobrar\" de su fila; si no, te quedan las dos cosas, el cobro hecho y la deuda igual de abierta."
+     "ojo": "Esto crea un cobro suelto y nada más: no salda la cuota que la clienta tenga pendiente ni le renueva el mes. Si tiene una cuota sin cobrar, apenas la elegís aparece un aviso amarillo con esa cuota y el botón \"Cobrar esta\": si viene a pagar eso, usá ese botón. Si seguís por acá, te quedan las dos cosas, el cobro hecho y la deuda igual de abierta."
     },
     {
      "titulo": "Mandarle el link de Mercado Pago",
@@ -686,10 +686,10 @@
     "\"Pagos al día\" y \"Cobrado por método\" suman toda la historia, no el mes. El único número del mes es la primera tarjeta, \"Ingresos\", que va en miles y redondea: un mes flojo puede llegar a decir \"$0k\". Muestra el último mes en el que hubo cobros, así que si arranca el mes y todavía no cobraste nada sigue diciendo el mes anterior —aunque abajo insista con \"Cobrado este mes\"—. Por eso el nombre del mes está escrito al lado del número.",
     "En \"Evolución de ingresos\" pasa lo mismo: son los últimos seis meses con cobros. Un mes sin nada no aparece como barra en cero, directamente no está, y la barra resaltada es la del último mes con cobros, que puede no ser este.",
     "En la columna Vencimiento las fechas se ven al revés, como 2026-09-20 (año, mes, día), igual que el renglón chiquito \"Pagado\" de las filas cobradas. En las ventanas que se abren encima van normales.",
-    "En \"Registrar pago\" la lista \"Cliente *\" trae solo a las clientas activas. A alguien que está de baja no le podés registrar un cobro desde acá.",
+    "En \"Otro cobro\" la lista \"Cliente *\" trae solo a las clientas activas. A alguien que está de baja no le podés registrar un cobro desde acá.",
     "Lo que cobrás entra solo a Caja según el medio: el efectivo a \"Caja del mostrador\", la transferencia a \"Cuenta bancaria\", la tarjeta a \"Tarjetas a acreditar\" y Mercado Pago a su propia cuenta. Por eso el efectivo es lo único que después hay que contar en el arqueo.",
     "Cada cobro deja un aviso \"Pago acreditado\" en la campana del sistema. Anularlo después no borra ese aviso.",
-    "En pantallas angostas la tabla va escondiendo columnas: en una tablet no se ven Método ni Comp., y en un celular tampoco Concepto ni Vencimiento. Del botón \"Registrar pago\" queda solo el signo +. Los botones de cada fila siguen estando.",
+    "En pantallas angostas la tabla va escondiendo columnas: en una tablet no se ven Método ni Comp., y en un celular tampoco Concepto ni Vencimiento. Del botón \"Otro cobro\" queda solo el signo +. Los botones de cada fila siguen estando.",
     "Las diez clientas con apellido \"Prueba\" son datos de prueba, pero lo que les cobres suma en los totales igual que un cobro real."
    ],
    "key": "pagos",

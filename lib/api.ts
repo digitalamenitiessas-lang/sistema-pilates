@@ -470,6 +470,32 @@ export function esOferta(pago: Pick<Payment, 'status' | 'renuevaMembresiaId'>): 
   return pago.status !== 'pagado' && pago.status !== 'anulado'
 }
 
+/**
+ * ¿La renovación de esta oferta ya se resolvió por otro camino?
+ *
+ * Pasa cuando el mostrador le asigna el período a mano ("Renovar") antes
+ * de que la clienta pague la oferta: el período nuevo nace con su propia
+ * cuota, y la oferta sigue viva hasta que el proceso diario la anula a la
+ * mañana siguiente. Cobrarla en esa ventana NO crea nada —`renovar_por_pago`
+ * (0041) corta con este mismo predicado y sólo le deja una nota al pago—,
+ * así que el mes se cobra dos veces.
+ *
+ * El predicado es el de la base a propósito, sin mirar estados: si la
+ * pantalla dijera otra cosa, ofrecería cobrar algo que la base trata
+ * distinto. La ficha y el portal tienen su copia local de lo mismo.
+ */
+export function ofertaYaResuelta(
+  pago: Pick<Payment, 'renuevaMembresiaId'>,
+  memberships: Pick<Membership, 'id' | 'studentId' | 'startDate' | 'endDate'>[]
+): boolean {
+  if (!pago.renuevaMembresiaId) return false
+  const vieja = memberships.find((m) => m.id === pago.renuevaMembresiaId)
+  return (
+    !!vieja &&
+    memberships.some((m) => m.studentId === vieja.studentId && m.startDate > vieja.endDate)
+  )
+}
+
 function derivePaymentStatus(
   status: string,
   dueDate: string,
@@ -1215,6 +1241,16 @@ export interface NewStudentInput {
   planId?: string
   /** Desde qué día rige el plan elegido en el alta. Por defecto, hoy. */
   planDesde?: string
+  /**
+   * El id de la ficha, elegido por el formulario una vez y no por la base.
+   *
+   * Es lo que hace inofensivo reintentar: si el insert llegó y la
+   * respuesta se perdió —wifi flojo en el mostrador—, el error es de red,
+   * no hay forma de saber que la ficha existe, y el segundo clic creaba
+   * otra. Con el mismo id, el segundo insert choca con la clave primaria
+   * y el alta sigue sobre la ficha que ya estaba.
+   */
+  id?: string
 }
 
 /**
@@ -1268,9 +1304,33 @@ async function savePrivateData(
 const PAYMENT_GRACE_DAYS = 5
 
 /**
+ * El alta quedó a medias: la ficha se guardó y un paso de después no.
+ *
+ * Existe para que la pantalla sepa que NO tiene que volver a crearla. El
+ * alta son tres escrituras sueltas —la ficha, sus datos reservados y la
+ * membresía con su cuota—, y un error en la segunda o la tercera llegaba
+ * al formulario igual que uno en la primera: con el botón de crear
+ * todavía activo. Apretarlo de nuevo, que es lo que cualquiera hace ante
+ * un cartel de error, creaba otra ficha de la misma clienta, y la base no
+ * lo frena porque no hay unicidad por DNI ni por mail.
+ */
+export class AltaIncompleta extends Error {
+  constructor(
+    public readonly studentId: string,
+    mensaje: string
+  ) {
+    super(mensaje)
+    this.name = 'AltaIncompleta'
+  }
+}
+
+/**
  * Devuelve el id de la ficha creada, que es lo que hace falta para
  * seguir: el alta puede terminar creándole el acceso, y para eso hay que
  * poder nombrar la ficha que se acaba de guardar.
+ *
+ * Si la ficha se guardó y lo de después no, tira `AltaIncompleta` con su
+ * id en vez de un error pelado.
  */
 export async function createStudent(
   input: NewStudentInput,
@@ -1283,6 +1343,7 @@ export async function createStudent(
   const { data: student, error } = await supabase
     .from('students')
     .insert({
+      ...(input.id ? { id: input.id } : {}),
       name: input.name,
       email: input.email,
       phone: input.phone,
@@ -1292,23 +1353,49 @@ export async function createStudent(
     })
     .select()
     .single()
-  if (error) throw error
+  // El choque con la clave primaria es el reintento de un insert que sí
+  // entró: la ficha ya existe con este id y lo que no llegó a correr es lo
+  // de abajo, así que se sigue desde ahí. Se mira `students_pkey` y no
+  // sólo el código, porque 23505 también es el de la credencial duplicada.
+  const yaEstaba =
+    !!input.id && error?.code === '23505' && /students_pkey/.test(error.message ?? '')
+  if (error && !yaEstaba) throw error
+  const id = yaEstaba ? (input.id as string) : (student.id as string)
+  const motivo = (err: unknown) => (err instanceof Error ? err.message : 'error desconocido')
 
-  await savePrivateData(student.id, {
-    medicalNotes: input.medicalNotes || undefined,
-    emergencyContact: input.emergencyContact || undefined,
-    lesiones: input.lesiones || undefined,
-    embarazo: input.embarazo || undefined,
-    cirugias: input.cirugias || undefined,
-    medicacion: input.medicacion || undefined,
-  })
+  try {
+    await savePrivateData(id, {
+      medicalNotes: input.medicalNotes || undefined,
+      emergencyContact: input.emergencyContact || undefined,
+      lesiones: input.lesiones || undefined,
+      embarazo: input.embarazo || undefined,
+      cirugias: input.cirugias || undefined,
+      medicacion: input.medicacion || undefined,
+    })
+  } catch (err) {
+    throw new AltaIncompleta(
+      id,
+      `La ficha se creó, pero los datos de salud y el contacto de emergencia no se guardaron (${motivo(err)}).` +
+        (input.planId ? ' El plan tampoco se asignó.' : '')
+    )
+  }
 
   let paymentId: string | null = null
   if (input.planId) {
-    paymentId = await assignMembership(student.id, input.planId, plans, settings, input.planDesde)
+    try {
+      paymentId = await assignMembership(id, input.planId, plans, settings, input.planDesde)
+    } catch (err) {
+      // "No se terminó de asignar" y no "no se asignó": la membresía y su
+      // cuota son dos inserts, y si cayó el segundo la membresía existe
+      // sin cuota. Asignarla de nuevo sin mirar le encolaría otro período.
+      throw new AltaIncompleta(
+        id,
+        `La ficha se creó, pero el plan no se terminó de asignar (${motivo(err)}). Mirá su ficha antes de asignarlo de nuevo.`
+      )
+    }
   }
 
-  return { id: student.id as string, paymentId }
+  return { id, paymentId }
 }
 
 export async function updateStudent(id: string, input: Omit<NewStudentInput, 'planId'>): Promise<void> {

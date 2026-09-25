@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { AsignarPlanModal } from '@/components/alumnos/asignar-plan-modal'
 import { RegistrarPagoModal, CobrarModal } from '@/components/pagos/pagos-page'
-import { esOferta, moverVencimiento, hoyISO, cubreLaFecha, ordenDeCobro } from '@/lib/api'
+import { esOferta, ofertaYaResuelta, moverVencimiento, hoyISO, cubreLaFecha, ordenDeCobro } from '@/lib/api'
 import type { Student, Payment } from '@/lib/types'
 
 /** El `T00:00` evita que un ISO suelto se lea como UTC y muestre el día anterior. */
@@ -143,10 +143,34 @@ export function PanelDelCliente({ student }: { student: Student }) {
 
   // Deuda de verdad, no la oferta de renovación: esa cobra un período que
   // todavía no existe —lo crea el pago— así que no se puede exigir (0041).
-  const deudas = payments.filter(
-    (p) => p.studentId === student.id && (p.status === 'pendiente' || p.status === 'vencido') && !esOferta(p)
-  )
+  const deudas = payments
+    .filter(
+      (p) => p.studentId === student.id && (p.status === 'pendiente' || p.status === 'vencido') && !esOferta(p)
+    )
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
   const debe = deudas.reduce((t, p) => t + p.amount, 0)
+
+  /**
+   * Lo que salda el botón "Cobrar": la deuda más vieja y, si no debe nada,
+   * la oferta de renovación.
+   *
+   * Ese botón abría "Registrar pago", que inserta un cobro NUEVO y no
+   * toca ninguna cuota. Con la clienta parada adelante y la cuota del
+   * alta pendiente, cobrarle por ahí dejaba la plata entrada y la deuda
+   * igual de abierta: le llegaba el mail de cobranza, y si alguien la
+   * cobraba de nuevo, pagaba dos veces. Con la oferta era peor, porque
+   * la membresía nueva la crea el pago DE ESA CUOTA (0041): un cobro
+   * suelto no le renovaba el mes y la oferta caducaba igual.
+   */
+  //
+  // Sin las ofertas que ya se resolvieron por otro camino: después de
+  // "Renovar" + "Cobrar" la oferta vieja sigue viva hasta el proceso
+  // diario, y el botón volvía a decir "Cobrar" apuntándole a ella. Cobrarla
+  // no crea nada (0041) y el mes se pagaba dos veces.
+  const ofertas = payments
+    .filter((p) => p.studentId === student.id && esOferta(p) && !ofertaYaResuelta(p, memberships))
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+  const cuotaACobrar = deudas[0] ?? ofertas[0]
 
   const restantes = vigente ? Math.max(0, vigente.classesTotal - vigente.classesUsed) : 0
   const dias = vigente ? diasHasta(vigente.endDate) : 0
@@ -229,12 +253,20 @@ export function PanelDelCliente({ student }: { student: Student }) {
                 {vigente ? 'Renovar' : 'Asignar plan'}
               </button>
             )}
-            {(can('pagos.registrar') || canWrite) && (
-              <button onClick={() => setRegistrando(true)} className={botonClase}>
-                <CreditCard className="w-3 h-3 shrink-0" />
-                Cobrar
-              </button>
-            )}
+            {(can('pagos.registrar') || canWrite) &&
+              (cuotaACobrar ? (
+                <button onClick={() => setCobrando(cuotaACobrar)} className={botonClase}>
+                  <CreditCard className="w-3 h-3 shrink-0" />
+                  Cobrar
+                </button>
+              ) : (
+                // Sin cuota abierta no hay nada que saldar: lo que queda es
+                // un cobro suelto, y el botón lo dice con su nombre.
+                <button onClick={() => setRegistrando(true)} className={botonClase}>
+                  <CreditCard className="w-3 h-3 shrink-0" />
+                  Otro cobro
+                </button>
+              ))}
             {vigente && (can('membresias.editar') || canWrite) && (
               <button onClick={() => setMoviendo(true)} className={botonClase}>
                 <CalendarClock className="w-3 h-3 shrink-0" />
@@ -242,6 +274,20 @@ export function PanelDelCliente({ student }: { student: Student }) {
               </button>
             )}
           </div>
+        )}
+
+        {/* El cobro suelto sigue a mano aunque haya una cuota abierta: una
+            clase o un taller que se cobra aparte no es la cuota, y sin esto
+            había que salir de Agenda para cobrarlo. Va chico y aparte para
+            que no compita con "Cobrar", que es lo que se hace casi siempre;
+            y el formulario igual avisa si la cuota sigue sin cobrar. */}
+        {cuotaACobrar && !moviendo && (can('pagos.registrar') || canWrite) && (
+          <button
+            onClick={() => setRegistrando(true)}
+            className="text-[11px] text-muted-foreground underline hover:text-foreground"
+          >
+            Otro cobro (algo que no es la cuota)
+          </button>
         )}
       </div>
 
