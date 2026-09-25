@@ -22,6 +22,7 @@ import {
   RefreshCw,
   HeartPulse,
   X,
+  KeyRound,
 } from 'lucide-react'
 import { cn, nombreDelDia } from '@/lib/utils'
 import { useData } from '@/lib/data-context'
@@ -31,6 +32,7 @@ import {
   eliminarMembresia,
   createSystemUser,
   reenviarAcceso,
+  blanquearClaveClienta,
   setMembershipAutoRenew,
   esOferta,
   hoyISO,
@@ -106,10 +108,22 @@ function textoCuota(p: Payment): string {
 function ReenviarAcceso({ student }: { student: Student }) {
   const [estado, setEstado] = useState<'listo' | 'mandando' | 'ok' | 'falla'>('listo')
   const [motivo, setMotivo] = useState<string | null>(null)
+  /**
+   * El servidor contestó que el reenvío no corresponde pero blanquear sí
+   * (`puedeBlanquear`: ya eligió su clave, o la ficha no tiene mail).
+   * Recién ahí se ofrece: es la única pregunta que la pantalla no puede
+   * contestar sola, porque no ve la metadata de la cuenta.
+   */
+  const [yaEligio, setYaEligio] = useState(false)
+  const [confirmando, setConfirmando] = useState(false)
+  const [blanqueando, setBlanqueando] = useState(false)
+  const [blanqueada, setBlanqueada] = useState<string | null>(null)
 
   const reenviar = async () => {
     setEstado('mandando')
     setMotivo(null)
+    setYaEligio(false)
+    setBlanqueada(null)
     try {
       const r = await reenviarAcceso(student.id)
       setEstado(r.mailEnviado ? 'ok' : 'falla')
@@ -117,6 +131,36 @@ function ReenviarAcceso({ student }: { student: Student }) {
     } catch (err) {
       setEstado('falla')
       setMotivo(err instanceof Error ? err.message : 'No se pudo reenviar')
+      setYaEligio((err as { datos?: { puedeBlanquear?: boolean } }).datos?.puedeBlanquear === true)
+    }
+  }
+
+  // Estado propio y no el del reenvío: si no, el botón de arriba decía
+  // "Mandando..." mientras lo que corría era el blanqueo.
+  const blanquear = async () => {
+    setBlanqueando(true)
+    setMotivo(null)
+    try {
+      const r = await blanquearClaveClienta(student.id)
+      setConfirmando(false)
+      setYaEligio(false)
+      setEstado('listo')
+      setBlanqueada(
+        `Listo: entra con ${r.usuario || 'su mail de siempre'} y su documento, y al entrar elige una clave nueva.` +
+          (r.fichaDistinta
+            ? ` Ojo: la ficha dice ${r.fichaDistinta}, pero la cuenta sigue entrando con el mail de arriba; blanquear no lo cambia.`
+            : '') +
+          (r.mailEnviado
+            ? ' Le mandamos un mail avisándole.'
+            : r.mailMotivo
+              ? ` El mail no salió: ${r.mailMotivo}`
+              : '')
+      )
+    } catch (err) {
+      setEstado('falla')
+      setMotivo(err instanceof Error ? err.message : 'No se pudo blanquear la contraseña')
+    } finally {
+      setBlanqueando(false)
     }
   }
 
@@ -131,7 +175,7 @@ function ReenviarAcceso({ student }: { student: Student }) {
         ) : (
           <button
             onClick={reenviar}
-            disabled={estado === 'mandando'}
+            disabled={estado === 'mandando' || blanqueando}
             className="px-3 py-1.5 rounded-xl border border-border text-xs font-semibold text-foreground hover:bg-muted transition-colors disabled:opacity-60 flex items-center gap-1.5"
           >
             {estado === 'mandando' ? (
@@ -146,6 +190,51 @@ function ReenviarAcceso({ student }: { student: Student }) {
       {estado === 'falla' && motivo && (
         <p className="w-full text-left text-xs text-aviso-fuerte bg-aviso-suave rounded-xl px-3 py-2">
           {motivo}
+        </p>
+      )}
+
+      {/* Blanquear: sólo después de que el servidor dijo que ya eligió su
+          clave. La confirmación va en la pantalla y no en un cartel
+          nativo, que el navegador de Instagram descarta solo. */}
+      {yaEligio && !confirmando && (
+        <button
+          onClick={() => setConfirmando(true)}
+          className="px-3 py-1.5 rounded-xl border border-border text-xs font-semibold text-foreground hover:bg-muted transition-colors flex items-center gap-1.5"
+        >
+          <KeyRound className="w-3.5 h-3.5" />
+          Blanquear la contraseña
+        </button>
+      )}
+      {confirmando && (
+        <div className="w-full text-left rounded-xl border border-aviso/50 bg-aviso-suave px-3 py-2.5 space-y-2">
+          <p className="text-xs font-semibold text-aviso-fuerte">¿Blanquear la contraseña de {student.name}?</p>
+          <p className="text-[11px] text-aviso-fuerte">
+            Vuelve a ser su documento y al entrar tiene que elegir una nueva. Hacelo sólo si
+            ella lo pidió: hasta que entre, cualquiera que sepa su mail y su documento puede
+            entrar a su cuenta. Queda anotado en la bitácora.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={blanquear}
+              disabled={blanqueando}
+              className="px-3 py-1.5 rounded-lg bg-aviso-fuerte text-background text-xs font-semibold disabled:opacity-60 flex items-center gap-1.5"
+            >
+              {blanqueando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              Sí, blanquear
+            </button>
+            <button
+              onClick={() => setConfirmando(false)}
+              disabled={blanqueando}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-muted-foreground hover:bg-muted"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+      {blanqueada && (
+        <p className="w-full text-left text-xs text-exito-fuerte bg-exito-suave rounded-xl px-3 py-2">
+          {blanqueada}
         </p>
       )}
     </div>

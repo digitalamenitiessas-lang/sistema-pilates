@@ -12,7 +12,7 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { cn, vigenciaTexto } from '@/lib/utils'
+import { cn, numeroDeWhatsApp, vigenciaTexto } from '@/lib/utils'
 import { Logotipo } from '@/components/layout/logotipo'
 import { supabase } from '@/lib/supabase'
 
@@ -215,10 +215,11 @@ function useLanding(): LandingData {
  */
 function useWa(): (text: string) => string | null {
   const { studio } = useLanding()
+  // Normalizado: el estudio lo carga desde Configuración como le sale, y
+  // un 381… sin el 54 9 mandaba los nueve botones de la web a Serbia.
+  const numero = numeroDeWhatsApp(studio.whatsapp)
   return (text: string) =>
-    studio.whatsapp
-      ? `https://wa.me/${studio.whatsapp}?text=${encodeURIComponent(text)}`
-      : null
+    numero ? `https://wa.me/${numero}?text=${encodeURIComponent(text)}` : null
 }
 
 /**

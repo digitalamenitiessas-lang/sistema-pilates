@@ -121,7 +121,17 @@ cobrada. Y **el alta quedaba abierta con "Crear cliente" activo** después
 de crear, con o sin error: un segundo clic duplicaba ficha, membresía,
 cuota y cobro. El detalle y lo verificado, en `PLAN.md`. El informe de la
 auditoría no está en el repo: el repo es público y el informe es, sobre
-todo, una lista de huecos.
+todo, una lista de huecos. A la noche entraron tres arreglos más de la
+misma auditoría, también sin migración: el portal ya no abre el domingo en
+la semana terminada (abre en el primer día en que ella puede reservar);
+los links de WhatsApp completan solos el 54 y el 9, en Pagos, en el
+tablero y en la web; y el mostrador puede **blanquear la contraseña** de
+una clienta desde su ficha, y el admin la de alguien del staff desde
+Usuarios, con cambio obligatorio al entrar. Además hay un botón para
+mandarse un aviso de prueba al celular, porque hasta hoy no le había
+llegado ninguno a nadie, y el link de "Cómo llegar" de la web pasó de Bing
+a Google Maps. El seguimiento de lo que queda de la auditoría vive fuera
+del repo, en una página privada.
 
 ### Lo que falta construir
 
@@ -133,8 +143,9 @@ todo, una lista de huecos.
 | — | **Una cuenta dada de baja sigue mostrando su saldo.** La vista `account_balances` no filtra por `active` y `fetchBalances` descarta la columna, así que aparece en Caja, en el tablero y en el selector de movimientos como si estuviera viva | chico |
 | — | **El arqueo sabe de una sola caja**: toma la primera con `arquea = true` y sobre esa abre, cierra y lista el día. Con dos cajas —el mostrador y una de la profesora, por ejemplo— la segunda no se puede arquear, y la pantalla no lo dice | mediano |
 | — | **La promo limitada a un plan nunca se aplica a la renovación.** `promociones_para` (`0079`) saca el plan de la cuota por `membership_id` o, si no, por el nombre del plan igual al concepto; la oferta de renovación nace **sin** `membership_id` y con el concepto "FE FLOW — renovación", así que no encuentra ninguna de las dos y descarta toda promo que tenga planes. Justo el pago que una promo de "pago temprano" quiere premiar. Hoy no hay promociones cargadas. Arreglo: una migración que busque el plan por `renueva_membresia_id` | chico |
-| — | **Blanquear una contraseña desde el sistema.** El reenvío del acceso da 409 si la clienta ya eligió la suya, y para el staff no existe. Una clienta sin acceso a su casilla, o una profesora que se olvidó la clave, queda afuera hasta que alguien entra a Supabase → Authentication | chico |
-| — | **Resend como SMTP de Supabase.** "Olvidé mi contraseña" es el único camino que le queda a una clienta que ya eligió su clave y la olvidó, y **no pasa por Resend**: usa el mailer de Supabase, que en el plan gratis manda desde una dirección de Supabase, permite unos pocos por hora y cae en spam. Con el dominio ya verificado es configuración, no desarrollo | chico |
+| — | **Resend como SMTP de Supabase.** "Olvidé mi contraseña" **no pasa por Resend**: usa el mailer de Supabase, que sólo le entrega a las casillas del equipo del proyecto, así que hoy no le llega a ninguna clienta. Desde el 25/09 el mostrador puede blanquearle la clave desde la ficha, pero el camino propio de ella sigue sin andar. Con el dominio ya verificado es configuración, no desarrollo. **Va después de rehacer la cuenta admin**: el mail de la demo es de un dominio ajeno | chico |
+| — | **Casi ningún aviso llega al celular.** El push sale sólo del proceso diario, y sólo para por vencer, vencida, deuda y renovación. El recordatorio de la clase ("Te esperamos hoy"), la reserva confirmada, la suspensión, el cambio de profesora y el lugar liberado los escribe la base y quedan en la campana: la clienta que no abre el portal no se entera. Y del staff no hay ningún celular suscripto, así que "caja sin cerrar" o "pago vencido" no le vibran a nadie. Desde el 25/09 cada uno puede probar su celular con "Mandar un aviso de prueba" | mediano |
+| — | **El blanqueo de contraseñas deja poco rastro.** El de una clienta deja una línea en la bitácora de la ficha, que quien la escribió puede borrar; el del staff no deja ninguno. Falta una tabla de auditoría sin delete, escrita desde el servidor, con quién, a quién y cuándo | chico |
 | **§2** | **Que las reservas del turno fijo se creen solas cada semana.** Es lo último de §2. Ya no depende de ninguna respuesta: Matías definió el 15/09 que manda la cantidad de clases del plan | chico |
 | **§2** | **Ventana de fechas en `fetchStudioData`.** Va en el mismo paso, no después: hoy trae **todas** las reservas sin filtro ni límite en cada ingreso. Con 8 filas no se nota; con turnos fijos reservando cada semana son miles en meses | chico |
 | — | **Los otros 40 lugares donde el mensaje de la base no llega a la pantalla.** El mismo arreglo de una línea que el de la `0046`, pero toca todos los módulos y va con su propia verificación. El 17/09 se le puso una red abajo: cualquier rechazo de RLS ahora se traduce a "Tu rol no tiene permiso para esta acción" en vez de mostrar el texto interno de Postgres | mediano |
@@ -212,7 +223,7 @@ Agenda, que es donde el mostrador pasa el día.
 | 🔴 | **Si la deuda frena la reserva.** Hoy no frena nada: `membresia_para` mira que la membresía esté activa y cubra la fecha, no si la cuota está paga. Una clienta dada de alta sin pagar —o a quien se le asignó el mes a mano con "Renovar"— reserva el período entero; al 5º día del inicio le llega un solo aviso y nada más. La renovación automática no tiene el hueco: ahí el período lo crea el pago. Se puede parametrizar ("con la cuota vencida hace más de N días, no reserva"), apagado por defecto y que lo haga cumplir la base; falta que la dueña diga la regla. Conviene antes del **~04/10**, cuando vencen las cuotas de la tanda del 29 |
 | 🔴 | **Mail de Giuliana**, la profesora del turno tarde. El nombre ya llegó —la agenda la muestra— pero no tiene mail ni cuenta, así que no puede entrar ni recibir los avisos de la `0060` |
 | 🔴 | **Decidir si la clase de prueba sigue generando deuda.** Pasó a $0 el 16/09, pero las membresías vendidas antes guardan su precio: hay cuotas de $20.000 de pruebas pendientes de cobro que quizá haya que anular |
-| 🔴 | **El WhatsApp de la web está roto.** `studio_whatsapp` quedó cargado como `3815727352`, sin el 54 y el 9, así que los **nueve** botones de la landing apuntan a un número que `wa.me` lee como de otro país. Debería ser `5493815727352`, pero el número hay que confirmarlo: antes había otro cargado |
+| 🔴 | **El número de WhatsApp de la web.** `studio_whatsapp` está **vacío** desde el 25/09, y la web usa el de respaldo escrito en el código (`5493816249107`, el de la `0045`). Desde el 25/09 el número se normaliza solo —un `3815727352` ya no va a Serbia—, pero cuál es el número hay que confirmarlo con el estudio y cargarlo en Configuración |
 | 🟡 | Conectar la cuenta de **Mercado Pago** (verificado: sin conectar) |
 | 🟡 | Verificar el **dominio en Resend** + `EMAIL_FROM` en Vercel. Hasta entonces el mail a las clientas **solo llega a la casilla dueña** |
 | 🟡 | Probar el portal desde una **cuenta de clienta**: es lo único que ejercita el aislamiento por cliente, y no se puede verificar desde adentro del sistema |

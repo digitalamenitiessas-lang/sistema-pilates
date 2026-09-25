@@ -12,13 +12,24 @@ export async function mailDeAcceso(input: {
   email: string
   nombre: string
   origen: string
+  /**
+   * Es un blanqueo y no un acceso nuevo. Cambia el asunto y la primera
+   * línea, y agrega qué hacer si no lo pidió: un blanqueo que ella no
+   * pidió es la única señal que tiene de que alguien quiso entrar a su
+   * cuenta.
+   */
+  blanqueo?: boolean
 }): Promise<{ subject: string; html: string }> {
   const nombre = input.nombre.trim().split(' ')[0] || 'Hola'
   return {
-    subject: 'Tu acceso al portal',
+    subject: input.blanqueo ? 'Tu contraseña del portal se blanqueó' : 'Tu acceso al portal',
     html: await emailLayout(
       `¡Hola ${nombre}!`,
-      `<p>Ya podés entrar a tu portal: reservar tus clases, ver cuántas te quedan y tus pagos.</p>
+      `${
+        input.blanqueo
+          ? '<p>En el estudio blanquearon tu contraseña del portal. Si no lo pediste vos, avisanos cuanto antes.</p>'
+          : '<p>Ya podés entrar a tu portal: reservar tus clases, ver cuántas te quedan y tus pagos.</p>'
+      }
        <p style="margin:18px 0 6px;"><strong>Cómo entrar</strong></p>
        <p style="margin:0;">Usuario: <strong>${input.email}</strong><br>
        Contraseña: <strong>tu número de documento</strong>, sin puntos</p>

@@ -1971,6 +1971,63 @@ credencial: después de borrarlas hay que devolver la secuencia con
 Queda sin hacer, anotado en §0: la promo limitada a un plan no se aplica a
 la renovación (`promociones_para` no encuentra el plan de la oferta).
 
+### ✅ El domingo del portal, el WhatsApp con 549 y blanquear contraseñas (25/09) — sin migración
+
+Tres arreglos más de la auditoría, más un botón y un dato.
+
+**El portal abría el domingo en la semana terminada.** Arrancaba en "esta
+semana, hoy" con el domingo recortado al sábado: todo deshabilitado y sin
+decir por qué, justo el domingo 27/09 en que la tanda de la apertura entra
+a reservar. Ahora abre en el primer día, de hoy al sábado de la semana que
+viene, en que ella puede reservar alguna clase que todavía no empezó
+—mirando su plan y las suspensiones—, y si no hay, en el primero con
+clases por delante. La semana quedó como fecha y no como desplazamiento:
+con un desplazamiento, el portal abierto del domingo al lunes saltaba una
+semana de más.
+
+**Los links de WhatsApp iban a Serbia.** Sacaban lo que no era dígito y
+nada más, y un 381… de diez dígitos es +381. `numeroDeWhatsApp`
+(`lib/utils.ts`) completa el 54 y el 9, saca el 0 y el 15, respeta el
+código de otro país sólo si viene con + o 00, y devuelve null si no queda
+una característica argentina real: sin número posible no hay botón. Lo
+usan Pagos, el tablero y los nueve botones de la web.
+
+**Blanquear una contraseña no existía.** Una clienta que ya eligió su
+clave y no puede usar su mail, o una profesora que se la olvidó, quedaban
+afuera hasta que alguien entrara a Supabase. En la ficha, si el reenvío
+dice que ya eligió su clave, aparece "Blanquear la contraseña": vuelve a
+ser su documento, con el cambio obligatorio, y deja una línea en la
+bitácora —antes de tocar la clave: si la base no la deja escribir, no se
+blanquea—. Al staff lo blanquea el admin desde Usuarios con una clave
+temporal. La revisión adversarial encontró lo delicado: la primera versión
+también movía el **mail de ingreso** de la cuenta al de la ficha, y con eso
+alguien que llamara "cambié de mail" se quedaba con la cuenta. Blanquear
+ya no toca el mail. Tampoco blanquea cuentas dadas de baja ni cuentas que
+no sean de clienta, aunque una ficha apunte a ellas.
+
+**"Mandar un aviso de prueba".** El push sólo sale del proceso diario, y
+hasta hoy no le había tocado ningún aviso a ningún celular suscripto: no
+había forma de saber si la clave privada de Vercel era la pareja de la
+pública. El botón, en el mismo lugar donde se activan los avisos, le pide
+al servidor de producción que firme un aviso para ese dispositivo.
+
+**El link de "Cómo llegar" era de Bing.** La web decía "Ver en Google
+Maps" y abría Bing. Quedó una búsqueda de Google Maps del Mercato. El link
+que mandó el estudio era de "Cómo llegar" y traía fijo el punto de
+partida —la ubicación de quien lo compartió—, así que no se usó tal cual.
+
+Verificado: el portal se probó reproduciendo la regla sobre la grilla real
+en cinco momentos (viernes 20:30 → sábado, sábado 14:00 y domingo → lunes
+siguiente, martes 07:00 → martes). `numeroDeWhatsApp` pasó 24 casos,
+incluidos los que la revisión encontró mal. El blanqueo, en la pantalla
+(el 409 hace aparecer el botón y la confirmación se cancela sin tocar la
+cuenta, comprobado contra Auth) y en el servidor por sus rechazos: a uno
+mismo, clave corta, una clienta por el camino del staff, sin sesión. Un
+blanqueo real no se ejerció. El push se probó a mano con las claves de
+`.env.local` contra el iPhone de la cuenta de prueba y llegó; el endpoint
+de prueba se niega a mandarle a un dispositivo de otra cuenta. Falta
+tocarlo en producción, que es lo que prueba la clave de Vercel.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.

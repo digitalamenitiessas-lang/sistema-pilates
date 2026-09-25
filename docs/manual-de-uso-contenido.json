@@ -62,7 +62,7 @@
       "Se abre WhatsApp con el mensaje ya escrito.",
       "Leelo, corregilo si hace falta, y recién ahí tocá enviar."
      ],
-     "ojo": "El sistema no manda nada solo: deja el mensaje escrito y vos lo enviás. El texto copia la alerta tal cual, así que a veces queda en tercera persona (\"No le quedan clases disponibles\") y las fechas salen escritas al revés, como 2026-09-17. Conviene arreglarlo antes de enviar. Si la persona no tiene teléfono cargado, el ícono directamente no aparece; y si el teléfono está cargado sin el código de país, WhatsApp abre un número que no existe. En la ficha el teléfono va como +54 9 381…"
+     "ojo": "El sistema no manda nada solo: deja el mensaje escrito y vos lo enviás. El texto copia la alerta tal cual, así que a veces queda en tercera persona (\"No le quedan clases disponibles\") y las fechas salen escritas al revés, como 2026-09-17. Conviene arreglarlo antes de enviar. Si la persona no tiene un teléfono completo (con la característica, por ejemplo 381), el ícono no aparece. El 54 y el 9 los agrega solo."
     },
     {
      "titulo": "Reclamar un pago pendiente",
@@ -108,7 +108,7 @@
     "\"Clases de Hoy\" no mira las excepciones de la Agenda. Si hoy suspendiste una clase o pusiste una profesora de reemplazo, acá la clase sigue apareciendo con el horario y la profesora de siempre. La Agenda sí muestra la suspensión y el reemplazo: para ese día, la Agenda manda.",
     "Una clase \"Especial\" (un taller con fecha) aparece en Inicio todas las semanas en ese mismo día, antes y después de su fecha, porque Inicio mira solo el día de la semana. En la Agenda aparece solo en su semana, que es lo correcto.",
     "El botón \"Asistencia\" solo aparece si hay alguien anotado en esa clase. Si nadie reservó, no hay botón: no se puede pasar lista de alguien que no reservó desde acá. Y cada persona que marcás ausente deja de contar como anotada: la barrita baja, la clase llena pierde el cartel \"Llena\" y el número de \"reservas confirmadas\" de arriba también baja.",
-    "El ícono de WhatsApp usa el teléfono tal cual está escrito en la ficha, sin agregarle nada. Si está cargado sin el código de país —3815000001, por ejemplo, como están los diez clientes de prueba— WhatsApp abre un número que no existe.",
+    "El ícono de WhatsApp completa solo el 54 y el 9 de la Argentina y le saca el 0 y el 15, así que un teléfono cargado como 381 572-7352 funciona. Si al número le falta la característica (por ejemplo, 15 572-7352), el ícono no aparece: cargale el teléfono completo en la ficha. Un número de otro país tiene que ir con el + adelante.",
     "La lista de Alertas corta en 12. Primero se arman las de membresías, después las de pagos vencidos y al final las de clase completa, así que si hay muchas membresías por vencer un pago vencido puede quedar afuera. El numerito del globito tampoco pasa de 12: para la deuda completa, mirá \"Pagos pendientes\" o entrá a Pagos.",
     "Cada cliente genera un solo aviso de membresía, y gana el del vencimiento: a quien le vence la membresía y además se le acabaron las clases, solo le vas a ver \"Membresía vence el…\". Y la alerta roja de membresía vencida se calla a los 30 días de vencida: desaparece de Alertas aunque el cliente siga sin renovar. Para esos, el lugar es Clientes.",
     "\"Pagos pendientes\" no cuenta las cuotas de renovación que todavía nadie pagó. Esas son un ofrecimiento —el mes que le estás ofreciendo, no algo que deba— así que no suman al \"Total adeudado\": en la pantalla Pagos tienen su propia tarjeta, \"Renovaciones\". Y si no hay ningún pago pendiente, esta tarjeta no dice nada: queda la lista en blanco y abajo \"Total adeudado $0\".",
@@ -636,7 +636,7 @@
      "pasos": [
       "En la fila de una cuota pendiente o vencida, tocá el ícono de cadena que está al lado de \"Cobrar\". Se abre la ventana \"Link de pago\".",
       "Si el link todavía no existía, esperá a que termine de decir \"Generando link en Mercado Pago...\". Si ya existía —el ícono de cadena se ve celeste— aparece al toque.",
-      "Tocá \"Copiar link\" para pegarlo donde quieras, o \"WhatsApp\" para abrir el chat con el mensaje ya escrito. Ese botón \"WhatsApp\" aparece solo si la clienta tiene teléfono cargado en su ficha.",
+      "Tocá \"Copiar link\" para pegarlo donde quieras, o \"WhatsApp\" para abrir el chat con el mensaje ya escrito. Ese botón \"WhatsApp\" aparece solo si la clienta tiene un teléfono completo en su ficha, con la característica.",
       "Cuando la clienta paga, el cobro se acredita cuando alguien entra a Pagos: la fila pasa a \"Pagado\", el método queda \"Mercado Pago\" y el comprobante se genera solo."
      ],
      "ojo": "El ícono de cadena aparece únicamente si Mercado Pago está conectado en Configuración. El link cobra el precio de lista —sin el 5% de descuento ni el 25% de recargo— y se genera una sola vez: no hay manera de cambiarle el monto ni de darlo de baja. Si después cobrás esa misma cuota en efectivo, el link sigue vivo, y una clienta que pague por ahí manda plata que el sistema ya no acredita solo."
@@ -1168,7 +1168,7 @@
     "No podés cambiar tu propio rol ni darte de baja a vos misma: al lado de tu nombre dice Vos y esos botones ni aparecen. El sistema tampoco se deja quedar sin ningún admin: si intentás bajar o dar de baja al último, lo rechaza con El sistema no puede quedarse sin ningún admin activo.",
     "A una persona dada de baja no se le puede cambiar el rol: el desplegable de su fila queda apagado hasta que la reactivés con la flecha redonda.",
     "El desplegable de rol de cada fila tiene cuatro opciones, una más que la ventana de alta: Cliente. Pasar a alguien a Cliente le saca el sistema entero y le deja solo el portal.",
-    "Desde esta pantalla no se le cambia la contraseña a nadie. La contraseña inicial se pone al crear la cuenta; después cada persona se la cambia sola con ¿Olvidaste tu contraseña? en la pantalla de ingreso."
+    "La contraseña inicial se pone al crear la cuenta; después cada persona se la cambia sola con ¿Olvidaste tu contraseña? en la pantalla de ingreso. Si alguien del equipo se la olvidó, tocá la llave de su fila, escribí una clave temporal de al menos 8 caracteres y pasásela en persona: al entrar con ella le vamos a pedir que elija una propia. A tu propia cuenta no se le blanquea desde acá."
    ],
    "key": "configuracion",
    "nombre": "Configuración"
@@ -1249,7 +1249,7 @@
     }
    ],
    "avisos": [
-    "Nadie puede cambiarle la contraseña a otro desde el sistema, ni vos. El único camino es el enlace de \"¿Olvidaste tu contraseña?\" que llega al mail de esa persona. Y una vez que un cliente tiene su acceso creado, el botón \"Crear acceso\" de su ficha ya no vuelve a aparecer. Por eso el email que cargues tiene que ser uno al que entre de verdad.",
+    "Si una clienta ya eligió su contraseña y no puede entrar, tocá \"Reenviar el mail de acceso\": el sistema te dice que ya la eligió y aparece \"Blanquear la contraseña\". Vuelve a ser su documento, con el cambio obligatorio al entrar, y queda anotado en la bitácora. Hacelo sólo si ella lo pidió. Blanquear no le cambia el mail con el que entra, así que el email que cargues al crear el acceso tiene que ser uno al que entre de verdad.",
     "Los clientes sí tienen, dentro de su portal, un botón para cambiar su propia contraseña. En el sistema de gestión ese botón todavía no está: el equipo cambia la suya por el enlace del mail. Si en la pantalla de alta de usuario leés \"puede cambiarla después\", es por ahí, no desde adentro del sistema.",
     "El enlace que llega por mail se usa una sola vez y vence. Si ya se usó, la pantalla dice \"El enlace no es válido o venció\" y hay que pedir uno nuevo. La contraseña nueva, además, tiene que ser distinta a la anterior.",
     "En Configuración → Permisos vas a ver una tabla para tildar qué puede hacer cada rol. Hoy la mayoría de esos tildes todavía no rigen, y la pantalla te lo avisa con un cartel amarillo: podés dejar la tabla como la querés y se va activando de a un grupo por vez. Lo que ya rige es Caja, Gastos y Reportes; el resto sigue funcionando por rol, tal como está descripto arriba.",

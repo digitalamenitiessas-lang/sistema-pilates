@@ -200,9 +200,19 @@ S += T('Si el mail de acceso no le llegó', [
     'reenvío también le mueve el usuario a la dirección nueva.',
 ], aviso='esto sirve <b>hasta que ella entra por primera vez</b>. Después el sistema lo rechaza, y '
          'está bien que lo haga: el mail dice que su contraseña es su documento, y una vez que '
-         'ella eligió la suya eso sería mentira. Si no puede entrar, es <b>ella</b> la que usa '
-         '“Olvidé mi contraseña” en la pantalla de ingreso — nadie del mostrador le toca la '
-         'contraseña a nadie.')
+         'ella eligió la suya eso sería mentira. Si no puede entrar, mirá la tarea que sigue.')
+
+S += T('Si ya eligió su clave y no puede entrar', [
+    'Abrí su ficha → <b>Reenviar el mail de acceso</b>. El sistema te dice que ya eligió su '
+    'contraseña y aparece <b>Blanquear la contraseña</b>.',
+    'Tocalo, leé el aviso y confirmá con <b>Sí, blanquear</b>.',
+    'Decile que entra con <b>su mail de siempre</b> y <b>su documento</b>, y que al entrar va a '
+    'tener que elegir una clave nueva. La pantalla te muestra con qué mail entra.',
+], aviso='hacelo <b>sólo si ella lo pidió</b>, y mejor con ella adelante: hasta que entre, '
+         'cualquiera que sepa su mail y su documento puede entrar a su cuenta. Blanquear <b>no '
+         'le cambia el mail</b> con el que entra, aunque la ficha diga otro, y queda anotado en '
+         'la bitácora de la ficha. A las profesoras y al mostrador les blanquea la clave el admin, '
+         'desde <b>Configuración → Usuarios</b>, con la llave de cada cuenta.')
 
 S += T('Cambiar un precio, un horario o un plazo', [
     'Precios y planes: <b>Planes</b> → editar el plan.',
@@ -229,7 +239,8 @@ S += [tabla([
      'Entra con su email y la contraseña que ella eligió. El documento deja de servir.'],
     ['Si se la olvida',
      '<b>Olvidé mi contraseña</b> en la pantalla de ingreso: le llega un enlace y elige una '
-     'nueva. El estudio no interviene.'],
+     'nueva. Si no puede usar su mail, el mostrador se la blanquea desde su ficha y vuelve a '
+     'entrar con su documento.'],
     ['Cada vez que entra',
      'Ve su <b>número de credencial</b> al lado del nombre del estudio, arriba. Es con el que '
      'se identifica y no cambia nunca.'],

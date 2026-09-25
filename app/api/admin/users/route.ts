@@ -254,12 +254,33 @@ export async function POST(request: Request) {
  *    probable de un reenvío es que el mail estaba mal escrito; sin esto,
  *    el reenvío iría a la dirección nueva anunciando un usuario que es el
  *    viejo.
+ *
+ * CON `forzar: true` ES BLANQUEAR, y el paso 1 no aplica: la clave vuelve
+ * a ser su documento aunque ella ya haya elegido otra, con el cambio
+ * obligatorio al entrar. Existe porque "olvidé mi contraseña" era el
+ * único camino para quien ya eligió la suya, y no sirve si no tiene
+ * acceso a su casilla o el mail está mal escrito: quedaba afuera hasta
+ * que alguien entrara a Supabase. Es el mismo poder que crear el acceso
+ * —el mostrador ya sabe el documento—, así que va con la misma clave de
+ * permiso, pero deja una línea en la bitácora de la ficha con quién lo
+ * hizo. Y NO mueve el mail de la cuenta (el paso 3 es sólo del reenvío):
+ * ver el comentario de `moverMail`.
+ *
+ * Con `userId` y `password` es blanquear a alguien del STAFF, que no
+ * tiene documento en una ficha: el admin le pone una clave temporal y
+ * al entrar la tiene que cambiar. Va detrás de `usuarios.crear_staff`,
+ * la misma clave no configurable que crear un usuario de staff: poder
+ * ponerle la clave a otro es poder entrar como él.
  */
 export async function PUT(request: Request) {
   const auth = await authorize(request, 'usuarios.crear_alumno')
   if (!auth.ok) return auth.response
 
-  const { studentId } = await request.json().catch(() => ({}))
+  const cuerpo = await request.json().catch(() => ({}))
+  if (cuerpo.userId) return blanquearStaff(auth, String(cuerpo.userId), cuerpo.password)
+
+  const { studentId } = cuerpo
+  const forzar = cuerpo.forzar === true
   if (!studentId) return NextResponse.json({ error: 'Falta studentId' }, { status: 400 })
 
   const { data: ficha } = await auth.admin
@@ -274,13 +295,7 @@ export async function PUT(request: Request) {
       { status: 400 }
     )
   }
-  const mail = String(ficha.email ?? '').trim().toLowerCase()
-  if (!mail) {
-    return NextResponse.json(
-      { error: 'La ficha no tiene email, así que no hay a dónde mandarlo.' },
-      { status: 400 }
-    )
-  }
+  const mailFicha = String(ficha.email ?? '').trim().toLowerCase()
   const dni = soloDigitos(ficha.dni ?? '')
   if (dni.length < 6) {
     return NextResponse.json(
@@ -296,40 +311,217 @@ export async function PUT(request: Request) {
       { status: 400 }
     )
   }
-  const meta = cuenta.user.user_metadata ?? {}
-  if (meta.debe_cambiar_clave !== true) {
+  // Una ficha se vincula a una cuenta por `students.user_id`, que es un
+  // dato de la ficha. Sin este control, alguien que pudiera editar ese
+  // campo lo apuntaría a la cuenta de una admin y le pondría de clave un
+  // documento que conoce. Reenviar o blanquear sólo toca cuentas de
+  // clienta; el staff se blanquea por el otro camino, con su permiso.
+  // Un error de la consulta no se confunde con "no es de clienta": se dice.
+  const { data: perfil, error: perfilError } = await auth.admin
+    .from('profiles')
+    .select('role, active')
+    .eq('id', ficha.user_id)
+    .maybeSingle()
+  if (perfilError) {
+    return NextResponse.json({ error: `No se pudo verificar la cuenta: ${perfilError.message}` }, { status: 500 })
+  }
+  if (!perfil || perfil.role !== 'alumno') {
     return NextResponse.json(
       {
         error:
-          'Ya eligió su propia contraseña, así que este mail le diría algo que no es. Si no puede entrar, que use "Olvidé mi contraseña" en la pantalla de ingreso.',
+          'Esa ficha está vinculada a una cuenta que no es de clienta, así que desde acá no se toca. Pedíselo a quien administra el sistema.',
+      },
+      { status: 403 }
+    )
+  }
+  if (perfil.active === false || estaBaneada(cuenta.user)) {
+    return NextResponse.json(
+      {
+        error:
+          'Ese acceso está dado de baja: primero hay que reactivarlo (lo hace el admin desde Configuración → Usuarios).',
       },
       { status: 409 }
     )
   }
 
+  const meta = cuenta.user.user_metadata ?? {}
+  const mailCuenta = String(cuenta.user.email ?? '').trim().toLowerCase()
+  if (!forzar) {
+    if (!mailFicha) {
+      return NextResponse.json(
+        {
+          error: 'La ficha no tiene email, así que no hay a dónde mandar el acceso.',
+          // Blanquear sí tiene sentido sin mail: la clave nueva se la dice
+          // el mostrador en persona. La pantalla lo ofrece con esto.
+          puedeBlanquear: true,
+        },
+        { status: 400 }
+      )
+    }
+    if (meta.debe_cambiar_clave !== true) {
+      return NextResponse.json(
+        {
+          error:
+            'Ya eligió su propia contraseña, así que este mail le diría algo que no es. Si no puede entrar, que use "Olvidé mi contraseña" en la pantalla de ingreso, o blanqueásela desde acá.',
+          puedeBlanquear: true,
+        },
+        { status: 409 }
+      )
+    }
+  }
+
+  // EL MAIL DE LA CUENTA SE MUEVE SÓLO EN EL REENVÍO, NUNCA AL BLANQUEAR.
+  // En el reenvío la cuenta todavía no se usó —el 409 de arriba lo
+  // garantiza—, y lo más probable es que el mail estuviera mal escrito.
+  // Al blanquear la cuenta ya es de ella: si el blanqueo también cambiara
+  // su mail de ingreso, alguien que llamara haciéndose pasar por ella
+  // ("cambié de mail") se quedaría con la cuenta, y a su dirección real no
+  // le llegaría nada. La cuenta sigue entrando con el mail que ya tenía.
+  const moverMail = !forzar && !!mailFicha && mailFicha !== mailCuenta
+  const destino = forzar ? mailCuenta : mailFicha
+
+  // Blanqueando, la línea de la bitácora va ANTES de tocar la clave: si la
+  // base no la deja escribir, el blanqueo no se hace, en vez de quedar
+  // hecho y sin rastro. Va con el cliente de quien llama y no con el
+  // service role, para que `author_id` lo selle la base con quien fue.
+  let notaId: string | null = null
+  if (forzar) {
+    const { data: nota, error: notaError } = await auth.caller
+      .from('student_notes')
+      .insert({
+        student_id: studentId,
+        kind: 'interna',
+        body:
+          'Se blanqueó la contraseña del portal: volvió a ser su documento, con el cambio obligatorio al entrar.',
+      })
+      .select('id')
+      .single()
+    if (notaError || !nota) {
+      return NextResponse.json(
+        {
+          error: `No se blanqueó: tu rol no puede anotar en la bitácora de la ficha (${notaError?.message ?? 'sin respuesta'}).`,
+        },
+        { status: 403 }
+      )
+    }
+    notaId = nota.id as string
+  }
+
   const { error: updError } = await auth.admin.auth.admin.updateUserById(ficha.user_id, {
     password: dni,
-    ...(mail !== String(cuenta.user.email ?? '').trim().toLowerCase()
-      ? { email: mail, email_confirm: true }
-      : {}),
+    ...(moverMail ? { email: mailFicha, email_confirm: true } : {}),
     user_metadata: { ...meta, debe_cambiar_clave: true },
   })
   if (updError) {
+    // La nota decía que se blanqueó, y no: se va.
+    if (notaId) await auth.caller.from('student_notes').delete().eq('id', notaId)
     return NextResponse.json(
       { error: `No se pudo preparar el acceso: ${updError.message}` },
       { status: 400 }
     )
   }
 
+  // Si la ficha dice otro mail que la cuenta, se avisa: el blanqueo no lo
+  // cambió, y la clienta entra con el de la cuenta.
+  const fichaDistinta = forzar && mailFicha && mailFicha !== mailCuenta ? mailFicha : null
+
+  if (!destino) {
+    return NextResponse.json({
+      ok: true,
+      mailEnviado: false,
+      mailMotivo: 'La cuenta no tiene email, así que no se le mandó nada: decile en persona cómo entra.',
+      usuario: mailCuenta || null,
+      fichaDistinta,
+    })
+  }
   const { subject, html } = await mailDeAcceso({
-    email: mail,
+    email: destino,
     nombre: String(ficha.name ?? ''),
     // No sale del pedido: es la direccion publica del estudio, y el
     // pedido puede venir del servidor de desarrollo (0068).
     origen: await urlDelPortal(new URL(request.url).origin),
+    blanqueo: forzar,
   })
-  const r = await enviarMail(mail, subject, html)
-  return NextResponse.json({ ok: true, mailEnviado: r.ok, mailMotivo: r.ok ? null : r.motivo })
+  const r = await enviarMail(destino, subject, html)
+  return NextResponse.json({
+    ok: true,
+    mailEnviado: r.ok,
+    mailMotivo: r.ok ? null : r.motivo,
+    usuario: destino,
+    ...(forzar ? { fichaDistinta } : {}),
+  })
+}
+
+/** Dada de baja: el DELETE de acá la banea por 100 años (0015). */
+function estaBaneada(u: { banned_until?: string | null }): boolean {
+  return !!u.banned_until && new Date(u.banned_until).getTime() > Date.now()
+}
+
+/** Blanquear la clave de alguien del staff: ver el comentario de PUT. */
+async function blanquearStaff(
+  auth: { admin: SupabaseClient; callerId: string; can: (c: string) => boolean },
+  userId: string,
+  password: unknown
+) {
+  if (!auth.can('usuarios.crear_staff')) {
+    return NextResponse.json({ error: 'Solo el admin puede blanquear la clave del personal' }, { status: 403 })
+  }
+  if (userId === auth.callerId) {
+    return NextResponse.json(
+      { error: 'Tu propia contraseña se cambia desde tu sesión, no desde acá.' },
+      { status: 400 }
+    )
+  }
+  const clave = String(password ?? '')
+  if (clave.length < 8) {
+    return NextResponse.json({ error: 'La clave temporal tiene que tener al menos 8 caracteres' }, { status: 400 })
+  }
+  // El teclado del celular agrega un espacio al aceptar una sugerencia y no
+  // se ve: la clave quedaría distinta de la que se le dicta a la persona.
+  if (clave !== clave.trim()) {
+    return NextResponse.json(
+      { error: 'La clave temporal no puede empezar ni terminar con un espacio' },
+      { status: 400 }
+    )
+  }
+
+  const { data: perfil, error: perfilError } = await auth.admin
+    .from('profiles')
+    .select('role, active')
+    .eq('id', userId)
+    .maybeSingle()
+  if (perfilError) {
+    return NextResponse.json({ error: `No se pudo verificar la cuenta: ${perfilError.message}` }, { status: 500 })
+  }
+  if (!perfil) return NextResponse.json({ error: 'No se encontró esa cuenta' }, { status: 404 })
+  if (perfil.role === 'alumno') {
+    return NextResponse.json(
+      { error: 'A una clienta se le blanquea desde su ficha: vuelve a su documento.' },
+      { status: 400 }
+    )
+  }
+
+  const { data: cuenta, error: leerError } = await auth.admin.auth.admin.getUserById(userId)
+  if (leerError || !cuenta?.user) {
+    return NextResponse.json(
+      { error: `No se pudo leer la cuenta: ${leerError?.message ?? 'no existe'}` },
+      { status: 400 }
+    )
+  }
+  if (perfil.active === false || estaBaneada(cuenta.user)) {
+    return NextResponse.json(
+      { error: 'Ese acceso está dado de baja: reactivalo primero y después blanqueale la clave.' },
+      { status: 409 }
+    )
+  }
+  const { error } = await auth.admin.auth.admin.updateUserById(userId, {
+    password: clave,
+    user_metadata: { ...(cuenta.user.user_metadata ?? {}), debe_cambiar_clave: true },
+  })
+  if (error) {
+    return NextResponse.json({ error: `No se pudo cambiar la clave: ${error.message}` }, { status: 400 })
+  }
+  return NextResponse.json({ ok: true })
 }
 
 export async function DELETE(request: Request) {

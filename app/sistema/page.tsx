@@ -110,6 +110,9 @@ function AppShell() {
   if (session.user?.user_metadata?.debe_cambiar_clave) {
     return (
       <CambiarClaveObligatorio
+        // La clienta entra con su documento; el staff, con la temporal que
+        // le puso el admin al blanquearla.
+        conDocumento={profile?.role === 'alumno'}
         // Recargar es lo más simple y lo más seguro: la sesión vuelve con
         // la metadata nueva y el corte de arriba deja de aplicar. Mutar el
         // usuario en memoria dejaría dos fuentes de verdad.
