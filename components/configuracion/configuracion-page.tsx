@@ -1243,7 +1243,7 @@ function tituloGrupo(key: string) {
  * fila), así que sumar un parámetro nuevo no requiere tocar este archivo.
  */
 function SettingsSection({ group }: { group: SettingGroup }) {
-  const { refresh, canWrite, profile } = useData()
+  const { refresh, canWrite, can, permisosReady, profile } = useData()
   const { settingsMeta } = useStudio()
   const meta = settingsMeta.filter((s) => s.group === group)
   const info = tituloGrupo(group)
@@ -1258,10 +1258,17 @@ function SettingsSection({ group }: { group: SettingGroup }) {
   const [apagando, setApagando] = useState<string | null>(null)
 
   const esAdmin = profile?.role === 'admin'
+  // Desde la 0087 los parámetros y los datos del estudio los cambia quien
+  // tiene `config.editar`, que en el preset es sólo el admin. No va
+  // `can(...) || canWrite`: recepción tiene canWrite y seguiría viendo el
+  // Guardar. Sin respuesta del motor (la 0012 sin correr) se cae al rol; con
+  // la 0087 sin correr el grupo está en sombra y recepción edita como hasta
+  // hoy.
+  const puedeEditar = permisosReady ? can('config.editar') : canWrite
   const valueOf = (s: StudioSetting) => draft[s.key] ?? s.value
   // Los de control aflojan el arqueo, así que no viven en manos de quien
   // cierra la caja. La base lo exige igual con una política restrictiva.
-  const editable = (s: StudioSetting) => canWrite && (!s.soloAdmin || esAdmin)
+  const editable = (s: StudioSetting) => puedeEditar && (!s.soloAdmin || esAdmin)
   const dirty = Object.keys(draft).some((k) => draft[k] !== meta.find((s) => s.key === k)?.value)
 
   const set = (key: string, value: string) => {
@@ -1461,7 +1468,9 @@ function SettingsSection({ group }: { group: SettingGroup }) {
                 )}
               </div>
             )}
-            {s.soloAdmin && !esAdmin && (
+            {/* Sólo para quien puede editar los demás: a quien no puede
+                tocar ninguno ya se lo dice la línea de abajo. */}
+            {s.soloAdmin && !esAdmin && puedeEditar && (
               <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
                 <Lock className="w-3 h-3" />
                 Solo lo cambia el admin: afloja el control del arqueo.
@@ -1472,7 +1481,15 @@ function SettingsSection({ group }: { group: SettingGroup }) {
 
         {error && <p className="text-xs text-destructive-fuerte">{error}</p>}
 
-        {canWrite && (
+        {!puedeEditar && (
+          <p className="text-[11px] text-muted-foreground flex items-center gap-1 pt-1">
+            <Lock className="w-3 h-3" />
+            Solo lectura: tu rol no puede cambiar{' '}
+            {group === 'estudio' ? 'los datos del estudio' : 'estos parámetros'}.
+          </p>
+        )}
+
+        {puedeEditar && (
           <div className="flex items-center gap-3 pt-1">
             <button
               onClick={save}

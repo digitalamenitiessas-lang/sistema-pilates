@@ -155,8 +155,11 @@ export function AsignarPlanModal({ student, onClose }: AsignarPlanModalProps) {
 
           {plans.length === 0 && (
             <p className="text-sm text-muted-foreground bg-muted rounded-xl px-3 py-3 text-center">
-              No hay planes activos para asignar. Creá uno en Planes, o reactivá
-              alguno de los que están dados de baja.
+              {/* Sin "creá uno": desde la 0087 recepción, que es quien da
+                  de alta, no crea planes. Y sin "reactivá": un plan dado de
+                  baja no se vuelve a activar desde ninguna pantalla. */}
+              No hay planes activos para asignar. Los planes se crean desde
+              Planes, con el permiso de crear planes.
             </p>
           )}
 

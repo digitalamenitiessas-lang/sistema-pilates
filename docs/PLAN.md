@@ -2242,6 +2242,78 @@ las fichas de todas las clientas (decisión del 27/09: queda así por
 ahora), y un "ausente" mal puesto no se puede volver a "sin marcar" desde
 ninguna pantalla.
 
+### 🟡 Los planes y los parámetros los cambia el admin (27/09) — `0087` **escrita, sin correr**
+
+Decisión de Matías del 27/09: **recepción deja de crear, modificar y dar de
+baja planes, y de cambiar los parámetros del negocio** —plazos, ventanas de
+pago, avisos, los datos del estudio y prender o apagar una regla—. Son
+`planes.crear`, `planes.editar`, `planes.eliminar` y `config.editar`.
+Destildarlas en la matriz no hacía nada: los grupos `Planes` y
+`Configuración` estaban en sombra, y en sombra `can()` responde el legado.
+La `0087` borra esas cuatro filas de recepción y **enciende los dos
+grupos**. Recepción sigue viendo planes y parámetros, entrando a
+Configuración y cobrando.
+
+**Lo que encontró la revisión: las vistas públicas se podían escribir.**
+`public_plans`, `public_studio_settings`, `public_disciplines` y
+`public_payment_discounts` son vistas simples sin `security_invoker`, con
+todos los privilegios por defecto para `anon` y `authenticated`. Postgres
+deja escribirlas solas, y la escritura toca la tabla con los permisos del
+dueño, sin RLS. O sea que **con la llave pública y sin sesión** se podía
+cambiar el precio de un plan, crear o borrar planes, reescribir los datos
+del estudio, prender `portal_autoregistro` o mover el `ajuste_pct` con que
+`cobrar_cuota` cobra. Venía de antes de esta migración, pero sin cerrarlo
+apagar las claves no frenaba a nadie. La `0087` les deja **sólo SELECT**,
+explícito, a las cinco `public_*` (la de horarios también, aunque con su
+join no se pueda escribir). La landing sigue leyendo igual. No se vuelve
+atrás con la vuelta atrás de las claves.
+
+Encender cambia sólo lo pedido porque **la migración lo comprueba adentro**
+en vez de suponerlo: compara matriz contra legado en cada clave en sombra
+de los dos grupos y rol por rol, mira las excepciones por persona (que
+encendidas pasan a regir), verifica que cada clave esté en el grupo por el
+que se la enciende, que toda política permisiva de escritura de `plans` y
+`studio_settings` sea **exactamente** su `can()` —una con la clave y un
+`or` al costado también corta— y que ninguna función `SECURITY DEFINER`
+abierta escriba esas tablas salvo `editar_disciplina`. Al final compara la
+tabla entera de la decisión y corta si queda alguna vista escribible sin
+`security_invoker` sobre `plans` o `studio_settings`, directa o a través de
+otra vista. `config.ver` y `planes.ver` quedan para los cuatro roles. La
+vuelta atrás va **por clave y no por grupo**: `promos.administrar` es de
+Planes, rige desde la `0079` con legado vacío, y devolver el grupo entero a
+sombra la dejaba sin nadie, ni el admin. El freno de mano
+(`modo = 'emergencia'`) le devuelve a recepción las cuatro claves, no la
+escritura por las vistas.
+
+En la pantalla, Planes y Configuración preguntan por la clave con
+`permisosReady ? can(...) : canWrite` —no `can(...) || canWrite`, que para
+recepción da siempre sí— y dicen en una línea que son de sólo lectura. La
+papelera de un plan pide `planes.editar` **y** `planes.eliminar`, porque la
+base pide las dos para una baja. Guardar un plan, darlo de baja o guardar
+parámetros ahora mira cuántas filas tocó: una pestaña abierta desde antes
+de correr la migración mostraba "Guardado" sin guardar. Y tres textos que
+le pedían a quien los leyera crear o reactivar un plan —la ventana de
+asignar plan y los dos avisos de renovación omitida— ya no lo piden:
+reactivar un plan dado de baja no existe en ninguna pantalla.
+
+**Verificado** en un Postgres local con las 84 migraciones del repo y los
+privilegios por defecto de Supabase, no contra Supabase: antes de la
+`0087` los cinco roles, `anon` incluido, escribían por las vistas; después
+todos rebotan con `42501` y siguen leyendo lo mismo. Con una sesión por
+rol, lo único que cambia en todo `mis_permisos()` son esas cuatro claves de
+recepción, y recepción pasa a rebotar en insertar (42501), modificar, dar
+de baja y borrar planes, y en cambiar valores, vigencias, datos del estudio
+e insertar o borrar parámetros (cero filas); el admin, todo como antes.
+Corre dos veces; corta sin dejar nada en 19 casos armados a propósito
+(matriz distinta del legado, excepción que cambiaría algo, grupo
+renombrado, política vieja, `FOR ALL`, la clave con un `or`, un `WITH
+CHECK` abierto, una función definer nueva, otra vista escribible sobre
+`plans` o sobre `public_plans`, sin el motor) y pasa en los que no cambian
+nada; la vuelta atrás deja `mis_permisos()` idéntico al de antes y
+`perm_diff()` en cero. **Falta** correrla, mirar la landing sin sesión, y
+cuando exista la primera cuenta de recepción, entrar con ella: el paso a
+paso está al final de la migración.
+
 ### 🟡 Anular un cobro no borra la deuda (27/09) — `0083` **corrida**, falta ejercerla en pantalla
 
 Salió de la auditoría del 25/09 (T26). **Anular desde Pagos tachaba el

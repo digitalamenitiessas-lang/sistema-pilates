@@ -2044,35 +2044,54 @@ function columnaDesconocida(mensaje: string): string | null {
  * subía y guardar un plan fallaba en la pantalla. Se parsea el nombre que
  * trae el mensaje en vez de mantener una lista, que hay que ampliar en cada
  * migración y falla justo el día que alguien se olvida.
+ *
+ * Devuelve cuántas filas tocó: un update que la RLS no deja pasar no da
+ * error, vuelve con cero filas (ver `updatePlan`).
  */
 async function escribirPlan(
-  escribir: (row: Record<string, unknown>) => PromiseLike<{ error: { message: string } | null }>,
+  escribir: (
+    row: Record<string, unknown>
+  ) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>,
   row: Record<string, unknown>
-): Promise<void> {
+): Promise<number> {
   const fila = { ...row }
   // Termina siempre: solo reintenta cuando saca una columna que el row
   // tenía, así que cada vuelta lo deja más chico. Y cualquier otro error
-  // —un CHECK, un permiso, la conexión— sube tal cual, como antes.
+  // —un CHECK, un permiso, la conexión— sube con su mensaje, como antes;
+  // el de la RLS, dicho en castellano.
   for (;;) {
-    const { error } = await escribir(fila)
-    if (!error) return
+    const { data, error } = await escribir(fila)
+    if (!error) return data?.length ?? 0
     const columna = columnaDesconocida(error.message)
-    if (!columna || !(columna in fila)) throw error
+    if (!columna || !(columna in fila)) throw errorDeLaBase(error, 'No se pudo guardar el plan')
     delete fila[columna]
   }
 }
 
 export async function createPlan(input: PlanInput): Promise<void> {
-  await escribirPlan((row) => supabase.from('plans').insert(row), planRow(input))
+  await escribirPlan((row) => supabase.from('plans').insert(row).select('id'), planRow(input))
 }
 
+// Desde la 0087 recepción no modifica ni da de baja planes. La pantalla ya
+// no le ofrece los botones, pero una pestaña abierta desde antes de la
+// migración todavía los tiene: sin mirar las filas, guardar cerraba el
+// formulario como si hubiera andado y el precio seguía siendo el viejo.
 export async function updatePlan(id: string, input: PlanInput): Promise<void> {
-  await escribirPlan((row) => supabase.from('plans').update(row).eq('id', id), planRow(input))
+  const filas = await escribirPlan(
+    (row) => supabase.from('plans').update(row).eq('id', id).select('id'),
+    planRow(input)
+  )
+  if (filas === 0) throw new Error('Tu rol no tiene permiso para modificar planes.')
 }
 
 export async function deactivatePlan(id: string): Promise<void> {
-  const { error } = await supabase.from('plans').update({ active: false }).eq('id', id)
-  if (error) throw error
+  const { data, error } = await supabase
+    .from('plans')
+    .update({ active: false })
+    .eq('id', id)
+    .select('id')
+  if (error) throw errorDeLaBase(error, 'No se pudo dar de baja el plan')
+  if (!data || data.length === 0) throw new Error('Tu rol no tiene permiso para dar de baja planes.')
 }
 
 /**
@@ -3645,7 +3664,6 @@ export async function setPaymentMethodActive(code: string, active: boolean): Pro
 // ---------------------------------------------------------------
 // Parámetros del negocio (studio_settings — migración 0011)
 // ---------------------------------------------------------------
-/** Guarda solo las claves que cambiaron. */
 /**
  * Prender o apagar una regla (0081).
  *
@@ -3674,12 +3692,26 @@ export async function setSettingRige(key: string, rige: boolean): Promise<void> 
   }
 }
 
+/**
+ * Guarda solo las claves que cambiaron.
+ *
+ * Mira las filas por lo mismo que `setSettingRige`: desde la 0087 sólo el
+ * admin tiene `config.editar`, y una pestaña de recepción abierta desde
+ * antes de la migración seguiría mostrando "Guardado" sin haber guardado.
+ */
 export async function saveSettings(changes: Record<string, string>): Promise<void> {
   const entries = Object.entries(changes)
   if (!entries.length) return
   for (const [key, value] of entries) {
-    const { error } = await supabase.from('studio_settings').update({ value }).eq('key', key)
-    if (error) throw error
+    const { data, error } = await supabase
+      .from('studio_settings')
+      .update({ value })
+      .eq('key', key)
+      .select('key')
+    if (error) throw errorDeLaBase(error, 'No se pudo guardar')
+    if (!data || data.length === 0) {
+      throw new Error('Tu rol no tiene permiso para cambiar los parámetros del negocio.')
+    }
   }
 }
 
