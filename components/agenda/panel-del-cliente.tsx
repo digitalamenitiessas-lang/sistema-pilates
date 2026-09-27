@@ -141,6 +141,22 @@ export function PanelDelCliente({ student }: { student: Student }) {
     .filter((m) => m.studentId === student.id && cubreLaFecha(m, hoy))
     .sort(ordenDeCobro)[0]
 
+  // El plan que todavía no arrancó. Sin esto, a toda la tanda que empieza
+  // el 29/09 el panel le decía "Sin membresía vigente" y le ofrecía
+  // "Asignar plan" el día antes de abrir, con la ficha ya paga: la
+  // invitación a venderle un segundo mes. Visto en la prueba del 27/09.
+  const porEmpezar = vigente
+    ? undefined
+    : memberships
+        .filter(
+          (m) =>
+            m.studentId === student.id &&
+            m.status !== 'suspendida' &&
+            m.status !== 'cancelada' &&
+            m.startDate > hoy
+        )
+        .sort((a, b) => a.startDate.localeCompare(b.startDate))[0]
+
   // Deuda de verdad, no la oferta de renovación: esa cobra un período que
   // todavía no existe —lo crea el pago— así que no se puede exigir (0041).
   const deudas = payments
@@ -194,6 +210,18 @@ export function PanelDelCliente({ student }: { student: Student }) {
             <p className="text-xs font-bold text-foreground truncate">{vigente.planName}</p>
             <p className="text-[11px] text-muted-foreground shrink-0">
               {restantes} de {vigente.classesTotal}
+            </p>
+          </div>
+        ) : porEmpezar ? (
+          <div className="space-y-0.5">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-xs font-bold text-foreground truncate">{porEmpezar.planName}</p>
+              <p className="text-[11px] text-muted-foreground shrink-0">
+                {Math.max(0, porEmpezar.classesTotal - porEmpezar.classesUsed)} de {porEmpezar.classesTotal}
+              </p>
+            </div>
+            <p className="text-[11px] text-info-fuerte">
+              Arranca el {fecha(porEmpezar.startDate)} · vence el {fecha(porEmpezar.endDate)}
             </p>
           </div>
         ) : (
@@ -250,7 +278,7 @@ export function PanelDelCliente({ student }: { student: Student }) {
             {(can('membresias.asignar') || canWrite) && (
               <button onClick={() => setAsignando(true)} className={botonClase}>
                 <RefreshCw className="w-3 h-3 shrink-0" />
-                {vigente ? 'Renovar' : 'Asignar plan'}
+                {vigente ? 'Renovar' : porEmpezar ? 'Asignar otro plan' : 'Asignar plan'}
               </button>
             )}
             {(can('pagos.registrar') || canWrite) &&
