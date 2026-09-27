@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import type { ReglaDelCobro } from './precios'
 import type {
   Teacher,
   Plan,
@@ -415,55 +416,12 @@ const EXPIRY_WARNING_DAYS = 5
 // ---------------------------------------------------------------
 export type Settings = Record<string, string>
 
-/**
- * El precio que se cobra según cómo paga el cliente.
- *
- * El ajuste vive en el medio de pago (0028) y no en el plan: es una
- * propiedad de cómo se paga, no de qué se compra. El redondeo es un
- * parámetro porque base × 0,95 da entero solo si la base es múltiplo de
- * 20 — con los precios de hoy nunca se nota, con el primer aumento sí.
- */
-export function precioConAjuste(
-  base: number,
-  ajustePct: number,
-  redondeo: string = 'cincuenta'
-): number {
-  const bruto = base * (1 + ajustePct / 100)
-  switch (redondeo) {
-    case 'cien':        return Math.round(bruto / 100) * 100
-    case 'cien_arriba': return Math.ceil(bruto / 100) * 100
-    case 'ninguno':     return Math.round(bruto * 100) / 100
-    // 'cincuenta' es el default y el que deja intacta la lista de precios
-    // publicada: sus doce valores son múltiplos de 50.
-    default:            return Math.round(bruto / 50) * 50
-  }
-}
-
-/**
- * El precio con una promoción aplicada.
- *
- * Espeja a `cobrar_cuota()` (0079) para que el número que la pantalla
- * anticipa sea el que la base va a cobrar. Quien manda es la base —el
- * monto se escribe allá— y esto es solo la vista previa: si algún día
- * divergen, gana la base y el comprobante muestra lo que cobró.
- *
- * El tope en cero es el mismo que el de allá: un monto fijo más grande
- * que la cuota no puede dejar una deuda negativa.
- */
-export function precioConPromo(
-  base: number,
-  tipo: 'porcentaje' | 'monto',
-  valor: number,
-  redondeo: string = 'cincuenta'
-): number {
-  const bruto = Math.max(0, tipo === 'porcentaje' ? base * (1 - valor / 100) : base - valor)
-  switch (redondeo) {
-    case 'cien':        return Math.round(bruto / 100) * 100
-    case 'cien_arriba': return Math.ceil(bruto / 100) * 100
-    case 'ninguno':     return Math.round(bruto * 100) / 100
-    default:            return Math.round(bruto / 50) * 50
-  }
-}
+// La cuenta del cobro —el ajuste del medio, la promo, el redondeo— vive
+// en `lib/precios.ts`, sin dependencias, para poder probarla contra la
+// base sin levantar la app. Se reexporta acá porque es de donde la
+// importan las pantallas.
+export { precioConAjuste, precioConPromo, precioDeCobro, cobroDeLaBase } from './precios'
+export type { PrecioDeCobro, PromoDelCobro, ReglaDelCobro } from './precios'
 
 export function settingNum(settings: Settings, key: string, fallback: number): number {
   const n = Number(settings[key])
@@ -2413,7 +2371,73 @@ export async function promocionesPara(paymentId: string): Promise<PromoAplicable
 }
 
 /**
- * Cobrar una cuota. La cuenta la hace la base (0079).
+ * Con qué regla cobra la base una cuota con promo: si el recargo del
+ * medio va encima de la promo (0086) o si la promo lo reemplaza (0079).
+ *
+ * La pantalla anticipa el monto antes de cobrar, y con tarjeta las dos
+ * reglas dan números distintos ($78.750 contra $63.000 en una cuota de
+ * $70.000 con 10%). Anticipar la nueva antes de que corra la 0086 sería
+ * prometer un número que la base no cobra.
+ *
+ * Se le pregunta a `regla_del_cobro()` (0086), que lo deduce del cuerpo
+ * de `cobrar_cuota` —lo único que cambia, y que desde acá no se ve—. No
+ * alcanza con que exista `precio_de_cobro`: si alguien vuelve
+ * `cobrar_cuota` a la de la 0079 y la función pura queda, la pantalla
+ * prometería la regla nueva y la base cobraría la vieja. Sin la función
+ * (PGRST202, o 42883 si la pregunta llega a Postgres), la 0086 no corrió:
+ * la regla es la de la 0079. Es el mismo patrón que `miTopeDeFijos` con
+ * la 0082.
+ *
+ * Devuelve `null` cuando no se pudo saber (sin red, un error de la base,
+ * una regla que esta pantalla no conoce). No se adivina: la pantalla lo
+ * dice en vez de mostrar un número que puede no ser.
+ */
+export async function reglaDelCobro(): Promise<ReglaDelCobro | null> {
+  try {
+    const { data, error } = await supabase.rpc('regla_del_cobro')
+    if (error) {
+      return error.code === 'PGRST202' || error.code === '42883' ? 'reemplaza' : null
+    }
+    return data === 'respeta_recargo' || data === 'reemplaza' ? data : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Si el cobro de esa cuota se hizo con el cupón que se escribió.
+ *
+ * `cobrar_cuota` devuelve el nombre de la promo, no cuál era: desde la
+ * 0086, un cupón que no le gana al descuento del medio no se aplica y en
+ * su lugar puede entrar la automática, así que "hubo promo" no quiere
+ * decir "se usó el cupón". Se mira la promo que quedó en el cobro.
+ *
+ * `null` si no se pudo leer: quien pregunta no dice nada en vez de
+ * afirmar algo que no sabe.
+ */
+export async function cuponUsadoEnElCobro(paymentId: string, codigo: string): Promise<boolean | null> {
+  try {
+    const { data: pago, error } = await supabase
+      .from('payments')
+      .select('promocion_id')
+      .eq('id', paymentId)
+      .maybeSingle()
+    if (error || !pago) return null
+    if (!pago.promocion_id) return false
+    const { data: promo, error: errPromo } = await supabase
+      .from('promociones')
+      .select('codigo')
+      .eq('id', pago.promocion_id)
+      .maybeSingle()
+    if (errPromo || !promo) return null
+    return (promo.codigo ?? '').toUpperCase() === codigo.trim().toUpperCase()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Cobrar una cuota. La cuenta la hace la base (0079, 0086).
  *
  * Reemplaza al update directo que hacía el navegador: con promociones y
  * topes de uso, un monto calculado en el cliente no se puede hacer

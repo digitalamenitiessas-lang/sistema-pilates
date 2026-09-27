@@ -18,7 +18,15 @@ import { urlDelPortal } from '@/lib/estudio'
  * que desdecir.
  */
 
-/** Cómo se lee la promo en un mail: sin jerga y sin el id. */
+/**
+ * Cómo se lee la promo en un mail: sin jerga y sin el id.
+ *
+ * `mediosConDescuento` son los medios activos que ya descuentan (el
+ * efectivo). Desde la 0086 la promo no se suma a ese descuento: queda el
+ * mayor de los dos, y una promo chica pagando en efectivo no cambia el
+ * precio. Sin decirlo, "se aplica solo cuando pagás" le promete a quien
+ * paga así algo que el mostrador no va a cobrar.
+ */
 function comoSeUsa(p: {
   tipo: string
   valor: number
@@ -29,7 +37,7 @@ function comoSeUsa(p: {
   dia_desde: number | null
   dia_hasta: number | null
   usos_por_cliente: number | null
-}): { beneficio: string; cuando: string; como: string } {
+}, mediosConDescuento: string[] = []): { beneficio: string; cuando: string; como: string } {
   const beneficio =
     p.tipo === 'porcentaje'
       ? `${Number(p.valor)}% de descuento`
@@ -55,9 +63,14 @@ function comoSeUsa(p: {
       ? ` Se puede usar ${p.usos_por_cliente === 1 ? 'una sola vez' : `hasta ${p.usos_por_cliente} veces`} por persona.`
       : ''
 
+  const noSeSuman =
+    mediosConDescuento.length > 0
+      ? ` Si pagás con ${mediosConDescuento.join(' o ')}, que ya ${mediosConDescuento.length === 1 ? 'tiene' : 'tienen'} su descuento, no se suman: se aplica el mayor de los dos.`
+      : ''
+
   const como = p.codigo
-    ? `Al pagar, decí el código <strong>${p.codigo}</strong> y te lo aplicamos.${tope}`
-    : `No hay que hacer nada: se aplica solo cuando pagás.${tope}`
+    ? `Al pagar, decí el código <strong>${p.codigo}</strong> y te lo aplicamos.${tope}${noSeSuman}`
+    : `No hay que hacer nada: se aplica solo cuando pagás.${tope}${noSeSuman}`
 
   return { beneficio, cuando, como }
 }
@@ -108,7 +121,22 @@ export async function POST(request: Request) {
     )
   }
 
-  const { beneficio, cuando, como } = comoSeUsa(promo)
+  // La frase de los medios con descuento va sólo si la base ya cobra con
+  // la regla de la 0086: con la de la 0079 la promo reemplaza al
+  // descuento, gane o pierda, y "se aplica el mayor" sería falso. Si no
+  // se puede saber, el anuncio sale como antes.
+  let mediosConDescuento: string[] = []
+  const { data: regla } = await caller.supabase.rpc('regla_del_cobro')
+  if (regla === 'respeta_recargo') {
+    const { data: medios } = await admin
+      .from('public_payment_discounts')
+      .select('name')
+    mediosConDescuento = (medios ?? [])
+      .map((m) => String(m.name ?? '').trim().toLowerCase())
+      .filter(Boolean)
+  }
+
+  const { beneficio, cuando, como } = comoSeUsa(promo, mediosConDescuento)
 
   // "Activas" es el padrón: quien no se dio de baja. A propósito NO se
   // filtra por membresía vigente — a quien se le venció es justamente a

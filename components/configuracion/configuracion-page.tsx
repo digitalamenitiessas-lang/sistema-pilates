@@ -77,6 +77,8 @@ import {
   setPromocionRige,
   deactivatePromocion,
   anunciarPromocion,
+  reglaDelCobro,
+  type ReglaDelCobro,
   type MpAccountInfo,
   type TeacherInput,
   type DisciplineInput,
@@ -2417,6 +2419,20 @@ function PromocionesSection() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [resultado, setResultado] = useState<string | null>(null)
+  // La regla con que la base combina la promo con el medio (0086). El
+  // texto de abajo la dice, y no puede decir la nueva mientras la base
+  // cobre con la vieja. `undefined` mientras se pregunta (no se dice
+  // ninguna); `null` si no se pudo saber (se dice sin afirmar cuál).
+  const [regla, setRegla] = useState<ReglaDelCobro | null | undefined>(undefined)
+  useEffect(() => {
+    let vivo = true
+    reglaDelCobro().then((r) => {
+      if (vivo) setRegla(r)
+    })
+    return () => {
+      vivo = false
+    }
+  }, [])
 
   const recargar = async () => {
     try {
@@ -2510,8 +2526,14 @@ function PromocionesSection() {
         <div className="px-5 py-4 space-y-2">
           <p className="text-[11px] text-muted-foreground pb-1">
             El descuento se aplica <strong>al cobrar la cuota</strong>, y lo
-            calcula la base: la pantalla no puede cobrar otra cosa. Una promo
-            reemplaza al ajuste del medio de pago, no se suman.
+            calcula la base: la pantalla no puede cobrar otra cosa.{' '}
+            {regla === 'respeta_recargo'
+              ? 'Si el medio de pago tiene recargo, se cobra encima del precio con la promo. Si tiene descuento, no se suman: queda el mayor.'
+              : regla === 'reemplaza'
+                ? 'Hoy una promo reemplaza al ajuste del medio de pago, también al recargo: falta correr la migración 0086.'
+                : regla === null
+                  ? 'Cómo se combina con el ajuste del medio de pago lo resuelve la base al cobrar.'
+                  : null}
           </p>
 
           {vivas.length === 0 && (

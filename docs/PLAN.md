@@ -2357,6 +2357,95 @@ de recepción, por la pantalla. El paso a paso:
    va a listar el arqueo como desactualizado sólo si la caja del día ya
    estaba cerrada cuando se anuló.
 
+### 🟡 La promo respeta el recargo de la tarjeta (27/09) — `0086` **escrita, sin correr**
+
+Visto en producción el 27/09: FE FLOW de $70.000 con una promo automática
+del 10% cobraba **$63.000 con tarjeta**, igual que en efectivo, cuando sin
+promo con tarjeta son $87.500. La regla de la `0079` ("la promo reemplaza
+al ajuste del medio") se comía el recargo, que existe para pagar la
+comisión. Decisión de Matías: **que respete el recargo**.
+
+> **Orden: primero el deploy, después la `0086`.** La pantalla de antes
+> anticipa la regla vieja sin preguntar: con la `0086` corrida mostraría
+> $63.000 con tarjeta y la base cobraría $78.750, y con tarjeta lo que dice
+> la pantalla es lo que se marca en el posnet. La pantalla nueva anda con
+> las dos bases. Mergear, esperar el deploy de Vercel, **recargar las
+> pestañas abiertas del mostrador** y recién ahí correrla.
+
+**La regla nueva**, en la base (`cobrar_cuota` hace la cuenta con
+`precio_de_cobro()`, una función pura):
+
+- **Recargo del medio**: va encima del precio con la promo. $70.000 →
+  $63.000 → **$78.750**. Con monto fijo igual: $65.000 → $81.250.
+- **Descuento del medio**: no se suman, queda el mayor. Con el 20% en
+  efectivo sigue siendo $56.000, como decidió el estudio el 23/09.
+- **Se corrigió un caso que la `0079` cobraba mal**: una promo más chica
+  que el efectivo (3% contra −5%) cobraba $67.900, **más** que los $66.500
+  sin promo, y encima gastaba el uso. Ahora cobra $66.500 y la promo no se
+  aplica ni gasta el uso. En el empate (5% contra −5%) también gana el medio.
+- **Un cupón que no gana no tapa a la automática**: con un cupón del 3%
+  escrito y una automática del 10%, en efectivo se aplica la del 10%
+  ($63.000) y el cupón queda sin usar. Antes, escribir el cupón salía más
+  caro que no escribirlo. Si el cupón gana, sigue siendo el que se aplica.
+- **La promo que no ganó queda anotada** (`payments.promocion_ofrecida_id`,
+  que no cuenta como uso) y `anular_cobro` se la pasa a la cuota reabierta.
+  Sin eso, la promesa de la `0083` se rompía: cobrado en efectivo con una
+  de pago temprano del 5%, anulado para corregir y vuelto a cobrar con
+  tarjeta fuera de la ventana, salía $87.500 en vez de $83.150.
+- El redondeo, una sola vez y al final, como siempre.
+
+**Qué guarda el cobro.** `precio_lista` igual que antes. `descuento`, con
+promo, es **lo que descontó la promo** (7.000 en el ejemplo, en cualquier
+medio); sin promo, lo que hizo el medio, como hasta hoy. El recargo que va
+encima de una promo se lee como `amount − (precio_lista − descuento)`
+(15.750). No tiene columna propia: habría que rellenar hacia atrás cobros
+de arqueos cerrados, y ninguno de los viejos combina promo con recargo.
+
+**La pantalla.** El "Cobrar" (el de Pagos, el de la Agenda y el de "Otro
+cobro" cuando salda una cuota) muestra la promo y el recargo en dos
+recuadros que suman el total, y nombra la promo o el cupón que no se
+aplica. La cuenta y la elección salieron a `lib/precios.ts` y se hacen en
+enteros, como `numeric`: la de coma flotante daba distinto que la base en
+25 de las 15.708 combinaciones probadas. De paso, la pantalla ahora
+redondea también sin ajuste, como la base. **Para saber qué regla
+anticipar** le pregunta a `regla_del_cobro()`, que la deduce del cuerpo de
+`cobrar_cuota`: sin la `0086` anticipa la de la `0079`, y si alguien vuelve
+`cobrar_cuota` a la vieja, también. Si no puede preguntar, dice "A
+confirmar" en vez de un número. El alta con "Paga ahora" no anticipa el
+monto (nunca lo hizo) y avisa si el cupón no se usó. Configuración →
+Promociones dice la regla que rige (y nada mientras pregunta). El anuncio
+por mail y campana agrega, con la regla nueva, que con efectivo no se suman
+y se aplica el mayor.
+
+**La guarda** compara el código entero de `cobrar_cuota` y `anular_cobro`
+(md5 sin comentarios ni espacios) contra el de la `0079`/`0083` y el de
+esta: si alguien las tocó después, corta. El SQL para mirarlo antes, sólo
+lectura, está en su punto 0.
+
+**Verificado** en un Postgres local con los archivos enteros de la `0079`
+y la `0083` y los disparadores reales del cobro (`0016`, `0020`, `0041`,
+`0084`), no contra Supabase. Por `cobrar_cuota`, antes y después de la
+`0086`: sin promo en los tres medios ($66.500 / $87.500 / $70.000,
+iguales), 10% ($63.000 / **$78.750** / $63.000), 3% en efectivo ($67.900
+→ **$66.500**, sin promo), $5.000 con tarjeta ($81.250), el 20% en
+efectivo ($56.000), 71.230 con los tres redondeos, un cupón de un uso que
+en efectivo no se gasta y con tarjeta sí, cupón 3% + automática 10%
+($67.900 → $63.000 en efectivo), y una renovación cobrada con promo y
+tarjeta (la membresía nace con $78.750). Anular para corregir con la de
+pago temprano al 5%, al 3% y con cupón: la cuota reabierta hereda la promo
+y con tarjeta cobra $83.150 / $84.900 / $84.900. La pantalla contra la
+base: las 15.708 combinaciones de `precio_de_cobro` y los cobros hechos en
+las tres bases (antes, después, y con la `cobrar_cuota` de la `0079` vuelta
+a pegar) dan igual, centavo por centavo y con la misma promo elegida. La
+`0086` corre dos veces seguidas; corta sin la `0079`, sin la `0083`, sobre
+una `cobrar_cuota` o una `anular_cobro` tocadas después (también fuera de
+las líneas que cambia) y sobre un arreglo posterior que siga usando
+`precio_de_cobro`; pasa si sólo cambió un comentario. La vuelta atrás de
+su final deja la `0079` y la `0083` como estaban y la `0086` vuelve a
+correr. **Falta** correrla y ejercerla por la pantalla con la sesión de
+recepción: el paso a paso está en el CÓMO VERIFICAR de la migración, y va
+con un cupón para no tocar los cobros de verdad.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
