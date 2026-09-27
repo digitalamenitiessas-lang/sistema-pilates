@@ -2242,6 +2242,39 @@ las fichas de todas las clientas (decisión del 27/09: queda así por
 ahora), y un "ausente" mal puesto no se puede volver a "sin marcar" desde
 ninguna pantalla.
 
+### 🟡 Las vistas no se escriben (27/09) — `0088` **escrita, sin correr** · va antes que la `0085`
+
+Lo encontró la revisión adversarial de la `0087` y se confirmó en
+producción el mismo día: con la llave pública —la que viaja en el
+navegador de cualquiera que abra la web— y sin sesión, un `PATCH` sobre
+`public_plans` o `public_studio_settings` volvía 200. Se probó con un id
+que no existe, así que no tocó nada; con uno real habría cambiado el
+precio de un plan o un dato del estudio, y por `public_payment_discounts`
+el ajuste con que se cobra cada medio de pago.
+
+Por qué: son vistas simples, que Postgres deja escribir pasando la
+escritura a la tabla; no tienen `security_invoker`, así que corren como su
+dueño y la RLS no se mira; y Supabase les da a `anon` y `authenticated`
+todos los privilegios por defecto. Estaba abierto desde la `0003`.
+
+El sistema no escribe nunca sobre una vista (se revisó todo `app/`, `lib/`
+y `components/`), así que la `0088` les saca la escritura **a todas las
+del esquema**, sin tocar quién las lee: un `grant select` parejo le habría
+dado lectura a `anon` sobre vistas que la `0073` cerró. No hay rastros de
+que se haya usado: precios, ajustes y datos del estudio están como el
+estudio los dejó, y las filas de `studio_settings` sin autor coinciden con
+las corridas de migraciones.
+
+Verificado en un Postgres local: antes, `anon` escribía por la vista aunque
+la tabla tuviera RLS; después, `anon` y `authenticated` reciben
+"permission denied for view", `anon` sigue leyendo `public_plans` y sigue
+sin leer `account_ledger`, corre dos veces y la comprobación final corta si
+queda una vista abierta. Falta correrla y repetir el `PATCH` desde afuera.
+
+**Lección para las próximas vistas**: toda vista nueva en `public` nace
+escribible para el navegador. O se crea con `security_invoker`, o se le
+deja sólo `select`.
+
 ### 🟡 Los planes y los parámetros los cambia el admin (27/09) — `0087` **escrita, sin correr**
 
 Decisión de Matías del 27/09: **recepción deja de crear, modificar y dar de

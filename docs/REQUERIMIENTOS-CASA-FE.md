@@ -142,8 +142,16 @@ período de la caja abierta, el WhatsApp del portal como link, las fechas en
 crudo y dos formularios que en el celular no dejaban ver el precio— junto
 con el turno fijo de un plan que todavía no arrancó (`0082`) y el cobro
 anulado que borraba la deuda (`0083`). El detalle, en `PLAN.md`.
-**`studio_whatsapp` está vacío** desde el 25/09: hasta que se cargue, la web
-usa el número de respaldo del código y el portal no ofrece WhatsApp.
+`studio_whatsapp` se cargó el mismo 27/09.
+
+A la tarde del **27/09** quedó escrito un segundo lote: la asistencia no se
+marca por adelantado (`0085`), la promo respeta el recargo de la tarjeta
+(`0086`) y recepción deja de cambiar planes y parámetros, con esos dos
+grupos de permisos encendidos (`0087`). Revisando la `0087` apareció un
+agujero que venía de la `0003`: **las vistas públicas se podían escribir
+sin sesión**, precios y datos del estudio incluidos. Se confirmó en
+producción sin tocar nada y lo cierra la `0088`, que va antes que las
+otras.
 
 El **27/09** se escribió la `0083`, **que falta correr**: anular un cobro
 dejaba el mes sin deuda y sin plata —el caso del medio equivocado, que va a
