@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { cn, numeroDeWhatsApp } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
-import { TomarAsistencia } from '@/components/asistencia/tomar-asistencia'
+import { TomarAsistencia, useVentanaDeAsistencia } from '@/components/asistencia/tomar-asistencia'
 import { fetchResumenPlata, type ResumenPlata } from '@/lib/caja-api'
 import { esOferta, hoyISO, settingBool, settingNum, settingText, todayDayIndex } from '@/lib/api'
 import { paymentReminderLink } from '../pagos/pagos-page'
@@ -119,6 +119,9 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
   // profesora cuando entra al sistema con la clase por empezar.
   const [asistenciaDe, setAsistenciaDe] = useState<(typeof classes)[number] | null>(null)
   const puedeMarcarAsistencia = can('reservas.asistencia') || canWrite
+  // Las clases de más tarde todavía no se marcan (0085): el botón abre la
+  // lista para ver quién viene, y lo dice.
+  const ventana = useVentanaDeAsistencia()
 
   // El bloque de plata: se consulta aparte porque sale de las vistas de
   // caja, no del paquete que trae el resto del tablero.
@@ -483,10 +486,15 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
                   {puedeMarcarAsistencia && cls.enrolled > 0 && (
                     <button
                       onClick={() => setAsistenciaDe(cls)}
+                      title={
+                        ventana.abierta(cls.id, hoy, cls.time)
+                          ? undefined
+                          : `La asistencia se marca desde ${ventana.cuando(cls.id, hoy, cls.time)}`
+                      }
                       className="shrink-0 px-3 py-1.5 rounded-lg border border-primary/40 text-primary-fuerte text-[11px] font-bold hover:bg-primary/5 transition-colors flex items-center gap-1.5"
                     >
                       <ClipboardCheck className="w-3.5 h-3.5" />
-                      Asistencia
+                      {ventana.abierta(cls.id, hoy, cls.time) ? 'Asistencia' : 'Ver lista'}
                     </button>
                   )}
                 </div>

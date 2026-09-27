@@ -18,7 +18,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { SeccionPlegable, SeccionesPlegables } from '@/components/ui/seccion-plegable'
-import { TomarAsistencia } from '@/components/asistencia/tomar-asistencia'
+import { TomarAsistencia, useVentanaDeAsistencia } from '@/components/asistencia/tomar-asistencia'
 import { disciplineStyle } from '@/lib/disciplines'
 import {
   addDays,
@@ -94,6 +94,9 @@ function TablaDeReservas({
   vacio: string
 }) {
   const { busyId, puedeMarcar, canWrite, onEstado, onCancelar } = acciones
+
+  // Una reserva de dentro de un mes no se marca (0085): la base lo rechaza.
+  const ventana = useVentanaDeAsistencia()
 
   if (filas.length === 0) {
     return <p className="px-4 py-8 text-center text-sm text-muted-foreground">{vacio}</p>
@@ -210,7 +213,7 @@ function TablaDeReservas({
                   <div className="flex items-center gap-1">
                     {r.status === 'confirmada' && (
                       <>
-                        {puedeMarcar && (
+                        {puedeMarcar && ventana.abierta(r.classId, r.date, r.time) && (
                           <>
                             <button
                               disabled={busyId === r.id}
@@ -334,6 +337,9 @@ function ClasesDelDia({
 }) {
   const { busyId, puedeMarcar, canWrite, onEstado, onCancelar } = acciones
 
+  // La clase de las 20:00 no se marca a la mañana (0085).
+  const ventana = useVentanaDeAsistencia()
+
   if (filas.length === 0) {
     return <p className="px-4 py-8 text-center text-sm text-muted-foreground">{vacio}</p>
   }
@@ -343,6 +349,7 @@ function ClasesDelDia({
       {agruparPorClase(filas).map((clase) => {
         const color = disciplineStyle(disciplines, clase.discipline).dot
         const sinMarcar = clase.filas.filter((r) => r.status === 'confirmada').length
+        const listaAbierta = ventana.abierta(clase.classId, clase.filas[0].date, clase.time)
         const presentes = clase.filas.filter((r) => r.status === 'asistió').length
         const ausentes = clase.filas.filter((r) => r.status === 'ausente').length
         const enEspera = clase.filas.filter((r) => r.status === 'lista de espera').length
@@ -366,12 +373,13 @@ function ClasesDelDia({
                   {enEspera > 0 && ` · ${enEspera} en espera`}
                 </p>
               </div>
-              {/* "Sin marcar" es una tarea pendiente, y solo lo es en un día
-                  que ya pasó o está pasando. En un día que todavía no
-                  llegó, lo que importa es cuántas se anotaron. */}
+              {/* "Sin marcar" es una tarea pendiente, y solo lo es cuando la
+                  lista ya se abrió (0085). En la clase de más tarde, o en un
+                  día que todavía no llegó, lo que importa es cuántas se
+                  anotaron. */}
               {sinMarcar > 0 && (
                 <span className="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary-fuerte">
-                  {onTomarAsistencia
+                  {onTomarAsistencia && listaAbierta
                     ? `${sinMarcar} sin marcar`
                     : `${sinMarcar} anotado${sinMarcar === 1 ? '' : 's'}`}
                 </span>
@@ -382,7 +390,7 @@ function ClasesDelDia({
                   className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity"
                 >
                   <ClipboardCheck className="w-3.5 h-3.5" />
-                  Tomar asistencia
+                  {listaAbierta ? 'Tomar asistencia' : 'Ver la lista'}
                 </button>
               )}
             </div>
@@ -419,7 +427,7 @@ function ClasesDelDia({
                     <div className="flex items-center gap-1 shrink-0">
                       {r.status === 'confirmada' && (
                         <>
-                          {puedeMarcar && (
+                          {puedeMarcar && ventana.abierta(r.classId, r.date, r.time) && (
                             <>
                               <button
                                 disabled={busyId === r.id}
@@ -677,6 +685,9 @@ export function ReservasPage() {
   // estudio la encienda. Cancelar y confirmar siguen siendo del mostrador.
   const puedeMarcar = can('reservas.asistencia') || canWrite
 
+  // Para contar "sin marcar" sólo lo que ya se puede marcar (0085).
+  const ventana = useVentanaDeAsistencia()
+
   const cambiarEstado = async (reservation: Reservation, estado: ReservationStatus) => {
     setBusyId(reservation.id)
     try {
@@ -758,7 +769,11 @@ export function ReservasPage() {
     .filter((r) => r.date < hoy)
     .sort((a, b) => b.date.localeCompare(a.date) || porHora(b, a))
 
-  const sinMarcarHoy = deHoy.filter((r) => r.status === 'confirmada').length
+  // La clase de las 20:00 no es tarea pendiente a las 9: su lista todavía
+  // no se abrió y la base no la dejaría marcar (0085).
+  const sinMarcarHoy = deHoy.filter(
+    (r) => r.status === 'confirmada' && ventana.abierta(r.classId, r.date, r.time)
+  ).length
 
   // Buscar por nombre o filtrar por una fecha es ir a buscar algo puntual,
   // y ahí los bloques por día estorban: lo buscado puede estar en el

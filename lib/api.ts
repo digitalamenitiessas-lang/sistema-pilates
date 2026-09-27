@@ -121,6 +121,63 @@ export function reservaCerrada(
 }
 
 /**
+ * Cuántos minutos antes del inicio se abre la lista de asistencia
+ * (`attendance_open_minutes`, 0085).
+ *
+ * Con `settingNum` y el mismo 30 por defecto que la base, a propósito: la
+ * función `asistencia_abre_minutos` de la 0085 copia lo que hace
+ * `Number()` acá —vacío es 0, lo que no es número es 30, negativo es 0—
+ * para que las dos mitades de la regla lean el mismo número. Sin la
+ * migración corrida la fila no viene y esto da 30: la pantalla ya espera
+ * la ventana aunque la base todavía acepte marcar a cualquier hora.
+ */
+export function minutosDeAsistencia(settings: Settings): number {
+  return Math.max(0, settingNum(settings, 'attendance_open_minutes', 30))
+}
+
+/**
+ * ¿Ya se puede marcar presente o ausente en esa clase?
+ *
+ * El 27/09 una profesora marcó ausente una reserva de 25 días adelante y
+ * la base lo aceptó: la persona perdía la clase por algo que no pasó, y
+ * la profesora no lo podía deshacer. Desde la 0085 la base lo rechaza
+ * para todos los roles; esto es para no ofrecer el botón que va a fallar.
+ *
+ * `hora` tiene que ser la de ESE día (la de la instancia si el estudio la
+ * corrió), porque la base compara contra `inicio_de_clase`.
+ *
+ * Por el reloj del navegador, truncado al minuto: puede abrir hasta un
+ * minuto DESPUÉS que la base, nunca antes, que es el lado seguro.
+ */
+export function asistenciaAbierta(
+  fecha: string,
+  hora: string,
+  minutosAntes: number,
+  ahora: { fecha: string; hora: string } = ahoraDelEstudio()
+): boolean {
+  return minutosHasta(fecha, hora || '00:00', ahora) <= Math.max(0, minutosAntes)
+}
+
+/**
+ * Desde cuándo se puede marcar esa clase, para decírselo a quien mira.
+ * Día y hora, porque con una ventana grande —o una clase temprano— la
+ * apertura cae el día anterior.
+ */
+export function aperturaDeAsistencia(
+  fecha: string,
+  hora: string,
+  minutosAntes: number
+): { fecha: string; hora: string } {
+  const [y, m, d] = fecha.split('-').map(Number)
+  // Date.UTC como calendario neutro, igual que `minutosHasta`: acá sólo
+  // se resta una distancia, y en UTC un día son 1440 minutos siempre.
+  const t = new Date(
+    Date.UTC(y, m - 1, d) + (enMinutos(hora || '00:00') - Math.max(0, minutosAntes)) * 60000
+  ).toISOString()
+  return { fecha: t.slice(0, 10), hora: t.slice(11, 16) }
+}
+
+/**
  * Cuántos minutos faltan para que empiece esa clase, según el reloj del
  * estudio. Negativo si ya empezó.
  *

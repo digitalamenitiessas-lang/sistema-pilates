@@ -1537,6 +1537,48 @@ Lo que **no** cierra: la permisiva de update no filtra por clase propia. Está
 anotado en §0 con su razón — esa pareja de políticas alcanza también a la
 cancelación de la alumna.
 
+**Corregido el 27/09 (T37) — `0085` escrita, sin correr.** La prueba en
+producción con la sesión de Ivana encontró que se podía marcar **una clase
+que no pasó**: tocó "Marcar ausente" en una reserva del 22/10 desde "Más
+adelante" y la base lo aceptó. La ausencia consume la clase y libera el
+lugar, y ella no lo podía deshacer. Ahora 'asistió' y 'ausente' se ponen
+**desde `attendance_open_minutes` antes del inicio** de ESE día (30 por
+defecto, en Configuración → Reservas; `inicio_de_clase`, así que una clase
+corrida de horario corre la lista con ella). Vale para **todos los roles**
+—no es un permiso sino un dato que no puede ser cierto; para "no viene"
+está cancelar—, y lo que entra sin sesión queda afuera, como en la `0038`.
+Ninguna función del servidor escribe esos estados. Deshacer una marca no
+tiene horario, pero sí cupo: si otra persona tomó el lugar que liberó el
+ausente, volver a 'confirmada' rebota con "La clase ya está completa" y lo
+que queda es cancelarla (la consulta y el paso están en la migración).
+
+De paso, **la profesora no podía marcar presente una reserva por
+excepción**: `consumir_clase` revalidaba la excepción como nueva y le pedía
+`reservas.excepcion`; y a quien la tiene, si la persona había comprado un
+plan en el medio, le pasaba la clase a ese plan. Ya no revalida al marcar
+una excepción **ya validada** que tenía su lugar. "Ya validada" es la firma
+`override_by`, y para que la firma signifique eso la base ahora la borra en
+todo alta —en las que no pasaban por la validación quedaba la que mandara
+el navegador: la espera, el alta ya marcada, el motor apagado— y un motivo
+de excepción pide `reservas.excepcion` en cualquier estado. Sin eso, el
+atajo habría regalado clases con una firma inventada. `consumir_clase` **se redefine entera**, copia de
+la `0084` con dos cambios marcados: va después de la `0084`, que ya corrió
+el 27/09 (corrida al revés, la `0084` deshace el arreglo y hay que volver a
+correr la `0085`). De ausente a presente sigue sin mirar el cupo, a
+propósito: si estuvo, estuvo.
+
+En pantalla, con el mismo número: Reservas esconde los botones de marcar
+fuera de la ventana, y la Agenda, el tablero y el "Tomar asistencia" de Hoy
+pasan a "Ver la lista" y dicen desde cuándo se marca; "sin marcar" cuenta
+sólo las clases con la lista abierta, y el encabezado de la lista muestra la
+hora de ese día. Probado en un Postgres local con las funciones de
+producción (las de la `0084`) y las políticas de la `0013`: 69 casos con
+sesión de profesora, admin, alumna, recepción sin `reservas.excepcion` y sin
+sesión; las lecturas raras del parámetro, dos corridas seguidas, las tres
+guardas y la vuelta atrás. La misma batería sin la `0085` reproduce los
+errores. **La reserva del 22/10 sigue en 'ausente'** —la migración no toca
+datos—. Falta ejercerlo en la pantalla con la sesión de la profesora.
+
 ### ✅ A la profesora también se le avisa (17/09) — `0060`
 
 Su campana no sonaba nunca. El camino corto era darle `avisos.ver`, y no servía
