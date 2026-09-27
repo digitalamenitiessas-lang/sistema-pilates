@@ -163,6 +163,23 @@ sin fallback al origen del pedido, como hace
 | **E** | **`mp_link` no se borra al anular ni al cobrar.** La cuota deja de estar pendiente pero el link sigue vivo en el mail que ya salió | Es la causa concreta de **C** |
 | **F** | **Credenciales de prueba vs producción.** Se guarda `init_point` siempre; con credenciales `TEST-` habría que usar `sandbox_init_point`. Y nada en la pantalla avisa con cuál de las dos está conectado | Se prueba con datos falsos creyendo que es real, o al revés |
 
+**Lo que agrega la `0083` a C y E (27/09).** Anular un cobro ahora puede
+dejar la cuota pendiente otra vez: una fila nueva, la *gemela*, que nace
+**sin link** y que el proceso diario reclama como deuda. Si el cobro
+anulado tenía un link vivo —se le mandó el link, pagó en el mostrador y
+después se anuló por el medio equivocado— y ella paga por ese link viejo,
+la plata entra a MP con el `external_reference` del cobro anulado:
+`applyApprovedPayment` no encuentra una fila pendiente, no asienta nada, y
+encima la gemela le sigue mandando "Tenés un pago pendiente". Antes de la
+`0083` esa plata se perdía igual, pero no se le reclamaba nada a nadie.
+Lo mismo con `anular_cuota()`: el link de una cuota anulada sigue
+cobrable. Hoy no pasa porque MP no está conectado y no hay ningún link.
+**Al prenderlo, C tiene que resolver este caso:** la gemela apunta al cobro
+que reemplaza con `payments.reabre_pago_id`, así que un pago aprobado sobre
+un cobro anulado puede buscar su gemela pendiente y acreditarla ahí. Y E,
+vencer la preferencia en MP al anular, no sólo borrar la columna: el link
+del mail no lo lee de la base.
+
 ### 3.4 Decisiones que no son técnicas y hay que preguntarle al estudio
 
 - **¿El recargo de Mercado Pago lo absorbe el estudio o se le traslada a la

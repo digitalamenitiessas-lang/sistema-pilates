@@ -499,6 +499,27 @@ export interface Payment {
    * `esOferta()` de lib/api.ts, no a mano.
    */
   renuevaMembresiaId?: string | null
+  /**
+   * De cuánto partió el cobro, antes del ajuste del medio o de la promo
+   * (0079). Es el monto con el que se reabre la deuda si el cobro se anula
+   * (0083). Nulo en los cobros viejos: ahí la base usa el precio del
+   * período.
+   */
+  precioLista?: number | null
+  /**
+   * 'suelto' = entró por "Otro cobro" y no salda ninguna cuota, así que
+   * anularlo no reabre nada (0083). Nulo mientras la 0083 no corrió: ahí
+   * no se sabe, y la pantalla lo trata como cuota.
+   */
+  origen?: 'cuota' | 'suelto' | null
+  /**
+   * La promo con que se cobró (0079) o, en una cuota reabierta, la que
+   * conserva del cobro anulado (0083): la base se la aplica aunque ya no
+   * esté vigente.
+   */
+  promocionId?: string | null
+  /** El cobro anulado que esta cuota reemplaza (0083). */
+  reabrePagoId?: string | null
 }
 
 export interface Profile {

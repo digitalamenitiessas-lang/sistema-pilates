@@ -1186,6 +1186,12 @@ export async function fetchStudioData(): Promise<StudioData> {
       receiptNumber: p.receipt_number,
       mpLink: p.mp_link ?? null,
       renuevaMembresiaId: renueva,
+      // Nulo en los cobros de antes de la 0079 y mientras no corra.
+      precioLista: p.precio_lista == null ? null : Number(p.precio_lista),
+      // Los tres, nulos mientras su migración no corra (0079, 0083).
+      origen: p.origen ?? null,
+      promocionId: p.promocion_id ?? null,
+      reabrePagoId: p.reabre_pago_id ?? null,
     }
   })
 
@@ -1730,28 +1736,56 @@ export interface NewPaymentInput {
    * tocar el código. Quien manda ahora es el catálogo.
    */
   method: string
+  /**
+   * De cuánto partió, antes del ajuste del medio. `amount` es lo que entró
+   * a la caja. Se guardan las dos cosas por lo mismo que en `cobrar_cuota`
+   * (0079): sin el precio de lista, el −5% del efectivo no se puede
+   * reconstruir después.
+   */
+  precioLista?: number
 }
 
-/** Registra un cobro; devuelve el número de comprobante asignado. */
+/**
+ * Registra un cobro suelto ("Otro cobro"); devuelve el número de
+ * comprobante asignado.
+ *
+ * Se marca `origen = 'suelto'` (0083): no salda ninguna cuota, así que
+ * anularlo no tiene deuda que reabrir. Sin la marca, la base no tenía
+ * cómo distinguirlo de una cuota cobrada, y anular una remera dejaba una
+ * deuda de "Remera" con mail de cobranza.
+ */
 export async function registerPayment(input: NewPaymentInput): Promise<number> {
-  const { data, error } = await supabase
-    .from('payments')
-    .insert({
-      student_id: input.studentId,
-      membership_id: input.membershipId || null,
-      concept: input.concept,
-      amount: input.amount,
-      due_date: hoyISO(),
-      // El día lo deriva la base del instante, en el huso del estudio
-      // (migración 0016). Una sola definición de "día" para todos.
-      paid_at: new Date().toISOString(),
-      status: 'pagado',
-      method: input.method,
-    })
-    .select()
-    .single()
+  const fila = {
+    student_id: input.studentId,
+    membership_id: input.membershipId || null,
+    concept: input.concept,
+    amount: input.amount,
+    due_date: hoyISO(),
+    // El día lo deriva la base del instante, en el huso del estudio
+    // (migración 0016). Una sola definición de "día" para todos.
+    paid_at: new Date().toISOString(),
+    status: 'pagado',
+    method: input.method,
+  }
+  // Mismo criterio que `cobrar_cuota` (0079): positivo descuenta,
+  // negativo es el recargo del medio.
+  const conLista =
+    input.precioLista !== undefined
+      ? { ...fila, precio_lista: input.precioLista, descuento: input.precioLista - input.amount }
+      : fila
+  // De la más completa a la de siempre. PGRST204 = alguna columna no
+  // existe todavía: primero `origen` (0083), después el precio de lista
+  // (0079). El cobro entra igual, como entraba antes; y el que entra sin
+  // la marca la recupera cuando corra la 0083, que deduce los sueltos.
+  const intentos = [{ ...conLista, origen: 'suelto' }, conLista, fila]
+  let data: { receipt_number: number } | null = null
+  let error: { code?: string } | null = null
+  for (const intento of new Set(intentos)) {
+    ;({ data, error } = await supabase.from('payments').insert(intento).select().single())
+    if (error?.code !== 'PGRST204') break
+  }
   if (error) throw error
-  return data.receipt_number
+  return data!.receipt_number
 }
 
 /**
@@ -1761,6 +1795,10 @@ export async function registerPayment(input: NewPaymentInput): Promise<number> {
  * Si el cobro era de un día que ya se arqueó, ese arqueo NO cambia — dice
  * lo que se contó ese día y sigue siendo cierto. Lo que haya que devolver
  * se registra hoy, como movimiento de caja.
+ *
+ * Ojo: esto NO reabre la deuda. Es el camino de antes de la 0083 y queda
+ * sólo como respaldo de `anularCobro` y `anularCuota`, que son los que usa
+ * la pantalla.
  */
 export async function voidPayment(paymentId: string, motivo: string): Promise<void> {
   const { data: actual } = await supabase
@@ -1777,6 +1815,132 @@ export async function voidPayment(paymentId: string, motivo: string): Promise<vo
     })
     .eq('id', paymentId)
   if (error) throw error
+}
+
+/**
+ * Qué queda después de anular un cobro (0083). Lo decide quien anula, y
+ * la base puede no hacerlo si no corresponde:
+ *
+ *   · 'debe'       → la cuota vuelve a quedar pendiente.
+ *   · 'nada'       → se tacha y no queda nada pendiente.
+ *   · 'renovacion' → se borra el período que creó el cobro de una oferta
+ *                    y la clienta vuelve a tener la oferta.
+ */
+export type QuedaAlAnular = 'debe' | 'nada' | 'renovacion'
+
+export interface ResultadoDeAnular {
+  comprobante: number | null
+  /** Lo que se había cobrado y deja de contar como plata entrada. */
+  anulado: number
+  /** Lo que quedó de verdad, que puede no ser lo que se pidió. */
+  queda: QuedaAlAnular
+  /** La cuota pendiente que quedó en su lugar, o la oferta que se devolvió. */
+  cuotaNueva: string | null
+  debe: number | null
+  vence: string | null
+  /** La promo que conserva la cuota reabierta. */
+  promo: string | null
+  /** El período que se borró al deshacer la renovación. */
+  periodoDesde: string | null
+  periodoHasta: string | null
+  /**
+   * Por qué no se hizo lo que se pidió —el período sigue pago con otra
+   * cuota, ya tenía una pendiente, es un cobro suelto…— o lo que conviene
+   * saber, como que la oferta ya había vencido.
+   */
+  aviso: string | null
+}
+
+/**
+ * Anula un cobro y deja lo que se pida en su lugar (0083).
+ *
+ * Anular sólo tachaba el cobro: la cuota no volvía a abrirse, la
+ * membresía quedaba sin deuda en todas las pantallas y el proceso diario
+ * no la reclamaba nunca. Lo del medio equivocado —anular para volver a
+ * cobrar bien— dejaba el mes cobrado sin plata adentro.
+ *
+ * La base decide cuándo no corresponde lo que se pidió, y por eso lo que
+ * vuelve es lo que hizo: la pantalla muestra eso en vez de dar por hecho.
+ *
+ * Sin la 0083 sólo se puede lo de antes, tachar, y se hace con
+ * `voidPayment`: el mostrador no puede quedarse sin anular por una
+ * migración. Lo otro no se hace a medias: si se pidió que vuelva a deber
+ * y la base no sabe, anular igual sería el mismo agujero de siempre.
+ */
+export async function anularCobro(
+  paymentId: string,
+  motivo: string,
+  queda: QuedaAlAnular,
+  /** Lo que se cobró, para poder contestar igual si hay que caer a `voidPayment`. */
+  cobrado: number,
+  receiptNumber?: number | null
+): Promise<ResultadoDeAnular> {
+  const { data, error } = await supabase.rpc('anular_cobro', {
+    p_payment: paymentId,
+    p_motivo: motivo.trim(),
+    p_queda: queda,
+  })
+  if (error?.code === '42883' || error?.code === 'PGRST202') {
+    if (queda === 'debe') {
+      throw new Error(
+        'Para que vuelva a quedar debiendo falta correr la migración 0083. Mientras tanto: anulalo con "No queda debiendo" y, si la clienta está pagando ahora, cobrale bien desde "Otro cobro".'
+      )
+    }
+    if (queda === 'renovacion') {
+      throw new Error('Para deshacer la renovación falta correr la migración 0083.')
+    }
+    await voidPayment(paymentId, motivo)
+    return {
+      comprobante: receiptNumber ?? null,
+      anulado: cobrado,
+      queda: 'nada',
+      cuotaNueva: null,
+      debe: null,
+      vence: null,
+      promo: null,
+      periodoDesde: null,
+      periodoHasta: null,
+      aviso: null,
+    }
+  }
+  if (error) throw errorDeLaBase(error, 'No se pudo anular el cobro')
+  const f = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | undefined
+  const texto = (v: unknown) => (v == null ? null : String(v))
+  return {
+    comprobante: f?.comprobante == null ? null : Number(f.comprobante),
+    anulado: Number(f?.anulado ?? cobrado),
+    queda: (f?.queda as QuedaAlAnular) ?? 'nada',
+    cuotaNueva: texto(f?.cuota_nueva),
+    debe: f?.debe == null ? null : Number(f.debe),
+    vence: texto(f?.vence),
+    promo: texto(f?.promo),
+    periodoDesde: texto(f?.periodo_desde),
+    periodoHasta: texto(f?.periodo_hasta),
+    aviso: texto(f?.aviso),
+  }
+}
+
+/**
+ * Anula una cuota que nunca se cobró (0083): la reabierta que no
+ * correspondía, o la que el estudio decide no cobrar. Hasta la 0083 la
+ * única salida era cancelar el período entero, que le saca las clases.
+ *
+ * No anula ofertas de renovación: no son deuda y caducan solas.
+ *
+ * Sin la 0083 cae al mismo update de `voidPayment`, que la base deja
+ * pasar con `pagos.anular` (0013). La pantalla no ofrece anular ofertas,
+ * que es lo único que la función frenaría y el update no.
+ */
+export async function anularCuota(paymentId: string, motivo: string): Promise<void> {
+  const { error } = await supabase.rpc('anular_cuota', {
+    p_payment: paymentId,
+    p_motivo: motivo.trim(),
+  })
+  if (error?.code === '42883' || error?.code === 'PGRST202') {
+    await voidPayment(paymentId, motivo)
+    return
+  }
+  if (error) throw errorDeLaBase(error, 'No se pudo anular la cuota')
 }
 
 /** Cobra un pago pendiente existente; devuelve el número de comprobante. */

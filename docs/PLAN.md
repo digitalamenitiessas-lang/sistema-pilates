@@ -2094,6 +2094,121 @@ las fichas de todas las clientas (decisión del 27/09: queda así por
 ahora), y un "ausente" mal puesto no se puede volver a "sin marcar" desde
 ninguna pantalla.
 
+### 🟡 Anular un cobro no borra la deuda (27/09) — `0083` **sin correr**
+
+Salió de la auditoría del 25/09 (T26). **Anular desde Pagos tachaba el
+cobro y ahí terminaba**: la cuota no volvía a abrirse, la membresía seguía
+sin deuda en todas las pantallas y el proceso diario no la reclamaba
+nunca. El caso que va a pasar la primera semana —cobrar con el medio
+equivocado y anular para corregir— dejaba el mes cobrado sin plata
+adentro. Con una renovación, el período que creó el cobro quedaba vivo y
+sin nada que lo cobre.
+
+**Qué cambia.** Anular pregunta qué queda después, y lo hace la base
+(`anular_cobro()`):
+
+- **Vuelve a deber**: una cuota pendiente *gemela* del mismo período, al
+  precio de lista —lo cobrado ya traía el −5% o el +25%, y cobrarlo otra
+  vez lo aplicaba dos veces—, con la promo con que se había cobrado y el
+  vencimiento de siempre, nunca antes de hoy. Es lo que viene elegido en
+  una cuota.
+- **No queda debiendo**: se tacha, como hasta hoy.
+- **Deshacer la renovación**, sólo en el cobro de una oferta: borra el
+  período que creó —si no tiene clases usadas, reservas ni otras cuotas, y
+  con el permiso de eliminar membresías— y le devuelve la oferta si todavía
+  está en fecha. En una renovación **no viene nada elegido**: cada salida
+  deja algo distinto y la elige quien sabe qué pasó.
+
+La base no reabre, aunque se pida, lo que no tiene deuda que reabrir: un
+**"Otro cobro"** (desde ahora `payments.origen = 'suelto'`; los que ya
+había se deducen), un cobro sin período, un período cancelado, uno que
+sigue pago con otra cuota, o uno que ya tiene su cuota pendiente. Y lo
+dice. Para lo que sí se reabrió y no correspondía hay **"No correspondía:
+deshacerla"** en la misma pantalla, y **cualquier cuota pendiente que no
+sea oferta se puede anular** desde su fila (`anular_cuota()`), sin
+cancelar el período. Sirve también para las cuotas de la clase de prueba
+de antes del 16/09. Quién anuló queda en `payment_staff`.
+
+De yapa, porque es la misma función: `promociones_para` busca el plan de
+la oferta de renovación por la membresía que renueva, así que **una promo
+limitada a un plan ya alcanza a la renovación**, que era la fila de la §0.
+
+**La revisión adversarial** del primer borrador encontró lo que cambió el
+diseño: con el tilde prendido de entrada, anular una remera inventaba una
+deuda de "Remera" con mail y promo automática; el control de duplicados
+comparaba conceptos dentro de una membresía que el "Otro cobro" no respeta
+(se cuelga de la que cubre hoy); en una renovación convertía una oferta en
+una deuda más un período no aceptado; la gemela perdía la promo si se
+anulaba fuera de su ventana; y una gemela equivocada no tenía cómo
+deshacerse. Todo eso es lo de arriba. Lo que quedó para Mercado Pago —el
+link viejo de un cobro anulado sigue cobrable y la plata no se asienta—
+está en [`MERCADO-PAGO.md`](MERCADO-PAGO.md), huecos C y E.
+
+**Verificado** en un Postgres local con los disparadores reales de la
+`0016`, `0020` y `0041` y las funciones de la `0079`, no contra Supabase:
+la migración corre dos veces seguidas, y sin la `0079` corta en la guarda
+sin dejar nada. Veinte casos, entre ellos: tarjeta → gemela de $70.000 y
+cobrarla en efectivo da $66.500; el cobro suelto y el cobro sin período no
+reabren; con una suelta del mismo nombre al lado, la cuota sí reabre; la
+cuota de antes de la `0079` reabre al precio del período y no a lo
+cobrado; la promo apagada y fuera de ventana se respeta en la gemela
+($56.000) y no se le ofrece a una pendiente común; deshacer la renovación
+frena con una reserva, con una clase usada y sin permiso —y en los tres el
+cobro sigue `pagado`—, y cuando pasa, deja una sola membresía, la oferta
+devuelta con el vencimiento original, `renovacion_control()` en cero y la
+oferta cobrable otra vez. El relleno de `origen` se probó sobre filas
+fabricadas antes de correrla. **Falta** correrla y ejercerla con la sesión
+de recepción, por la pantalla. El paso a paso:
+
+1. **Antes de tocar nada**, en el SQL Editor: `select * from
+   public.renovacion_control();` y `select * from public.perm_diff();` en
+   cero. Correr la `0083` entera. Después:
+   `select origen, status, count(*) from public.payments group by 1, 2;`
+   — con los datos del 27/09 tienen que salir todas `cuota` (hoy no hay
+   ningún "Otro cobro"). Y las dos funciones rechazan sin sesión:
+   `select * from public.anular_cobro((select id from public.payments where status='pagado' limit 1), 'x', 'nada');`
+   → *No tenés permiso para anular cobros*.
+2. **Una clienta de prueba nueva** desde el alta, sin mail (así no se crea
+   acceso ni sale correo), con FE FLOW desde hoy y **"Paga ahora" en
+   tarjeta**: $87.500. En Pagos, anular ese cobro: tiene que venir elegido
+   "Vuelve a deber la cuota" y decir $70.000. Anular. La pantalla dice
+   *Vuelve a deber $70.000, con vencimiento el …*. En la base:
+   `select status, amount, precio_lista, due_date, origen, reabre_pago_id is not null as reabre, notes from public.payments where student_id = '<id>' order by created_at;`
+   → la anulada (87.500, lista 70.000) y la pendiente (70.000, `reabre`
+   true, vencimiento = inicio + `payment_grace_days`). Y
+   `select anulado_por, anulado_at from public.payment_staff where payment_id = '<el cobro>';`
+   con el uuid de recepción.
+3. **Cobrar la gemela en efectivo** desde su fila: $66.500, y en la base
+   `precio_lista` 70.000 y `descuento` 3.500.
+4. **Anular ese cobro otra vez, y "No correspondía: deshacerla"** en la
+   pantalla de resultado: la pendiente nueva queda `anulado` con la nota
+   *Anulada: No correspondía reabrirla…*, y la ficha no muestra deuda.
+5. **"Otro cobro"** a la misma clienta por una remera de $15.000: en la base
+   `origen = 'suelto'`. Anularlo: el modal no ofrece elegir y dice que no
+   queda nada pendiente; en la base, ninguna fila nueva.
+6. **La renovación.** A la clienta de prueba, emitirle la oferta a mano
+   como en la `0041` (su bloque CÓMO VERIFICAR, paso 1, filtrando por su
+   nombre) y cobrarla desde Pagos. Anular ese cobro: no tiene que venir
+   nada elegido. Elegir "Deshacer la renovación". En la base: una sola
+   membresía de ella, el cobro `anulado` con `membership_id` nulo y la nota
+   *Se deshizo la renovación…*, una oferta pendiente nueva con
+   `due_date` = fin del período + 1 y `reabre_pago_id` apuntando al cobro,
+   y `select * from public.renovacion_control();` en cero.
+7. **La promo**, si se quiere ejercer: en Configuración, una "Prueba 0083"
+   del 20% para los días de hoy, encendida; cobrar una cuota ($56.000);
+   cambiarle la ventana a otros días y apagarla; anular con "vuelve a
+   deber". La pendiente tiene `promocion_id`, "Cobrar" muestra la promo con
+   *Es la del cobro que se anuló* y cobra $56.000. Ese último cobro,
+   anularlo con "No queda debiendo" para que no quede plata de prueba en
+   la caja.
+8. **Limpiar**: borrar la clienta de prueba (la cascada se lleva
+   membresías, cuotas, sellos y avisos), después la promo de prueba desde
+   el SQL Editor (`delete from public.promociones where nombre = 'Prueba 0083';`),
+   y devolver la secuencia de credenciales como el 25/09 (los números de
+   comprobante gastados no vuelven). `caja_control()`
+   va a listar el arqueo como desactualizado sólo si la caja del día ya
+   estaba cerrada cuando se anuló.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
