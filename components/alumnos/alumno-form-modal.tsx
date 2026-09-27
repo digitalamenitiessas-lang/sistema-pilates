@@ -355,7 +355,7 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
               sí. Se corrigen desde la ficha. */}
           <fieldset disabled={!!creado} className="space-y-4 min-w-0 disabled:opacity-70">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <label className={labelClass}>Nombre completo *</label>
               <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="Ej: Ana García" className={inputClass} />
             </div>

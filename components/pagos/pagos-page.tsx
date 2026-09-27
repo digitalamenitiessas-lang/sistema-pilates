@@ -1394,10 +1394,10 @@ export function PagosPage() {
                           </td>
                           <td className="px-4 py-3 hidden sm:table-cell">
                             <div>
-                              <p className="text-xs text-muted-foreground">{p.dueDate}</p>
+                              <p className="text-xs text-muted-foreground">{fechaCorta(p.dueDate)}</p>
                               {p.date && (
                                 <p className="text-[10px] text-muted-foreground/60">
-                                  Pagado {p.date}
+                                  Pagado {fechaCorta(p.date)}
                                 </p>
                               )}
                               {/* En una oferta la fecha no es un vencimiento

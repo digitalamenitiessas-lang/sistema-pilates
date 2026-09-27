@@ -273,6 +273,115 @@ export async function reabrirCaja(sessionId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------
+// El turno abierto, contado como lo cuenta el cierre
+// ---------------------------------------------------------------
+export interface TurnoEnCurso {
+  /** El cierre anterior, que es donde arranca la cuenta. null en el primer turno de la caja. */
+  desde: string | null
+  /** Hasta cuándo se contó: el momento de la consulta. */
+  hasta: string
+  saldoInicial: number
+  ingresos: number
+  egresos: number
+  esperado: number
+  /** Movimientos del período anteriores a la apertura: entraron con la caja cerrada. */
+  antesDeAbrir: number
+}
+
+const aCentavos = (n: number) => Math.round(n * 100) / 100
+
+/**
+ * Lo que `cerrar_caja` (0020) va a firmar si se cierra ahora, con la misma
+ * cuenta y leyendo lo mismo.
+ *
+ * La pantalla armaba el resumen del cierre con los números del DÍA —entró
+ * hoy, salió hoy— y le llamaba "saldo al abrir" a lo que quedaba restando,
+ * que es el saldo del cajón al empezar HOY. El 27/09, con un turno abierto
+ * el 23/09, el cierre decía "Saldo al abrir $147.250 · Entró $42.750" y la
+ * base guardó "saldo inicial $0 · ingresos $190.000": el turno no es un
+ * día, va de un cierre al siguiente. El "debería haber" daba igual —las
+ * dos cuentas terminan en el saldo del cajón—; lo que mentía era cómo se
+ * llegaba a él.
+ *
+ * Así que acá no hay cuenta propia, está la de la base:
+ *
+ * - saldo inicial: `saldo_cuenta` en el instante del cierre anterior, o
+ *   cero si no hubo ninguno (el primer turno arranca en '-infinity').
+ * - entró y salió: el libro de la cuenta entre ese instante, excluido, y
+ *   ahora, incluido.
+ * - debería haber: la suma. No se lee `account_balances`, que suma también
+ *   lo fechado a futuro y el cierre deja afuera.
+ *
+ * `desde` va tal como vino de la base, sin pasar por `Date`: tiene
+ * microsegundos, y el ajuste del arqueo anterior está asentado EXACTAMENTE
+ * en ese instante. Redondeado a milisegundos, `at > desde` lo deja adentro:
+ * probado contra la base el 27/09, el turno abierto ese día a las 13:48,
+ * sin un solo gasto, daba "Salió $1.000" —el faltante del cierre anterior
+ * contado otra vez—.
+ *
+ * "Ahora" es el reloj de quien mira, no el de la base: la diferencia son
+ * segundos, y sólo cambia algo si justo en ese momento entra un cobro.
+ */
+export async function fetchTurno(sesion: CashSession): Promise<TurnoEnCurso> {
+  const hasta = new Date().toISOString()
+  const desde =
+    sesion.desde && Number.isFinite(Date.parse(sesion.desde)) ? sesion.desde : null
+
+  // Paginado y contando, porque PostgREST corta en mil filas sin avisar: un
+  // turno olvidado un par de meses sumaría la mitad y lo mostraría como
+  // el total.
+  const libro = async () => {
+    const filas: Array<{ sentido: string; monto: number; at: string }> = []
+    let total = Infinity
+    while (filas.length < total) {
+      let q = supabase
+        .from('account_ledger')
+        .select('sentido, monto, at', { count: 'exact' })
+        .eq('account_id', sesion.accountId)
+        .lte('at', hasta)
+        .order('at')
+        .order('ref_id')
+        .order('sentido')
+        .range(filas.length, filas.length + 999)
+      if (desde) q = q.gt('at', desde)
+      const { data, error, count } = await q
+      if (error) throw comoError(error, 'No se pudo leer el libro del turno')
+      if (!data || data.length === 0) break
+      filas.push(...data.map((f) => ({ sentido: f.sentido, monto: Number(f.monto), at: f.at })))
+      total = count ?? filas.length
+    }
+    return filas
+  }
+
+  const inicial = async () => {
+    if (!desde) return 0
+    const { data, error } = await supabase.rpc('saldo_cuenta', {
+      p_account: sesion.accountId,
+      p_hasta: desde,
+    })
+    if (error) throw comoError(error, 'No se pudo leer el saldo del cierre anterior')
+    return Number(data ?? 0)
+  }
+
+  const [filas, saldoInicial] = await Promise.all([libro(), inicial()])
+  const suma = (sentido: string) =>
+    aCentavos(filas.filter((f) => f.sentido === sentido).reduce((t, f) => t + f.monto, 0))
+  const ingresos = suma('ingreso')
+  const egresos = suma('egreso')
+  const abrio = Date.parse(sesion.openedAt)
+
+  return {
+    desde,
+    hasta,
+    saldoInicial,
+    ingresos,
+    egresos,
+    esperado: aCentavos(saldoInicial + ingresos - egresos),
+    antesDeAbrir: filas.filter((f) => Date.parse(f.at) < abrio).length,
+  }
+}
+
+// ---------------------------------------------------------------
 // Movimientos manuales
 // ---------------------------------------------------------------
 export interface MovementInput {

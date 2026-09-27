@@ -728,7 +728,7 @@ function Estudio({ schedule }: { schedule: PublicClass[] }) {
             acompañar tu evolución.
           </p>
           <p className="text-sm md:text-base text-foreground/75 leading-relaxed mt-3 max-w-2xl mx-auto">
-            {cupo !== null && `${cupo} ${plural(cupo, 'alumna', 'alumnas')} por clase. `}
+            {cupo !== null && `${cupo} ${plural(cupo, 'lugar', 'lugares')} por clase. `}
             Más atención, más precisión, una mejor experiencia.
           </p>
         </Reveal>

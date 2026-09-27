@@ -22,7 +22,7 @@ import {
   X,
   XCircle,
 } from 'lucide-react'
-import { cn, DIAS } from '@/lib/utils'
+import { cn, DIAS, numeroDeWhatsApp } from '@/lib/utils'
 import { Sello } from '@/components/layout/logotipo'
 import { supabase } from '@/lib/supabase'
 import { useData, useStudio } from '@/lib/data-context'
@@ -35,7 +35,9 @@ import {
   mondayOf,
   ahoraDelEstudio,
   reservaCerrada,
-  cancelacionEnPlazo,
+  consecuenciaDeCancelar,
+  type ConsecuenciaDeCancelar,
+  topeDeDevoluciones,
   createReservation,
   updateReservationStatus,
   fetchWeekOccupancy,
@@ -46,7 +48,6 @@ import {
   suerteDeLaReserva,
   enDias,
   settingNum,
-  settingRige,
   settingText,
   fechasDelTurno,
   tomarTurnoFijoPropio,
@@ -296,56 +297,6 @@ function MembershipCard({
 }
 
 /**
- * Qué le puede pasar a la clase si la cancela ahora, para poder decírselo
- * ANTES. Tres casos distintos, y el tercero importa tanto como los otros:
- *
- *   'vuelve'      → está en plazo, la clase vuelve al plan
- *   'no-consume'  → la reserva no sale de ningún plan (entró por una
- *                   excepción que el estudio autorizó, `membershipId` en
- *                   nulo), así que no hay nada que perder. Sin esta rama
- *                   el cartel rojo le mentiría: le diría que pierde una
- *                   clase que nunca se le descontó.
- *   'se-pierde'   → fuera de plazo. Acá va el recupero.
- *
- * El recupero se cuenta igual que en la base (0046): reposiciones hechas
- * contra ESA membresía, sin contar las canceladas, contra el tope de
- * `recovery_max`. Es la segunda cuenta duplicada del portal, por el mismo
- * motivo que la del plazo — el cliente tiene que saberlo antes de
- * apretar—, y como la otra, la base es la que decide.
- */
-function suerteDeLaClase(
-  reserva: Reservation,
-  reservas: Reservation[],
-  horasDePlazo: number,
-  /** El tope de devoluciones del período, o null si el estudio no lo activó. */
-  tope: number | null
-): {
-  caso: 'vuelve' | 'no-consume' | 'se-pierde' | 'sin-cupo'
-  restantes: number | null
-} {
-  const enPlazo = cancelacionEnPlazo(reserva.date, reserva.time, horasDePlazo)
-  if (!reserva.membershipId) return { caso: 'no-consume', restantes: null }
-  if (!enPlazo) return { caso: 'se-pierde', restantes: null }
-  // Sin tope configurado, cancelar a tiempo siempre devuelve — que es
-  // como se comportó el sistema hasta la 0076 y como sigue hasta que el
-  // estudio encienda el parámetro.
-  if (tope === null) return { caso: 'vuelve', restantes: null }
-
-  // La misma cuenta que hace la base al sellar (0076): las canceladas de
-  // ESTE período que quedaron marcadas 'en plazo'. Se cuentan las que ya
-  // están selladas, no las que "parecen" en plazo — el sello es el que
-  // decide, y es lo único que la clienta no puede escribir.
-  const devueltas = reservas.filter(
-    (r) =>
-      r.membershipId === reserva.membershipId &&
-      r.status === 'cancelada' &&
-      r.cancelKind === 'en plazo'
-  ).length
-  const restantes = Math.max(0, tope - devueltas)
-  return { caso: restantes > 0 ? 'vuelve' : 'sin-cupo', restantes }
-}
-
-/**
  * El cartel de cancelar.
  *
  * Reemplaza un `window.confirm`, y no por gusto: los carteles nativos los
@@ -369,7 +320,7 @@ function ConfirmarCancelacion({
   onConfirmar,
 }: {
   reserva: Reservation
-  suerte: ReturnType<typeof suerteDeLaClase>
+  suerte: ConsecuenciaDeCancelar
   horasDePlazo: number
   trabajando: boolean
   onCerrar: () => void
@@ -422,7 +373,11 @@ function ConfirmarCancelacion({
             </div>
           )}
 
-          {caso === 'no-consume' && (
+          {/* La lista de espera cae acá como siempre cayó: nunca se le
+              selló un período. La suspendida no llega nunca —el botón se
+              esconde en las clases suspendidas— pero si llegara, esto es
+              lo cierto: no se le descuenta. */}
+          {(caso === 'no-consume' || caso === 'espera' || caso === 'suspendida') && (
             <div className="rounded-xl bg-muted px-3.5 py-3">
               <p className="text-sm font-semibold text-foreground">
                 No perdés ninguna clase
@@ -1137,6 +1092,37 @@ function OfrecerTurnoFijo({
   )
 }
 
+/**
+ * "Podés abonar en recepción o pedir el link de pago por WhatsApp", con el
+ * WhatsApp hecho link y el mensaje ya escrito. Sin número cargado queda
+ * sólo la recepción: ofrecer un canal sin dar cómo llegar era lo que había.
+ */
+function PedirLinkDePago({
+  verbo,
+  href,
+  className,
+}: {
+  verbo: 'renovar' | 'abonar'
+  href: string | null
+  className: string
+}) {
+  return (
+    <p className={cn('text-[10px] mt-1', className)}>
+      {href ? (
+        <>
+          Podés {verbo} en recepción o{' '}
+          <a href={href} target="_blank" rel="noreferrer" className="underline font-semibold">
+            pedir el link de pago por WhatsApp
+          </a>
+          .
+        </>
+      ) : (
+        `Podés ${verbo} en recepción.`
+      )}
+    </p>
+  )
+}
+
 export function PortalPage() {
   const { profile, refresh, signOut } = useData()
   const { students, classes, reservations, payments, disciplines, occurrences, settings, settingsMeta, memberships, turnosFijos, plans } =
@@ -1244,6 +1230,17 @@ export function PortalPage() {
 
   const ms = me?.membership
   const miCredencial = credencial(me?.memberNo, settings)
+
+  // El WhatsApp del estudio, el mismo parámetro que usan los botones de la
+  // web y normalizado igual. Hasta el 27/09 el portal decía "escribinos por
+  // WhatsApp" y "pedí el link de pago por WhatsApp" sin dar ni link ni
+  // número. Si el estudio no lo cargó, no se ofrece: la ayuda del parámetro
+  // promete que vacío esconde WhatsApp, y un número de respaldo escrito acá
+  // mandaría a la clienta a un teléfono que nadie eligió.
+  const waEstudio = numeroDeWhatsApp(settingText(settings, 'studio_whatsapp'))
+  const quienEscribe = me ? `${me.name}${miCredencial ? ` (${miCredencial})` : ''}` : ''
+  const escribirAlEstudio = (texto: string) =>
+    waEstudio ? `https://wa.me/${waEstudio}?text=${encodeURIComponent(texto)}` : null
   const classesLeft = ms ? ms.classesTotal - ms.classesUsed : 0
 
   // Las fechas que el estudio suspendió, con su motivo, para las clases
@@ -1532,18 +1529,8 @@ export function PortalPage() {
   }
 
   const horasDeCancelacion = settingNum(settings, 'cancel_hours', 3)
-  // El mismo default que la base (0046): sin la clave, dos por período.
-  /**
-   * El tope de devoluciones (0076), o null si el estudio no lo encendió.
-   *
-   * `null` y no un número por defecto, a propósito: con un 2 escrito acá,
-   * el portal empezaría a decirle a la clienta "te quedan 0 devoluciones"
-   * antes de que la migración corra o antes de que el estudio active la
-   * regla. El default vive en la base, no en el navegador.
-   */
-  const topeDevoluciones = settingRige(settingsMeta, 'cancel_free_max')
-    ? settingNum(settings, 'cancel_free_max', 0)
-    : null
+  // Null si el estudio no encendió el tope: ver `topeDeDevoluciones`.
+  const topeDevoluciones = topeDeDevoluciones(settings, settingsMeta)
 
   /**
    * Cuántas devoluciones le quedan en el período que corre hoy.
@@ -1562,8 +1549,11 @@ export function PortalPage() {
   })()
 
   // `reservations` ya son sólo las suyas: RLS no le manda las de nadie más.
+  // Es la misma cuenta que usa el mostrador en Reservas: si una de las dos
+  // pantallas dijera otra cosa, la clienta y la recepción discutirían con
+  // números distintos.
   const suerteDe = (r: Reservation) =>
-    suerteDeLaClase(r, reservations, horasDeCancelacion, topeDevoluciones)
+    consecuenciaDeCancelar(r, reservations, horasDeCancelacion, topeDevoluciones)
 
   // Antes esto arrancaba con un `window.confirm`. Los navegadores
   // embebidos lo descartan solos —devuelven "no" sin mostrar nada—, así
@@ -1846,9 +1836,15 @@ export function PortalPage() {
                   recién cuando ese termina.
                 </p>
                 {!misRenovaciones.some((p) => p.mpLink) && (
-                  <p className="text-[10px] text-info-fuerte mt-1">
-                    Podés renovar en recepción o pedir el link de pago por WhatsApp.
-                  </p>
+                  <PedirLinkDePago
+                    verbo="renovar"
+                    href={escribirAlEstudio(
+                      `Hola, soy ${quienEscribe}. Quiero renovar ${misRenovaciones
+                        .map((p) => p.planName)
+                        .join(' y ')}. ¿Me pasan el link de pago?`
+                    )}
+                    className="text-info-fuerte"
+                  />
                 )}
               </>
             )}
@@ -1914,9 +1910,15 @@ export function PortalPage() {
               )
             })}
             {!myDebts.some((p) => p.mpLink) && (
-              <p className="text-[10px] text-aviso-fuerte mt-1">
-                Podés abonar en recepción o pedir el link de pago por WhatsApp.
-              </p>
+              <PedirLinkDePago
+                verbo="abonar"
+                href={escribirAlEstudio(
+                  `Hola, soy ${quienEscribe}. Quiero abonar ${myDebts
+                    .map((p) => `${p.planName} ($${p.amount.toLocaleString('es-AR')})`)
+                    .join(' y ')}. ¿Me pasan el link de pago?`
+                )}
+                className="text-aviso-fuerte"
+              />
             )}
           </div>
         )}
@@ -2259,7 +2261,20 @@ export function PortalPage() {
         )}
 
         <p className="text-center text-[10px] text-muted-foreground pt-2">
-          ¿Dudas? Escribinos por WhatsApp o consultá en recepción.
+          {(() => {
+            const href = escribirAlEstudio(`Hola, soy ${quienEscribe}. Tengo una consulta.`)
+            return href ? (
+              <>
+                ¿Dudas?{' '}
+                <a href={href} target="_blank" rel="noreferrer" className="underline font-semibold">
+                  Escribinos por WhatsApp
+                </a>{' '}
+                o consultá en recepción.
+              </>
+            ) : (
+              '¿Dudas? Consultá en recepción.'
+            )
+          })()}
         </p>
       </main>
 

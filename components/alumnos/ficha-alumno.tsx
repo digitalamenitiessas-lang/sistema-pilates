@@ -1331,7 +1331,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                         })()}
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-xs font-medium text-foreground">{r.date}</p>
+                        <p className="text-xs font-medium text-foreground">{fecha(r.date)}</p>
                         <p className="text-xs text-muted-foreground">{r.time}</p>
                       </div>
                       <span
@@ -1440,7 +1440,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                   // había clase para su estado— o sea una deuda que ya
                   // nadie debe. Con la 0041 esa fila pasa a ser común.
                   const detalle = p.status === 'pagado'
-                    ? `Pagado el ${p.date} · ${p.method === 'mercadopago' ? 'Mercado Pago' : p.method ?? ''}`
+                    ? `Pagado el ${p.date ? fecha(p.date) : ''} · ${p.method === 'mercadopago' ? 'Mercado Pago' : p.method ?? ''}`
                     : ofertaCaducada
                     ? `Renovación no tomada · vencía el ${fecha(p.dueDate)}`
                     : anulada

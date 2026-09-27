@@ -169,6 +169,90 @@ export function cancelacionEnPlazo(
 }
 
 /**
+ * El tope de devoluciones por período (0076), o null si el estudio no lo
+ * encendió.
+ *
+ * `null` y no un número por defecto, a propósito: con un 2 escrito acá,
+ * la pantalla empezaría a decir "le quedan 0 devoluciones" antes de que
+ * la migración corra o antes de que el estudio active la regla. El
+ * default vive en la base (`devoluciones_tope`), no en el navegador.
+ */
+export function topeDeDevoluciones(settings: Settings, meta: StudioSetting[]): number | null {
+  return settingRige(meta, 'cancel_free_max') ? settingNum(settings, 'cancel_free_max', 0) : null
+}
+
+/**
+ * Qué le pasa a la clase si esa reserva se cancela AHORA, para poder
+ * decirlo antes de apretar y no enterarse después.
+ *
+ *   'vuelve'      → en plazo y con devoluciones: la clase vuelve al plan.
+ *   'sin-cupo'    → en plazo, pero ya gastó las devoluciones del período
+ *                   (0076). Avisó bien y aun así la pierde: no es lo mismo
+ *                   que llegar tarde, y si reclama la respuesta es otra.
+ *   'se-pierde'   → fuera de plazo.
+ *   'no-consume'  → la reserva no sale de ningún plan (entró por una
+ *                   excepción, `membershipId` en nulo), así que no hay
+ *                   nada que perder. Sin esta rama el cartel diría que
+ *                   pierde una clase que nunca se le descontó.
+ *   'espera'      → está en lista de espera: nunca tomó lugar ni se le
+ *                   selló un período, así que cancelar no le cuesta nada.
+ *   'suspendida'  → el estudio suspendió esa fecha. La base no sella
+ *                   plazo (`cancel_kind` en nulo): no se cuenta ni gasta
+ *                   una devolución, a la hora que sea.
+ *
+ * ESPEJA la clasificación de `consumir_clase` (0076), que es la que
+ * decide de verdad y sella el resultado en la fila. Está repetida por el
+ * mismo motivo que `cancelacionEnPlazo`: quien cancela tiene que saberlo
+ * ANTES. Y como aquella, si alguna vez se corren, tiene que avisar de más
+ * y no de menos.
+ *
+ * Las devoluciones se cuentan como las cuenta la base: canceladas de ESE
+ * período selladas 'en plazo'. Las ya selladas, no las que "parecen" en
+ * plazo — el sello es el que decide. `restantes` es cuántas le quedan
+ * ANTES de esta cancelación; null cuando no hay tope que contar.
+ *
+ * `reservas` tiene que traer las de esa persona en ese período. Se filtra
+ * por `membershipId`, así que pasarle las del estudio entero da lo mismo
+ * — pero con las de una profesora, que ve sólo las de sus clases (0058),
+ * contaría de menos.
+ */
+export interface ConsecuenciaDeCancelar {
+  caso: 'vuelve' | 'sin-cupo' | 'se-pierde' | 'no-consume' | 'espera' | 'suspendida'
+  restantes: number | null
+}
+
+export function consecuenciaDeCancelar(
+  reserva: Reservation,
+  reservas: Reservation[],
+  horasDePlazo: number,
+  /** El de `topeDeDevoluciones`: null si el tope no rige. */
+  tope: number | null,
+  opts: { suspendida?: boolean } = {}
+): ConsecuenciaDeCancelar {
+  // Mismo orden que el trigger: la suspensión manda sobre el reloj.
+  if (opts.suspendida) return { caso: 'suspendida', restantes: null }
+  if (!reserva.membershipId) {
+    return { caso: reserva.status === 'lista de espera' ? 'espera' : 'no-consume', restantes: null }
+  }
+  if (!cancelacionEnPlazo(reserva.date, reserva.time, horasDePlazo)) {
+    return { caso: 'se-pierde', restantes: null }
+  }
+  // Sin tope, cancelar a tiempo siempre devuelve: es como se comportó el
+  // sistema hasta la 0076 y como sigue mientras el estudio no lo encienda.
+  if (tope === null) return { caso: 'vuelve', restantes: null }
+
+  const devueltas = reservas.filter(
+    (r) =>
+      r.membershipId === reserva.membershipId &&
+      r.id !== reserva.id &&
+      r.status === 'cancelada' &&
+      r.cancelKind === 'en plazo'
+  ).length
+  const restantes = Math.max(0, tope - devueltas)
+  return { caso: restantes > 0 ? 'vuelve' : 'sin-cupo', restantes }
+}
+
+/**
  * Cuántos días faltan para una fecha, desde el hoy del estudio.
  *
  * Se arma con las partes del ISO y no con `new Date(iso)`, por lo mismo
@@ -213,17 +297,41 @@ export function addDays(iso: string, days: number): string {
   return localISO(date)
 }
 
+/**
+ * Qué día de la semana es esa fecha, con la convención de la grilla:
+ * 0 = lunes .. 5 = sábado, y 6 = domingo, que el estudio no abre. No es
+ * el `getDay()` de JavaScript, que arranca en domingo: mezclarlas corre
+ * la grilla un día entero.
+ */
+export function diaDeLaFecha(iso: string): number {
+  const [y, m, d] = iso.split('-').map(Number)
+  return (new Date(y, m - 1, d).getDay() + 6) % 7
+}
+
 /** Lunes de la semana que contiene esa fecha (dayOfWeek 0 = lunes). */
 export function mondayOf(iso: string = hoyISO()): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  const diff = (new Date(y, m - 1, d).getDay() + 6) % 7
-  return addDays(iso, -diff)
+  return addDays(iso, -diaDeLaFecha(iso))
+}
+
+/**
+ * La semana de trabajo que le toca a esa fecha, y qué día es dentro de
+ * ella: el lunes y el índice 0..5.
+ *
+ * El domingo no pertenece a ninguna: el estudio no abre, así que se lo
+ * trata como la víspera de la semana que viene, con el lunes elegido.
+ * Contarlo en la semana que termina —lo que hace `mondayOf`— abre una
+ * grilla de lunes a sábado que ya pasó entera, justo el día en que se
+ * mira lo que viene.
+ */
+export function semanaDeTrabajo(iso: string = hoyISO()): { lunes: string; dia: number } {
+  const lunes = mondayOf(iso)
+  const dia = diaDeLaFecha(iso)
+  return dia === 6 ? { lunes: addDays(lunes, 7), dia: 0 } : { lunes, dia }
 }
 
 /** Índice de día 0=lunes .. 6=domingo para hoy en el estudio. */
 export function todayDayIndex(): number {
-  const [y, m, d] = hoyISO().split('-').map(Number)
-  return (new Date(y, m - 1, d).getDay() + 6) % 7
+  return diaDeLaFecha(hoyISO())
 }
 
 const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']

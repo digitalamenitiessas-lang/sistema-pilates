@@ -270,7 +270,7 @@ function PlanFormModal({ plan, onClose }: { plan?: Plan; onClose: () => void }) 
 
         <div className="px-6 py-5 space-y-4 overflow-y-auto">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <label className={labelClass}>Nombre del plan *</label>
               <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="Ej: Reformer Plus" className={inputClass} />
             </div>

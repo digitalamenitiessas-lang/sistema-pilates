@@ -8,7 +8,7 @@
 > **¿Buscás qué falta? Está en la §0, acá abajo.** Es la única lista al día; el
 > resto del documento es el análisis y la historia.
 
-## 0. LO QUE FALTA — la lista viva  ·  al 25/09/2026
+## 0. LO QUE FALTA — la lista viva  ·  al 27/09/2026
 
 > **Esta es la única lista al día.** Las secciones de abajo son el análisis y la
 > historia de cómo se llegó acá, y varias quedaron viejas a propósito: son la
@@ -132,6 +132,18 @@ mandarse un aviso de prueba al celular, porque hasta hoy no le había
 llegado ninguno a nadie, y el link de "Cómo llegar" de la web pasó de Bing
 a Google Maps. El seguimiento de lo que queda de la auditoría vive fuera
 del repo, en una página privada.
+
+El **27/09** se ejerció el sistema por rol, en producción: el admin como
+mostrador, una clienta, la profesora y la dueña, cada paso contra la base.
+Lo que toca plata anduvo. Lo que salió se arregló en el mismo día —cancelar
+desde Reservas pide confirmación, los montos de los avisos salen en pesos
+(`0084`), los textos sin género, el domingo en la Agenda y en las horas, el
+período de la caja abierta, el WhatsApp del portal como link, las fechas en
+crudo y dos formularios que en el celular no dejaban ver el precio— junto
+con el turno fijo de un plan que todavía no arrancó (`0082`) y el cobro
+anulado que borraba la deuda (`0083`). El detalle, en `PLAN.md`.
+**`studio_whatsapp` está vacío** desde el 25/09: hasta que se cargue, la web
+usa el número de respaldo del código y el portal no ofrece WhatsApp.
 
 ### Lo que falta construir
 

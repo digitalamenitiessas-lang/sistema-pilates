@@ -907,47 +907,15 @@ export async function GET(request: Request) {
     }
   }
 
-  // ── La caja que quedó abierta de días anteriores ──────────────────────
+  // ── La caja que quedó abierta de días anteriores: ya no se avisa ─────
   //
-  // El aviso `caja_sin_cerrar` existía a medias desde la 0020: declarado en
-  // el CHECK de tipos, con ícono y color en la campana, en los tipos de
-  // TypeScript… y nadie lo escribía nunca. Estaba el enchufe y no el cable.
-  //
-  // El turno de caja no es un día: va de un cierre al siguiente, y arranca
-  // donde terminó el anterior, así que si nadie cierra no se pierde ni un
-  // peso. Lo que se pierde es el arqueo diario: cuando cierren el jueves van
-  // a contar el efectivo de tres días juntos, y si hay diferencia no van a
-  // saber de qué día salió. Por eso el aviso es un recordatorio y no un
-  // bloqueo: frenar un cobro con una clienta enfrente es peor que un arqueo
-  // de tres días.
-  //
-  // Avisa desde el día siguiente a la apertura, y una vez por día: la clave
-  // lleva la fecha de hoy, así el recordatorio vuelve mañana si siguen sin
-  // cerrar, pero el cron corriendo dos veces no lo duplica.
-  const { data: abiertas } = await admin
-    .from('cash_sessions')
-    .select('id, fecha, opened_at, accounts(name)')
-    .is('closed_at', null)
-    .lt('fecha', today)
-
-  for (const s of abiertas ?? []) {
-    const cuenta = (s.accounts as unknown as { name: string } | null)?.name ?? 'la caja'
-    const dias = Math.max(
-      1,
-      Math.round((Date.parse(today) - Date.parse(s.fecha)) / 86400000)
-    )
-    rows.push({
-      type: 'caja_sin_cerrar',
-      title: 'La caja quedó sin cerrar',
-      body:
-        `${cuenta} está abierta desde el ${formatDate(s.fecha)}` +
-        ` (${dias} ${dias === 1 ? 'día' : 'días'}). Mientras no se cierre, el arqueo` +
-        ` va a juntar la plata de todos esos días.`,
-      student_id: null,
-      audience: 'staff',
-      dedupe_key: `caja-abierta-${s.id}-${today}`,
-    })
-  }
+  // Hasta el 27/09 salía todos los días "La caja quedó sin cerrar… el arqueo
+  // va a juntar la plata de todos esos días". Matías lo pidió sacar: la caja
+  // se abre y se cierra cuando la dueña quiere, y un turno de varios días es
+  // una forma de trabajar, no un olvido. Lo que hacía falta era que el cierre
+  // dijera qué período cubre, y eso lo muestra ahora la pantalla de Caja
+  // ("Turno del mié 23/09 10:58 a hoy 13:48"). El tipo `caja_sin_cerrar`
+  // queda en la base y en la campana por los avisos viejos.
 
   // ── Insertar (idempotente) y avisar solo por lo NUEVO ─────────────────
   const insertarAvisos = async (tanda: NotificationRow[]) => {

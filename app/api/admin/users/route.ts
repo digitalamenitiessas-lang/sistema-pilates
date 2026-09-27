@@ -329,7 +329,7 @@ export async function PUT(request: Request) {
     return NextResponse.json(
       {
         error:
-          'Esa ficha está vinculada a una cuenta que no es de clienta, así que desde acá no se toca. Pedíselo a quien administra el sistema.',
+          'Esa ficha está vinculada a una cuenta que no es de cliente, así que desde acá no se toca. Pedíselo a quien administra el sistema.',
       },
       { status: 403 }
     )
@@ -496,7 +496,7 @@ async function blanquearStaff(
   if (!perfil) return NextResponse.json({ error: 'No se encontró esa cuenta' }, { status: 404 })
   if (perfil.role === 'alumno') {
     return NextResponse.json(
-      { error: 'A una clienta se le blanquea desde su ficha: vuelve a su documento.' },
+      { error: 'La contraseña de un cliente se blanquea desde su ficha: vuelve a su documento.' },
       { status: 400 }
     )
   }

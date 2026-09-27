@@ -13,13 +13,24 @@ import {
   History,
   UserCheck,
   ClipboardCheck,
+  Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { SeccionPlegable, SeccionesPlegables } from '@/components/ui/seccion-plegable'
 import { TomarAsistencia } from '@/components/asistencia/tomar-asistencia'
 import { disciplineStyle } from '@/lib/disciplines'
-import { addDays, hoyISO, updateReservationStatus, formaDeLaReserva } from '@/lib/api'
+import {
+  addDays,
+  hoyISO,
+  updateReservationStatus,
+  formaDeLaReserva,
+  cancelacionEnPlazo,
+  consecuenciaDeCancelar,
+  topeDeDevoluciones,
+  settingNum,
+  type ConsecuenciaDeCancelar,
+} from '@/lib/api'
 import type {
   Discipline,
   DisciplineItem,
@@ -57,6 +68,8 @@ interface AccionesDeFila {
   puedeMarcar: boolean
   canWrite: boolean
   onEstado: (r: Reservation, estado: ReservationStatus) => void
+  /** Abre el "¿seguro?": cancelar no va directo, ver `ConfirmarCancelacion`. */
+  onCancelar: (r: Reservation) => void
 }
 
 /**
@@ -80,7 +93,7 @@ function TablaDeReservas({
   mostrarFecha: boolean
   vacio: string
 }) {
-  const { busyId, puedeMarcar, canWrite, onEstado } = acciones
+  const { busyId, puedeMarcar, canWrite, onEstado, onCancelar } = acciones
 
   if (filas.length === 0) {
     return <p className="px-4 py-8 text-center text-sm text-muted-foreground">{vacio}</p>
@@ -126,7 +139,7 @@ function TablaDeReservas({
                 <td className="px-4 py-3 whitespace-nowrap">
                   {mostrarFecha ? (
                     <div>
-                      <p className="text-sm text-foreground font-medium">{r.date}</p>
+                      <p className="text-sm text-foreground font-medium">{fechaCorta(r.date)}</p>
                       <p className="text-xs text-muted-foreground tabular-nums">{r.time}</p>
                     </div>
                   ) : (
@@ -220,7 +233,7 @@ function TablaDeReservas({
                         {canWrite && (
                           <button
                             disabled={busyId === r.id}
-                            onClick={() => onEstado(r, 'cancelada')}
+                            onClick={() => onCancelar(r)}
                             className="w-7 h-7 rounded-lg hover:bg-destructive-suave flex items-center justify-center text-muted-foreground hover:text-destructive-fuerte transition-colors disabled:opacity-50"
                             title="Cancelar reserva"
                           >
@@ -319,7 +332,7 @@ function ClasesDelDia({
   onTomarAsistencia?: (clase: ClaseDelDia) => void
   vacio: string
 }) {
-  const { busyId, puedeMarcar, canWrite, onEstado } = acciones
+  const { busyId, puedeMarcar, canWrite, onEstado, onCancelar } = acciones
 
   if (filas.length === 0) {
     return <p className="px-4 py-8 text-center text-sm text-muted-foreground">{vacio}</p>
@@ -429,7 +442,7 @@ function ClasesDelDia({
                           {canWrite && (
                             <button
                               disabled={busyId === r.id}
-                              onClick={() => onEstado(r, 'cancelada')}
+                              onClick={() => onCancelar(r)}
                               className="w-7 h-7 rounded-lg hover:bg-destructive-suave flex items-center justify-center text-muted-foreground hover:text-destructive-fuerte transition-colors disabled:opacity-50"
                               title="Cancelar reserva"
                             >
@@ -460,15 +473,203 @@ function ClasesDelDia({
   )
 }
 
+/**
+ * El "¿seguro que querés cancelar?" del mostrador.
+ *
+ * Lo pidió Matías el 27/09, probando el sistema: la cruz cancelaba de un
+ * toque. Y un toque de más acá no es inocente — la base sella en ese
+ * momento si la clase se devuelve o se pierde, gasta una de las
+ * devoluciones del período y le libera el lugar a otra persona, y esta
+ * pantalla no tiene cómo deshacerlo.
+ *
+ * El paso de más dice la consecuencia, no sólo la pregunta: es lo que la
+ * recepción necesita tener enfrente si la clienta está del otro lado del
+ * teléfono. La cuenta es la misma que le muestra el portal al cancelar
+ * (`consecuenciaDeCancelar`), así que las dos pantallas dicen lo mismo.
+ *
+ * Va en la página y no en un `window.confirm`: esos carteles los
+ * descartan solos el panel de vista previa y el navegador de Instagram,
+ * y el botón parece muerto.
+ */
+function ConfirmarCancelacion({
+  reserva,
+  consecuencia,
+  horasDePlazo,
+  tope,
+  trabajando,
+  error,
+  onCerrar,
+  onConfirmar,
+}: {
+  reserva: Reservation
+  consecuencia: ConsecuenciaDeCancelar
+  horasDePlazo: number
+  tope: number | null
+  trabajando: boolean
+  error: string | null
+  onCerrar: () => void
+  onConfirmar: () => void
+}) {
+  const plazo = `${horasDePlazo} ${horasDePlazo === 1 ? 'hora' : 'horas'}`
+  const { caso, restantes } = consecuencia
+  // Con cero horas de plazo, "en plazo" es "todavía no empezó". Hace falta
+  // porque la cruz también está en la clase en curso y en el historial
+  // —una reserva de ayer que quedó confirmada—, y ahí "faltan menos de 3
+  // horas" sería falso.
+  const yaEmpezo = !cancelacionEnPlazo(reserva.date, reserva.time, 0)
+  // Después de esta cancelación, que es el número que se le puede decir.
+  const despues = restantes === null ? null : restantes - 1
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/20 backdrop-blur-sm"
+      onClick={trabajando ? undefined : onCerrar}
+    >
+      <div
+        className="bg-card rounded-2xl shadow-2xl w-full max-w-sm border border-border"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h2 className="text-base font-bold text-foreground">¿Seguro que querés cancelar?</h2>
+          <button
+            type="button"
+            onClick={onCerrar}
+            disabled={trabajando}
+            className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground disabled:opacity-50"
+            aria-label="Cerrar"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="px-5 py-5 space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-foreground">{reserva.studentName}</p>
+            <p className="text-xs text-muted-foreground">
+              {reserva.className} · {fechaCorta(reserva.date)} · {reserva.time}
+              {reserva.teacherName ? ` · ${reserva.teacherName}` : ''}
+            </p>
+          </div>
+
+          {/* Los colores son los del portal: verde vuelve, ámbar avisó a
+              tiempo y la pierde igual, rojo llegó tarde. Son tres cosas
+              distintas y la recepción las tiene que poder explicar. */}
+          {caso === 'vuelve' && (
+            <div className="rounded-xl bg-exito-suave px-3.5 py-3">
+              <p className="text-sm font-semibold text-exito-fuerte">La clase se le devuelve</p>
+              <p className="text-xs text-exito-fuerte/90 mt-1">
+                Faltan más de {plazo} para que empiece, así que vuelve a su plan.
+              </p>
+              {despues !== null && tope !== null && (
+                <p className="text-xs text-exito-fuerte/90 mt-2">
+                  Usa una de sus {tope} {tope === 1 ? 'devolución' : 'devoluciones'} del período
+                  {despues === 0
+                    ? ': es la última.'
+                    : `: después de esta le ${despues === 1 ? 'queda' : 'quedan'} ${despues}.`}
+                </p>
+              )}
+            </div>
+          )}
+
+          {caso === 'sin-cupo' && (
+            <div className="rounded-xl bg-aviso-suave px-3.5 py-3">
+              <p className="text-sm font-semibold text-aviso-fuerte">La clase se pierde</p>
+              <p className="text-xs text-aviso-fuerte/90 mt-1">
+                {/* En 0 el estudio decidió que cancelar nunca devuelve: decir
+                    "ya usó las 0 devoluciones" no se entiende. */}
+                {tope === 0
+                  ? `Faltan más de ${plazo}, pero el estudio tiene las devoluciones en 0: cancelar no devuelve la clase.`
+                  : `Faltan más de ${plazo}, pero ya usó ${
+                      tope === 1 ? 'la devolución' : `las ${tope} devoluciones`
+                    } del período.`}
+              </p>
+              <p className="text-xs text-aviso-fuerte/90 mt-2">
+                Cancelar igual le libera el lugar a otra persona.
+              </p>
+            </div>
+          )}
+
+          {caso === 'se-pierde' && (
+            <div className="rounded-xl bg-destructive/10 px-3.5 py-3">
+              <p className="text-sm font-semibold text-destructive-fuerte">La clase se pierde</p>
+              <p className="text-xs text-destructive-fuerte/90 mt-1">
+                {reserva.date < hoyISO()
+                  ? 'Esa clase ya pasó: cancelarla ahora no se la devuelve.'
+                  : yaEmpezo
+                    ? 'La clase ya empezó: cancelarla ahora no se la devuelve.'
+                    : `Faltan menos de ${plazo} para que empiece: no se le devuelve.`}
+              </p>
+              {!yaEmpezo && (
+                <p className="text-xs text-destructive-fuerte/90 mt-2">
+                  Cancelar igual le libera el lugar a otra persona.
+                </p>
+              )}
+            </div>
+          )}
+
+          {(caso === 'no-consume' || caso === 'espera' || caso === 'suspendida') && (
+            <div className="rounded-xl bg-muted px-3.5 py-3">
+              <p className="text-sm font-semibold text-foreground">No le cuesta nada</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {caso === 'espera'
+                  ? 'Está en lista de espera: todavía no tenía lugar, así que cancelar no le descuenta ninguna clase.'
+                  : caso === 'suspendida'
+                    ? 'El estudio suspendió esa clase: cancelarla no le descuenta nada ni le gasta una devolución.'
+                    : 'Esta reserva no sale de ningún plan, así que cancelarla no le descuenta nada.'}
+              </p>
+            </div>
+          )}
+
+          {error && (
+            <p className="text-xs text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">
+              {error}
+            </p>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onCerrar}
+              disabled={trabajando}
+              className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-muted transition-colors disabled:opacity-60"
+            >
+              No
+            </button>
+            <button
+              type="button"
+              onClick={onConfirmar}
+              disabled={trabajando}
+              className="flex-1 py-2.5 rounded-xl bg-destructive text-white text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {trabajando && <Loader2 className="w-4 h-4 animate-spin" />}
+              {trabajando ? 'Cancelando...' : 'Sí, cancelar'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ReservasPage() {
   const { refresh, canWrite, can } = useData()
-  const { reservations: RESERVATIONS, students: STUDENTS, disciplines } = useStudio()
+  const {
+    reservations: RESERVATIONS,
+    students: STUDENTS,
+    disciplines,
+    occurrences,
+    settings,
+    settingsMeta,
+  } = useStudio()
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('todas')
   const [filterDate, setFilterDate] = useState<string>('')
   const [busyId, setBusyId] = useState<string | null>(null)
   /** La clase a la que se le está tomando asistencia, si hay alguna */
   const [asistenciaDe, setAsistenciaDe] = useState<ClaseDelDia | null>(null)
+  /** La reserva que espera el "sí, cancelar" */
+  const [aCancelar, setACancelar] = useState<Reservation | null>(null)
+  const [errorAlCancelar, setErrorAlCancelar] = useState<string | null>(null)
 
   // Marcar asistencia es su propia clave desde la 0012: la profesora la
   // tiene sin poder tocar el resto. Mientras esté en sombra, can()
@@ -483,6 +684,43 @@ export function ReservasPage() {
       await refresh()
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'No se pudo actualizar la reserva')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  // Los mismos parámetros con los que la base sella la cancelación, así
+  // que si el estudio los cambia desde Configuración, el aviso cambia.
+  const horasDeCancelacion = settingNum(settings, 'cancel_hours', 3)
+  const topeDevoluciones = topeDeDevoluciones(settings, settingsMeta)
+
+  // Se cuenta sobre todas las reservas del estudio: la cuenta filtra por el
+  // período de ESA reserva, y el mostrador las ve todas.
+  const consecuenciaDe = (r: Reservation) =>
+    consecuenciaDeCancelar(r, RESERVATIONS, horasDeCancelacion, topeDevoluciones, {
+      suspendida: occurrences.some(
+        (o) => o.classId === r.classId && o.date === r.date && o.status === 'suspendida'
+      ),
+    })
+
+  const pedirCancelacion = (r: Reservation) => {
+    setErrorAlCancelar(null)
+    setACancelar(r)
+  }
+
+  const confirmarCancelacion = async () => {
+    const r = aCancelar
+    if (!r) return
+    setBusyId(r.id)
+    setErrorAlCancelar(null)
+    try {
+      await updateReservationStatus(r.id, 'cancelada')
+      await refresh()
+      setACancelar(null)
+    } catch (err) {
+      // Adentro del cartel y no en un `alert`: el alert también lo
+      // descartan solos los navegadores embebidos, y el error se perdía.
+      setErrorAlCancelar(err instanceof Error ? err.message : 'No se pudo cancelar la reserva')
     } finally {
       setBusyId(null)
     }
@@ -532,6 +770,7 @@ export function ReservasPage() {
     puedeMarcar,
     canWrite,
     onEstado: cambiarEstado,
+    onCancelar: pedirCancelacion,
   }
 
   const conteo = (n: number) => (
@@ -737,6 +976,21 @@ export function ReservasPage() {
           title={asistenciaDe.title}
           time={asistenciaDe.time}
           onClose={() => setAsistenciaDe(null)}
+        />
+      )}
+
+      {/* Afuera por lo mismo: la reserva puede estar en una sección que se
+          pliega o, al cancelarla, cambiar de lugar en la lista. */}
+      {aCancelar && (
+        <ConfirmarCancelacion
+          reserva={aCancelar}
+          consecuencia={consecuenciaDe(aCancelar)}
+          horasDePlazo={horasDeCancelacion}
+          tope={topeDevoluciones}
+          trabajando={busyId === aCancelar.id}
+          error={errorAlCancelar}
+          onCerrar={() => setACancelar(null)}
+          onConfirmar={confirmarCancelacion}
         />
       )}
     </div>

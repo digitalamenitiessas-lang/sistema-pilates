@@ -2028,6 +2028,72 @@ blanqueo real no se ejerció. El push se probó a mano con las claves de
 de prueba se niega a mandarle a un dispositivo de otra cuenta. Falta
 tocarlo en producción, que es lo que prueba la clave de Vercel.
 
+### ✅ Lo que salió de probar cada rol el 27/09 — `0084`, **escrita, sin correr**
+
+El domingo antes de abrir se ejerció el sistema por flujo, en producción y
+con la sesión de cada rol —el admin haciendo de mostrador, una clienta, la
+profesora Ivana y la dueña—, comprobando cada paso contra la base. Lo que
+tocaba plata anduvo: el alta con cobro, el Cobrar de la Agenda, el tope de
+devoluciones, el arqueo con faltante, la promoción (la pantalla dijo
+$63.000 y la base asentó $63.000 con su descuento y su comprobante) y el
+cambio de precio, que llega a la web pública. Lo que salió, arreglado acá:
+
+**Cancelar desde Reservas era un toque.** Sin confirmar y sin decir que la
+clase se iba a perder: el "perdió la clase" aparecía recién después. Ahora
+la cruz abre un cartel en la página —no nativo: el navegador de Instagram
+los descarta— que dice qué le pasa a esa clase, con la misma cuenta que usa
+la base (`consecuenciaDeCancelar`, compartida con el portal).
+
+**La plata en los avisos salía en formato inglés** ("$42,750") y el cierre
+de caja decía "-1000.00". La `0084` agrega `pesos(numeric)`, que no depende
+del locale de la base, y la usan los cuatro textos que llevan montos.
+
+**"Quedaste anotada" y otros textos en femenino para todos.** La misma
+`0084` los pasa a neutro en la base ("Tu lugar quedó reservado en…",
+"Cambió quién da tu clase"), y en la pantalla se cambiaron los que se ven:
+la web pública decía "8 alumnas por clase" y ahora "8 lugares por clase".
+La regla: un texto sobre una persona no tiene género; sobre los clientes en
+grupo, "cliente", que es la palabra que eligió el estudio el 09/09.
+
+**El domingo.** La Agenda del staff abría en la semana terminada, como le
+pasaba al portal hasta el 25/09. Y a quien cobra por hora se le podían
+cargar horas en domingo, que la liquidación paga sin mirar el día: ahora no
+se puede guardar, y una clase especial con fecha en domingo tampoco.
+
+**La caja abierta varios días.** El cierre describía mal el "saldo al
+abrir", y el proceso diario mandaba todos los días "el arqueo va a juntar
+la plata de todos esos días". La caja se abre y se cierra cuando la dueña
+quiere: el cierre ahora dice qué período cubre ("Turno del mié 23/09 10:58
+a hoy 13:48") con la misma cuenta que `cerrar_caja`, y el recordatorio
+diario se sacó.
+
+**El portal nombraba el WhatsApp y no daba cómo llegar.** "Escribinos por
+WhatsApp" y "pedí el link de pago por WhatsApp" eran texto suelto. Ahora
+son links con el mensaje escrito —nombre, credencial y, en la deuda, plan y
+monto—, con el número de `studio_whatsapp`. Si el parámetro está vacío no
+se inventa uno: queda "consultá en recepción". **Hoy está vacío** (se vació
+el 25/09 desde la cuenta admin), así que el link aparece cuando se cargue.
+
+**Fechas en crudo** ("2026-10-22") en la ficha, en Reservas y en Pagos.
+
+**El formulario de planes y el del alta se rompían en el celular.** La
+grilla es de una columna en pantallas chicas y el primer campo pedía
+`col-span-2`: eso crea una segunda columna implícita y todo lo que sigue se
+acomoda en dos, la primera de ancho cero. La dueña no veía el precio desde
+el teléfono. Ahora es `sm:col-span-2`.
+
+Verificado en producción, con cada sesión: el aislamiento de la clienta y
+de la profesora (la profesora lee cero filas de plata; ve sólo las reservas
+de sus clases; desmarcar le da 403; marcar una reserva de otra clase o
+borrar una reserva no toca ninguna fila), las reservas y cancelaciones del
+portal con el tope, el fijo, los pagos, el perfil y la campana. Lo de este
+bloque se verificó por `tsc`, `next build` y la `0084` en un Postgres
+local con el locale que se equivoca como producción; en pantalla falta
+verlo cuando se despliegue. Quedó anotado y no se tocó: la profesora lee
+las fichas de todas las clientas (decisión del 27/09: queda así por
+ahora), y un "ausente" mal puesto no se puede volver a "sin marcar" desde
+ninguna pantalla.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.

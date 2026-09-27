@@ -413,7 +413,7 @@ function TeacherAccessModal({ teacher, onClose }: { teacher: Teacher; onClose: (
             />
             <p className="text-[11px] text-muted-foreground mt-1.5">
               Se la pasás y con eso entra. Conviene que la cambie: con su cuenta se ven los datos de
-              las clientas.
+              los clientes.
             </p>
           </div>
 
@@ -2209,7 +2209,7 @@ function PromocionFormModal({
               className={inputClass}
             />
             <p className="text-[11px] text-muted-foreground mt-1.5">
-              Lo va a ver la clienta en el mail y en el comprobante.
+              Aparece en el mail y en el comprobante de quien la usa.
             </p>
           </div>
 
@@ -2317,7 +2317,7 @@ function PromocionFormModal({
             <p className="text-[11px] text-muted-foreground mt-1.5">
               <strong>Vacío = automática:</strong> se aplica sola al cobrar, sin
               que nadie la pida. Con código hay que escribirlo en el cobro, así
-              que sirve para lo que se reparte a algunas y no a todas.
+              que sirve para lo que se reparte a algunos clientes y no a todos.
             </p>
           </div>
 
@@ -2334,7 +2334,7 @@ function PromocionFormModal({
               />
             </div>
             <div>
-              <label className={labelClass}>Por clienta</label>
+              <label className={labelClass}>Por cliente</label>
               <input
                 type="number"
                 min={1}
@@ -2617,8 +2617,8 @@ function PromocionesSection() {
               {anunciando === p.id && (
                 <div className="rounded-lg bg-muted/60 p-2.5 space-y-2">
                   <p className="text-[11px] text-foreground">
-                    Les llega un mail a todas las clientas activas con mail
-                    cargado, y un aviso en el portal a todas. <strong>Esto no se
+                    Les llega un mail a todos los clientes activos con mail
+                    cargado, y un aviso en el portal a todos. <strong>Esto no se
                     deshace</strong>, así que conviene mandarse la prueba primero.
                   </p>
                   <div className="flex gap-2">
