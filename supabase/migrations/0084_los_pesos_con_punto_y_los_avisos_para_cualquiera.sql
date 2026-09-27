@@ -22,6 +22,12 @@
 --   · `cerrar_liquidacion` (0065)         'FM999999999.00'    "el total da -1500.00 …"
 --   · `guard_periodo_liquidacion` (0055)  reemplazo a mano    "$10.000", bien
 --
+-- La última se deja como está. La primera versión de esta migración la
+-- reescribía con `pesos()` para que la regla quedara en un solo lugar, y
+-- al correrla el 27/09 el chequeo de abajo cortó: la que está viva en
+-- producción no es la que dice la 0055 del repo. Como ahí no había nada
+-- que arreglar, no vale la pena pisar una versión que no se conoce.
+--
 -- Ahora hay una sola manera, `public.pesos(numeric)`, y es la que tiene
 -- que usar cualquier texto nuevo que lleve plata: "$42.750", "-$1.000",
 -- "$1.234,50". Los centavos aparecen sólo si los hay.
@@ -49,7 +55,7 @@
 --     portal" como motivo del turno fijo. No se redefine acá porque hay
 --     una migración en revisión —la del fijo de un plan que todavía no
 --     arrancó— que la redefine entera, y copiarla desde la 0077 pisaría
---     ese arreglo. La frase se cambia en esa migración.
+--     ese arreglo. La frase se cambió en esa migración, la 0082.
 --   · Los avisos que ya están en `notifications` conservan su texto. Es
 --     lo mismo que dijo la 0033: son el registro de lo que se dijo.
 --
@@ -87,7 +93,6 @@ declare
     array['avisar_instancia', 'Cambió la profesora de tu clase', 'Cambió quién da tu clase'],
     array['cerrar_caja', 'hace falta un motivo'', (p_saldo_real - v_esp)', 'public.pesos(p_saldo_real - v_esp)'],
     array['cerrar_liquidacion', 'FM999999999.00', 'public.pesos(v_l.total)'],
-    array['guard_periodo_liquidacion', 'FM999,999,999', 'public.pesos(v_choca.total)'],
     array['cancelar_membresia', 'cancel_motivo', 'cancel_motivo'],
     array['cancelar_membresia', 'en la ficha de la clienta', 'queda escrito en la ficha'''],
     array['consumir_clase', 'devoluciones_tope()', 'devoluciones_tope()'],
@@ -647,51 +652,7 @@ end;
 $$;
 
 -- ------------------------------------------------------------
--- 8. LOS PERÍODOS QUE SE PISAN — el de la 0055, con `pesos()`
---
--- Era la única que daba bien. Se cambia igual para que la regla quede en
--- un solo lugar: con dos maneras de escribir plata, la próxima función se
--- copia de la que no es.
--- ------------------------------------------------------------
-
-create or replace function public.guard_periodo_liquidacion()
-returns trigger
-language plpgsql security definer set search_path = ''
-as $$
-declare v_choca record;
-begin
-  -- Una anulada es el registro de que se cerró mal: no reserva días.
-  if new.estado = 'anulada' then return new; end if;
-
-  select s.desde, s.hasta, s.estado, s.total into v_choca
-  from public.teacher_settlements s
-  where s.teacher_id = new.teacher_id
-    and s.estado <> 'anulada'
-    and s.id <> new.id
-    -- Dos rangos se pisan si cada uno empieza antes de que el otro
-    -- termine. Es la comparación entera: basta un día en común.
-    and s.desde <= new.hasta
-    and s.hasta >= new.desde
-  limit 1;
-
-  if found then
-    raise exception
-      'Ese período se pisa con una liquidación % del % al % por %. Si hay que corregirla, anulala primero.',
-      v_choca.estado,
-      to_char(v_choca.desde, 'DD/MM/YYYY'),
-      to_char(v_choca.hasta, 'DD/MM/YYYY'),
-      -- La trampa de la `G` que se esquivaba acá a mano ahora la esquiva
-      -- `pesos()` (0084), que además trae el signo: por eso el `$` salió
-      -- del mensaje.
-      public.pesos(v_choca.total);
-  end if;
-
-  return new;
-end;
-$$;
-
--- ------------------------------------------------------------
--- 9. CANCELAR UNA MEMBRESÍA — el de la 0070, con otra frase
+-- 8. CANCELAR UNA MEMBRESÍA — el de la 0070, con otra frase
 --
 -- "…queda escrito en la ficha de la clienta" pasa a "…queda escrito en
 -- la ficha". Se lee en el mostrador, con la ficha abierta: no hace falta
@@ -770,7 +731,7 @@ end;
 $$;
 
 -- ------------------------------------------------------------
--- 10. EL DESCUENTO DE CLASES — el de la 0076, con dos frases
+-- 9. EL DESCUENTO DE CLASES — el de la 0076, con dos frases
 --
 -- Las dos las lee el mostrador sobre una persona concreta:
 --   · "Esa clase perdida no es de este cliente." → "…es de otra ficha."
@@ -1044,7 +1005,7 @@ end;
 $$;
 
 -- ------------------------------------------------------------
--- 11. LA MODALIDAD DEL PLAN — el de la 0040, con otra frase
+-- 10. LA MODALIDAD DEL PLAN — el de la 0040, con otra frase
 --
 -- "Para anotarla en esta clase necesita el plan…" hablaba de ella en
 -- tercera persona, y este error no lo ve sólo el mostrador: sale igual
@@ -1262,7 +1223,7 @@ end;
 $$;
 
 -- ------------------------------------------------------------
--- 12. SOLTAR EL TURNO FIJO DESDE EL PORTAL — el de la 0077
+-- 11. SOLTAR EL TURNO FIJO DESDE EL PORTAL — el de la 0077
 --
 -- El motivo que queda escrito en el turno pasa de "Lo dejó la clienta
 -- desde el portal" a "Lo dejó desde el portal": se lee en su ficha, así
@@ -1292,7 +1253,7 @@ end;
 $$;
 
 -- ------------------------------------------------------------
--- 13. TRES AYUDAS DE CONFIGURACIÓN QUE QUEDARON EN FEMENINO
+-- 12. TRES AYUDAS DE CONFIGURACIÓN QUE QUEDARON EN FEMENINO
 --
 -- No son avisos, pero las escribe la base y las lee el equipo, y son las
 -- únicas que se salían de la regla de la 0033: quedaron en femenino
@@ -1344,9 +1305,11 @@ commit;
 --    Si aparece `anular_cobro`, es la migración de "anular el cobro no
 --    borra la deuda", que se escribió antes que esta y arma su mensaje
 --    con el reemplazo a mano: da bien, pero conviene pasarla a `pesos()`.
+--    `guard_periodo_liquidacion` puede aparecer también: se dejó afuera
+--    a propósito (ver arriba).
 --
--- 2. Que ninguna diga lo que se cambió (tiene que dar una sola fila,
---    `turno_fijo_propio`, que queda afuera a propósito — ver arriba).
+-- 2. Que ninguna diga lo que se cambió (tiene que dar cero filas:
+--    `turno_fijo_propio` la corrigió la 0082).
 --    Las frases van enteras porque `prosrc` trae también los comentarios,
 --    y ahí "la clienta" sigue apareciendo:
 --
