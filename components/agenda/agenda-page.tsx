@@ -920,7 +920,22 @@ function ClassDetailModal({
               {/* Quién ocupa permanentemente este horario (§2, 0048). Va
                   antes de la ficha del cliente porque es una propiedad de
                   la clase y no de quien se esté anotando. */}
-              <TurnosDeLaClase classId={cls.id} capacity={cls.capacity} cliente={clienteElegido} />
+              <TurnosDeLaClase
+                classId={cls.id}
+                capacity={cls.capacity}
+                fecha={cls.date}
+                cliente={clienteElegido}
+                onAnotada={(anotadaId, nombre) => {
+                  // Darle el horario o completárselo también la anota en
+                  // esta fecha: queda en la lista de anotadas y, si era la
+                  // elegida, sale del selector, igual que con "Reservar".
+                  setAnotadas((prev) => [
+                    ...prev,
+                    { nombre, espera: false, recupero: false, excepcion: false },
+                  ])
+                  if (anotadaId === studentId) elegirCliente('')
+                }}
+              />
 
               {/* La ficha rápida (§1 del pedido del 15/09): con el cliente
                   elegido, el mostrador ve su plan, hasta cuándo, cuántas le
@@ -942,7 +957,7 @@ function ClassDetailModal({
                     onChange={(e) => setRecuperaId(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary transition-colors"
                   >
-                    <option value="">Anotarla normal, descontando una clase</option>
+                    <option value="">Reservar como siempre, descontando una clase</option>
                     {recuperables.map((r) => (
                       <option key={r.id} value={r.id}>
                         Recuperar la del {new Date(`${r.date}T00:00`).toLocaleDateString('es-AR')}
@@ -969,7 +984,7 @@ function ClassDetailModal({
               {ofreceExcepcion && (
                 <div className="rounded-xl border border-aviso/50 bg-aviso-suave px-3 py-2.5 space-y-2">
                   <p className="text-[11px] font-bold text-aviso-fuerte">
-                    Anotarla igual, como excepción
+                    Reservar igual, como excepción
                   </p>
                   <p className="text-[10px] text-aviso-fuerte/90 leading-relaxed">
                     Esta clase no se descuenta de ningún plan y queda tu nombre como quien la

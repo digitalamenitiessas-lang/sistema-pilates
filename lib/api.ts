@@ -2430,9 +2430,13 @@ export async function anunciarPromocion(
 // Turnos fijos (0048)
 //
 // Un turno fijo es el derecho de un cliente sobre un día y hora de la
-// grilla, no una reserva ni un conjunto de reservas. Por eso acá no se
-// crea ni se cancela nada de `reservations`: se escribe una fila de
-// `fixed_slots` y listo.
+// grilla, no una reserva ni un conjunto de reservas. Por eso asignarlo,
+// liberarlo o pausarlo escribe una fila de `fixed_slots` y nada más.
+//
+// Lo que sí toca `reservations` es completar sus fechas
+// (`reservarFechasDelTurno`), y eso va aparte y de a una, por el mismo
+// insert que la reserva a mano. El cupo de cada fecha lo ocupan esas
+// reservas, no el turno: `enforce_class_capacity` no mira `fixed_slots`.
 // ---------------------------------------------------------------
 
 /** El aviso de que la 0048 todavía no corrió, dicho una sola vez. */
@@ -2442,13 +2446,13 @@ function sinTurnosFijos(error: { code?: string } | null): boolean {
 }
 
 /**
- * Las fechas de esa clase, semana a semana, desde mañana hasta que
- * termina el período.
+ * Las fechas de esa clase, semana a semana, entre dos días inclusive.
  *
- * "Desde mañana" y no desde hoy: la clase de hoy ya la acaba de reservar
- * —es lo que disparó la pregunta— y volver a ofrecerla sería contarla dos
- * veces. El día de la semana sale de la clase y no de la fecha reservada,
- * porque es el mismo dato con el que la base valida (`reserva_en_hora`).
+ * Es sólo el calendario: no sabe qué tiene reservado nadie. Lo que un
+ * turno fijo todavía puede llenar lo dice `fechasPorCompletar`, que
+ * arranca de acá. El día de la semana sale de la clase y no de una fecha
+ * reservada, porque es el mismo dato con el que la base valida
+ * (`reserva_en_hora`).
  */
 export function fechasDelTurno(diaDeLaSemana: number, desde: string, hasta: string): string[] {
   const fechas: string[] = []
@@ -2465,18 +2469,312 @@ export function fechasDelTurno(diaDeLaSemana: number, desde: string, hasta: stri
 }
 
 /**
+ * De qué período salen las fechas de un turno fijo.
+ *
+ * El que cubre esa fecha y, si ninguno la cubre, el próximo en arrancar.
+ * Lo segundo es la tanda de la apertura: el 27/09 las clientas entran con
+ * un plan que arranca el 29, y hasta acá el portal miraba "el período de
+ * hoy", que para ellas no existe — así que nunca les ofrecía el fijo.
+ *
+ * El pase de prueba va último aunque cubra la fecha: FE FIRST dice una vez
+ * por semana porque es UNA clase, no porque ella vaya a venir una vez, y el
+ * período del pase son siete días. La que usó su clase gratis el sábado y
+ * arranca FE FLOW el martes quiere completar el mes de FE FLOW.
+ *
+ * Ojo, que no es "el plan que paga la clase": ése es `membresia_para`
+ * (0037), que cobra primero la que todavía tiene clases y vence antes —o
+ * sea, un pase sin usar—. Acá la pregunta es otra, de qué plan son las
+ * semanas que vienen, y por eso el pase va al revés. Con un pase sin usar
+ * que cubra la primera fecha de un lote, esa fecha se la cobra el pase y
+ * las demás este plan.
+ *
+ * Es el mismo orden que `plan_de_los_fijos` (0082), que es el que pone el
+ * tope de horarios en la base. El tope el portal no lo calcula: se lo
+ * pregunta (`miTopeDeFijos`). Pero que las fechas propuestas y el tope
+ * hablen del mismo plan depende de que los dos órdenes coincidan, así
+ * que si uno cambia, cambia el otro.
+ *
+ * Suspendida y cancelada no entran: en la base son las que no tienen
+ * `status = 'activa'`, y ésas no pagan ninguna clase.
+ */
+export function periodoDelTurno(
+  propias: Membership[],
+  planes: Plan[],
+  fecha: string
+): Membership | undefined {
+  const esPase = (m: Membership) => (planes.find((p) => p.id === m.planId)?.isTrial ? 1 : 0)
+  const cubre = (m: Membership) => (m.startDate <= fecha ? 1 : 0)
+  return propias
+    .filter((m) => m.status !== 'cancelada' && m.status !== 'suspendida' && m.endDate >= fecha)
+    .sort(
+      (a, b) =>
+        esPase(a) - esPase(b) ||
+        cubre(b) - cubre(a) ||
+        // Entre las que cubren, la que más lejos llega (0078); entre las
+        // que todavía no arrancaron, la que arranca primero.
+        (cubre(a) ? b.endDate.localeCompare(a.endDate) : a.startDate.localeCompare(b.startDate))
+    )[0]
+}
+
+/**
+ * El período de una fecha que se está MIRANDO, que no es lo mismo que el
+ * de una fecha reservada.
+ *
+ * El mostrador abre el martes 20/10 para darle el horario a una clienta
+ * cuyo plan vence el 14/10. `periodoDelTurno` con el 20/10 no encuentra
+ * nada —descarta todo plan que venza antes—, y la Agenda le decía "no
+ * tiene un plan vigente ni por empezar" a alguien que está yendo. Si la
+ * fecha no tiene período, se mira el de hoy: la pantalla puede decir "su
+ * plan no llega a esta fecha", que es lo que pasa.
+ */
+export function periodoMirando(
+  propias: Membership[],
+  planes: Plan[],
+  fecha: string,
+  hoy: string = hoyISO()
+): Membership | undefined {
+  return periodoDelTurno(propias, planes, fecha > hoy ? fecha : hoy) ?? periodoDelTurno(propias, planes, hoy)
+}
+
+/**
+ * Las fechas que un turno fijo todavía puede llenar dentro de un período.
+ *
+ * DENTRO DEL PERÍODO. No hasta `prioridad_hasta`, que suma los días de
+ * gracia y el período que tenga encolado: eso le reservaría clases que
+ * paga otro plan, cuando lo que pidió es "el mes que tiene".
+ *
+ * DESDE DÓNDE depende de quién pregunta, y por eso es un parámetro:
+ *
+ *   · Al hacer fijo un horario, desde la fecha que eligió —la que acaba
+ *     de reservar ella, o la que el mostrador tiene abierta—. Si reservó
+ *     el 06/10 y no el 29/09, es porque el 29 no viene: anotárselo le
+ *     gastaba una clase del plan y, para deshacerlo, una de sus
+ *     devoluciones del período (0076). Es el "desde mañana" que tenía
+ *     antes la hoja, dicho con la fecha.
+ *   · Al completar un horario que ya es suyo, desde la primera fecha que
+ *     ya tiene de ese horario en el período, o desde que arranca si no
+ *     tiene ninguna (`turnoPorCompletar` dice por qué).
+ *
+ * Y nunca antes de que arranque el período ni antes de hoy.
+ *
+ * Sin las fechas en las que ya tiene una reserva de esa clase, en
+ * cualquier estado. Ésa es la cuenta que evita descontar dos veces: la
+ * clase que acaba de reservar —la que disparó la pregunta—, las que le
+ * anotó el mostrador al darle el horario, las que ya se anotó ella. Una en
+ * lista de espera también, porque volver a insertarla choca con la
+ * restricción única y sale como un error que no le dice nada.
+ *
+ * Las canceladas también quedan afuera, y por dos razones. Una es de
+ * ella: si canceló el 13 es porque ese día no viene, y un "completá tu
+ * horario" que se la vuelve a anotar le deshace lo que decidió. La otra
+ * es de la base: esa fecha no entraría por el insert sino por
+ * `reactivar_reserva` (0031), que no vuelve a mirar el saldo —está
+ * anotado en la §0—. Así todo lo que se completa pasa por el insert y por
+ * `consumir_clase` entero.
+ *
+ * Las suspendidas y las que ya cerraron no se ofrecen: las va a rechazar
+ * la base, y listarlas en "te anotamos en…" sería prometer una fecha que
+ * no existe.
+ *
+ * Las que ya están completas van aparte, en `llenas`, si se sabe la
+ * ocupación. Sin eso, la tarjeta de Inicio le ofrecía para siempre la
+ * misma fecha llena: la reserva fallaba, no quedaba registrada, y la
+ * cuenta de "te faltan" no bajaba nunca. Si la ocupación no se sabe
+ * (`ocupacion` sin pasar), no se filtra nada y la base dice cuál está
+ * llena al reservar.
+ */
+export function fechasPorCompletar({
+  clase,
+  periodo,
+  desde,
+  studentId,
+  reservas,
+  ocurrencias = [],
+  ocupacion,
+  ahora = ahoraDelEstudio(),
+  minutosDeCorte = 0,
+}: {
+  clase: { id: string; dayOfWeek: number; time: string; capacity: number }
+  periodo: { startDate: string; endDate: string }
+  desde?: string
+  studentId: string
+  reservas: Reservation[]
+  ocurrencias?: ClassOccurrence[]
+  /** Anotadas por `${classId}|${fecha}`, de `fetchOcupacionDeClases`. */
+  ocupacion?: Map<string, number>
+  ahora?: { fecha: string; hora: string }
+  minutosDeCorte?: number
+}): { fechas: string[]; llenas: string[] } {
+  const arranque = [periodo.startDate, desde ?? ''].reduce((a, b) => (b > a ? b : a), ahora.fecha)
+  const tomadas = new Set(
+    reservas.filter((r) => r.studentId === studentId && r.classId === clase.id).map((r) => r.date)
+  )
+  const fechas: string[] = []
+  const llenas: string[] = []
+  for (const f of fechasDelTurno(clase.dayOfWeek, arranque, periodo.endDate)) {
+    if (tomadas.has(f)) continue
+    const exc = ocurrencias.find((o) => o.classId === clase.id && o.date === f)
+    if (exc?.status === 'suspendida') continue
+    if (reservaCerrada(f, exc?.startTime ?? clase.time, ahora, minutosDeCorte)) continue
+    // El mismo cupo que mira `enforce_class_capacity` (0018): el de ese día
+    // si el estudio lo cambió, y si no el de la clase. Una fecha sin fila
+    // en la vista es una fecha sin nadie anotado.
+    if (ocupacion && (ocupacion.get(`${clase.id}|${f}`) ?? 0) >= (exc?.capacity ?? clase.capacity)) {
+      llenas.push(f)
+      continue
+    }
+    fechas.push(f)
+  }
+  return { fechas, llenas }
+}
+
+/**
+ * Lo que le falta a un horario que ya es suyo: de qué período y qué fechas.
+ *
+ * Mira primero el período de `mirando` —hoy, en el portal; la fecha que el
+ * mostrador tiene abierta, en la Agenda— y, si ahí no le entra ninguna,
+ * el siguiente: el que arranca después de que ése vence. Lo segundo es la
+ * renovación. Pagó el mes que viene, el período nuevo quedó encolado
+ * ('futura'), y el de hoy ya tiene todas las fechas anotadas o las clases
+ * agotadas. Sin mirar el siguiente, el "cuando renueves, las completás
+ * desde Inicio" de la hoja recién valía el día que arrancaba, y hasta ese
+ * día sus martes quedaban libres para cualquiera.
+ *
+ * Y dentro de cada período, desde la primera fecha de ese horario que ya
+ * tiene ahí, en cualquier estado; si no tiene ninguna, desde que arranca.
+ * Completar es llenar los huecos de lo que empezó, no volver para atrás:
+ * a la que hizo fijo el martes desde el 06/10 —porque el 29/09 no venía—
+ * la tarjeta de Inicio le ofrecía el 29 hasta que pasara, y el renglón de
+ * la Agenda también. Con el mes que viene sin nada anotado, o con el
+ * horario que le dio el mostrador antes de que la Agenda anotara fechas,
+ * no hay primera fecha y se completa entero.
+ *
+ * Nulo si no tiene período. Si tiene y no le entra nada en ninguno, vuelve
+ * el primero con `entran` en cero, para que la pantalla pueda decir por qué.
+ */
+export function turnoPorCompletar({
+  propias,
+  planes,
+  mirando,
+  ...resto
+}: Omit<Parameters<typeof fechasPorCompletar>[0], 'periodo' | 'desde'> & {
+  propias: Membership[]
+  planes: Plan[]
+  mirando: string
+}): { periodo: Membership; fechas: string[]; llenas: string[]; libres: number; entran: number } | null {
+  const hoy = resto.ahora?.fecha ?? hoyISO()
+  const cuenta = (periodo: Membership) => {
+    const primera = resto.reservas
+      .filter(
+        (r) =>
+          r.studentId === resto.studentId &&
+          r.classId === resto.clase.id &&
+          r.date >= periodo.startDate &&
+          r.date <= periodo.endDate
+      )
+      .map((r) => r.date)
+      .sort()[0]
+    const { fechas, llenas } = fechasPorCompletar({ ...resto, periodo, desde: primera })
+    const libres = Math.max(0, periodo.classesTotal - periodo.classesUsed)
+    return { periodo, fechas, llenas, libres, entran: Math.min(fechas.length, libres) }
+  }
+  const primero = periodoMirando(propias, planes, mirando, hoy)
+  if (!primero) return null
+  const deEste = cuenta(primero)
+  if (deEste.entran > 0) return deEste
+  const siguiente = periodoDelTurno(propias, planes, addDays(primero.endDate, 1))
+  if (!siguiente || siguiente.id === primero.id) return deEste
+  const delOtro = cuenta(siguiente)
+  return delOtro.entran > 0 ? delOtro : deEste
+}
+
+/**
+ * Cuántas hay anotadas en esas clases, fecha por fecha, entre dos días.
+ * Clave `${classId}|${fecha}`.
+ *
+ * De `class_occupancy` y no de las reservas del paquete, por lo mismo que
+ * la grilla: la clienta sólo lee las suyas, y contar sobre eso diría que
+ * todo martes tiene lugar.
+ *
+ * `undefined` si la vista no contesta, y no un mapa vacío: vacío quiere
+ * decir "no hay nadie anotado en ninguna", que es una afirmación. Sin
+ * dato, `fechasPorCompletar` no filtra y la base dice cuál está llena al
+ * reservar.
+ */
+export async function fetchOcupacionDeClases(
+  classIds: string[],
+  desde: string,
+  hasta: string
+): Promise<Map<string, number> | undefined> {
+  if (classIds.length === 0 || hasta < desde) return new Map()
+  try {
+    const { data, error } = await supabase
+      .from('class_occupancy')
+      .select('class_id, date, confirmed')
+      .in('class_id', classIds)
+      .gte('date', desde)
+      .lte('date', hasta)
+    if (error) return undefined
+    const map = new Map<string, number>()
+    for (const row of (data ?? []) as Array<{ class_id: string; date: string; confirmed: number | string }>) {
+      map.set(`${row.class_id}|${row.date}`, Number(row.confirmed))
+    }
+    return map
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Cuántos horarios fijos le tocan, según la base (0082). Número, o `null`
+ * si no hay tope: sin plan, o con un plan que no declara su frecuencia.
+ *
+ * `undefined` quiere decir "no sé", y no es lo mismo que `null`. Viene así
+ * cuando la 0082 todavía no corrió —la función no existe: 42883 o
+ * PGRST202— o cuando la pregunta falló. En los dos casos el portal se
+ * queda con lo de antes: el tope del plan que muestra, y el fijo sólo para
+ * quien tiene un plan que cubra hoy, porque sin la 0082 la base sigue
+ * siendo la 0077 y la 0078, y ofrecerle otra cosa era ofrecerle algo que
+ * la base rechaza siempre.
+ *
+ * Que exista la función es además la forma de saber que la 0082 corrió:
+ * cambia el cuerpo de dos funciones que ya existían, y eso desde acá no se
+ * ve.
+ */
+export async function miTopeDeFijos(): Promise<number | null | undefined> {
+  try {
+    const { data, error } = await supabase.rpc('mi_tope_de_fijos')
+    if (error) return undefined
+    return typeof data === 'number' && data > 0 ? data : null
+  } catch {
+    return undefined
+  }
+}
+
+/**
  * El turno fijo que la clienta se da a sí misma (0077).
  *
  * Va por función y no escribiendo `fixed_slots`: su política de insert
  * pide `turnos.asignar`, que es del mostrador. La función valida que la
- * clase se repita, que tenga membresía vigente y que no lo tenga ya, y
- * cada rechazo viene con el texto que ella lee.
+ * clase se repita, que tenga un plan vigente o por empezar (0082) y que no
+ * lo tenga ya, y cada rechazo viene con el texto que ella lee.
  */
 export async function tomarTurnoFijoPropio(classId: string): Promise<string> {
   const { data, error } = await supabase.rpc('turno_fijo_propio', { p_class: classId })
   if (error) {
     if (error.code === 'PGRST202') {
       throw new Error('Para elegir tu horario fijo falta correr la migración 0077.')
+    }
+    // El texto de la 0077, que pedía una membresía que cubriera HOY. El
+    // portal no le ofrece el fijo con un plan por empezar mientras la
+    // 0082 no corrió (`miTopeDeFijos`), así que esto es la red: si igual
+    // llega, lo que le pasa es que su plan todavía no arrancó. Dicho así, y
+    // no "necesitás una membresía", que a quien ya pagó le suena a que el
+    // pago no entró. Y sin nombrar migraciones, que es cosa nuestra.
+    if (/membresía vigente para tomar un horario fijo/i.test(error.message ?? '')) {
+      throw new Error(
+        'Tu plan todavía no arrancó: el horario fijo lo vas a poder elegir desde el día que empieza. La reserva que hiciste queda en pie.'
+      )
     }
     throw errorDeLaBase(error, 'No se pudo tomar el horario fijo')
   }
@@ -2506,15 +2804,24 @@ export async function soltarTurnoFijoPropio(slotId: string): Promise<void> {
  * Se corta al primer "sin clases": una vez agotado el plan, las que
  * siguen van a fallar todas por lo mismo y repetir el mismo error cuatro
  * veces no le dice nada nuevo.
+ *
+ * Y se corta también al llegar a `tope`, que es lo que la pantalla le
+ * dijo antes de apretar: "te descuenta N clases". La base corta sola al
+ * agotarse el plan cuando la fecha entra por insert, que es lo normal
+ * desde que `fechasPorCompletar` deja afuera las canceladas. Si alguna
+ * llegara por `reactivar_reserva` (0031) —otra pantalla, una carrera—,
+ * ese camino no mira el saldo, y esto es la red de este lado.
  */
 export async function reservarFechasDelTurno(
   studentId: string,
   classId: string,
-  fechas: string[]
+  fechas: string[],
+  tope: number = Infinity
 ): Promise<{ hechas: string[]; fallaron: Array<{ fecha: string; motivo: string }> }> {
   const hechas: string[] = []
   const fallaron: Array<{ fecha: string; motivo: string }> = []
   for (const fecha of fechas) {
+    if (hechas.length >= tope) break
     try {
       await createReservation(studentId, classId, fecha, 'confirmada')
       hechas.push(fecha)

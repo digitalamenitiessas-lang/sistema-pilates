@@ -1853,6 +1853,112 @@ trigger y no con una validación de pantalla.
 Y el turno fijo dejó de ser invisible: se ve en Inicio, con hasta cuándo
 lo conserva y un botón para soltarlo.
 
+**Corregido el 27/09 (T27) — `0082` por correr, antes de mergear.** Tenía
+tres agujeros, y los tres le caían a la tanda de la apertura, que entra con
+planes del 29:
+
+- **El portal no le ofrecía el fijo** con un plan que todavía no arrancó:
+  el fin del período se leía del plan de hoy y con un plan 'futura' daba
+  nulo, así que la hoja no se abría. Ahora el período es el del plan que
+  va a pagar las semanas de ese horario (`periodoDelTurno`, `lib/api.ts`:
+  el que cubre la fecha o el próximo en arrancar, con el pase de prueba
+  último). No es exactamente "el que paga la clase": con un pase sin usar
+  que cubre la primera fecha, `membresia_para` (0037) cobra ésa del pase
+  y las demás del plan. Las fechas van desde la que eligió —si reservó el
+  06/10 y no el 29/09, el 29 no se le anota: le gastaba una clase y, para
+  deshacerlo, una de sus dos devoluciones (0076)— hasta que vence el
+  período, sin las que ya tiene en cualquier estado, sin las suspendidas,
+  sin las que ya cerraron y sin las completas (`fechasPorCompletar`, con
+  la ocupación de `class_occupancy` para el período entero). Nunca hasta
+  `prioridad_hasta`, que se mete en el período encolado.
+- **La base se lo rechazaba igual**: `turno_fijo_propio` pedía una
+  membresía que cubriera hoy. La `0082` pide "vigente o por empezar". Y
+  arregla junto el tope de la `0078`, que sin membresía de hoy no tenía
+  plan que leer — o sea que a una clienta con plan del 29 no la limitaba
+  nada, ni desde el portal ni desde el mostrador. El plan que pone el
+  tope sale de `plan_de_los_fijos`, y el portal ya no lo calcula: se lo
+  pregunta a la base con `mi_tope_de_fijos()`. Que esa función exista es
+  además cómo el portal sabe que la `0082` corrió; sin ella no le ofrece
+  el fijo a quien tiene un plan por empezar, igual que antes. De paso el
+  trigger rechaza un fijo sobre un taller, que hasta acá sólo lo frenaba
+  la pantalla del mostrador.
+- **"Darle este horario fijo" en la Agenda no reservaba nada.** Escribía el
+  derecho y el lugar de cada martes quedaba libre: el cupo lo cuenta
+  `enforce_class_capacity`, sobre reservas. Y encima apagaba el portal,
+  que no le ofrecía completar un horario que ya era suyo. Ahora la Agenda
+  muestra antes qué fechas le va a anotar —desde la que está abierta— y
+  cuántas clases le descuenta, las anota de a una por el mismo insert que
+  "Reservar", y dice cuál no entró y por qué. Pide `turnos.asignar` para
+  el horario y `reservas.crear` para las fechas. Si el plan no llega a la
+  fecha abierta, lo dice ("vence el 14/10, antes de esta fecha") en vez de
+  "no tiene plan".
+- **Completar lo que falta**, para el horario que ya es suyo: en la Agenda,
+  en el renglón de cada dueña (el selector saca a las ya anotadas en esa
+  fecha, así que ahí no servía); en el portal, en la tarjeta de Inicio y al
+  reservar a mano una clase de ese horario. La cuenta es lo que entra, no
+  lo que falta, y arranca en la primera fecha de ese horario que ya tiene
+  en el período —completar es llenar huecos, no volver para atrás: a la
+  que lo hizo fijo desde el 06/10 no se le ofrece el 29/09—. Y mira
+  también el período encolado (`turnoPorCompletar`): después de renovar,
+  el mes nuevo aparece para completar en cuanto se paga, no el día que
+  arranca.
+
+Verificado sin tocar la base de producción:
+
+- Las funciones puras, extraídas del código tal cual, contra los casos del
+  revisor: la del FE START que reservó el 06/10 recibe 13 y 20/10 y no el
+  29/09; la del FE FLOW agotado con la renovación encolada ve los cuatro
+  martes del período nuevo el 10/10; mirando el 20/10 a la de FE FLOW
+  hasta el 14/10 la Agenda encuentra su plan; la fecha llena va aparte,
+  con el cupo del día si el estudio lo cambió.
+- La `0082` en un Postgres local descartable, con un esqueleto de las
+  tablas, la `0077` y la `0078` tal cual y todo creado por una dueña que no
+  es superusuaria, llamando como `authenticated`. Antes: la del plan del
+  29 rechazada y el mostrador le daba horarios sin tope; la del pase de
+  hoy más FE FLOW del 29, trabada en 1; el taller entraba por el
+  mostrador. Después: la del 29 toma el suyo y su FE START la frena en el
+  segundo, por el portal y por el mostrador; la del pase más FE FLOW
+  llega a 2; sin plan, con la futura cancelada o vencida ayer sigue el
+  rechazo con el texto nuevo; el taller rebota por los dos lados, y el
+  que ya existía se puede pausar y liberar pero no reactivar;
+  `mi_tope_de_fijos` da 1, 2, null, null, 2, 1, null para las siete, y
+  `plan_de_los_fijos` le niega el permiso a `authenticated`. La guarda
+  corta sin la `0077`, la migración se puede correr dos veces, y la vuelta
+  atrás (0077 + 0078 + los dos drops) deja todo como antes y admite
+  volver a correrla.
+
+**No se ejerció en el navegador**: tomar un fijo escribe reservas, y la
+consigna era no tocar la base. Queda para después de correr la `0082`,
+con la sesión de una clienta y con la del mostrador:
+
+1. **La migración.** Las dos consultas de "CÓMO VERIFICAR" al final de la
+   `0082`: cuatro funciones, `plan_de_los_fijos` sin `authenticated`, y el
+   plan que pone el tope — Marco Rossi FE BALANCE (no el pase), Lourdes
+   Bobba FE FLOW (no el FE STRONG cancelado), Test 1 FE START y Test 3
+   FE FLOW, los dos del 29/09.
+2. **Completar desde la Agenda (Test 2 Cobro Agenda).** Tiene el lunes
+   10:00 que le dio el mostrador hoy, sin fechas, con el 28/09 cancelado.
+   Abrir cualquier lunes 10:00: su renglón tiene que decir "Le faltan 4
+   fechas de su plan FE FLOW: 05/10 · 12/10 · 19/10 · 26/10" — sin el 28.
+   "Anotarla" y mirar `reservations` de esa ficha y esa clase: cuatro
+   confirmadas con el `membership_id` del FE FLOW, y `classes_used` +4.
+3. **Dar desde la Agenda con tope (Test 1 Alta Efectivo, FE START del
+   29/09, 1 vez por semana).** Abrir el martes 06/10 18:00, elegirla: la
+   previa dice "desde el 06/10" y no nombra el 29/09. Darlo. Después, el
+   jueves: tiene que rebotar con "Tu plan FE START es de 1 vez por semana".
+   Antes de la `0082` ése entraba.
+4. **El plan que no llega a la fecha (Lourdes Bobba).** Abrir un martes
+   del 20/10 en adelante y elegirla, sin apretar nada: "Su plan FE FLOW
+   vence el 14/10, antes de esta fecha", no "no tiene plan".
+5. **El portal, con una clienta de plan por empezar.** Ninguna de las
+   cuentas de prueba tiene uno: hace falta un alta con un plan que arranque
+   más adelante y acceso con un mail de Matías. Reservar el segundo martes
+   de su plan, no el primero: la hoja lista las fechas desde ése, sin el
+   primero, y "Hacerlo fijo" deja la fila en `fixed_slots` y las reservas.
+   Inicio no tiene que ofrecer el martes que salteó.
+6. **Volver atrás los datos**: liberar los turnos de prueba desde la
+   Agenda y cancelar o borrar las reservas creadas.
+
 ### ✅ Promociones y cupones (23/09) — `0079` y `0080`
 
 Lo pidió el estudio: "poder crear descuentos: por ejemplo los diez

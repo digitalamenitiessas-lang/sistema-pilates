@@ -49,7 +49,12 @@ import {
   enDias,
   settingNum,
   settingText,
-  fechasDelTurno,
+  cubreLaFecha,
+  fechasPorCompletar,
+  fetchOcupacionDeClases,
+  miTopeDeFijos,
+  periodoDelTurno,
+  turnoPorCompletar,
   tomarTurnoFijoPropio,
   soltarTurnoFijoPropio,
   reservarFechasDelTurno,
@@ -942,7 +947,8 @@ function BarraPestanas({
 }
 
 /**
- * La hoja que ofrece convertir la reserva recién hecha en horario fijo.
+ * La hoja que ofrece convertir la reserva recién hecha en horario fijo, o
+ * completar las fechas de un horario que ya es suyo.
  *
  * NÚMEROS, NO PROMESAS. Le dice cuántas fechas le quedan hasta que vence
  * su período y cuántas clases del plan le consume, porque las dos cosas
@@ -951,6 +957,14 @@ function BarraPestanas({
  * fallar solo en la última semana. Es el primer motivo que la 0048 anotó
  * para no materializar reservas a ciegas.
  *
+ * DOS MODOS, porque un horario puede ser suyo sin que tenga las fechas
+ * anotadas: se lo dio el mostrador antes de que la Agenda supiera
+ * anotarla, o renovó y el turno siguió siendo suyo pero el mes nuevo
+ * arranca vacío (0077: "al renovar vuelve a elegir"). Antes, tener el
+ * turno era justo lo que apagaba la oferta —"no se ofrece dos veces el
+ * mismo horario"—, así que en esos dos casos no había por dónde
+ * completarlo.
+ *
  * Hoja de la página y no `window.confirm`: el portal ya tuvo que sacar
  * ese cartel del flujo de cancelar, porque el navegador de Instagram
  * —por donde entran las clientas— lo descarta solo y el botón parece
@@ -958,7 +972,11 @@ function BarraPestanas({
  */
 function OfrecerTurnoFijo({
   clase,
+  modo,
+  recienReservada,
+  periodo,
   fechas,
+  llenas,
   clasesLibres,
   trabajando,
   resultado,
@@ -966,7 +984,14 @@ function OfrecerTurnoFijo({
   onAceptar,
 }: {
   clase: { title: string; time: string; dayOfWeek: number }
+  /** 'nuevo' = todavía no es su horario; 'completar' = ya lo es. */
+  modo: 'nuevo' | 'completar'
+  /** Si la hoja sale de una reserva que acaba de hacer, o de Inicio. */
+  recienReservada: boolean
+  periodo: { planName: string; startDate: string; endDate: string }
   fechas: string[]
+  /** Las que ya están completas: no se reservan, pero se le dicen. */
+  llenas: string[]
   clasesLibres: number
   trabajando: boolean
   resultado: { hechas: string[]; fallaron: Array<{ fecha: string; motivo: string }> } | null
@@ -980,6 +1005,14 @@ function OfrecerTurnoFijo({
   // calendario cuando no alcanza.
   const entran = Math.min(fechas.length, clasesLibres)
   const sobran = fechas.length - entran
+  // El plan que todavía no arrancó se nombra con su inicio: "hasta que
+  // vence tu plan" a secas, a quien no lo empezó a usar, no le dice desde
+  // cuándo.
+  const hoy = hoyISO()
+  const delPlan =
+    periodo.startDate > hoy
+      ? `tu plan ${periodo.planName}, del ${pretty(periodo.startDate)} al ${pretty(periodo.endDate)}`
+      : `tu plan ${periodo.planName}, que vence el ${pretty(periodo.endDate)}`
 
   return (
     <div
@@ -991,9 +1024,15 @@ function OfrecerTurnoFijo({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 py-4 border-b border-border">
-          <p className="text-xs text-exito-fuerte font-semibold">¡Reserva confirmada!</p>
+          {recienReservada ? (
+            <p className="text-xs text-exito-fuerte font-semibold">¡Reserva confirmada!</p>
+          ) : (
+            <p className="text-xs text-muted-foreground font-semibold">Tu horario fijo</p>
+          )}
           <h2 className="text-base font-bold text-foreground mt-0.5">
-            ¿Venís todos los {dia} a las {clase.time}?
+            {modo === 'nuevo'
+              ? `¿Venís todos los ${dia} a las ${clase.time}?`
+              : `¿Te anotamos los ${dia} a las ${clase.time} que faltan?`}
           </h2>
         </div>
 
@@ -1027,12 +1066,26 @@ function OfrecerTurnoFijo({
         ) : (
           <div className="px-5 py-4 space-y-3">
             <p className="text-sm text-foreground">
-              Si lo hacés fijo, te guardamos ese horario y te anotamos las clases que te quedan
-              hasta que vence tu plan.
+              {/* "Las que siguen" y no "todas": desde una reserva, las
+                  fechas arrancan en la que eligió. Si reservó el 06/10 y
+                  no el 29/09, el 29 no se le anota. */}
+              {modo === 'nuevo'
+                ? `Si lo hacés fijo, te guardamos ese horario y te anotamos en esa clase las semanas que siguen de ${delPlan}.`
+                : `Ya es tu horario fijo. Te anotamos en las semanas que ${
+                    recienReservada ? 'siguen' : 'te faltan'
+                  } de ${delPlan}.`}
             </p>
             <div className="rounded-xl bg-muted px-4 py-3 space-y-1">
               <p className="text-sm font-semibold text-foreground">
-                {entran === 0
+                {/* Las dos razones de un cero son distintas y se dicen
+                    distinto: "no te quedan clases" a quien le quedan pero
+                    no hay más martes en su plan le haría creer que se le
+                    acabó el saldo. */}
+                {fechas.length === 0
+                  ? llenas.length > 0
+                    ? 'Las fechas que quedan de este horario ya están completas'
+                    : 'No quedan más fechas de este horario en tu plan'
+                  : entran === 0
                   ? 'No te quedan clases en el plan'
                   : `${entran} ${entran === 1 ? 'clase más' : 'clases más'}: ${fechas
                       .slice(0, entran)
@@ -1045,6 +1098,15 @@ function OfrecerTurnoFijo({
                     clasesLibres - entran === 1 ? 'queda' : 'quedan'
                   } ${clasesLibres - entran} para otros días.`}
               </p>
+              {/* La fecha llena, dicha: sin esto, a quien tiene todos los
+                  martes le falta uno y no sabe por qué. */}
+              {llenas.length > 0 && (
+                <p className="text-[11px] text-aviso-fuerte">
+                  {llenas.length === 1
+                    ? `El ${pretty(llenas[0])} ya está completo, así que ése no te lo podemos anotar.`
+                    : `Ya están completos el ${llenas.map((f) => pretty(f)).join(', ')}, así que ésos no te los podemos anotar.`}
+                </p>
+              )}
               {/* El mes que no entra en el plan, dicho antes. */}
               {sobran > 0 && (
                 <p className="text-[11px] text-aviso-fuerte">
@@ -1054,8 +1116,14 @@ function OfrecerTurnoFijo({
                 </p>
               )}
             </div>
+            {/* Qué pasa el mes que viene, dicho antes: las fechas no se
+                crean solas (0077), pero el horario sigue siendo suyo y la
+                tarjeta de Inicio mira también el período encolado
+                (`turnoPorCompletar`), así que aparecen en cuanto renueva y
+                no recién el día que arranca. */}
             <p className="text-[11px] text-muted-foreground">
-              El horario queda tuyo hasta que vence el plan. Cuando renueves, volvés a elegir.
+              El horario queda tuyo mientras renueves a tiempo. Las fechas del período siguiente no se
+              anotan solas: cuando renueves, te aparecen en Inicio para completarlas.
             </p>
           </div>
         )}
@@ -1075,14 +1143,14 @@ function OfrecerTurnoFijo({
                 disabled={trabajando}
                 className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-40"
               >
-                Solo esta vez
+                {recienReservada ? 'Solo esta vez' : 'Ahora no'}
               </button>
               <button
                 onClick={onAceptar}
                 disabled={trabajando || entran === 0}
                 className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40"
               >
-                {trabajando ? 'Anotándote…' : 'Hacerlo fijo'}
+                {trabajando ? 'Anotándote…' : modo === 'nuevo' ? 'Hacerlo fijo' : 'Anotarme'}
               </button>
             </>
           )}
@@ -1414,37 +1482,200 @@ export function PortalPage() {
   const misTurnos = turnosFijos.filter((t) => t.studentId === me?.id && t.estado !== 'liberado')
 
   /**
-   * Hasta dónde se llena: el fin del período que corre hoy.
+   * El período de sus horarios fijos mirado desde hoy: el que corre o, si
+   * todavía no arrancó, el que viene (`periodoDelTurno`).
    *
-   * Y no `prioridad_hasta`, que suma los días de gracia y el período que
-   * tenga encolado: eso se pasa de lo que la clienta pidió —"el mes que
-   * tiene"— y le reservaría clases de un plan que todavía no empezó.
+   * Hasta el 27/09 esto era `ms` con la condición de que no fuera
+   * 'futura', y esa condición es la que dejaba afuera a la tanda de la
+   * apertura entera: con el plan arrancando el 29, el fin del período daba
+   * nulo y la hoja del fijo no se abría nunca.
+   *
+   * Y el fin es el de ESTE período, no `prioridad_hasta`, que suma los días
+   * de gracia y el período que tenga encolado: eso se pasa de lo que la
+   * clienta pidió —"el mes que tiene"— y le reservaría clases que paga
+   * otro plan.
    */
-  const finDelPeriodo = ms && ms.status !== 'futura' ? ms.endDate : null
+  const periodoDeHoy = periodoDelTurno(misMembresias, plans, today)
 
   /**
-   * Cuántos horarios fijos le tocan, según su plan (0078).
+   * Cuántos horarios fijos le tocan, dicho por la base (`mi_tope_de_fijos`,
+   * 0082): un número, `null` si no hay tope, `undefined` si la base no
+   * contestó o la 0082 no corrió.
+   *
+   * Se pregunta en vez de calcularse porque el que lo hace cumplir es un
+   * trigger, y dos cuentas del mismo número son dos lugares donde se
+   * desactualiza. Se vuelve a preguntar cuando cambian sus membresías, que
+   * es lo único que lo mueve.
+   */
+  const [topeDeLaBase, setTopeDeLaBase] = useState<number | null | undefined>(undefined)
+  const meId = me?.id
+  const claveDeMembresias = misMembresias
+    .map((m) => `${m.id}:${m.planId}:${m.status}:${m.startDate}:${m.endDate}`)
+    .join('|')
+  useEffect(() => {
+    if (!meId) return
+    let vigente = true
+    miTopeDeFijos().then((t) => {
+      if (vigente) setTopeDeLaBase(t)
+    })
+    return () => {
+      vigente = false
+    }
+  }, [meId, claveDeMembresias])
+
+  /**
+   * Si la base le va a dejar tomar un horario fijo.
+   *
+   * Que `mi_tope_de_fijos` conteste es lo que dice que la 0082 corrió, y
+   * con ella alcanza un plan vigente o por empezar — que es lo mismo que
+   * `hojaDelFijo` pide al buscar el período. Sin ella rige la 0077, que
+   * pide un plan que cubra HOY, y a la del plan del 29 se lo rechaza
+   * siempre: ofrecérselo era mostrarle una hoja que termina en error. Así
+   * que sin la 0082 no se le ofrece, igual que antes de este arreglo.
+   */
+  const laBaseSabeDePlanesPorEmpezar = topeDeLaBase !== undefined
+  const puedeTomarFijo =
+    laBaseSabeDePlanesPorEmpezar || misMembresias.some((m) => cubreLaFecha(m, today))
+
+  /**
+   * El tope, para no ofrecerle un horario que la base va a rechazar.
    *
    * `weekly_frequency` es el tope y cero significa sin tope — un plan que
    * no declara su frecuencia no limita nada. Null cuando no hay plan a la
    * vista: ahí la pantalla no promete ni niega, y la base decide.
+   *
+   * Sin la 0082, lo de antes: el plan que muestra la pantalla (`ms`), que
+   * es el que mira la 0078 — el que cubre hoy. Con ella, el de la base: el
+   * que corre hoy o el próximo en arrancar, con el pase de prueba último.
    */
-  const topeDeTurnos = (() => {
-    if (!ms) return null
-    const plan = plans.find((p) => p.id === ms.planId)
-    return plan && plan.weeklyFrequency > 0 ? plan.weeklyFrequency : null
-  })()
+  const topeDeTurnos = laBaseSabeDePlanesPorEmpezar
+    ? topeDeLaBase ?? null
+    : (() => {
+        if (!ms) return null
+        const plan = plans.find((p) => p.id === ms.planId)
+        return plan && plan.weeklyFrequency > 0 ? plan.weeklyFrequency : null
+      })()
   const llegoAlTope = topeDeTurnos !== null && misTurnos.length >= topeDeTurnos
 
+  const libresDe = (m: Membership | undefined) => (m ? Math.max(0, m.classesTotal - m.classesUsed) : 0)
+
   /**
-   * La clase recién reservada sobre la que se ofrece el horario fijo.
+   * Sobre qué horario se abre la hoja del fijo.
+   *
+   * `date` es la clase recién reservada, o nulo cuando la abre ella desde
+   * Inicio para completar un horario que ya es suyo. `modo` se fija al
+   * abrirla y no se recalcula: al tomar el turno el paquete del estudio
+   * vuelve con el horario ya suyo, y la hoja que está mostrando el
+   * resultado no tiene que cambiar de título en el medio.
    *
    * La pregunta va DESPUÉS de reservar y no antes: reservar hoy es un
    * toque, y meterle una confirmación adelante se la cobra a todas,
    * incluida la que sólo quería esa clase. Si cierra la hoja sin elegir,
    * se queda con la reserva que pidió — no hay nada a medias.
    */
-  const [ofrecerFijo, setOfrecerFijo] = useState<{ classId: string; date: string } | null>(null)
+  const [ofrecerFijo, setOfrecerFijo] = useState<{
+    classId: string
+    date: string | null
+    modo: 'nuevo' | 'completar'
+  } | null>(null)
+  const [resultadoFijo, setResultadoFijo] = useState<{
+    hechas: string[]
+    fallaron: Array<{ fecha: string; motivo: string }>
+  } | null>(null)
+
+  /**
+   * Cuántas hay anotadas en sus horarios fijos —y en el que se le está
+   * ofreciendo— de hoy hasta que vence lo último que tiene, para no
+   * ofrecerle una fecha llena (`fechasPorCompletar`).
+   *
+   * La semana de la grilla ya está en `occupancy`, pero el fijo mira el
+   * mes entero. Se vuelve a pedir con cada cambio de reservas, igual que
+   * la de la grilla. Mientras no llega, o si la vista no contesta, no se
+   * filtra nada: la base dice cuál está llena al reservar.
+   */
+  const [ocupacionFijos, setOcupacionFijos] = useState<Map<string, number> | undefined>(undefined)
+  const clasesDelFijo = [
+    ...new Set([...misTurnos.map((t) => t.classId), ...(ofrecerFijo ? [ofrecerFijo.classId] : [])]),
+  ]
+    .sort()
+    .join(',')
+  const hastaDelFijo =
+    misMembresias
+      .filter((m) => m.status !== 'cancelada' && m.status !== 'suspendida')
+      .map((m) => m.endDate)
+      .sort()
+      .pop() ?? ''
+  useEffect(() => {
+    if (!clasesDelFijo || hastaDelFijo < today) return
+    let vigente = true
+    fetchOcupacionDeClases(clasesDelFijo.split(','), today, hastaDelFijo).then((m) => {
+      if (vigente) setOcupacionFijos(m)
+    })
+    return () => {
+      vigente = false
+    }
+  }, [clasesDelFijo, today, hastaDelFijo, reservations])
+
+  /**
+   * Lo que le falta a un horario que ya es suyo, mirado desde hoy
+   * (`turnoPorCompletar`): del período que corre o, si ahí ya no le entra
+   * nada, del que tiene encolado.
+   */
+  const porCompletar = (classId: string) => {
+    const cls = classes.find((c) => c.id === classId)
+    if (!cls || !me) return null
+    return turnoPorCompletar({
+      clase: cls,
+      propias: misMembresias,
+      planes: plans,
+      mirando: today,
+      studentId: me.id,
+      reservas: reservations,
+      ocurrencias: occurrences,
+      ocupacion: ocupacionFijos,
+      ahora,
+      minutosDeCorte,
+    })
+  }
+
+  /** Las fechas de ese horario desde una que acaba de reservar. */
+  const desdeLaReservada = (classId: string, date: string) => {
+    const cls = classes.find((c) => c.id === classId)
+    const periodo = periodoDelTurno(misMembresias, plans, date)
+    if (!cls || !periodo || !me) return null
+    const { fechas, llenas } = fechasPorCompletar({
+      clase: cls,
+      periodo,
+      desde: date,
+      studentId: me.id,
+      reservas: reservations,
+      ocurrencias: occurrences,
+      ocupacion: ocupacionFijos,
+      ahora,
+      minutosDeCorte,
+    })
+    return { cls, periodo, fechas, llenas, libres: libresDe(periodo) }
+  }
+
+  /**
+   * Lo que la hoja muestra y lo que `hacerFijo` reserva, con los datos del
+   * render. Una sola cuenta para las dos cosas: si la hoja dijera cuatro
+   * fechas y la acción reservara otras, el "números, no promesas" de la
+   * hoja no valdría nada.
+   *
+   * Desde una reserva, las fechas son las que siguen a ésa, dentro del
+   * período de esa fecha —no el de hoy: a quien arranca el 29 y reservó el
+   * 30, el de hoy no existe—. Desde Inicio, todo lo que le falta, que es
+   * lo que la tarjeta le contó.
+   */
+  const hojaDelFijo = (() => {
+    if (!ofrecerFijo || !me) return null
+    if (ofrecerFijo.date) return desdeLaReservada(ofrecerFijo.classId, ofrecerFijo.date)
+    const cls = classes.find((c) => c.id === ofrecerFijo.classId)
+    const falta = porCompletar(ofrecerFijo.classId)
+    if (!cls || !falta) return null
+    return { cls, periodo: falta.periodo, fechas: falta.fechas, llenas: falta.llenas, libres: falta.libres }
+  })()
 
   const book = async (classId: string, date: string, waitlist: boolean) => {
     if (!me) return
@@ -1454,21 +1685,32 @@ export function PortalPage() {
       await refresh()
       flash('ok', waitlist ? 'Quedaste en lista de espera' : '¡Reserva confirmada!')
       // Sólo para las de la grilla: un taller tiene fecha propia y no se
-      // repite (la base lo rechaza igual, 0077). Y no se ofrece dos veces
-      // el mismo horario.
+      // repite (la base lo rechaza igual, 0077).
       const cls = classes.find((c) => c.id === classId)
-      // Y no se ofrece si ya llegó al tope de su plan (0078): la base lo
-      // va a rechazar con el nombre del plan, y ofrecer algo que va a
-      // fallar es peor que no ofrecerlo. El que ya tiene lo ve en Inicio,
-      // con la salida para dejarlo y tomar otro.
-      if (
-        !waitlist &&
-        cls &&
-        cls.kind !== 'especial' &&
-        !misTurnos.some((t) => t.classId === classId) &&
-        !llegoAlTope
-      ) {
-        setOfrecerFijo({ classId, date })
+      const suyo = misTurnos.find((t) => t.classId === classId)
+      setResultadoFijo(null)
+      if (!waitlist && cls && cls.kind !== 'especial') {
+        if (!suyo) {
+          // No se ofrece si ya llegó al tope de su plan (0078): la base lo
+          // va a rechazar con el nombre del plan, y ofrecer algo que va a
+          // fallar es peor que no ofrecerlo. El que ya tiene lo ve en
+          // Inicio, con la salida para dejarlo y tomar otro. Tampoco si la
+          // base todavía no sabe de planes por empezar (`puedeTomarFijo`).
+          if (!llegoAlTope && puedeTomarFijo) setOfrecerFijo({ classId, date, modo: 'nuevo' })
+        } else if (suyo.estado === 'activo') {
+          // Ya es su horario, pero puede que sin las fechas: se lo dio el
+          // mostrador, o renovó y el mes nuevo arrancó vacío. Se ofrece
+          // completarlo sólo si falta algo que entre. La cuenta es con los
+          // datos de ANTES de reservar —los de este render—, así que la
+          // fecha recién reservada se saca a mano y se descuenta su clase.
+          // La hoja vuelve a contar con los datos frescos al abrirse.
+          const d = desdeLaReservada(classId, date)
+          const faltan = d ? d.fechas.filter((f) => f !== date) : []
+          if (d && faltan.length > 0 && d.libres - 1 > 0) {
+            setOfrecerFijo({ classId, date, modo: 'completar' })
+          }
+        }
+        // Un horario en pausa no se completa: ella avisó que no viene.
       }
     } catch (err) {
       flash('error', err instanceof Error ? err.message : 'No se pudo reservar')
@@ -1493,31 +1735,25 @@ export function PortalPage() {
     }
   }
 
-  const [resultadoFijo, setResultadoFijo] = useState<{
-    hechas: string[]
-    fallaron: Array<{ fecha: string; motivo: string }>
-  } | null>(null)
-
   /**
-   * Toma el horario fijo y reserva las fechas que quedan.
+   * Toma el horario fijo, si todavía no es suyo, y reserva las fechas que
+   * faltan del período.
    *
    * El orden importa: primero el turno —si el cupo fijo de esa clase está
    * lleno, la base lo rechaza con su mensaje y no se reservó nada— y
    * después las fechas, de a una. Al revés le dejaría reservas hechas
    * sobre un horario que nunca fue suyo.
+   *
+   * Las fechas y el tope son los de `hojaDelFijo`: exactamente lo que la
+   * hoja le mostró.
    */
   const hacerFijo = async () => {
-    if (!me || !ofrecerFijo) return
-    const cls = classes.find((c) => c.id === ofrecerFijo.classId)
-    if (!cls) return
+    if (!me || !ofrecerFijo || !hojaDelFijo) return
+    const { fechas, libres } = hojaDelFijo
     setFijando(true)
     try {
-      await tomarTurnoFijoPropio(ofrecerFijo.classId)
-      const r = await reservarFechasDelTurno(
-        me.id,
-        ofrecerFijo.classId,
-        fechasDelTurno(cls.dayOfWeek, addDays(ofrecerFijo.date, 1), finDelPeriodo ?? ofrecerFijo.date)
-      )
+      if (ofrecerFijo.modo === 'nuevo') await tomarTurnoFijoPropio(ofrecerFijo.classId)
+      const r = await reservarFechasDelTurno(me.id, ofrecerFijo.classId, fechas, libres)
       await refresh()
       setResultadoFijo(r)
     } catch (err) {
@@ -1668,24 +1904,24 @@ export function PortalPage() {
         />
       )}
 
-      {ofrecerFijo && me && finDelPeriodo && (() => {
-        const cls = classes.find((c) => c.id === ofrecerFijo.classId)
-        if (!cls) return null
-        return (
-          <OfrecerTurnoFijo
-            clase={cls}
-            fechas={fechasDelTurno(cls.dayOfWeek, addDays(ofrecerFijo.date, 1), finDelPeriodo)}
-            clasesLibres={ms ? Math.max(0, ms.classesTotal - ms.classesUsed) : 0}
-            trabajando={fijando}
-            resultado={resultadoFijo}
-            onCerrar={() => {
-              setOfrecerFijo(null)
-              setResultadoFijo(null)
-            }}
-            onAceptar={hacerFijo}
-          />
-        )
-      })()}
+      {ofrecerFijo && hojaDelFijo && (
+        <OfrecerTurnoFijo
+          clase={hojaDelFijo.cls}
+          modo={ofrecerFijo.modo}
+          recienReservada={!!ofrecerFijo.date}
+          periodo={hojaDelFijo.periodo}
+          fechas={hojaDelFijo.fechas}
+          llenas={hojaDelFijo.llenas}
+          clasesLibres={hojaDelFijo.libres}
+          trabajando={fijando}
+          resultado={resultadoFijo}
+          onCerrar={() => {
+            setOfrecerFijo(null)
+            setResultadoFijo(null)
+          }}
+          onAceptar={hacerFijo}
+        />
+      )}
 
       {showChangePassword && (
         <ChangePasswordModal
@@ -1720,7 +1956,21 @@ export function PortalPage() {
             Ahora está acá, con el motivo cuando lo hay y con la salida
             para dejarlo. */}
         {pestana === 'inicio' &&
-          misTurnos.map((t) => (
+          misTurnos.map((t) => {
+            // Lo que le falta a este horario y le entra: del período que
+            // corre o, si ahí ya no hay nada, del que tiene encolado. Es la
+            // salida para el horario que le dio el mostrador sin anotarla, y
+            // para el mes nuevo después de renovar: sin esto, tener el turno
+            // era no poder completarlo.
+            //
+            // La cuenta es lo que entra, no lo que falta: con cinco martes
+            // y tres clases, "te faltan cinco" le ofrecía dos fechas que la
+            // base iba a rechazar, y como las rechazadas no quedan anotadas,
+            // el cartel no se iba nunca.
+            const falta = t.estado === 'activo' ? porCompletar(t.classId) : null
+            const entran = falta?.entran ?? 0
+            const delOtroPeriodo = !!falta && falta.periodo.startDate > today
+            return (
             <section key={t.id} className="bg-card rounded-2xl border border-border p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -1730,7 +1980,7 @@ export function PortalPage() {
                   </p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
                     {t.classTitle}
-                    {finDelPeriodo ? ` · lo conservás hasta el ${pretty(finDelPeriodo)}` : ''}
+                    {periodoDeHoy ? ` · lo conservás hasta el ${pretty(periodoDeHoy.endDate)}` : ''}
                   </p>
                   {t.estado === 'pausado' && (
                     <p className="text-[11px] text-aviso-fuerte mt-1.5">
@@ -1746,6 +1996,25 @@ export function PortalPage() {
                   {soltando === t.id ? '…' : 'Dejarlo'}
                 </button>
               </div>
+              {falta && entran > 0 && (
+                <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-muted px-3 py-2">
+                  <p className="text-[11px] text-foreground">
+                    {`Te falta anotarte en ${entran} ${entran === 1 ? 'fecha' : 'fechas'} de este horario`}
+                    {delOtroPeriodo
+                      ? ` en tu plan ${falta.periodo.planName}, del ${pretty(falta.periodo.startDate)} al ${pretty(falta.periodo.endDate)}.`
+                      : '.'}
+                  </p>
+                  <button
+                    onClick={() => {
+                      setResultadoFijo(null)
+                      setOfrecerFijo({ classId: t.classId, date: null, modo: 'completar' })
+                    }}
+                    className="shrink-0 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-[11px] font-semibold"
+                  >
+                    Ver fechas
+                  </button>
+                </div>
+              )}
               {/* Dejarlo no cancela lo ya reservado: cada clase tiene su
                   propio plazo, y borrarlas desde acá lo saltearía. */}
               <p className="text-[10px] text-muted-foreground mt-2">
@@ -1758,7 +2027,8 @@ export function PortalPage() {
                   }.`}
               </p>
             </section>
-          ))}
+            )
+          })}
 
         {/* El motivo, pegado a la tarjeta. Inicio es lo primero que abre y
             sin esto la clienta ve un rótulo —"Vencida", "Empieza
