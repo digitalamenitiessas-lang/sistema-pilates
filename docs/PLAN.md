@@ -1853,6 +1853,112 @@ trigger y no con una validación de pantalla.
 Y el turno fijo dejó de ser invisible: se ve en Inicio, con hasta cuándo
 lo conserva y un botón para soltarlo.
 
+**Corregido el 27/09 (T27) — `0082` corrida el 27/09, falta ejercerla en pantalla.** Tenía
+tres agujeros, y los tres le caían a la tanda de la apertura, que entra con
+planes del 29:
+
+- **El portal no le ofrecía el fijo** con un plan que todavía no arrancó:
+  el fin del período se leía del plan de hoy y con un plan 'futura' daba
+  nulo, así que la hoja no se abría. Ahora el período es el del plan que
+  va a pagar las semanas de ese horario (`periodoDelTurno`, `lib/api.ts`:
+  el que cubre la fecha o el próximo en arrancar, con el pase de prueba
+  último). No es exactamente "el que paga la clase": con un pase sin usar
+  que cubre la primera fecha, `membresia_para` (0037) cobra ésa del pase
+  y las demás del plan. Las fechas van desde la que eligió —si reservó el
+  06/10 y no el 29/09, el 29 no se le anota: le gastaba una clase y, para
+  deshacerlo, una de sus dos devoluciones (0076)— hasta que vence el
+  período, sin las que ya tiene en cualquier estado, sin las suspendidas,
+  sin las que ya cerraron y sin las completas (`fechasPorCompletar`, con
+  la ocupación de `class_occupancy` para el período entero). Nunca hasta
+  `prioridad_hasta`, que se mete en el período encolado.
+- **La base se lo rechazaba igual**: `turno_fijo_propio` pedía una
+  membresía que cubriera hoy. La `0082` pide "vigente o por empezar". Y
+  arregla junto el tope de la `0078`, que sin membresía de hoy no tenía
+  plan que leer — o sea que a una clienta con plan del 29 no la limitaba
+  nada, ni desde el portal ni desde el mostrador. El plan que pone el
+  tope sale de `plan_de_los_fijos`, y el portal ya no lo calcula: se lo
+  pregunta a la base con `mi_tope_de_fijos()`. Que esa función exista es
+  además cómo el portal sabe que la `0082` corrió; sin ella no le ofrece
+  el fijo a quien tiene un plan por empezar, igual que antes. De paso el
+  trigger rechaza un fijo sobre un taller, que hasta acá sólo lo frenaba
+  la pantalla del mostrador.
+- **"Darle este horario fijo" en la Agenda no reservaba nada.** Escribía el
+  derecho y el lugar de cada martes quedaba libre: el cupo lo cuenta
+  `enforce_class_capacity`, sobre reservas. Y encima apagaba el portal,
+  que no le ofrecía completar un horario que ya era suyo. Ahora la Agenda
+  muestra antes qué fechas le va a anotar —desde la que está abierta— y
+  cuántas clases le descuenta, las anota de a una por el mismo insert que
+  "Reservar", y dice cuál no entró y por qué. Pide `turnos.asignar` para
+  el horario y `reservas.crear` para las fechas. Si el plan no llega a la
+  fecha abierta, lo dice ("vence el 14/10, antes de esta fecha") en vez de
+  "no tiene plan".
+- **Completar lo que falta**, para el horario que ya es suyo: en la Agenda,
+  en el renglón de cada dueña (el selector saca a las ya anotadas en esa
+  fecha, así que ahí no servía); en el portal, en la tarjeta de Inicio y al
+  reservar a mano una clase de ese horario. La cuenta es lo que entra, no
+  lo que falta, y arranca en la primera fecha de ese horario que ya tiene
+  en el período —completar es llenar huecos, no volver para atrás: a la
+  que lo hizo fijo desde el 06/10 no se le ofrece el 29/09—. Y mira
+  también el período encolado (`turnoPorCompletar`): después de renovar,
+  el mes nuevo aparece para completar en cuanto se paga, no el día que
+  arranca.
+
+Verificado sin tocar la base de producción:
+
+- Las funciones puras, extraídas del código tal cual, contra los casos del
+  revisor: la del FE START que reservó el 06/10 recibe 13 y 20/10 y no el
+  29/09; la del FE FLOW agotado con la renovación encolada ve los cuatro
+  martes del período nuevo el 10/10; mirando el 20/10 a la de FE FLOW
+  hasta el 14/10 la Agenda encuentra su plan; la fecha llena va aparte,
+  con el cupo del día si el estudio lo cambió.
+- La `0082` en un Postgres local descartable, con un esqueleto de las
+  tablas, la `0077` y la `0078` tal cual y todo creado por una dueña que no
+  es superusuaria, llamando como `authenticated`. Antes: la del plan del
+  29 rechazada y el mostrador le daba horarios sin tope; la del pase de
+  hoy más FE FLOW del 29, trabada en 1; el taller entraba por el
+  mostrador. Después: la del 29 toma el suyo y su FE START la frena en el
+  segundo, por el portal y por el mostrador; la del pase más FE FLOW
+  llega a 2; sin plan, con la futura cancelada o vencida ayer sigue el
+  rechazo con el texto nuevo; el taller rebota por los dos lados, y el
+  que ya existía se puede pausar y liberar pero no reactivar;
+  `mi_tope_de_fijos` da 1, 2, null, null, 2, 1, null para las siete, y
+  `plan_de_los_fijos` le niega el permiso a `authenticated`. La guarda
+  corta sin la `0077`, la migración se puede correr dos veces, y la vuelta
+  atrás (0077 + 0078 + los dos drops) deja todo como antes y admite
+  volver a correrla.
+
+**No se ejerció en el navegador**: tomar un fijo escribe reservas, y la
+consigna era no tocar la base. Queda para después de correr la `0082`,
+con la sesión de una clienta y con la del mostrador:
+
+1. **La migración.** Las dos consultas de "CÓMO VERIFICAR" al final de la
+   `0082`: cuatro funciones, `plan_de_los_fijos` sin `authenticated`, y el
+   plan que pone el tope — Marco Rossi FE BALANCE (no el pase), Lourdes
+   Bobba FE FLOW (no el FE STRONG cancelado), Test 1 FE START y Test 3
+   FE FLOW, los dos del 29/09.
+2. **Completar desde la Agenda (Test 2 Cobro Agenda).** Tiene el lunes
+   10:00 que le dio el mostrador hoy, sin fechas, con el 28/09 cancelado.
+   Abrir cualquier lunes 10:00: su renglón tiene que decir "Le faltan 4
+   fechas de su plan FE FLOW: 05/10 · 12/10 · 19/10 · 26/10" — sin el 28.
+   "Anotarla" y mirar `reservations` de esa ficha y esa clase: cuatro
+   confirmadas con el `membership_id` del FE FLOW, y `classes_used` +4.
+3. **Dar desde la Agenda con tope (Test 1 Alta Efectivo, FE START del
+   29/09, 1 vez por semana).** Abrir el martes 06/10 18:00, elegirla: la
+   previa dice "desde el 06/10" y no nombra el 29/09. Darlo. Después, el
+   jueves: tiene que rebotar con "Tu plan FE START es de 1 vez por semana".
+   Antes de la `0082` ése entraba.
+4. **El plan que no llega a la fecha (Lourdes Bobba).** Abrir un martes
+   del 20/10 en adelante y elegirla, sin apretar nada: "Su plan FE FLOW
+   vence el 14/10, antes de esta fecha", no "no tiene plan".
+5. **El portal, con una clienta de plan por empezar.** Ninguna de las
+   cuentas de prueba tiene uno: hace falta un alta con un plan que arranque
+   más adelante y acceso con un mail de Matías. Reservar el segundo martes
+   de su plan, no el primero: la hoja lista las fechas desde ése, sin el
+   primero, y "Hacerlo fijo" deja la fila en `fixed_slots` y las reservas.
+   Inicio no tiene que ofrecer el martes que salteó.
+6. **Volver atrás los datos**: liberar los turnos de prueba desde la
+   Agenda y cancelar o borrar las reservas creadas.
+
 ### ✅ Promociones y cupones (23/09) — `0079` y `0080`
 
 Lo pidió el estudio: "poder crear descuentos: por ejemplo los diez
@@ -2028,6 +2134,187 @@ blanqueo real no se ejerció. El push se probó a mano con las claves de
 de prueba se niega a mandarle a un dispositivo de otra cuenta. Falta
 tocarlo en producción, que es lo que prueba la clave de Vercel.
 
+### ✅ Lo que salió de probar cada rol el 27/09 — `0084` **corrida y verificada**
+
+El domingo antes de abrir se ejerció el sistema por flujo, en producción y
+con la sesión de cada rol —el admin haciendo de mostrador, una clienta, la
+profesora Ivana y la dueña—, comprobando cada paso contra la base. Lo que
+tocaba plata anduvo: el alta con cobro, el Cobrar de la Agenda, el tope de
+devoluciones, el arqueo con faltante, la promoción (la pantalla dijo
+$63.000 y la base asentó $63.000 con su descuento y su comprobante) y el
+cambio de precio, que llega a la web pública. Lo que salió, arreglado acá:
+
+**Cancelar desde Reservas era un toque.** Sin confirmar y sin decir que la
+clase se iba a perder: el "perdió la clase" aparecía recién después. Ahora
+la cruz abre un cartel en la página —no nativo: el navegador de Instagram
+los descarta— que dice qué le pasa a esa clase, con la misma cuenta que usa
+la base (`consecuenciaDeCancelar`, compartida con el portal).
+
+**La plata en los avisos salía en formato inglés** ("$42,750") y el cierre
+de caja decía "-1000.00". La `0084` agrega `pesos(numeric)`, que no depende
+del locale de la base, y la usan los cuatro textos que llevan montos.
+
+**"Quedaste anotada" y otros textos en femenino para todos.** La misma
+`0084` los pasa a neutro en la base ("Tu lugar quedó reservado en…",
+"Cambió quién da tu clase"), y en la pantalla se cambiaron los que se ven:
+la web pública decía "8 alumnas por clase" y ahora "8 lugares por clase".
+La regla: un texto sobre una persona no tiene género; sobre los clientes en
+grupo, "cliente", que es la palabra que eligió el estudio el 09/09.
+
+**El domingo.** La Agenda del staff abría en la semana terminada, como le
+pasaba al portal hasta el 25/09. Y a quien cobra por hora se le podían
+cargar horas en domingo, que la liquidación paga sin mirar el día: ahora no
+se puede guardar, y una clase especial con fecha en domingo tampoco.
+
+**La caja abierta varios días.** El cierre describía mal el "saldo al
+abrir", y el proceso diario mandaba todos los días "el arqueo va a juntar
+la plata de todos esos días". La caja se abre y se cierra cuando la dueña
+quiere: el cierre ahora dice qué período cubre ("Turno del mié 23/09 10:58
+a hoy 13:48") con la misma cuenta que `cerrar_caja`, y el recordatorio
+diario se sacó.
+
+**El portal nombraba el WhatsApp y no daba cómo llegar.** "Escribinos por
+WhatsApp" y "pedí el link de pago por WhatsApp" eran texto suelto. Ahora
+son links con el mensaje escrito —nombre, credencial y, en la deuda, plan y
+monto—, con el número de `studio_whatsapp`. Si el parámetro está vacío no
+se inventa uno: queda "consultá en recepción". **Hoy está vacío** (se vació
+el 25/09 desde la cuenta admin), así que el link aparece cuando se cargue.
+
+**Fechas en crudo** ("2026-10-22") en la ficha, en Reservas y en Pagos.
+
+**El formulario de planes y el del alta se rompían en el celular.** La
+grilla es de una columna en pantallas chicas y el primer campo pedía
+`col-span-2`: eso crea una segunda columna implícita y todo lo que sigue se
+acomoda en dos, la primera de ancho cero. La dueña no veía el precio desde
+el teléfono. Ahora es `sm:col-span-2`.
+
+Verificado en producción, con cada sesión: el aislamiento de la clienta y
+de la profesora (la profesora lee cero filas de plata; ve sólo las reservas
+de sus clases; desmarcar le da 403; marcar una reserva de otra clase o
+borrar una reserva no toca ninguna fila), las reservas y cancelaciones del
+portal con el tope, el fijo, los pagos, el perfil y la campana. Lo de este
+bloque se verificó por `tsc`, `next build` y la `0084` en un Postgres
+local con el locale que se equivoca como producción; en pantalla falta
+verlo cuando se despliegue. Quedó anotado y no se tocó: la profesora lee
+las fichas de todas las clientas (decisión del 27/09: queda así por
+ahora), y un "ausente" mal puesto no se puede volver a "sin marcar" desde
+ninguna pantalla.
+
+### 🟡 Anular un cobro no borra la deuda (27/09) — `0083` **corrida**, falta ejercerla en pantalla
+
+Salió de la auditoría del 25/09 (T26). **Anular desde Pagos tachaba el
+cobro y ahí terminaba**: la cuota no volvía a abrirse, la membresía seguía
+sin deuda en todas las pantallas y el proceso diario no la reclamaba
+nunca. El caso que va a pasar la primera semana —cobrar con el medio
+equivocado y anular para corregir— dejaba el mes cobrado sin plata
+adentro. Con una renovación, el período que creó el cobro quedaba vivo y
+sin nada que lo cobre.
+
+**Qué cambia.** Anular pregunta qué queda después, y lo hace la base
+(`anular_cobro()`):
+
+- **Vuelve a deber**: una cuota pendiente *gemela* del mismo período, al
+  precio de lista —lo cobrado ya traía el −5% o el +25%, y cobrarlo otra
+  vez lo aplicaba dos veces—, con la promo con que se había cobrado y el
+  vencimiento de siempre, nunca antes de hoy. Es lo que viene elegido en
+  una cuota.
+- **No queda debiendo**: se tacha, como hasta hoy.
+- **Deshacer la renovación**, sólo en el cobro de una oferta: borra el
+  período que creó —si no tiene clases usadas, reservas ni otras cuotas, y
+  con el permiso de eliminar membresías— y le devuelve la oferta si todavía
+  está en fecha. En una renovación **no viene nada elegido**: cada salida
+  deja algo distinto y la elige quien sabe qué pasó.
+
+La base no reabre, aunque se pida, lo que no tiene deuda que reabrir: un
+**"Otro cobro"** (desde ahora `payments.origen = 'suelto'`; los que ya
+había se deducen), un cobro sin período, un período cancelado, uno que
+sigue pago con otra cuota, o uno que ya tiene su cuota pendiente. Y lo
+dice. Para lo que sí se reabrió y no correspondía hay **"No correspondía:
+deshacerla"** en la misma pantalla, y **cualquier cuota pendiente que no
+sea oferta se puede anular** desde su fila (`anular_cuota()`), sin
+cancelar el período. Sirve también para las cuotas de la clase de prueba
+de antes del 16/09. Quién anuló queda en `payment_staff`.
+
+De yapa, porque es la misma función: `promociones_para` busca el plan de
+la oferta de renovación por la membresía que renueva, así que **una promo
+limitada a un plan ya alcanza a la renovación**, que era la fila de la §0.
+
+**La revisión adversarial** del primer borrador encontró lo que cambió el
+diseño: con el tilde prendido de entrada, anular una remera inventaba una
+deuda de "Remera" con mail y promo automática; el control de duplicados
+comparaba conceptos dentro de una membresía que el "Otro cobro" no respeta
+(se cuelga de la que cubre hoy); en una renovación convertía una oferta en
+una deuda más un período no aceptado; la gemela perdía la promo si se
+anulaba fuera de su ventana; y una gemela equivocada no tenía cómo
+deshacerse. Todo eso es lo de arriba. Lo que quedó para Mercado Pago —el
+link viejo de un cobro anulado sigue cobrable y la plata no se asienta—
+está en [`MERCADO-PAGO.md`](MERCADO-PAGO.md), huecos C y E.
+
+**Verificado** en un Postgres local con los disparadores reales de la
+`0016`, `0020` y `0041` y las funciones de la `0079`, no contra Supabase:
+la migración corre dos veces seguidas, y sin la `0079` corta en la guarda
+sin dejar nada. Veinte casos, entre ellos: tarjeta → gemela de $70.000 y
+cobrarla en efectivo da $66.500; el cobro suelto y el cobro sin período no
+reabren; con una suelta del mismo nombre al lado, la cuota sí reabre; la
+cuota de antes de la `0079` reabre al precio del período y no a lo
+cobrado; la promo apagada y fuera de ventana se respeta en la gemela
+($56.000) y no se le ofrece a una pendiente común; deshacer la renovación
+frena con una reserva, con una clase usada y sin permiso —y en los tres el
+cobro sigue `pagado`—, y cuando pasa, deja una sola membresía, la oferta
+devuelta con el vencimiento original, `renovacion_control()` en cero y la
+oferta cobrable otra vez. El relleno de `origen` se probó sobre filas
+fabricadas antes de correrla. **Falta** correrla y ejercerla con la sesión
+de recepción, por la pantalla. El paso a paso:
+
+1. **Antes de tocar nada**, en el SQL Editor: `select * from
+   public.renovacion_control();` y `select * from public.perm_diff();` en
+   cero. Correr la `0083` entera. Después:
+   `select origen, status, count(*) from public.payments group by 1, 2;`
+   — con los datos del 27/09 tienen que salir todas `cuota` (hoy no hay
+   ningún "Otro cobro"). Y las dos funciones rechazan sin sesión:
+   `select * from public.anular_cobro((select id from public.payments where status='pagado' limit 1), 'x', 'nada');`
+   → *No tenés permiso para anular cobros*.
+2. **Una clienta de prueba nueva** desde el alta, sin mail (así no se crea
+   acceso ni sale correo), con FE FLOW desde hoy y **"Paga ahora" en
+   tarjeta**: $87.500. En Pagos, anular ese cobro: tiene que venir elegido
+   "Vuelve a deber la cuota" y decir $70.000. Anular. La pantalla dice
+   *Vuelve a deber $70.000, con vencimiento el …*. En la base:
+   `select status, amount, precio_lista, due_date, origen, reabre_pago_id is not null as reabre, notes from public.payments where student_id = '<id>' order by created_at;`
+   → la anulada (87.500, lista 70.000) y la pendiente (70.000, `reabre`
+   true, vencimiento = inicio + `payment_grace_days`). Y
+   `select anulado_por, anulado_at from public.payment_staff where payment_id = '<el cobro>';`
+   con el uuid de recepción.
+3. **Cobrar la gemela en efectivo** desde su fila: $66.500, y en la base
+   `precio_lista` 70.000 y `descuento` 3.500.
+4. **Anular ese cobro otra vez, y "No correspondía: deshacerla"** en la
+   pantalla de resultado: la pendiente nueva queda `anulado` con la nota
+   *Anulada: No correspondía reabrirla…*, y la ficha no muestra deuda.
+5. **"Otro cobro"** a la misma clienta por una remera de $15.000: en la base
+   `origen = 'suelto'`. Anularlo: el modal no ofrece elegir y dice que no
+   queda nada pendiente; en la base, ninguna fila nueva.
+6. **La renovación.** A la clienta de prueba, emitirle la oferta a mano
+   como en la `0041` (su bloque CÓMO VERIFICAR, paso 1, filtrando por su
+   nombre) y cobrarla desde Pagos. Anular ese cobro: no tiene que venir
+   nada elegido. Elegir "Deshacer la renovación". En la base: una sola
+   membresía de ella, el cobro `anulado` con `membership_id` nulo y la nota
+   *Se deshizo la renovación…*, una oferta pendiente nueva con
+   `due_date` = fin del período + 1 y `reabre_pago_id` apuntando al cobro,
+   y `select * from public.renovacion_control();` en cero.
+7. **La promo**, si se quiere ejercer: en Configuración, una "Prueba 0083"
+   del 20% para los días de hoy, encendida; cobrar una cuota ($56.000);
+   cambiarle la ventana a otros días y apagarla; anular con "vuelve a
+   deber". La pendiente tiene `promocion_id`, "Cobrar" muestra la promo con
+   *Es la del cobro que se anuló* y cobra $56.000. Ese último cobro,
+   anularlo con "No queda debiendo" para que no quede plata de prueba en
+   la caja.
+8. **Limpiar**: borrar la clienta de prueba (la cascada se lleva
+   membresías, cuotas, sellos y avisos), después la promo de prueba desde
+   el SQL Editor (`delete from public.promociones where nombre = 'Prueba 0083';`),
+   y devolver la secuencia de credenciales como el 25/09 (los números de
+   comprobante gastados no vuelven). `caja_control()`
+   va a listar el arqueo como desactualizado sólo si la caja del día ya
+   estaba cerrada cuando se anuló.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
@@ -2096,7 +2383,7 @@ tocarlo en producción, que es lo que prueba la clave de Vercel.
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a **`0075`** ✅. La **`0075` corrió el 22/09** y se verificó en los tres puntos de su bloque: la vista conserva sus once columnas, sigue siendo `security_invoker` —sin sesión la lectura muere en `permission denied for function can`, que sólo pasa si la política corre como quien pregunta— y el medio sale con su nombre: se cargó un gasto con `method = 'efectivo'` y el libro mostró **Efectivo**. El gasto de prueba se borró. La **`0074` corrió el 22/09** y se verificó ejerciendo lo que venía a habilitar: un medio inventado rebota con `23503` (clave ajena) y no con `23514` (el CHECK viejo), y con la cuenta "Macro" y el medio "Débito" creados desde Configuración se cobraron $70.000 que fueron solos a esa cuenta. Todo revertido. La **`0073` corrió el 22/09** y se verificó de las dos maneras que hacían falta: las seis puertas cerradas con la llave pública, y con sesión de admin los cinco cortes de Ocupación dando los mismos números y el descuento de clases todavía andando (se reservó una clase, `classes_used` pasó de 3 a 4, se borró la reserva y volvió a 3). La **`0072` corrió el 22/09**; el agujero que cierra se reprodujo antes de escribir el arreglo. La **`0071` corrió el 19/09** y se verificó por los tres rechazos, que es lo que importa de esa función. La **`0070` y la `0069` corrieron el 18/09**. La **`0068` a la `0061` corrieron el 17/09**. La **`0060` corrió el 17/09** y se verificó suspendiendo una clase con la profesora logueada: le llegó a la campana sin recargar y siguió sin ver los avisos de staff. La **`0059` corrió el 17/09**; probarla encontró que la pantalla ofrecía deshacer una marca sin permiso. La **`0058` corrió el 16/09** y hubo que corregir el cupo dos veces: la Agenda tenía su propia cuenta y era la que se veía. La **`0057` corrió el 16/09 en el segundo intento** —la primera abortó por un `group_key` inexistente, y la envoltura `begin/commit` no dejó nada a medias—. La **`0056` corrió el 16/09** y se verificó moviendo el descuento a -8 y a 0 con la web abierta: la línea siguió al número y desapareció al apagarlo; el dato quedó restaurado en -5. La **`0053` corrió el 15/09**. La **`0052` corrió el 15/09** y se corrigió una redacción; es idempotente. La **`0051` corrió el 15/09** y se corrigió dos veces sobre la marcha —los nombres en castellano y el día en el corte por clase—; es idempotente, todo `create or replace`. La **`0050` corrió el 15/09**, se corrigió la clave foránea del autor y se volvió a correr; es idempotente a propósito. La **`0048` y la `0049` corrieron el 15/09** y se verificaron ejerciéndolas: el cupo rechazó el noveno turno fijo, un pausado quedó fuera de la liberación automática, y el interruptor encendido liberó exactamente uno. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Migraciones aplicadas | `0001` a **`0084`** ✅. La **`0082`, la `0083` y la `0084` corrieron el 27/09**, en ese orden. Verificado contra la base con la sesión del admin: existen `mi_tope_de_fijos` (0082) y `anular_cuota` (0083, rechaza un id inexistente con "Esa cuota no existe."), los diez cobros tienen `origen = 'cuota'`, y `pesos()` (0084) da "$42.750", "-$1.000", "$1.234,50" y "$0". **La `0084` cortó en el primer intento**, y el chequeo inicial hizo su trabajo: la versión viva de `guard_periodo_liquidacion` no es la de la `0055` del repo —no dice `FM999,999,999`—, así que esa migración se corrió desde otra copia o la función se tocó a mano. Se sacó de la `0084`, que no tenía nada que arreglarle, y la segunda corrida pasó. Ojo que **la `0054` y la `0055` no figuraban en este registro**: la que está en producción no es necesariamente la del repo, y conviene compararla antes de volver a redefinirla. Las `0076` a `0081` corrieron entre el 23 y el 24/09, cada una anotada en su bloque. La **`0075` corrió el 22/09** y se verificó en los tres puntos de su bloque: la vista conserva sus once columnas, sigue siendo `security_invoker` —sin sesión la lectura muere en `permission denied for function can`, que sólo pasa si la política corre como quien pregunta— y el medio sale con su nombre: se cargó un gasto con `method = 'efectivo'` y el libro mostró **Efectivo**. El gasto de prueba se borró. La **`0074` corrió el 22/09** y se verificó ejerciendo lo que venía a habilitar: un medio inventado rebota con `23503` (clave ajena) y no con `23514` (el CHECK viejo), y con la cuenta "Macro" y el medio "Débito" creados desde Configuración se cobraron $70.000 que fueron solos a esa cuenta. Todo revertido. La **`0073` corrió el 22/09** y se verificó de las dos maneras que hacían falta: las seis puertas cerradas con la llave pública, y con sesión de admin los cinco cortes de Ocupación dando los mismos números y el descuento de clases todavía andando (se reservó una clase, `classes_used` pasó de 3 a 4, se borró la reserva y volvió a 3). La **`0072` corrió el 22/09**; el agujero que cierra se reprodujo antes de escribir el arreglo. La **`0071` corrió el 19/09** y se verificó por los tres rechazos, que es lo que importa de esa función. La **`0070` y la `0069` corrieron el 18/09**. La **`0068` a la `0061` corrieron el 17/09**. La **`0060` corrió el 17/09** y se verificó suspendiendo una clase con la profesora logueada: le llegó a la campana sin recargar y siguió sin ver los avisos de staff. La **`0059` corrió el 17/09**; probarla encontró que la pantalla ofrecía deshacer una marca sin permiso. La **`0058` corrió el 16/09** y hubo que corregir el cupo dos veces: la Agenda tenía su propia cuenta y era la que se veía. La **`0057` corrió el 16/09 en el segundo intento** —la primera abortó por un `group_key` inexistente, y la envoltura `begin/commit` no dejó nada a medias—. La **`0056` corrió el 16/09** y se verificó moviendo el descuento a -8 y a 0 con la web abierta: la línea siguió al número y desapareció al apagarlo; el dato quedó restaurado en -5. La **`0053` corrió el 15/09**. La **`0052` corrió el 15/09** y se corrigió una redacción; es idempotente. La **`0051` corrió el 15/09** y se corrigió dos veces sobre la marcha —los nombres en castellano y el día en el corte por clase—; es idempotente, todo `create or replace`. La **`0050` corrió el 15/09**, se corrigió la clave foránea del autor y se volvió a correr; es idempotente a propósito. La **`0048` y la `0049` corrieron el 15/09** y se verificaron ejerciéndolas: el cupo rechazó el noveno turno fijo, un pausado quedó fuera de la liberación automática, y el interruptor encendido liberó exactamente uno. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
 | Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |

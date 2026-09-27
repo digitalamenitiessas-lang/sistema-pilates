@@ -21,7 +21,7 @@ import {
 import { cn, nombreDelDia } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { SeccionPlegable, SeccionesPlegables } from '@/components/ui/seccion-plegable'
-import { hoyISO, addDays } from '@/lib/api'
+import { hoyISO, addDays, diaDeLaFecha } from '@/lib/api'
 import {
   fetchCondiciones,
   fijarCondicion,
@@ -64,6 +64,17 @@ const input =
 /** El primer día del mes en curso, que es el período que se mira siempre. */
 function inicioDeMes(): string {
   return hoyISO().slice(0, 8) + '01'
+}
+
+/**
+ * El último día en que el estudio abrió: hoy, o el sábado si hoy es
+ * domingo. Es la fecha con la que arranca la carga de horas, que casi
+ * siempre es de lo que se trabajó ese día o el anterior; arrancar en hoy
+ * a secas le proponía un domingo a quien cargaba el fin de semana.
+ */
+function ultimoDiaAbierto(): string {
+  const hoy = hoyISO()
+  return diaDeLaFecha(hoy) === 6 ? addDays(hoy, -1) : hoy
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -621,7 +632,7 @@ function Horas({ desde, hasta }: { desde: string; hasta: string }) {
   const [filas, setFilas] = useState<HorasTrabajadas[] | null>(null)
   const [abierto, setAbierto] = useState(false)
   const [teacherId, setTeacherId] = useState('')
-  const [dia, setDia] = useState(hoyISO())
+  const [dia, setDia] = useState(ultimoDiaAbierto)
   const [tipo, setTipo] = useState<HorasTrabajadas['tipo']>('trabajo')
   const [horas, setHoras] = useState('')
   const [detalle, setDetalle] = useState('')
@@ -629,6 +640,14 @@ function Horas({ desde, hasta }: { desde: string; hasta: string }) {
   const [error, setError] = useState<string | null>(null)
 
   const puedeCargar = can('personal.cargar') || canWrite
+
+  // El estudio no abre los domingos, así que unas horas en domingo son
+  // la fecha mal elegida — y a quien cobra por hora se le pagarían igual,
+  // porque la liquidación suma lo que hay sin mirar el día. Se frena y no
+  // sólo se avisa: Matías lo pidió así el 27/09 ("domingo no se habilitan
+  // días de trabajo"). Si algún día hay un evento en domingo, se carga en
+  // el sábado con el detalle, o se vuelve a abrir esta puerta.
+  const esDomingo = !!dia && diaDeLaFecha(dia) === 6
 
   const cargar = useCallback(() => {
     fetchHoras(desde, hasta).then(setFilas).catch(() => setFilas([]))
@@ -688,6 +707,11 @@ function Horas({ desde, hasta }: { desde: string; hasta: string }) {
                 </p>
                 <p className="text-[11px] text-muted-foreground truncate">
                   {fecha(h.fecha)}
+                  {/* Lo que se guardó igual queda a la vista para quien
+                      revisa antes de cerrar la liquidación. */}
+                  {diaDeLaFecha(h.fecha) === 6 && (
+                    <span className="font-semibold text-aviso-fuerte"> · domingo</span>
+                  )}
                   {h.detalle ? ` · ${h.detalle}` : ''}
                 </p>
               </div>
@@ -743,9 +767,15 @@ function Horas({ desde, hasta }: { desde: string; hasta: string }) {
             placeholder="Detalle (cubrió recepción, capacitación…)"
             className={cn(input, 'w-full')}
           />
+          {esDomingo && (
+            <p className="rounded-xl bg-aviso-suave px-3 py-2 text-[11px] text-aviso-fuerte">
+              El <span className="font-semibold">{fecha(dia)}</span> es domingo, y el estudio no
+              abre los domingos. Elegí el día en que se trabajó.
+            </p>
+          )}
           <div className="flex gap-2">
             <button
-              disabled={saving || !teacherId}
+              disabled={saving || !teacherId || esDomingo}
               onClick={guardar}
               className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
             >

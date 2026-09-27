@@ -136,7 +136,7 @@ export async function POST(request: Request) {
       `[PRUEBA] ${promo.nombre}`,
       await emailLayout(
         promo.nombre,
-        `<p style="background:#f3f0ec;padding:8px 12px;border-radius:8px;font-size:12px;">Esto es una prueba. Así lo van a ver las ${conMail.length} clientas con mail cargado.</p>
+        `<p style="background:#f3f0ec;padding:8px 12px;border-radius:8px;font-size:12px;">Esto es una prueba. Así lo van a ver los ${conMail.length} clientes con mail cargado.</p>
          <p><strong>${beneficio}</strong> en tu cuota.</p>
          <p>${cuando}</p>
          <p>${como}</p>`

@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 import { cn, numeroDeWhatsApp } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
-import { registerPayment, collectPayment, createMpLink, syncMpPayments, voidPayment, precioConAjuste, precioConPromo, settingText, esOferta, ofertaYaResuelta, hoyISO, promocionesPara, cobrarCuota, type PromoAplicable } from '@/lib/api'
+import { registerPayment, collectPayment, createMpLink, syncMpPayments, anularCobro, anularCuota, addDays, precioConAjuste, precioConPromo, settingText, esOferta, ofertaYaResuelta, hoyISO, promocionesPara, cobrarCuota, type PromoAplicable, type QuedaAlAnular, type ResultadoDeAnular } from '@/lib/api'
 import type { Payment, PaymentMethod, Student } from '@/lib/types'
 
 type FilterStatus = 'todos' | 'pagado' | 'pendiente' | 'renovacion' | 'vencido'
@@ -364,6 +364,7 @@ export function RegistrarPagoModal({
         concept: concept || 'Pago',
         amount: aCobrar,
         method,
+        precioLista: deLista,
       })
       await refresh()
       setReceiptNumber(n)
@@ -731,6 +732,14 @@ export function CobrarModal({ payment, onClose }: { payment: Payment; onClose: (
                       Paga ${Math.abs(diferencia).toLocaleString('es-AR')} menos que el precio
                       de lista{ajuste !== 0 && ', y la promoción reemplaza al ajuste del medio'}
                     </span>
+                    {/* La cuota reabierta trae la promo del cobro que se
+                        anuló (0083), y la base se la aplica aunque ya no
+                        esté en su ventana: sin decirlo, parece un error. */}
+                    {payment.promocionId === promoElegida.id && (
+                      <span className="block font-normal opacity-80 mt-0.5">
+                        Es la del cobro que se anuló: se respeta aunque ya no esté vigente.
+                      </span>
+                    )}
                   </p>
                 ) : diferencia !== 0 && (
                   <p
@@ -951,6 +960,22 @@ function MpLinkModal({ payment, onClose }: { payment: Payment; onClose: () => vo
   )
 }
 
+/**
+ * El concepto sin el " — renovación" del final y sin mayúsculas: la cuota
+ * de una renovación y un cobro suelto del mismo plan se llaman igual para
+ * quien los lee, y eso es lo que el aviso de abajo necesita comparar.
+ */
+const conceptoBase = (c: string) => c.replace(/ — renovación$/, '').trim().toLowerCase()
+const comprobante = (n: number | null | undefined) => `#${String(n ?? 0).padStart(6, '0')}`
+
+interface OpcionDeAnular {
+  valor: QuedaAlAnular
+  titulo: string
+  detalle: React.ReactNode
+  /** Por qué no se puede, dicho antes de que la base lo rechace. */
+  bloqueo?: string | null
+}
+
 function AnularCobroModal({
   pago,
   onClose,
@@ -960,39 +985,320 @@ function AnularCobroModal({
   onClose: () => void
   onAnulado: () => void
 }) {
-  const { refresh } = useData()
+  const { refresh, can, canWrite, permisosReady } = useData()
+  const { memberships, reservations, payments } = useStudio()
   const [motivo, setMotivo] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [hecho, setHecho] = useState<ResultadoDeAnular | null>(null)
+  const [deshecha, setDeshecha] = useState(false)
+
+  // QUÉ CASO ES, que es lo que decide qué se puede elegir. La base decide
+  // igual (0083); esto es para no ofrecer lo que va a rechazar.
+  const esRenovacion = !!pago.renuevaMembresiaId
+  const periodo = pago.membershipId
+    ? memberships.find((m) => m.id === pago.membershipId)
+    : undefined
+  const sinOpciones: string | null =
+    esRenovacion && !pago.membershipId
+      ? 'Este cobro de renovación no llegó a crear ningún período: al anularlo no queda nada pendiente.'
+      : !esRenovacion && pago.origen === 'suelto'
+        ? 'Se cargó como "Otro cobro": no saldó ninguna cuota, así que al anularlo no queda nada pendiente.'
+        : !pago.membershipId
+          ? 'No está colgado de ningún período: al anularlo no queda nada pendiente.'
+          : periodo?.status === 'cancelada'
+            ? 'El período de este cobro está cancelado: al anularlo no queda nada pendiente.'
+            : null
+
+  // Una cuota vuelve a deber de entrada: es deshacer el cobro, que es lo
+  // que casi siempre se quiere (el medio equivocado, la plata que no
+  // entró). Una renovación NO arranca con nada elegido: las tres salidas
+  // son razonables y cada una deja algo distinto —una deuda, un período
+  // sin deuda o ningún período—, así que la elige quien sabe qué pasó.
+  const [queda, setQueda] = useState<QuedaAlAnular | null>(
+    sinOpciones ? 'nada' : esRenovacion ? null : 'debe'
+  )
+
+  // El monto con que reabre, con la misma regla que la base: el precio de
+  // lista del cobro; si no lo tiene (antes de la 0079), el del período,
+  // salvo que lo haya creado una renovación, que guarda ahí lo cobrado.
+  const periodoDeRenovacion =
+    !!periodo && payments.some((p) => p.membershipId === periodo.id && !!p.renuevaMembresiaId)
+  const deLista =
+    pago.precioLista ??
+    (!esRenovacion && periodo && !periodoDeRenovacion && periodo.price > 0
+      ? periodo.price
+      : pago.amount)
+  const conAjuste = deLista !== pago.amount
+  const hoy = hoyISO()
+  const rango = periodo ? ` del ${fechaCorta(periodo.startDate)} al ${fechaCorta(periodo.endDate)}` : ''
+
+  // Otra cuota cobrada del mismo período: la base no va a reabrir.
+  const otraCuotaPaga = periodo
+    ? payments.find(
+        (p) =>
+          p.id !== pago.id &&
+          p.membershipId === periodo.id &&
+          p.status === 'pagado' &&
+          p.origen !== 'suelto'
+      )
+    : undefined
+  // Un "Otro cobro" del mismo nombre: es el doble cobro de verdad, y el
+  // que hay que anular es ése. Anulando la cuota, la base la reabre —la
+  // suelta no salda nada— y queda una deuda por un mes que entró dos veces.
+  const sueltaParecida = !sinOpciones
+    ? payments.find(
+        (p) =>
+          p.id !== pago.id &&
+          p.studentId === pago.studentId &&
+          p.status === 'pagado' &&
+          p.origen === 'suelto' &&
+          conceptoBase(p.planName) === conceptoBase(pago.planName)
+      )
+    : undefined
+
+  // Deshacer la renovación: las mismas condiciones que va a mirar la base.
+  const puedeBorrar = permisosReady ? can('membresias.eliminar') : canWrite
+  const reservasDelPeriodo = periodo
+    ? reservations.filter((r) => r.membershipId === periodo.id).length
+    : 0
+  const otrasDelPeriodo = periodo
+    ? payments.filter(
+        (p) =>
+          p.id !== pago.id &&
+          p.status !== 'anulado' &&
+          (p.membershipId === periodo.id || p.renuevaMembresiaId === periodo.id)
+      ).length
+    : 0
+  const bloqueoDeshacer = !puedeBorrar
+    ? 'Borra el período, y eso pide el permiso de eliminar membresías.'
+    : (periodo?.classesUsed ?? 0) > 0
+      ? `El período ya tiene ${periodo!.classesUsed} clase${periodo!.classesUsed === 1 ? '' : 's'} usada${periodo!.classesUsed === 1 ? '' : 's'}.`
+      : reservasDelPeriodo > 0
+        ? `El período ya tiene ${reservasDelPeriodo} reserva${reservasDelPeriodo === 1 ? '' : 's'} hecha${reservasDelPeriodo === 1 ? '' : 's'} contra él.`
+        : otrasDelPeriodo > 0
+          ? 'El período ya tiene otras cuotas o cobros.'
+          : null
+  const renovada = esRenovacion
+    ? memberships.find((m) => m.id === pago.renuevaMembresiaId)
+    : undefined
+  const limiteOferta = renovada ? addDays(renovada.endDate, 1) : null
+
+  const opciones: OpcionDeAnular[] = sinOpciones
+    ? []
+    : esRenovacion
+      ? [
+          {
+            valor: 'renovacion',
+            titulo: 'Deshacer la renovación',
+            detalle: (
+              <>
+                Se borra el período{rango} que creó este cobro
+                {limiteOferta && limiteOferta >= hoy
+                  ? `, y vuelve a tener la oferta de renovación hasta el ${fechaCorta(limiteOferta)}. `
+                  : limiteOferta
+                    ? `. La oferta vencía el ${fechaCorta(limiteOferta)}, así que no se le vuelve a ofrecer. `
+                    : '. '}
+                Para cuando se le cobró a otra clienta o decidió no renovar.
+              </>
+            ),
+            bloqueo: bloqueoDeshacer,
+          },
+          {
+            valor: 'debe',
+            titulo: 'Vuelve a deber',
+            detalle: (
+              <>
+                El período{rango} sigue asignado y queda debiendo su cuota de{' '}
+                <span className="font-semibold text-foreground">${deLista.toLocaleString('es-AR')}</span>
+                {pago.promocionId && ', con la promoción con que se había cobrado'}. Para el medio
+                equivocado o la plata que no entró.
+              </>
+            ),
+          },
+          {
+            valor: 'nada',
+            titulo: 'No queda debiendo',
+            detalle: <>El período{rango} sigue asignado, sin deuda.</>,
+          },
+        ]
+      : [
+          {
+            valor: 'debe',
+            titulo: 'Vuelve a deber la cuota',
+            detalle: (
+              <>
+                Queda una cuota pendiente de{' '}
+                <span className="font-semibold text-foreground">${deLista.toLocaleString('es-AR')}</span>
+                {conAjuste && ', el precio de lista: el ajuste del medio se calcula de nuevo al cobrarla'}
+                .
+                {pago.promocionId &&
+                  ' Conserva la promoción con que se había cobrado, aunque ya no esté vigente.'}{' '}
+                Para el medio equivocado o la plata que no entró.
+                {otraCuotaPaga && (
+                  <span className="block mt-1 text-aviso-fuerte">
+                    Este período también figura pago con el comprobante{' '}
+                    {comprobante(otraCuotaPaga.receiptNumber)}, así que no se va a reabrir.
+                  </span>
+                )}
+              </>
+            ),
+          },
+          {
+            valor: 'nada',
+            titulo: 'No queda debiendo',
+            detalle: (
+              <>
+                Para cuando lo que no correspondía era la cuota, como un plan mal cargado. El
+                período sigue asignado; si tampoco va, cancelalo o deshacelo desde su ficha.
+              </>
+            ),
+          },
+        ]
 
   const confirmar = async () => {
     if (!motivo.trim()) {
       setError('Escribí por qué se anula')
       return
     }
+    if (!queda) {
+      setError('Elegí qué queda después de anular')
+      return
+    }
     setSaving(true)
     setError(null)
     try {
-      await voidPayment(pago.id, motivo)
+      const r = await anularCobro(pago.id, motivo, queda, pago.amount, pago.receiptNumber)
       await refresh()
-      onAnulado()
+      setHecho(r)
+      setSaving(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo anular')
       setSaving(false)
     }
   }
 
+  // "Deshacer" de la cuota recién reabierta. Es la salida del error más
+  // probable de este modal —dejar prendido "vuelve a deber" cuando no
+  // correspondía—, y sin esto la gemela quedaba para siempre como deuda.
+  const deshacerCuota = async () => {
+    if (!hecho?.cuotaNueva) return
+    setSaving(true)
+    setError(null)
+    try {
+      await anularCuota(
+        hecho.cuotaNueva,
+        `No correspondía reabrirla al anular el comprobante ${comprobante(hecho.comprobante)}`
+      )
+      await refresh()
+      setDeshecha(true)
+      setSaving(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo deshacer')
+      setSaving(false)
+    }
+  }
+
+  // Lo que hizo la base, dicho. Puede no haber hecho lo que se pidió —el
+  // mes sigue pago con otra cuota, ya tenía una pendiente— y cerrar el
+  // modal sin decirlo haría creer que la deuda está.
+  if (hecho) {
+    return (
+      <div className="fixed inset-0 z-50 bg-foreground/20 backdrop-blur-sm flex items-end sm:items-center justify-center" onClick={onAnulado}>
+        <div
+          className="bg-card w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl shadow-2xl border border-border"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-5 py-4 border-b border-border">
+            <h2 className="text-base font-bold text-foreground">Cobro anulado</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {pago.studentName} · ${hecho.anulado.toLocaleString('es-AR')} dejan de contar como plata entrada
+            </p>
+          </div>
+          <div className="px-5 py-4 space-y-3 text-sm text-foreground">
+            {deshecha ? (
+              <p>La cuota reabierta se anuló: no queda debiendo nada por este cobro.</p>
+            ) : hecho.queda === 'debe' && hecho.debe != null ? (
+              <>
+                <p>
+                  Vuelve a deber <strong>${hecho.debe.toLocaleString('es-AR')}</strong>
+                  {hecho.vence ? <>, con vencimiento el {fechaCorta(hecho.vence)}</> : null}. La cuota
+                  ya está en Pagos para cobrarla de nuevo.
+                </p>
+                {hecho.promo && (
+                  <p className="text-xs text-exito-fuerte bg-exito-suave rounded-xl px-3 py-2.5">
+                    Conserva la promoción <strong>{hecho.promo}</strong>: al cobrarla se aplica aunque
+                    ya no esté vigente.
+                  </p>
+                )}
+              </>
+            ) : hecho.queda === 'renovacion' ? (
+              <>
+                <p>
+                  Se deshizo la renovación
+                  {hecho.periodoDesde && hecho.periodoHasta
+                    ? `: se borró el período del ${fechaCorta(hecho.periodoDesde)} al ${fechaCorta(hecho.periodoHasta)}`
+                    : ''}
+                  .
+                  {hecho.cuotaNueva && hecho.vence
+                    ? ` Vuelve a tener la oferta de renovación hasta el ${fechaCorta(hecho.vence)}; si no la toma, se anula sola.`
+                    : ''}
+                </p>
+                {hecho.aviso && (
+                  <p className="text-xs text-aviso-fuerte bg-aviso-suave rounded-xl px-3 py-2.5">
+                    {hecho.aviso}
+                  </p>
+                )}
+              </>
+            ) : hecho.aviso ? (
+              <p className="text-xs text-aviso-fuerte bg-aviso-suave rounded-xl px-3 py-2.5">
+                No se reabrió la deuda. {hecho.aviso}
+              </p>
+            ) : (
+              <p>
+                No queda debiendo nada por este cobro.
+                {pago.membershipId &&
+                  pago.origen !== 'suelto' &&
+                  ' El período sigue asignado: si tampoco corresponde, cancelalo o deshacelo desde su ficha.'}
+              </p>
+            )}
+            {error && <p className="text-xs text-destructive-fuerte">{error}</p>}
+          </div>
+          <div className="px-5 py-4 border-t border-border flex gap-2">
+            {hecho.queda === 'debe' && hecho.cuotaNueva && !deshecha && (
+              <button
+                onClick={deshacerCuota}
+                disabled={saving}
+                className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                No correspondía: deshacerla
+              </button>
+            )}
+            <button
+              onClick={onAnulado}
+              disabled={saving}
+              className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-40"
+            >
+              Listo
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="fixed inset-0 z-50 bg-foreground/20 backdrop-blur-sm flex items-end sm:items-center justify-center" onClick={onClose}>
       <div
-        className="bg-card w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl shadow-2xl border border-border"
+        className="bg-card w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl shadow-2xl border border-border max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 py-4 border-b border-border">
           <h2 className="text-base font-bold text-foreground">Anular cobro</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
             {pago.studentName} · ${pago.amount.toLocaleString('es-AR')}
-            {pago.receiptNumber ? ` · comprobante #${String(pago.receiptNumber).padStart(6, '0')}` : ''}
+            {pago.receiptNumber ? ` · comprobante ${comprobante(pago.receiptNumber)}` : ''}
           </p>
         </div>
 
@@ -1007,6 +1313,15 @@ function AnularCobroModal({
             </p>
           </div>
 
+          {sueltaParecida && (
+            <p className="text-xs text-aviso-fuerte bg-aviso-suave rounded-xl px-3 py-2.5">
+              También tiene un &quot;Otro cobro&quot; de {sueltaParecida.planName} del{' '}
+              {fechaCorta(sueltaParecida.date || sueltaParecida.dueDate)} (
+              {comprobante(sueltaParecida.receiptNumber)}). Si lo que pasó es que se cobró dos veces,
+              el que hay que anular es ése: no toca ninguna cuota.
+            </p>
+          )}
+
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1.5">
               ¿Por qué se anula?
@@ -1015,7 +1330,141 @@ function AnularCobroModal({
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
               autoFocus
-              placeholder="Ej: se cobró dos veces por error"
+              placeholder="Ej: se cargó con el medio equivocado"
+              className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary"
+            />
+          </div>
+
+          {sinOpciones ? (
+            <p className="text-xs text-muted-foreground rounded-xl border border-border px-3.5 py-3">
+              {sinOpciones}
+            </p>
+          ) : (
+            <fieldset className="space-y-2">
+              <legend className="block text-xs font-semibold text-foreground mb-1.5">
+                ¿Qué queda después?
+              </legend>
+              {opciones.map((o) => (
+                <label
+                  key={o.valor}
+                  className={cn(
+                    'flex items-start gap-2.5 rounded-xl border px-3.5 py-3',
+                    o.bloqueo ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
+                    queda === o.valor ? 'border-primary bg-primary/5' : 'border-border'
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="queda"
+                    checked={queda === o.valor}
+                    disabled={!!o.bloqueo}
+                    onChange={() => setQueda(o.valor)}
+                    className="mt-0.5 w-4 h-4 accent-[var(--color-primary)]"
+                  />
+                  <span className="min-w-0">
+                    <span className="text-sm font-semibold text-foreground">{o.titulo}</span>
+                    <span className="block text-[11px] text-muted-foreground mt-1">{o.detalle}</span>
+                    {o.bloqueo && (
+                      <span className="block text-[11px] text-aviso-fuerte mt-1">
+                        No se puede: {o.bloqueo}
+                      </span>
+                    )}
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+          )}
+
+          {error && <p className="text-xs text-destructive-fuerte">{error}</p>}
+        </div>
+
+        <div className="px-5 py-4 border-t border-border flex gap-2">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground">
+            Cancelar
+          </button>
+          <button
+            onClick={confirmar}
+            disabled={saving || !queda}
+            className="flex-1 py-2.5 rounded-xl bg-destructive text-destructive-foreground text-sm font-semibold disabled:opacity-40 flex items-center justify-center gap-2"
+          >
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            Anular
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Anular una cuota que nunca se cobró (0083). Hasta acá la única salida
+ * era cancelar el período entero, y una cuota reabierta por error quedaba
+ * como deuda para siempre, con su mail de cobranza.
+ */
+function AnularCuotaModal({ pago, onClose }: { pago: Payment; onClose: () => void }) {
+  const { refresh } = useData()
+  const [motivo, setMotivo] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const confirmar = async () => {
+    if (!motivo.trim()) {
+      setError('Escribí por qué se anula')
+      return
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      await anularCuota(pago.id, motivo)
+      await refresh()
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo anular')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-foreground/20 backdrop-blur-sm flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div
+        className="bg-card w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl shadow-2xl border border-border"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-5 py-4 border-b border-border">
+          <h2 className="text-base font-bold text-foreground">Anular cuota</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {pago.studentName} · {pago.planName} · ${pago.amount.toLocaleString('es-AR')} · vence el{' '}
+            {fechaCorta(pago.dueDate)}
+          </p>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          <div className="rounded-xl bg-muted/50 px-4 py-3 text-xs text-foreground/80 space-y-1.5">
+            <p>
+              Deja de figurar como deuda: sale de Pendientes, del portal de la clienta y de los avisos
+              de cobranza.
+            </p>
+            <p>No hay plata que devolver, porque nunca se cobró. Queda tachada, con el motivo.</p>
+            {pago.membershipId && (
+              <p>El período sigue asignado: si tampoco corresponde, cancelalo o deshacelo desde su ficha.</p>
+            )}
+            {pago.mpLink && (
+              <p className="text-aviso-fuerte">
+                El link de Mercado Pago que se le mandó sigue andando: si lo paga igual, esa plata no
+                se asienta sola.
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1.5">
+              ¿Por qué se anula?
+            </label>
+            <input
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              autoFocus
+              placeholder="Ej: se reabrió por error"
               className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary"
             />
           </div>
@@ -1050,6 +1499,7 @@ export function PagosPage() {
   const [collectingPayment, setCollectingPayment] = useState<Payment | null>(null)
   const [linkPayment, setLinkPayment] = useState<Payment | null>(null)
   const [anulando, setAnulando] = useState<Payment | null>(null)
+  const [anulandoCuota, setAnulandoCuota] = useState<Payment | null>(null)
   const puedeAnular = can('pagos.anular') || canWrite
   const [syncMsg, setSyncMsg] = useState<string | null>(null)
 
@@ -1394,10 +1844,10 @@ export function PagosPage() {
                           </td>
                           <td className="px-4 py-3 hidden sm:table-cell">
                             <div>
-                              <p className="text-xs text-muted-foreground">{p.dueDate}</p>
+                              <p className="text-xs text-muted-foreground">{fechaCorta(p.dueDate)}</p>
                               {p.date && (
                                 <p className="text-[10px] text-muted-foreground/60">
-                                  Pagado {p.date}
+                                  Pagado {fechaCorta(p.date)}
                                 </p>
                               )}
                               {/* En una oferta la fecha no es un vencimiento
@@ -1449,6 +1899,18 @@ export function PagosPage() {
                                 >
                                   Cobrar
                                 </button>
+                                {/* Una cuota que no corresponde cobrar se anula
+                                    sin tocar el período (0083). Las ofertas no:
+                                    no son deuda y caducan solas. */}
+                                {puedeAnular && !esOferta(p) && (
+                                  <button
+                                    onClick={() => setAnulandoCuota(p)}
+                                    title="Anular esta cuota"
+                                    className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive-fuerte transition-colors"
+                                  >
+                                    <Ban className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
                                 {mpConfigured && (
                                   <button
                                     onClick={() => setLinkPayment(p)}
@@ -1577,6 +2039,9 @@ export function PagosPage() {
           onClose={() => setAnulando(null)}
           onAnulado={() => setAnulando(null)}
         />
+      )}
+      {anulandoCuota && (
+        <AnularCuotaModal pago={anulandoCuota} onClose={() => setAnulandoCuota(null)} />
       )}
     </div>
   )

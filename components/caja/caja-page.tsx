@@ -28,8 +28,10 @@ import {
   fetchLedger,
   fetchOpenSession,
   fetchSessions,
+  fetchTurno,
   reabrirCaja,
   type CajaProblema,
+  type TurnoEnCurso,
 } from '@/lib/caja-api'
 import type { AccountBalance, CashSession, LedgerEntry, MovementKind } from '@/lib/types'
 
@@ -50,25 +52,89 @@ function Monto({ n, className }: { n: number; className?: string }) {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// El período del turno
+//
+// El turno se muestra por su período —de cuándo a cuándo— y nada más.
+// Hasta el 27/09 la pantalla avisaba en naranja "Sin cerrar hace 4 días ·
+// el arqueo va a juntar todos esos días", y el cierre repetía "lo que
+// contás incluye esos días, no solo hoy", como si dejar la caja abierta
+// fuera un descuido. Matías lo definió al revés: la caja se abre y se
+// cierra cuando el estudio quiere. Lo que hacía falta era ver el período y
+// que los números fueran los de ese período; el reto sobraba.
+//
+// Siempre en el huso del estudio. Antes las horas salían con el del
+// navegador, y los días se contaban cortando el ISO en UTC, que a las
+// 21:00 de Buenos Aires ya es el día siguiente.
+// ─────────────────────────────────────────────────────────────────
+const HUSO_DEL_ESTUDIO = 'America/Argentina/Buenos_Aires'
+const PARTES_DEL_MOMENTO = new Intl.DateTimeFormat('en-CA', {
+  timeZone: HUSO_DEL_ESTUDIO,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  // h23 por lo mismo que en `ahoraDelEstudio` (lib/api.ts), y porque
+  // es-AR, según el motor, escribe "10:58 a. m.".
+  hourCycle: 'h23',
+})
+const DIA_DE_LA_SEMANA = new Intl.DateTimeFormat('es-AR', {
+  timeZone: HUSO_DEL_ESTUDIO,
+  weekday: 'short',
+})
+
+/** Un instante leído en el estudio: el día ("mié 23/09", o "hoy") y la hora ("10:58"). */
+function enElEstudio(iso: string): { fecha: string; dia: string; hora: string } {
+  const d = new Date(iso)
+  const partes = PARTES_DEL_MOMENTO.formatToParts(d)
+  const p = (tipo: string) => partes.find((x) => x.type === tipo)?.value ?? '00'
+  const fecha = `${p('year')}-${p('month')}-${p('day')}`
+  return {
+    fecha,
+    dia:
+      fecha === hoyISO()
+        ? 'hoy'
+        : `${DIA_DE_LA_SEMANA.format(d).replace('.', '')} ${p('day')}/${p('month')}`,
+    hora: `${p('hour')}:${p('minute')}`,
+  }
+}
+
+/** Para una frase: "el mié 23/09 a las 10:58", o "hoy a las 10:58". */
+function cuando(iso: string): string {
+  const m = enElEstudio(iso)
+  return `${m.dia === 'hoy' ? 'hoy' : `el ${m.dia}`} a las ${m.hora}`
+}
+
+/** "de 09:05 a 13:48" si fue un solo día; "del mié 23/09 10:58 a hoy 13:48" si fueron varios. */
+function periodo(desde: string, hasta: string): string {
+  const a = enElEstudio(desde)
+  const h = enElEstudio(hasta)
+  if (a.fecha === h.fecha) return `de ${a.hora} a ${h.hora}`
+  return `del ${a.dia} ${a.hora} ${h.dia === 'hoy' ? 'a hoy' : `al ${h.dia}`} ${h.hora}`
+}
+
+// ─────────────────────────────────────────────────────────────────
 // Cierre: un solo campo, cuánto contaste
 // ─────────────────────────────────────────────────────────────────
 function CierreModal({
   cuenta,
   sesion,
-  esperado,
-  ingresos,
-  egresos,
+  turnoInicial,
+  onTurno,
   onClose,
   onCerrado,
 }: {
   cuenta: AccountBalance
   sesion: CashSession
-  esperado: number
   // Los totales del turno se calculan en vivo: los de la sesión recién se
-  // llenan al cerrarla, así que mientras está abierta son cero y el
-  // resumen mostraría ceros al lado de un esperado que no los explica.
-  ingresos: number
-  egresos: number
+  // llenan al cerrarla, así que mientras está abierta son cero.
+  //
+  // Llega el que ya tenía la pantalla, para no abrir en blanco, y se vuelve
+  // a pedir: lo que se firma es lo de ahora, y la pantalla puede llevar
+  // horas cargada. `onTurno` le pasa el número nuevo a la tarjeta de atrás,
+  // así no quedan dos "debería haber" distintos uno encima del otro.
+  turnoInicial: TurnoEnCurso | null
+  onTurno: (t: TurnoEnCurso) => void
   onClose: () => void
   onCerrado: () => void
 }) {
@@ -76,9 +142,37 @@ function CierreModal({
   const [notas, setNotas] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [turno, setTurno] = useState<TurnoEnCurso | null>(turnoInicial)
+  const [errorTurno, setErrorTurno] = useState<string | null>(null)
 
+  useEffect(() => {
+    let vigente = true
+    fetchTurno(sesion)
+      .then((t) => {
+        if (!vigente) return
+        setTurno(t)
+        setErrorTurno(null)
+        onTurno(t)
+      })
+      .catch((err) => {
+        if (!vigente) return
+        // Se descarta el que había llegado: mostrarlo sería presentar un
+        // número viejo como el de ahora. Se dice que no se pudo.
+        setTurno(null)
+        setErrorTurno(err instanceof Error ? err.message : 'No se pudo calcular el turno')
+      })
+    return () => {
+      vigente = false
+    }
+  }, [sesion, onTurno])
+
+  const esperado = turno?.esperado ?? null
+  const calculando = turno === null && errorTurno === null
   const valor = contado.trim() === '' ? null : Number(contado)
-  const diferencia = valor === null ? null : valor - esperado
+  const diferencia = valor === null || esperado === null ? null : valor - esperado
+  // Sin esperado la pantalla no puede saber si hay diferencia, y la base
+  // puede pedir el motivo igual: el campo tiene que estar para poder darlo.
+  const pideMotivo = errorTurno !== null || (diferencia !== null && diferencia !== 0)
 
   const confirmar = async () => {
     if (valor === null || Number.isNaN(valor)) {
@@ -104,39 +198,61 @@ function CierreModal({
       >
         <div className="px-5 py-4 border-b border-border">
           <h2 className="text-base font-bold text-foreground">Cerrar {cuenta.name}</h2>
+          {/* El período entero, de la apertura a ahora: es lo que se está
+              contando. Si fueron varios días, las dos fechas lo dicen. */}
           <p className="text-xs text-muted-foreground mt-0.5">
-            Turno abierto desde {new Date(sesion.openedAt).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+            Turno {periodo(sesion.openedAt, turno?.hasta ?? new Date().toISOString())}
           </p>
-          {/* Y también acá, que es donde se escribe el número: si el turno
-              viene de atrás, lo que se cuenta no es la plata de hoy. */}
-          {diasAbierta(sesion.openedAt) !== null && (
-            <p className="text-xs font-semibold text-aviso-fuerte mt-1">
-              Viene abierto de hace {diasAbierta(sesion.openedAt)}{' '}
-              {diasAbierta(sesion.openedAt) === 1 ? 'día' : 'días'}: lo que contás incluye esos
-              días, no solo hoy.
-            </p>
-          )}
         </div>
 
         <div className="px-5 py-4 space-y-4">
-          <div className="rounded-xl bg-muted/50 px-4 py-3 space-y-1.5 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Saldo al abrir</span>
-              <Monto n={esperado - ingresos + egresos} />
+          {turno ? (
+            <div className="rounded-xl bg-muted/50 px-4 py-3 space-y-1.5 text-sm">
+              {/* "Al cierre anterior" y no "al abrir": el turno arranca donde
+                  terminó el anterior, y lo que entre mientras la caja está
+                  cerrada se suma a este. Es la cuenta de `cerrar_caja`. */}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">
+                  {turno.desde ? 'Saldo al cierre anterior' : 'Saldo inicial'}
+                </span>
+                <Monto n={turno.saldoInicial} />
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Entró</span>
+                <Monto n={turno.ingresos} className="text-exito-fuerte" />
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Salió</span>
+                <Monto n={turno.egresos} className="text-destructive-fuerte" />
+              </div>
+              <div className="flex justify-between pt-1.5 border-t border-border font-semibold">
+                <span>Debería haber</span>
+                <Monto n={turno.esperado} />
+              </div>
+              {/* Lo único en que el período de la cuenta no es el de arriba:
+                  lo que entró con la caja cerrada. Se nombra sólo si pasó,
+                  para que "Entró" no tenga plata de antes de la apertura sin
+                  que nadie sepa de dónde salió. */}
+              {turno.antesDeAbrir > 0 && (
+                <p className="text-[11px] text-muted-foreground leading-snug pt-1">
+                  Incluye {turno.antesDeAbrir === 1 ? 'un movimiento' : `${turno.antesDeAbrir} movimientos`}{' '}
+                  de antes de abrirla:{' '}
+                  {turno.desde
+                    ? `el turno arranca en el cierre anterior, ${cuando(turno.desde)}.`
+                    : 'es el primer cierre de esta caja y junta todo lo anterior.'}
+                </p>
+              )}
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Entró</span>
-              <Monto n={ingresos} className="text-exito-fuerte" />
+          ) : calculando ? (
+            <div className="rounded-xl bg-muted/50 px-4 py-6 flex justify-center">
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Salió</span>
-              <Monto n={egresos} className="text-destructive-fuerte" />
-            </div>
-            <div className="flex justify-between pt-1.5 border-t border-border font-semibold">
-              <span>Debería haber</span>
-              <Monto n={esperado} />
-            </div>
-          </div>
+          ) : (
+            <p className="rounded-xl bg-aviso-suave px-4 py-3 text-xs text-aviso-fuerte leading-relaxed">
+              No se pudo calcular cuánto debería haber ({errorTurno}). Podés cerrar igual: el
+              sistema hace la cuenta al cerrar y te avisa si falta el motivo de una diferencia.
+            </p>
+          )}
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1.5">
@@ -148,7 +264,7 @@ function CierreModal({
               value={contado}
               onChange={(e) => setContado(e.target.value)}
               autoFocus
-              placeholder={String(Math.round(esperado))}
+              placeholder={esperado === null ? '' : String(Math.round(esperado))}
               className="w-full px-3 py-3 rounded-xl border border-border bg-background text-lg font-semibold text-foreground tabular-nums outline-none focus:border-primary"
             />
           </div>
@@ -176,10 +292,10 @@ function CierreModal({
             </p>
           )}
 
-          {diferencia !== null && diferencia !== 0 && (
+          {pideMotivo && (
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1.5">
-                ¿Qué pasó?
+                {esperado === null ? 'Si hubo diferencia, ¿qué pasó?' : '¿Qué pasó?'}
               </label>
               <input
                 value={notas}
@@ -202,7 +318,7 @@ function CierreModal({
           </button>
           <button
             onClick={confirmar}
-            disabled={saving || valor === null}
+            disabled={saving || valor === null || calculando}
             className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 flex items-center justify-center gap-2"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -372,27 +488,6 @@ function MovimientoModal({
 // ─────────────────────────────────────────────────────────────────
 // Pantalla
 // ─────────────────────────────────────────────────────────────────
-/**
- * Hace cuántos días quedó abierto el turno, o null si abrió hoy.
- *
- * El turno de caja no es un día: va de un cierre al siguiente, así que si
- * nadie cierra no se pierde un peso — lo que se pierde es el arqueo
- * diario, porque el jueves se cuenta el efectivo de tres días juntos y una
- * diferencia ya no se puede atribuir a un día. La pantalla decía sólo
- * "Abierta desde el 21 sep 09:15", que es el dato y no el problema: hay
- * que pararse a restar para darse cuenta.
- *
- * Se cuenta en días de calendario del estudio, igual que el aviso del
- * proceso diario, para que los dos digan el mismo número.
- */
-function diasAbierta(fechaISO: string): number | null {
-  const abrio = fechaISO.slice(0, 10)
-  const hoy = hoyISO()
-  if (abrio >= hoy) return null
-  const dias = Math.round((Date.parse(hoy) - Date.parse(abrio)) / 86400000)
-  return dias > 0 ? dias : null
-}
-
 export function CajaPage() {
   const { can, canWrite } = useData()
   // Para escribir "Efectivo" y no "efectivo": las claves de
@@ -402,6 +497,8 @@ export function CajaPage() {
   const [tab, setTab] = useState<Tab>('caja')
   const [saldos, setSaldos] = useState<AccountBalance[]>([])
   const [sesion, setSesion] = useState<CashSession | null>(null)
+  // Lo que firmaría el cierre si se cerrara ahora (ver `fetchTurno`).
+  const [turno, setTurno] = useState<TurnoEnCurso | null>(null)
   const [dia, setDia] = useState<{ ingresos: number; egresos: number; neto: number } | null>(null)
   const [libro, setLibro] = useState<LedgerEntry[]>([])
   /**
@@ -515,6 +612,15 @@ export function CajaPage() {
         setDia(d)
         setLibro(l)
         setArqueos(arq)
+        // Después, porque necesita la sesión: el turno cuenta desde su
+        // `desde`. Si falla no se deja el de la carga anterior, que sería
+        // un "debería haber" viejo presentado como el de ahora.
+        try {
+          setTurno(s ? await fetchTurno(s) : null)
+        } catch (err) {
+          setTurno(null)
+          throw err
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar la caja')
@@ -540,8 +646,11 @@ export function CajaPage() {
     }
   }
 
-  // Lo que debería haber ahora en el cajón, según el sistema.
-  const esperado = cajaPrincipal?.saldo ?? 0
+  // Lo que debería haber ahora en el cajón. Con un turno abierto es el
+  // mismo número que va a mostrar el cierre, sacado de la misma cuenta: el
+  // saldo de `account_balances` suma también lo fechado a futuro, que el
+  // cierre deja afuera, y la tarjeta y el cierre no pueden decir dos cosas.
+  const esperado = sesion ? turno?.esperado ?? null : cajaPrincipal?.saldo ?? 0
   const sinPermisoCompleto = cajaPrincipal && (!cajaPrincipal.veCobros || !cajaPrincipal.veGastos)
 
   if (cargando) {
@@ -622,20 +731,8 @@ export function CajaPage() {
                   <div>
                     <h2 className="text-sm font-bold text-foreground">{cajaPrincipal.name}</h2>
                     <p className="text-xs text-muted-foreground">
-                      {sesion
-                        ? `Abierta desde ${new Date(sesion.openedAt).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
-                        : 'Sin turno abierto'}
+                      {sesion ? `Abierta ${cuando(sesion.openedAt)}` : 'Sin turno abierto'}
                     </p>
-                    {/* El dato que hay que ver sin restar: si el turno viene
-                        de días anteriores, el arqueo de hoy junta la plata
-                        de todos esos días. */}
-                    {sesion && diasAbierta(sesion.openedAt) !== null && (
-                      <p className="text-xs font-semibold text-aviso-fuerte mt-0.5">
-                        Sin cerrar hace {diasAbierta(sesion.openedAt)}{' '}
-                        {diasAbierta(sesion.openedAt) === 1 ? 'día' : 'días'} · el arqueo va a
-                        juntar todos esos días
-                      </p>
-                    )}
                   </div>
                   {sesion ? (
                     puedeCerrar && (
@@ -676,7 +773,7 @@ export function CajaPage() {
                   <div className="px-5 py-4">
                     <p className="text-xs text-muted-foreground">Debería haber</p>
                     <p className="text-xl font-bold text-foreground tabular-nums mt-1">
-                      {plata(esperado)}
+                      {esperado === null ? '—' : plata(esperado)}
                     </p>
                   </div>
                 </div>
@@ -825,9 +922,10 @@ export function CajaPage() {
                         month: 'short',
                       })}
                     </p>
+                    {/* El título es el día del cierre, y solo, escondía que
+                        el turno podía venir de días antes. */}
                     <p className="text-[11px] text-muted-foreground">
-                      {a.closedAt &&
-                        `Cerrada ${new Date(a.closedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`}
+                      {a.closedAt && `Turno ${periodo(a.openedAt, a.closedAt)}`}
                       {a.notas && ` · ${a.notas}`}
                     </p>
 
@@ -919,9 +1017,8 @@ export function CajaPage() {
         <CierreModal
           cuenta={cajaPrincipal}
           sesion={sesion}
-          esperado={esperado}
-          ingresos={dia?.ingresos ?? 0}
-          egresos={dia?.egresos ?? 0}
+          turnoInicial={turno}
+          onTurno={setTurno}
           onClose={() => setCerrando(false)}
           onCerrado={() => {
             setCerrando(false)
@@ -979,7 +1076,7 @@ function LibroLista({
           <div className="flex-1 min-w-0">
             <p className="text-sm text-foreground truncate">{e.concepto}</p>
             <p className="text-[11px] text-muted-foreground truncate">
-              {new Date(e.at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+              {enElEstudio(e.at).hora}
               {e.contraparte && ` · ${e.contraparte}`}
               {e.medio && ` · ${e.medio}`}
               {cuentas &&

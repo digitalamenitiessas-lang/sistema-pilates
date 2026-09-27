@@ -169,6 +169,90 @@ export function cancelacionEnPlazo(
 }
 
 /**
+ * El tope de devoluciones por período (0076), o null si el estudio no lo
+ * encendió.
+ *
+ * `null` y no un número por defecto, a propósito: con un 2 escrito acá,
+ * la pantalla empezaría a decir "le quedan 0 devoluciones" antes de que
+ * la migración corra o antes de que el estudio active la regla. El
+ * default vive en la base (`devoluciones_tope`), no en el navegador.
+ */
+export function topeDeDevoluciones(settings: Settings, meta: StudioSetting[]): number | null {
+  return settingRige(meta, 'cancel_free_max') ? settingNum(settings, 'cancel_free_max', 0) : null
+}
+
+/**
+ * Qué le pasa a la clase si esa reserva se cancela AHORA, para poder
+ * decirlo antes de apretar y no enterarse después.
+ *
+ *   'vuelve'      → en plazo y con devoluciones: la clase vuelve al plan.
+ *   'sin-cupo'    → en plazo, pero ya gastó las devoluciones del período
+ *                   (0076). Avisó bien y aun así la pierde: no es lo mismo
+ *                   que llegar tarde, y si reclama la respuesta es otra.
+ *   'se-pierde'   → fuera de plazo.
+ *   'no-consume'  → la reserva no sale de ningún plan (entró por una
+ *                   excepción, `membershipId` en nulo), así que no hay
+ *                   nada que perder. Sin esta rama el cartel diría que
+ *                   pierde una clase que nunca se le descontó.
+ *   'espera'      → está en lista de espera: nunca tomó lugar ni se le
+ *                   selló un período, así que cancelar no le cuesta nada.
+ *   'suspendida'  → el estudio suspendió esa fecha. La base no sella
+ *                   plazo (`cancel_kind` en nulo): no se cuenta ni gasta
+ *                   una devolución, a la hora que sea.
+ *
+ * ESPEJA la clasificación de `consumir_clase` (0076), que es la que
+ * decide de verdad y sella el resultado en la fila. Está repetida por el
+ * mismo motivo que `cancelacionEnPlazo`: quien cancela tiene que saberlo
+ * ANTES. Y como aquella, si alguna vez se corren, tiene que avisar de más
+ * y no de menos.
+ *
+ * Las devoluciones se cuentan como las cuenta la base: canceladas de ESE
+ * período selladas 'en plazo'. Las ya selladas, no las que "parecen" en
+ * plazo — el sello es el que decide. `restantes` es cuántas le quedan
+ * ANTES de esta cancelación; null cuando no hay tope que contar.
+ *
+ * `reservas` tiene que traer las de esa persona en ese período. Se filtra
+ * por `membershipId`, así que pasarle las del estudio entero da lo mismo
+ * — pero con las de una profesora, que ve sólo las de sus clases (0058),
+ * contaría de menos.
+ */
+export interface ConsecuenciaDeCancelar {
+  caso: 'vuelve' | 'sin-cupo' | 'se-pierde' | 'no-consume' | 'espera' | 'suspendida'
+  restantes: number | null
+}
+
+export function consecuenciaDeCancelar(
+  reserva: Reservation,
+  reservas: Reservation[],
+  horasDePlazo: number,
+  /** El de `topeDeDevoluciones`: null si el tope no rige. */
+  tope: number | null,
+  opts: { suspendida?: boolean } = {}
+): ConsecuenciaDeCancelar {
+  // Mismo orden que el trigger: la suspensión manda sobre el reloj.
+  if (opts.suspendida) return { caso: 'suspendida', restantes: null }
+  if (!reserva.membershipId) {
+    return { caso: reserva.status === 'lista de espera' ? 'espera' : 'no-consume', restantes: null }
+  }
+  if (!cancelacionEnPlazo(reserva.date, reserva.time, horasDePlazo)) {
+    return { caso: 'se-pierde', restantes: null }
+  }
+  // Sin tope, cancelar a tiempo siempre devuelve: es como se comportó el
+  // sistema hasta la 0076 y como sigue mientras el estudio no lo encienda.
+  if (tope === null) return { caso: 'vuelve', restantes: null }
+
+  const devueltas = reservas.filter(
+    (r) =>
+      r.membershipId === reserva.membershipId &&
+      r.id !== reserva.id &&
+      r.status === 'cancelada' &&
+      r.cancelKind === 'en plazo'
+  ).length
+  const restantes = Math.max(0, tope - devueltas)
+  return { caso: restantes > 0 ? 'vuelve' : 'sin-cupo', restantes }
+}
+
+/**
  * Cuántos días faltan para una fecha, desde el hoy del estudio.
  *
  * Se arma con las partes del ISO y no con `new Date(iso)`, por lo mismo
@@ -213,17 +297,41 @@ export function addDays(iso: string, days: number): string {
   return localISO(date)
 }
 
+/**
+ * Qué día de la semana es esa fecha, con la convención de la grilla:
+ * 0 = lunes .. 5 = sábado, y 6 = domingo, que el estudio no abre. No es
+ * el `getDay()` de JavaScript, que arranca en domingo: mezclarlas corre
+ * la grilla un día entero.
+ */
+export function diaDeLaFecha(iso: string): number {
+  const [y, m, d] = iso.split('-').map(Number)
+  return (new Date(y, m - 1, d).getDay() + 6) % 7
+}
+
 /** Lunes de la semana que contiene esa fecha (dayOfWeek 0 = lunes). */
 export function mondayOf(iso: string = hoyISO()): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  const diff = (new Date(y, m - 1, d).getDay() + 6) % 7
-  return addDays(iso, -diff)
+  return addDays(iso, -diaDeLaFecha(iso))
+}
+
+/**
+ * La semana de trabajo que le toca a esa fecha, y qué día es dentro de
+ * ella: el lunes y el índice 0..5.
+ *
+ * El domingo no pertenece a ninguna: el estudio no abre, así que se lo
+ * trata como la víspera de la semana que viene, con el lunes elegido.
+ * Contarlo en la semana que termina —lo que hace `mondayOf`— abre una
+ * grilla de lunes a sábado que ya pasó entera, justo el día en que se
+ * mira lo que viene.
+ */
+export function semanaDeTrabajo(iso: string = hoyISO()): { lunes: string; dia: number } {
+  const lunes = mondayOf(iso)
+  const dia = diaDeLaFecha(iso)
+  return dia === 6 ? { lunes: addDays(lunes, 7), dia: 0 } : { lunes, dia }
 }
 
 /** Índice de día 0=lunes .. 6=domingo para hoy en el estudio. */
 export function todayDayIndex(): number {
-  const [y, m, d] = hoyISO().split('-').map(Number)
-  return (new Date(y, m - 1, d).getDay() + 6) % 7
+  return diaDeLaFecha(hoyISO())
 }
 
 const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
@@ -1078,6 +1186,12 @@ export async function fetchStudioData(): Promise<StudioData> {
       receiptNumber: p.receipt_number,
       mpLink: p.mp_link ?? null,
       renuevaMembresiaId: renueva,
+      // Nulo en los cobros de antes de la 0079 y mientras no corra.
+      precioLista: p.precio_lista == null ? null : Number(p.precio_lista),
+      // Los tres, nulos mientras su migración no corra (0079, 0083).
+      origen: p.origen ?? null,
+      promocionId: p.promocion_id ?? null,
+      reabrePagoId: p.reabre_pago_id ?? null,
     }
   })
 
@@ -1622,28 +1736,56 @@ export interface NewPaymentInput {
    * tocar el código. Quien manda ahora es el catálogo.
    */
   method: string
+  /**
+   * De cuánto partió, antes del ajuste del medio. `amount` es lo que entró
+   * a la caja. Se guardan las dos cosas por lo mismo que en `cobrar_cuota`
+   * (0079): sin el precio de lista, el −5% del efectivo no se puede
+   * reconstruir después.
+   */
+  precioLista?: number
 }
 
-/** Registra un cobro; devuelve el número de comprobante asignado. */
+/**
+ * Registra un cobro suelto ("Otro cobro"); devuelve el número de
+ * comprobante asignado.
+ *
+ * Se marca `origen = 'suelto'` (0083): no salda ninguna cuota, así que
+ * anularlo no tiene deuda que reabrir. Sin la marca, la base no tenía
+ * cómo distinguirlo de una cuota cobrada, y anular una remera dejaba una
+ * deuda de "Remera" con mail de cobranza.
+ */
 export async function registerPayment(input: NewPaymentInput): Promise<number> {
-  const { data, error } = await supabase
-    .from('payments')
-    .insert({
-      student_id: input.studentId,
-      membership_id: input.membershipId || null,
-      concept: input.concept,
-      amount: input.amount,
-      due_date: hoyISO(),
-      // El día lo deriva la base del instante, en el huso del estudio
-      // (migración 0016). Una sola definición de "día" para todos.
-      paid_at: new Date().toISOString(),
-      status: 'pagado',
-      method: input.method,
-    })
-    .select()
-    .single()
+  const fila = {
+    student_id: input.studentId,
+    membership_id: input.membershipId || null,
+    concept: input.concept,
+    amount: input.amount,
+    due_date: hoyISO(),
+    // El día lo deriva la base del instante, en el huso del estudio
+    // (migración 0016). Una sola definición de "día" para todos.
+    paid_at: new Date().toISOString(),
+    status: 'pagado',
+    method: input.method,
+  }
+  // Mismo criterio que `cobrar_cuota` (0079): positivo descuenta,
+  // negativo es el recargo del medio.
+  const conLista =
+    input.precioLista !== undefined
+      ? { ...fila, precio_lista: input.precioLista, descuento: input.precioLista - input.amount }
+      : fila
+  // De la más completa a la de siempre. PGRST204 = alguna columna no
+  // existe todavía: primero `origen` (0083), después el precio de lista
+  // (0079). El cobro entra igual, como entraba antes; y el que entra sin
+  // la marca la recupera cuando corra la 0083, que deduce los sueltos.
+  const intentos = [{ ...conLista, origen: 'suelto' }, conLista, fila]
+  let data: { receipt_number: number } | null = null
+  let error: { code?: string } | null = null
+  for (const intento of new Set(intentos)) {
+    ;({ data, error } = await supabase.from('payments').insert(intento).select().single())
+    if (error?.code !== 'PGRST204') break
+  }
   if (error) throw error
-  return data.receipt_number
+  return data!.receipt_number
 }
 
 /**
@@ -1653,6 +1795,10 @@ export async function registerPayment(input: NewPaymentInput): Promise<number> {
  * Si el cobro era de un día que ya se arqueó, ese arqueo NO cambia — dice
  * lo que se contó ese día y sigue siendo cierto. Lo que haya que devolver
  * se registra hoy, como movimiento de caja.
+ *
+ * Ojo: esto NO reabre la deuda. Es el camino de antes de la 0083 y queda
+ * sólo como respaldo de `anularCobro` y `anularCuota`, que son los que usa
+ * la pantalla.
  */
 export async function voidPayment(paymentId: string, motivo: string): Promise<void> {
   const { data: actual } = await supabase
@@ -1669,6 +1815,132 @@ export async function voidPayment(paymentId: string, motivo: string): Promise<vo
     })
     .eq('id', paymentId)
   if (error) throw error
+}
+
+/**
+ * Qué queda después de anular un cobro (0083). Lo decide quien anula, y
+ * la base puede no hacerlo si no corresponde:
+ *
+ *   · 'debe'       → la cuota vuelve a quedar pendiente.
+ *   · 'nada'       → se tacha y no queda nada pendiente.
+ *   · 'renovacion' → se borra el período que creó el cobro de una oferta
+ *                    y la clienta vuelve a tener la oferta.
+ */
+export type QuedaAlAnular = 'debe' | 'nada' | 'renovacion'
+
+export interface ResultadoDeAnular {
+  comprobante: number | null
+  /** Lo que se había cobrado y deja de contar como plata entrada. */
+  anulado: number
+  /** Lo que quedó de verdad, que puede no ser lo que se pidió. */
+  queda: QuedaAlAnular
+  /** La cuota pendiente que quedó en su lugar, o la oferta que se devolvió. */
+  cuotaNueva: string | null
+  debe: number | null
+  vence: string | null
+  /** La promo que conserva la cuota reabierta. */
+  promo: string | null
+  /** El período que se borró al deshacer la renovación. */
+  periodoDesde: string | null
+  periodoHasta: string | null
+  /**
+   * Por qué no se hizo lo que se pidió —el período sigue pago con otra
+   * cuota, ya tenía una pendiente, es un cobro suelto…— o lo que conviene
+   * saber, como que la oferta ya había vencido.
+   */
+  aviso: string | null
+}
+
+/**
+ * Anula un cobro y deja lo que se pida en su lugar (0083).
+ *
+ * Anular sólo tachaba el cobro: la cuota no volvía a abrirse, la
+ * membresía quedaba sin deuda en todas las pantallas y el proceso diario
+ * no la reclamaba nunca. Lo del medio equivocado —anular para volver a
+ * cobrar bien— dejaba el mes cobrado sin plata adentro.
+ *
+ * La base decide cuándo no corresponde lo que se pidió, y por eso lo que
+ * vuelve es lo que hizo: la pantalla muestra eso en vez de dar por hecho.
+ *
+ * Sin la 0083 sólo se puede lo de antes, tachar, y se hace con
+ * `voidPayment`: el mostrador no puede quedarse sin anular por una
+ * migración. Lo otro no se hace a medias: si se pidió que vuelva a deber
+ * y la base no sabe, anular igual sería el mismo agujero de siempre.
+ */
+export async function anularCobro(
+  paymentId: string,
+  motivo: string,
+  queda: QuedaAlAnular,
+  /** Lo que se cobró, para poder contestar igual si hay que caer a `voidPayment`. */
+  cobrado: number,
+  receiptNumber?: number | null
+): Promise<ResultadoDeAnular> {
+  const { data, error } = await supabase.rpc('anular_cobro', {
+    p_payment: paymentId,
+    p_motivo: motivo.trim(),
+    p_queda: queda,
+  })
+  if (error?.code === '42883' || error?.code === 'PGRST202') {
+    if (queda === 'debe') {
+      throw new Error(
+        'Para que vuelva a quedar debiendo falta correr la migración 0083. Mientras tanto: anulalo con "No queda debiendo" y, si la clienta está pagando ahora, cobrale bien desde "Otro cobro".'
+      )
+    }
+    if (queda === 'renovacion') {
+      throw new Error('Para deshacer la renovación falta correr la migración 0083.')
+    }
+    await voidPayment(paymentId, motivo)
+    return {
+      comprobante: receiptNumber ?? null,
+      anulado: cobrado,
+      queda: 'nada',
+      cuotaNueva: null,
+      debe: null,
+      vence: null,
+      promo: null,
+      periodoDesde: null,
+      periodoHasta: null,
+      aviso: null,
+    }
+  }
+  if (error) throw errorDeLaBase(error, 'No se pudo anular el cobro')
+  const f = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | undefined
+  const texto = (v: unknown) => (v == null ? null : String(v))
+  return {
+    comprobante: f?.comprobante == null ? null : Number(f.comprobante),
+    anulado: Number(f?.anulado ?? cobrado),
+    queda: (f?.queda as QuedaAlAnular) ?? 'nada',
+    cuotaNueva: texto(f?.cuota_nueva),
+    debe: f?.debe == null ? null : Number(f.debe),
+    vence: texto(f?.vence),
+    promo: texto(f?.promo),
+    periodoDesde: texto(f?.periodo_desde),
+    periodoHasta: texto(f?.periodo_hasta),
+    aviso: texto(f?.aviso),
+  }
+}
+
+/**
+ * Anula una cuota que nunca se cobró (0083): la reabierta que no
+ * correspondía, o la que el estudio decide no cobrar. Hasta la 0083 la
+ * única salida era cancelar el período entero, que le saca las clases.
+ *
+ * No anula ofertas de renovación: no son deuda y caducan solas.
+ *
+ * Sin la 0083 cae al mismo update de `voidPayment`, que la base deja
+ * pasar con `pagos.anular` (0013). La pantalla no ofrece anular ofertas,
+ * que es lo único que la función frenaría y el update no.
+ */
+export async function anularCuota(paymentId: string, motivo: string): Promise<void> {
+  const { error } = await supabase.rpc('anular_cuota', {
+    p_payment: paymentId,
+    p_motivo: motivo.trim(),
+  })
+  if (error?.code === '42883' || error?.code === 'PGRST202') {
+    await voidPayment(paymentId, motivo)
+    return
+  }
+  if (error) throw errorDeLaBase(error, 'No se pudo anular la cuota')
 }
 
 /** Cobra un pago pendiente existente; devuelve el número de comprobante. */
@@ -2158,9 +2430,13 @@ export async function anunciarPromocion(
 // Turnos fijos (0048)
 //
 // Un turno fijo es el derecho de un cliente sobre un día y hora de la
-// grilla, no una reserva ni un conjunto de reservas. Por eso acá no se
-// crea ni se cancela nada de `reservations`: se escribe una fila de
-// `fixed_slots` y listo.
+// grilla, no una reserva ni un conjunto de reservas. Por eso asignarlo,
+// liberarlo o pausarlo escribe una fila de `fixed_slots` y nada más.
+//
+// Lo que sí toca `reservations` es completar sus fechas
+// (`reservarFechasDelTurno`), y eso va aparte y de a una, por el mismo
+// insert que la reserva a mano. El cupo de cada fecha lo ocupan esas
+// reservas, no el turno: `enforce_class_capacity` no mira `fixed_slots`.
 // ---------------------------------------------------------------
 
 /** El aviso de que la 0048 todavía no corrió, dicho una sola vez. */
@@ -2170,13 +2446,13 @@ function sinTurnosFijos(error: { code?: string } | null): boolean {
 }
 
 /**
- * Las fechas de esa clase, semana a semana, desde mañana hasta que
- * termina el período.
+ * Las fechas de esa clase, semana a semana, entre dos días inclusive.
  *
- * "Desde mañana" y no desde hoy: la clase de hoy ya la acaba de reservar
- * —es lo que disparó la pregunta— y volver a ofrecerla sería contarla dos
- * veces. El día de la semana sale de la clase y no de la fecha reservada,
- * porque es el mismo dato con el que la base valida (`reserva_en_hora`).
+ * Es sólo el calendario: no sabe qué tiene reservado nadie. Lo que un
+ * turno fijo todavía puede llenar lo dice `fechasPorCompletar`, que
+ * arranca de acá. El día de la semana sale de la clase y no de una fecha
+ * reservada, porque es el mismo dato con el que la base valida
+ * (`reserva_en_hora`).
  */
 export function fechasDelTurno(diaDeLaSemana: number, desde: string, hasta: string): string[] {
   const fechas: string[] = []
@@ -2193,18 +2469,312 @@ export function fechasDelTurno(diaDeLaSemana: number, desde: string, hasta: stri
 }
 
 /**
+ * De qué período salen las fechas de un turno fijo.
+ *
+ * El que cubre esa fecha y, si ninguno la cubre, el próximo en arrancar.
+ * Lo segundo es la tanda de la apertura: el 27/09 las clientas entran con
+ * un plan que arranca el 29, y hasta acá el portal miraba "el período de
+ * hoy", que para ellas no existe — así que nunca les ofrecía el fijo.
+ *
+ * El pase de prueba va último aunque cubra la fecha: FE FIRST dice una vez
+ * por semana porque es UNA clase, no porque ella vaya a venir una vez, y el
+ * período del pase son siete días. La que usó su clase gratis el sábado y
+ * arranca FE FLOW el martes quiere completar el mes de FE FLOW.
+ *
+ * Ojo, que no es "el plan que paga la clase": ése es `membresia_para`
+ * (0037), que cobra primero la que todavía tiene clases y vence antes —o
+ * sea, un pase sin usar—. Acá la pregunta es otra, de qué plan son las
+ * semanas que vienen, y por eso el pase va al revés. Con un pase sin usar
+ * que cubra la primera fecha de un lote, esa fecha se la cobra el pase y
+ * las demás este plan.
+ *
+ * Es el mismo orden que `plan_de_los_fijos` (0082), que es el que pone el
+ * tope de horarios en la base. El tope el portal no lo calcula: se lo
+ * pregunta (`miTopeDeFijos`). Pero que las fechas propuestas y el tope
+ * hablen del mismo plan depende de que los dos órdenes coincidan, así
+ * que si uno cambia, cambia el otro.
+ *
+ * Suspendida y cancelada no entran: en la base son las que no tienen
+ * `status = 'activa'`, y ésas no pagan ninguna clase.
+ */
+export function periodoDelTurno(
+  propias: Membership[],
+  planes: Plan[],
+  fecha: string
+): Membership | undefined {
+  const esPase = (m: Membership) => (planes.find((p) => p.id === m.planId)?.isTrial ? 1 : 0)
+  const cubre = (m: Membership) => (m.startDate <= fecha ? 1 : 0)
+  return propias
+    .filter((m) => m.status !== 'cancelada' && m.status !== 'suspendida' && m.endDate >= fecha)
+    .sort(
+      (a, b) =>
+        esPase(a) - esPase(b) ||
+        cubre(b) - cubre(a) ||
+        // Entre las que cubren, la que más lejos llega (0078); entre las
+        // que todavía no arrancaron, la que arranca primero.
+        (cubre(a) ? b.endDate.localeCompare(a.endDate) : a.startDate.localeCompare(b.startDate))
+    )[0]
+}
+
+/**
+ * El período de una fecha que se está MIRANDO, que no es lo mismo que el
+ * de una fecha reservada.
+ *
+ * El mostrador abre el martes 20/10 para darle el horario a una clienta
+ * cuyo plan vence el 14/10. `periodoDelTurno` con el 20/10 no encuentra
+ * nada —descarta todo plan que venza antes—, y la Agenda le decía "no
+ * tiene un plan vigente ni por empezar" a alguien que está yendo. Si la
+ * fecha no tiene período, se mira el de hoy: la pantalla puede decir "su
+ * plan no llega a esta fecha", que es lo que pasa.
+ */
+export function periodoMirando(
+  propias: Membership[],
+  planes: Plan[],
+  fecha: string,
+  hoy: string = hoyISO()
+): Membership | undefined {
+  return periodoDelTurno(propias, planes, fecha > hoy ? fecha : hoy) ?? periodoDelTurno(propias, planes, hoy)
+}
+
+/**
+ * Las fechas que un turno fijo todavía puede llenar dentro de un período.
+ *
+ * DENTRO DEL PERÍODO. No hasta `prioridad_hasta`, que suma los días de
+ * gracia y el período que tenga encolado: eso le reservaría clases que
+ * paga otro plan, cuando lo que pidió es "el mes que tiene".
+ *
+ * DESDE DÓNDE depende de quién pregunta, y por eso es un parámetro:
+ *
+ *   · Al hacer fijo un horario, desde la fecha que eligió —la que acaba
+ *     de reservar ella, o la que el mostrador tiene abierta—. Si reservó
+ *     el 06/10 y no el 29/09, es porque el 29 no viene: anotárselo le
+ *     gastaba una clase del plan y, para deshacerlo, una de sus
+ *     devoluciones del período (0076). Es el "desde mañana" que tenía
+ *     antes la hoja, dicho con la fecha.
+ *   · Al completar un horario que ya es suyo, desde la primera fecha que
+ *     ya tiene de ese horario en el período, o desde que arranca si no
+ *     tiene ninguna (`turnoPorCompletar` dice por qué).
+ *
+ * Y nunca antes de que arranque el período ni antes de hoy.
+ *
+ * Sin las fechas en las que ya tiene una reserva de esa clase, en
+ * cualquier estado. Ésa es la cuenta que evita descontar dos veces: la
+ * clase que acaba de reservar —la que disparó la pregunta—, las que le
+ * anotó el mostrador al darle el horario, las que ya se anotó ella. Una en
+ * lista de espera también, porque volver a insertarla choca con la
+ * restricción única y sale como un error que no le dice nada.
+ *
+ * Las canceladas también quedan afuera, y por dos razones. Una es de
+ * ella: si canceló el 13 es porque ese día no viene, y un "completá tu
+ * horario" que se la vuelve a anotar le deshace lo que decidió. La otra
+ * es de la base: esa fecha no entraría por el insert sino por
+ * `reactivar_reserva` (0031), que no vuelve a mirar el saldo —está
+ * anotado en la §0—. Así todo lo que se completa pasa por el insert y por
+ * `consumir_clase` entero.
+ *
+ * Las suspendidas y las que ya cerraron no se ofrecen: las va a rechazar
+ * la base, y listarlas en "te anotamos en…" sería prometer una fecha que
+ * no existe.
+ *
+ * Las que ya están completas van aparte, en `llenas`, si se sabe la
+ * ocupación. Sin eso, la tarjeta de Inicio le ofrecía para siempre la
+ * misma fecha llena: la reserva fallaba, no quedaba registrada, y la
+ * cuenta de "te faltan" no bajaba nunca. Si la ocupación no se sabe
+ * (`ocupacion` sin pasar), no se filtra nada y la base dice cuál está
+ * llena al reservar.
+ */
+export function fechasPorCompletar({
+  clase,
+  periodo,
+  desde,
+  studentId,
+  reservas,
+  ocurrencias = [],
+  ocupacion,
+  ahora = ahoraDelEstudio(),
+  minutosDeCorte = 0,
+}: {
+  clase: { id: string; dayOfWeek: number; time: string; capacity: number }
+  periodo: { startDate: string; endDate: string }
+  desde?: string
+  studentId: string
+  reservas: Reservation[]
+  ocurrencias?: ClassOccurrence[]
+  /** Anotadas por `${classId}|${fecha}`, de `fetchOcupacionDeClases`. */
+  ocupacion?: Map<string, number>
+  ahora?: { fecha: string; hora: string }
+  minutosDeCorte?: number
+}): { fechas: string[]; llenas: string[] } {
+  const arranque = [periodo.startDate, desde ?? ''].reduce((a, b) => (b > a ? b : a), ahora.fecha)
+  const tomadas = new Set(
+    reservas.filter((r) => r.studentId === studentId && r.classId === clase.id).map((r) => r.date)
+  )
+  const fechas: string[] = []
+  const llenas: string[] = []
+  for (const f of fechasDelTurno(clase.dayOfWeek, arranque, periodo.endDate)) {
+    if (tomadas.has(f)) continue
+    const exc = ocurrencias.find((o) => o.classId === clase.id && o.date === f)
+    if (exc?.status === 'suspendida') continue
+    if (reservaCerrada(f, exc?.startTime ?? clase.time, ahora, minutosDeCorte)) continue
+    // El mismo cupo que mira `enforce_class_capacity` (0018): el de ese día
+    // si el estudio lo cambió, y si no el de la clase. Una fecha sin fila
+    // en la vista es una fecha sin nadie anotado.
+    if (ocupacion && (ocupacion.get(`${clase.id}|${f}`) ?? 0) >= (exc?.capacity ?? clase.capacity)) {
+      llenas.push(f)
+      continue
+    }
+    fechas.push(f)
+  }
+  return { fechas, llenas }
+}
+
+/**
+ * Lo que le falta a un horario que ya es suyo: de qué período y qué fechas.
+ *
+ * Mira primero el período de `mirando` —hoy, en el portal; la fecha que el
+ * mostrador tiene abierta, en la Agenda— y, si ahí no le entra ninguna,
+ * el siguiente: el que arranca después de que ése vence. Lo segundo es la
+ * renovación. Pagó el mes que viene, el período nuevo quedó encolado
+ * ('futura'), y el de hoy ya tiene todas las fechas anotadas o las clases
+ * agotadas. Sin mirar el siguiente, el "cuando renueves, las completás
+ * desde Inicio" de la hoja recién valía el día que arrancaba, y hasta ese
+ * día sus martes quedaban libres para cualquiera.
+ *
+ * Y dentro de cada período, desde la primera fecha de ese horario que ya
+ * tiene ahí, en cualquier estado; si no tiene ninguna, desde que arranca.
+ * Completar es llenar los huecos de lo que empezó, no volver para atrás:
+ * a la que hizo fijo el martes desde el 06/10 —porque el 29/09 no venía—
+ * la tarjeta de Inicio le ofrecía el 29 hasta que pasara, y el renglón de
+ * la Agenda también. Con el mes que viene sin nada anotado, o con el
+ * horario que le dio el mostrador antes de que la Agenda anotara fechas,
+ * no hay primera fecha y se completa entero.
+ *
+ * Nulo si no tiene período. Si tiene y no le entra nada en ninguno, vuelve
+ * el primero con `entran` en cero, para que la pantalla pueda decir por qué.
+ */
+export function turnoPorCompletar({
+  propias,
+  planes,
+  mirando,
+  ...resto
+}: Omit<Parameters<typeof fechasPorCompletar>[0], 'periodo' | 'desde'> & {
+  propias: Membership[]
+  planes: Plan[]
+  mirando: string
+}): { periodo: Membership; fechas: string[]; llenas: string[]; libres: number; entran: number } | null {
+  const hoy = resto.ahora?.fecha ?? hoyISO()
+  const cuenta = (periodo: Membership) => {
+    const primera = resto.reservas
+      .filter(
+        (r) =>
+          r.studentId === resto.studentId &&
+          r.classId === resto.clase.id &&
+          r.date >= periodo.startDate &&
+          r.date <= periodo.endDate
+      )
+      .map((r) => r.date)
+      .sort()[0]
+    const { fechas, llenas } = fechasPorCompletar({ ...resto, periodo, desde: primera })
+    const libres = Math.max(0, periodo.classesTotal - periodo.classesUsed)
+    return { periodo, fechas, llenas, libres, entran: Math.min(fechas.length, libres) }
+  }
+  const primero = periodoMirando(propias, planes, mirando, hoy)
+  if (!primero) return null
+  const deEste = cuenta(primero)
+  if (deEste.entran > 0) return deEste
+  const siguiente = periodoDelTurno(propias, planes, addDays(primero.endDate, 1))
+  if (!siguiente || siguiente.id === primero.id) return deEste
+  const delOtro = cuenta(siguiente)
+  return delOtro.entran > 0 ? delOtro : deEste
+}
+
+/**
+ * Cuántas hay anotadas en esas clases, fecha por fecha, entre dos días.
+ * Clave `${classId}|${fecha}`.
+ *
+ * De `class_occupancy` y no de las reservas del paquete, por lo mismo que
+ * la grilla: la clienta sólo lee las suyas, y contar sobre eso diría que
+ * todo martes tiene lugar.
+ *
+ * `undefined` si la vista no contesta, y no un mapa vacío: vacío quiere
+ * decir "no hay nadie anotado en ninguna", que es una afirmación. Sin
+ * dato, `fechasPorCompletar` no filtra y la base dice cuál está llena al
+ * reservar.
+ */
+export async function fetchOcupacionDeClases(
+  classIds: string[],
+  desde: string,
+  hasta: string
+): Promise<Map<string, number> | undefined> {
+  if (classIds.length === 0 || hasta < desde) return new Map()
+  try {
+    const { data, error } = await supabase
+      .from('class_occupancy')
+      .select('class_id, date, confirmed')
+      .in('class_id', classIds)
+      .gte('date', desde)
+      .lte('date', hasta)
+    if (error) return undefined
+    const map = new Map<string, number>()
+    for (const row of (data ?? []) as Array<{ class_id: string; date: string; confirmed: number | string }>) {
+      map.set(`${row.class_id}|${row.date}`, Number(row.confirmed))
+    }
+    return map
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Cuántos horarios fijos le tocan, según la base (0082). Número, o `null`
+ * si no hay tope: sin plan, o con un plan que no declara su frecuencia.
+ *
+ * `undefined` quiere decir "no sé", y no es lo mismo que `null`. Viene así
+ * cuando la 0082 todavía no corrió —la función no existe: 42883 o
+ * PGRST202— o cuando la pregunta falló. En los dos casos el portal se
+ * queda con lo de antes: el tope del plan que muestra, y el fijo sólo para
+ * quien tiene un plan que cubra hoy, porque sin la 0082 la base sigue
+ * siendo la 0077 y la 0078, y ofrecerle otra cosa era ofrecerle algo que
+ * la base rechaza siempre.
+ *
+ * Que exista la función es además la forma de saber que la 0082 corrió:
+ * cambia el cuerpo de dos funciones que ya existían, y eso desde acá no se
+ * ve.
+ */
+export async function miTopeDeFijos(): Promise<number | null | undefined> {
+  try {
+    const { data, error } = await supabase.rpc('mi_tope_de_fijos')
+    if (error) return undefined
+    return typeof data === 'number' && data > 0 ? data : null
+  } catch {
+    return undefined
+  }
+}
+
+/**
  * El turno fijo que la clienta se da a sí misma (0077).
  *
  * Va por función y no escribiendo `fixed_slots`: su política de insert
  * pide `turnos.asignar`, que es del mostrador. La función valida que la
- * clase se repita, que tenga membresía vigente y que no lo tenga ya, y
- * cada rechazo viene con el texto que ella lee.
+ * clase se repita, que tenga un plan vigente o por empezar (0082) y que no
+ * lo tenga ya, y cada rechazo viene con el texto que ella lee.
  */
 export async function tomarTurnoFijoPropio(classId: string): Promise<string> {
   const { data, error } = await supabase.rpc('turno_fijo_propio', { p_class: classId })
   if (error) {
     if (error.code === 'PGRST202') {
       throw new Error('Para elegir tu horario fijo falta correr la migración 0077.')
+    }
+    // El texto de la 0077, que pedía una membresía que cubriera HOY. El
+    // portal no le ofrece el fijo con un plan por empezar mientras la
+    // 0082 no corrió (`miTopeDeFijos`), así que esto es la red: si igual
+    // llega, lo que le pasa es que su plan todavía no arrancó. Dicho así, y
+    // no "necesitás una membresía", que a quien ya pagó le suena a que el
+    // pago no entró. Y sin nombrar migraciones, que es cosa nuestra.
+    if (/membresía vigente para tomar un horario fijo/i.test(error.message ?? '')) {
+      throw new Error(
+        'Tu plan todavía no arrancó: el horario fijo lo vas a poder elegir desde el día que empieza. La reserva que hiciste queda en pie.'
+      )
     }
     throw errorDeLaBase(error, 'No se pudo tomar el horario fijo')
   }
@@ -2234,15 +2804,24 @@ export async function soltarTurnoFijoPropio(slotId: string): Promise<void> {
  * Se corta al primer "sin clases": una vez agotado el plan, las que
  * siguen van a fallar todas por lo mismo y repetir el mismo error cuatro
  * veces no le dice nada nuevo.
+ *
+ * Y se corta también al llegar a `tope`, que es lo que la pantalla le
+ * dijo antes de apretar: "te descuenta N clases". La base corta sola al
+ * agotarse el plan cuando la fecha entra por insert, que es lo normal
+ * desde que `fechasPorCompletar` deja afuera las canceladas. Si alguna
+ * llegara por `reactivar_reserva` (0031) —otra pantalla, una carrera—,
+ * ese camino no mira el saldo, y esto es la red de este lado.
  */
 export async function reservarFechasDelTurno(
   studentId: string,
   classId: string,
-  fechas: string[]
+  fechas: string[],
+  tope: number = Infinity
 ): Promise<{ hechas: string[]; fallaron: Array<{ fecha: string; motivo: string }> }> {
   const hechas: string[] = []
   const fallaron: Array<{ fecha: string; motivo: string }> = []
   for (const fecha of fechas) {
+    if (hechas.length >= tope) break
     try {
       await createReservation(studentId, classId, fecha, 'confirmada')
       hechas.push(fecha)

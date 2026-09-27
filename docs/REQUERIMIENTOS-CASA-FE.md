@@ -8,7 +8,7 @@
 > **¿Buscás qué falta? Está en la §0, acá abajo.** Es la única lista al día; el
 > resto del documento es el análisis y la historia.
 
-## 0. LO QUE FALTA — la lista viva  ·  al 25/09/2026
+## 0. LO QUE FALTA — la lista viva  ·  al 27/09/2026
 
 > **Esta es la única lista al día.** Las secciones de abajo son el análisis y la
 > historia de cómo se llegó acá, y varias quedaron viejas a propósito: son la
@@ -133,6 +133,27 @@ llegado ninguno a nadie, y el link de "Cómo llegar" de la web pasó de Bing
 a Google Maps. El seguimiento de lo que queda de la auditoría vive fuera
 del repo, en una página privada.
 
+El **27/09** se ejerció el sistema por rol, en producción: el admin como
+mostrador, una clienta, la profesora y la dueña, cada paso contra la base.
+Lo que toca plata anduvo. Lo que salió se arregló en el mismo día —cancelar
+desde Reservas pide confirmación, los montos de los avisos salen en pesos
+(`0084`), los textos sin género, el domingo en la Agenda y en las horas, el
+período de la caja abierta, el WhatsApp del portal como link, las fechas en
+crudo y dos formularios que en el celular no dejaban ver el precio— junto
+con el turno fijo de un plan que todavía no arrancó (`0082`) y el cobro
+anulado que borraba la deuda (`0083`). El detalle, en `PLAN.md`.
+**`studio_whatsapp` está vacío** desde el 25/09: hasta que se cargue, la web
+usa el número de respaldo del código y el portal no ofrece WhatsApp.
+
+El **27/09** se escribió la `0083`, **que falta correr**: anular un cobro
+dejaba el mes sin deuda y sin plata —el caso del medio equivocado, que va a
+pasar la primera semana—. Ahora quien anula elige qué queda: la cuota
+pendiente otra vez, al precio de lista y con su promo; nada; o, en una
+renovación, deshacer el período que creó. La base no reabre lo que nunca
+saldó una cuota, como un "Otro cobro", y una cuota pendiente se puede
+anular sin cancelar el período. El detalle y el paso a paso para
+verificarla, en `PLAN.md`.
+
 ### Lo que falta construir
 
 | | Qué | Tamaño |
@@ -142,7 +163,8 @@ del repo, en una página privada.
 | 🔴 | **"A imputar" acusa y no se puede vaciar.** Un cobro con un medio sin cuenta cae en la cuenta transitoria —eso está bien, es visible y no se pierde— pero **no hay pantalla para imputarlo ni para reasignarle la cuenta a un cobro ya hecho**, y la cuenta está excluida del modal de movimientos, así que ni con una transferencia manual se la puede vaciar. El tablero la denuncia y no lleva a ningún lado | mediano |
 | — | **Una cuenta dada de baja sigue mostrando su saldo.** La vista `account_balances` no filtra por `active` y `fetchBalances` descarta la columna, así que aparece en Caja, en el tablero y en el selector de movimientos como si estuviera viva | chico |
 | — | **El arqueo sabe de una sola caja**: toma la primera con `arquea = true` y sobre esa abre, cierra y lista el día. Con dos cajas —el mostrador y una de la profesora, por ejemplo— la segunda no se puede arquear, y la pantalla no lo dice | mediano |
-| — | **La promo limitada a un plan nunca se aplica a la renovación.** `promociones_para` (`0079`) saca el plan de la cuota por `membership_id` o, si no, por el nombre del plan igual al concepto; la oferta de renovación nace **sin** `membership_id` y con el concepto "FE FLOW — renovación", así que no encuentra ninguna de las dos y descarta toda promo que tenga planes. Justo el pago que una promo de "pago temprano" quiere premiar. Hoy no hay promociones cargadas. Arreglo: una migración que busque el plan por `renueva_membresia_id` | chico |
+| — | **La promo limitada a un plan nunca se aplica a la renovación.** `promociones_para` (`0079`) no encontraba el plan de la oferta, que nace sin `membership_id` y con el concepto "FE FLOW — renovación", y descartaba toda promo con planes. **Lo arregla la `0083`**, que redefine esa función por otro motivo y de paso busca el plan por `renueva_membresia_id`. Queda la fila hasta que corra | — |
+| — | **Deshacer una asignación borra también los cobros anulados.** `eliminar_membresia` (`0071`) frena si hay un cobro `pagado`, pero borra todas las filas del período, incluidas las anuladas con comprobante. Anular el cobro y después deshacer la asignación hace desaparecer un comprobante emitido. La `0083` no pasa por ahí —deshacer una renovación deja el cobro tachado—, pero la ficha sí. Arreglo: que borre sólo las pendientes y deje las anuladas sin período | chico |
 | — | **Resend como SMTP de Supabase.** "Olvidé mi contraseña" **no pasa por Resend**: usa el mailer de Supabase, que sólo le entrega a las casillas del equipo del proyecto, así que hoy no le llega a ninguna clienta. Desde el 25/09 el mostrador puede blanquearle la clave desde la ficha, pero el camino propio de ella sigue sin andar. Con el dominio ya verificado es configuración, no desarrollo. **Va después de rehacer la cuenta admin**: el mail de la demo es de un dominio ajeno | chico |
 | — | **Casi ningún aviso llega al celular.** El push sale sólo del proceso diario, y sólo para por vencer, vencida, deuda y renovación. El recordatorio de la clase ("Te esperamos hoy"), la reserva confirmada, la suspensión, el cambio de profesora y el lugar liberado los escribe la base y quedan en la campana: la clienta que no abre el portal no se entera. Y del staff no hay ningún celular suscripto, así que "caja sin cerrar" o "pago vencido" no le vibran a nadie. Desde el 25/09 cada uno puede probar su celular con "Mandar un aviso de prueba" | mediano |
 | — | **El blanqueo de contraseñas deja poco rastro.** El de una clienta deja una línea en la bitácora de la ficha, que quien la escribió puede borrar; el del staff no deja ninguno. Falta una tabla de auditoría sin delete, escrita desde el servidor, con quién, a quién y cuándo | chico |
@@ -154,7 +176,8 @@ del repo, en una página privada.
 | — | **Marcar asistencia no filtra por clase propia en la base.** La permisiva de update mira la clave y no el `class_id`, así que en teoría una profesora podría marcar en la clase de otra; en la práctica no tiene por dónde, porque desde la `0058` no lee esas filas y para escribir hace falta el uuid. No se cerró con la `0059` a propósito: esa pareja de políticas es la más delicada del sistema —la restrictiva alcanza también a la cancelación de la alumna— y se prueba con tiempo | chico |
 | 🔴 | **Mercado Pago entero, aislado a pedido de Matías (24/09).** No está configurado —las dos credenciales vacías, cero links generados— y el relevamiento encontró seis huecos, el principal que **nadie le dice a MP a dónde notificar**: `notification_url` no existe en el proyecto, así que el webhook sólo suena si alguien lo registró a mano en el panel, y el sync tapa el agujero sin que nadie se entere. Todo en [`docs/MERCADO-PAGO.md`](MERCADO-PAGO.md), que es por donde se arranca | mediano |
 | — | **El cupón no se puede usar desde el portal.** La clienta que recibe un código sólo puede canjearlo en el mostrador: el pago por Mercado Pago no pasa por `cobrar_cuota()`, así que el link se arma con el precio de lista. Falta también publicar las promociones vigentes en la web y el reporte de uso | mediano |
-| — | **`reactivar_reserva` no revalida el saldo de clases.** Lo hace en el INSERT y no en el UPDATE, así que volver a una reserva cancelada puede pasar por encima del contador. Viene de antes, pero el turno fijo lo dispara más seguido: reserva de a siete fechas | chico |
+| — | **`reactivar_reserva` no revalida el saldo de clases.** Lo hace en el INSERT y no en el UPDATE, así que volver a una reserva cancelada puede pasar por encima del contador. Viene de antes. Desde el 27/09 el turno fijo **ya no pasa por ahí**: completar sus fechas deja afuera las canceladas (si canceló el 13 es porque ese día no viene) y corta en las clases que le quedan. Queda el camino de siempre, volver a reservar a mano una que canceló | chico |
+| — | **El turno "en pausa" promete un lugar que nadie cuida.** La Agenda le dice al mostrador "el estudio le guarda el lugar" y el portal a ella "lo seguís conservando", pero `guard_cupo_fijo` (`0048`) sólo cuenta los activos: mientras está en pausa el lugar fijo se le puede dar a otra, y al reactivarlo la base lo rechaza por cupo. Hay que decidir si la pausa ocupa cupo fijo o si el texto deja de prometerlo | chico |
 | **§1** | Cambio de horario por fecha. La tabla lo soporta desde la `0018`; falta la pantalla | chico |
 | — | Foto del comprobante de gasto (primer uso de Storage) · avisos de caja en el proceso diario | chico |
 | — | **Fichaje de entrada y salida** de las profesoras. Se apoya en `staff_work_logs` sin rehacer nada, pero necesita que tengan cuenta | chico |
@@ -187,6 +210,7 @@ inicio" quedaron dentro de Perfil.
 | **No puede tomar el lugar que se liberó** | El aviso de la `0052` le dice "entrá a reservarlo" y en el portal encuentra el renglón "En espera" sin ningún botón. La base sí lo permitiría |
 | **El recupero no existe del lado de ella** | Desde el 17/09 el cartel de cancelar le dice cuántas recuperaciones le quedan y hasta cuándo, pero pedirla sigue siendo ir al mostrador |
 | ✅ **El turno fijo lo elige y lo ve** | `0077` y `0078` (23/09). Al reservar le pregunta si es por esta vez o fijo; si es fijo le completa el período, y lo ve en Inicio con hasta cuándo lo conserva y un botón para soltarlo. **En la renovación vuelve a elegir** |
+| ⏳ **…también con un plan que todavía no arrancó** (27/09, T27) | La tanda de la apertura no podía: el portal medía "el período de hoy", que para un plan del 29 no existe, y la `0077` pedía una membresía que cubriera hoy. Ahora las fechas salen del plan que va a pagar las semanas del horario, desde la que ella eligió hasta que vence, y el tope lo dice la base (`mi_tope_de_fijos`, con el pase de prueba último). La Agenda, al dar el horario, **la anota en las fechas desde la abierta** —antes sólo escribía el derecho, y el lugar de cada fecha lo cuidan las reservas—, y lo que le falte a un horario que ya es suyo (lo dio el mostrador, o renovó) se completa desde su renglón en la Agenda o desde Inicio, que mira también el período encolado. **La `0082` se corre antes de mergear**: sin ella el portal no le ofrece el fijo a quien tiene un plan por empezar, igual que antes, y el resto anda |
 | **Los domingos no existen** | La base admite `day_of_week = 6`; el portal tiene seis días y recorta el índice a 5 |
 | **Un pago en mostrador no le avisa nada** | `pago_acreditado` es de staff, y el mail "Recibimos tu pago" sale solo por el camino de Mercado Pago |
 | **No puede corregir ni un dato propio** | Ni el teléfono. Y sus datos de salud le viajan al navegador aunque la pantalla no los use |
@@ -222,7 +246,7 @@ Agenda, que es donde el mostrador pasa el día.
 |---|---|
 | 🔴 | **Si la deuda frena la reserva.** Hoy no frena nada: `membresia_para` mira que la membresía esté activa y cubra la fecha, no si la cuota está paga. Una clienta dada de alta sin pagar —o a quien se le asignó el mes a mano con "Renovar"— reserva el período entero; al 5º día del inicio le llega un solo aviso y nada más. La renovación automática no tiene el hueco: ahí el período lo crea el pago. Se puede parametrizar ("con la cuota vencida hace más de N días, no reserva"), apagado por defecto y que lo haga cumplir la base; falta que la dueña diga la regla. Conviene antes del **~04/10**, cuando vencen las cuotas de la tanda del 29 |
 | 🔴 | **Mail de Giuliana**, la profesora del turno tarde. El nombre ya llegó —la agenda la muestra— pero no tiene mail ni cuenta, así que no puede entrar ni recibir los avisos de la `0060` |
-| 🔴 | **Decidir si la clase de prueba sigue generando deuda.** Pasó a $0 el 16/09, pero las membresías vendidas antes guardan su precio: hay cuotas de $20.000 de pruebas pendientes de cobro que quizá haya que anular |
+| 🔴 | **Decidir si la clase de prueba sigue generando deuda.** Pasó a $0 el 16/09, pero las membresías vendidas antes guardan su precio: hay cuotas de $20.000 de pruebas pendientes de cobro que quizá haya que anular. Con la `0083` corrida se anulan una por una desde Pagos, sin cancelar el período |
 | 🔴 | **El número de WhatsApp de la web.** `studio_whatsapp` está **vacío** desde el 25/09, y la web usa el de respaldo escrito en el código (`5493816249107`, el de la `0045`). Desde el 25/09 el número se normaliza solo —un `3815727352` ya no va a Serbia—, pero cuál es el número hay que confirmarlo con el estudio y cargarlo en Configuración |
 | 🟡 | Conectar la cuenta de **Mercado Pago** (verificado: sin conectar) |
 | 🟡 | Verificar el **dominio en Resend** + `EMAIL_FROM` en Vercel. Hasta entonces el mail a las clientas **solo llega a la casilla dueña** |

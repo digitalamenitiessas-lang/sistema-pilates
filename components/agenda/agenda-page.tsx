@@ -27,7 +27,8 @@ import { PanelDelCliente } from '@/components/agenda/panel-del-cliente'
 import { TurnosDeLaClase } from '@/components/agenda/turnos-de-la-clase'
 import {
   addDays,
-  mondayOf,
+  diaDeLaFecha,
+  semanaDeTrabajo,
   createReservation,
   clearClassDate,
   hoyISO,
@@ -46,6 +47,8 @@ import type { ClassSession, Discipline } from '@/lib/types'
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 const DAYS_SHORT = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+const AVISO_DOMINGO =
+  'Esa fecha cae domingo, y el estudio no abre los domingos: la Agenda y el portal van de lunes a sábado, así que la clase no la vería nadie. Elegí otra fecha.'
 const MONTH_NAMES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 
 
@@ -192,6 +195,16 @@ function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => v
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // El día de una regular se elige de un menú que termina en el sábado;
+  // el de una especial sale de la fecha, y la fecha aceptaba un domingo.
+  // Esa clase se guardaba sin quejarse y no aparecía en ningún lado: la
+  // Agenda y el portal dibujan de lunes a sábado, así que nadie la veía,
+  // nadie la reservaba y nadie le tomaba lista — pero la liquidación sí
+  // se la contaba a la profesora, porque `sesiones_dictadas` la encuentra
+  // por la fecha. Se frena en vez de avisar porque no hay forma de que
+  // sirva.
+  const especialEnDomingo = kind === 'especial' && !!date && diaDeLaFecha(date) === 6
+
   const inputClass =
     'w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors'
   const labelClass =
@@ -207,15 +220,15 @@ function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => v
       setError('Una clase especial necesita su fecha')
       return
     }
+    if (especialEnDomingo) {
+      setError(AVISO_DOMINGO)
+      return
+    }
     setSaving(true)
     setError(null)
+
     // En una especial el día de la semana se deriva de la fecha, así la
     // grilla la ubica igual que a cualquier otra.
-    const diaDeLaFecha = (iso: string) => {
-      const [y, m, d] = iso.split('-').map(Number)
-      return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7
-    }
-
     const input: ClassInput = {
       title,
       discipline,
@@ -338,6 +351,9 @@ function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => v
                     required
                     className={inputClass}
                   />
+                  {especialEnDomingo && (
+                    <p className="text-[11px] text-destructive-fuerte mt-1">{AVISO_DOMINGO}</p>
+                  )}
                 </>
               ) : (
                 <>
@@ -467,7 +483,7 @@ function ClassFormModal({ cls, onClose }: { cls?: ClassSession; onClose: () => v
           </button>
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || especialEnDomingo}
             className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -904,7 +920,22 @@ function ClassDetailModal({
               {/* Quién ocupa permanentemente este horario (§2, 0048). Va
                   antes de la ficha del cliente porque es una propiedad de
                   la clase y no de quien se esté anotando. */}
-              <TurnosDeLaClase classId={cls.id} capacity={cls.capacity} cliente={clienteElegido} />
+              <TurnosDeLaClase
+                classId={cls.id}
+                capacity={cls.capacity}
+                fecha={cls.date}
+                cliente={clienteElegido}
+                onAnotada={(anotadaId, nombre) => {
+                  // Darle el horario o completárselo también la anota en
+                  // esta fecha: queda en la lista de anotadas y, si era la
+                  // elegida, sale del selector, igual que con "Reservar".
+                  setAnotadas((prev) => [
+                    ...prev,
+                    { nombre, espera: false, recupero: false, excepcion: false },
+                  ])
+                  if (anotadaId === studentId) elegirCliente('')
+                }}
+              />
 
               {/* La ficha rápida (§1 del pedido del 15/09): con el cliente
                   elegido, el mostrador ve su plan, hasta cuándo, cuántas le
@@ -926,7 +957,7 @@ function ClassDetailModal({
                     onChange={(e) => setRecuperaId(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary transition-colors"
                   >
-                    <option value="">Anotarla normal, descontando una clase</option>
+                    <option value="">Reservar como siempre, descontando una clase</option>
                     {recuperables.map((r) => (
                       <option key={r.id} value={r.id}>
                         Recuperar la del {new Date(`${r.date}T00:00`).toLocaleDateString('es-AR')}
@@ -953,7 +984,7 @@ function ClassDetailModal({
               {ofreceExcepcion && (
                 <div className="rounded-xl border border-aviso/50 bg-aviso-suave px-3 py-2.5 space-y-2">
                   <p className="text-[11px] font-bold text-aviso-fuerte">
-                    Anotarla igual, como excepción
+                    Reservar igual, como excepción
                   </p>
                   <p className="text-[10px] text-aviso-fuerte/90 leading-relaxed">
                     Esta clase no se descuenta de ningún plan y queda tu nombre como quien la
@@ -1027,18 +1058,35 @@ export function AgendaPage() {
   const [selectedDisciplines, setSelectedDisciplines] = useState<Discipline[]>([])
   const [selectedClass, setSelectedClass] = useState<WeekClass | null>(null)
 
-  const [weekOffset, setWeekOffset] = useState(0)
   const [showForm, setShowForm] = useState(false)
   const [editingClass, setEditingClass] = useState<ClassSession | undefined>(undefined)
-  // Día visible en la vista mobile (0=Lun..5=Sáb); arranca en hoy, o lunes si es domingo
-  const [mobileDay, setMobileDay] = useState(() => {
-    const dow = (new Date().getDay() + 6) % 7
-    return dow > 5 ? 0 : dow
-  })
 
-  const weekStart = addDays(mondayOf(), weekOffset * 7)
+  // Dónde abre: la semana de trabajo de hoy, en el día de hoy. El domingo,
+  // en la que viene y con el lunes elegido — antes abría en la que acababa
+  // de terminar, de lunes a sábado ya pasados, que el domingo es lo último
+  // que se quiere mirar. Hoy sale del reloj del estudio y no del
+  // navegador: el día de la vista mobile lo sacaba del navegador, y en
+  // otro huso caía en otro día.
+  const [arranque] = useState(() => semanaDeTrabajo())
+  // La semana como FECHA y no como "cuántas semanas desde hoy", igual que
+  // en el portal: con un desplazamiento, la Agenda que quedaba abierta del
+  // domingo al lunes se corría sola una semana, porque "esta semana"
+  // cambiaba debajo de lo que se estaba mirando.
+  const [weekStart, setWeekStart] = useState(arranque.lunes)
+  // Día visible en la vista mobile (0=Lun..5=Sáb).
+  const [mobileDay, setMobileDay] = useState(arranque.dia)
+
   const weekEnd = addDays(weekStart, 5)
   const today = hoyISO()
+  // "Hoy" vuelve a donde la Agenda abriría ahora: el domingo, al lunes que
+  // viene. Se recalcula en cada render y no se toma del arranque, así la
+  // Agenda que quedó abierta desde el sábado lo ofrece cuando llega el
+  // domingo.
+  const semanaDeHoy = semanaDeTrabajo(today)
+  const irAHoy = () => {
+    setWeekStart(semanaDeHoy.lunes)
+    setMobileDay(semanaDeHoy.dia)
+  }
 
   // Cuántas hay anotadas en cada clase de la semana visible, contado por la
   // base.
@@ -1186,7 +1234,7 @@ export function AgendaPage() {
       {/* Week navigation */}
       <div className="px-4 md:px-6 py-3 border-b border-border flex items-center justify-between bg-card">
         <button
-          onClick={() => setWeekOffset((w) => w - 1)}
+          onClick={() => setWeekStart((w) => addDays(w, -7))}
           className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
           aria-label="Semana anterior"
         >
@@ -1194,9 +1242,9 @@ export function AgendaPage() {
         </button>
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-semibold text-foreground">{weekLabel}</h2>
-          {weekOffset !== 0 && (
+          {weekStart !== semanaDeHoy.lunes && (
             <button
-              onClick={() => setWeekOffset(0)}
+              onClick={irAHoy}
               className="text-xs text-primary-fuerte font-medium hover:underline"
             >
               Hoy
@@ -1204,7 +1252,7 @@ export function AgendaPage() {
           )}
         </div>
         <button
-          onClick={() => setWeekOffset((w) => w + 1)}
+          onClick={() => setWeekStart((w) => addDays(w, 7))}
           className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
           aria-label="Semana siguiente"
         >
