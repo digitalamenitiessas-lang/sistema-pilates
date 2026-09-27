@@ -426,13 +426,16 @@ export async function GET(request: Request) {
     // Plan apagado, o fila de plan ausente, que entra por el mismo lado.
     // Ahora el aviso llega ANTES de que la membresía venza —la ventana se
     // abre renewal_invoice_days antes—, así que al estudio le queda tiempo de
-    // reactivar el plan y que la clienta no se entere de nada.
+    // asignarle otro plan y que la persona no se entere de nada.
     if (!plan?.active) {
       salteadas.planApagado++
       omitidas.push({
         type: 'renovacion_omitida',
         title: 'No se ofreció la renovación: plan desactivado',
-        body: `${student?.name ?? '—'}: el plan ${plan?.name ?? 'de la membresía'} está desactivado, así que no se le emitió la cuota y la membresía vence el ${formatDate(m.end_date)}. Reactivá el plan o asignale otro.`,
+        // Sin "reactivá el plan": ninguna pantalla vuelve a activar un plan
+        // dado de baja, y desde la 0087 recepción —que también lee este
+        // aviso— no toca planes. Asignar otro sí lo puede hacer.
+        body: `${student?.name ?? '—'}: el plan ${plan?.name ?? 'de la membresía'} está desactivado, así que no se le emitió la cuota y la membresía vence el ${formatDate(m.end_date)}. Asignale otro plan desde su ficha.`,
         student_id: m.student_id,
         membership_id: m.id,
         audience: 'staff',
@@ -452,7 +455,9 @@ export async function GET(request: Request) {
       omitidas.push({
         type: 'renovacion_omitida',
         title: 'No se ofreció la renovación: plan sin precio',
-        body: `${student?.name ?? '—'}: el plan ${plan.name} no tiene precio, así que no hay cuota de renovación que emitir y la membresía vence el ${formatDate(m.end_date)}. Ponele precio al plan o asignale el período nuevo a mano.`,
+        // El precio lo pone quien tiene `planes.editar` (desde la 0087, el
+        // admin); el período a mano lo asigna también recepción.
+        body: `${student?.name ?? '—'}: el plan ${plan.name} no tiene precio, así que no hay cuota de renovación que emitir y la membresía vence el ${formatDate(m.end_date)}. Hay que ponerle precio desde Planes, con el permiso de modificar planes, o asignarle el período nuevo a mano.`,
         student_id: m.student_id,
         membership_id: m.id,
         audience: 'staff',

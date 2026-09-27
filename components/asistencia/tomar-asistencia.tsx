@@ -1,11 +1,61 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Check, X, Loader2, Repeat2, Undo2, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
-import { updateReservationStatus } from '@/lib/api'
+import {
+  updateReservationStatus,
+  ahoraDelEstudio,
+  asistenciaAbierta,
+  aperturaDeAsistencia,
+  minutosDeAsistencia,
+} from '@/lib/api'
 import type { Reservation } from '@/lib/types'
+
+/**
+ * Desde cuándo se puede marcar una clase (0085), para toda pantalla que
+ * ofrezca pasar lista: esta, la Agenda, el tablero y Reservas.
+ *
+ * Existe porque hasta el 27/09 los botones de marcar aparecían en
+ * cualquier reserva, también en las de dentro de un mes, y la base las
+ * aceptaba. Ahora la base las rechaza, y cada pantalla pregunta acá para
+ * no ofrecer lo que va a fallar — con el mismo número y la misma hora de
+ * inicio que usa la base.
+ */
+export function useVentanaDeAsistencia() {
+  const { settings, occurrences } = useStudio()
+
+  // Se vuelve a dibujar cada 30 segundos: quien abre la lista unos
+  // minutos antes de que se habilite la tiene que ver abrirse sin recargar.
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((n) => n + 1), 30_000)
+    return () => window.clearInterval(id)
+  }, [])
+
+  const minutos = minutosDeAsistencia(settings)
+
+  // La hora de ESE día: si el estudio corrió la clase, manda la instancia,
+  // igual que en `inicio_de_clase`, que es contra lo que compara la base.
+  const horaDelDia = (classId: string, fecha: string, hora: string) =>
+    occurrences.find((o) => o.classId === classId && o.date === fecha)?.startTime ?? hora
+
+  return {
+    minutos,
+    /** La hora de ESA fecha, para mostrarla junto al aviso de apertura */
+    hora: horaDelDia,
+    abierta: (classId: string, fecha: string, hora: string) =>
+      asistenciaAbierta(fecha, horaDelDia(classId, fecha, hora), minutos),
+    /** "hoy a las 07:30" o "el 22/10 a las 07:30" */
+    cuando: (classId: string, fecha: string, hora: string) => {
+      const a = aperturaDeAsistencia(fecha, horaDelDia(classId, fecha, hora), minutos)
+      if (a.fecha === ahoraDelEstudio().fecha) return `hoy a las ${a.hora}`
+      const [, mes, dia] = a.fecha.split('-')
+      return `el ${dia}/${mes} a las ${a.hora}`
+    },
+  }
+}
 
 /**
  * Tomar asistencia de una clase en una fecha.
@@ -60,6 +110,15 @@ export function TomarAsistencia({
    */
   const puedeDeshacer = can('reservas.editar') || canWrite
 
+  /**
+   * Antes de la ventana la lista se puede mirar —es la forma de ver quién
+   * viene— pero no marcar. Deshacer sí queda: volver a 'confirmada' es la
+   * salida para una marca que se puso antes de tiempo, y la base lo deja a
+   * cualquier hora a quien tiene `reservas.editar`.
+   */
+  const ventana = useVentanaDeAsistencia()
+  const abierta = ventana.abierta(classId, date, time)
+
   const lista = useMemo(
     () =>
       reservations
@@ -108,7 +167,11 @@ export function TomarAsistencia({
             <div className="min-w-0">
               <h2 className="text-base font-bold text-foreground truncate">{title}</h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {time} · {lista.length} {lista.length === 1 ? 'cliente' : 'clientes'}
+                {/* La de ese día y no la de la grilla: Reservas y el tablero
+                    pasan la hora base, y si el estudio corrió la clase el
+                    encabezado contradecía al aviso de apertura de abajo. */}
+                {ventana.hora(classId, date, time)} · {lista.length}{' '}
+                {lista.length === 1 ? 'cliente' : 'clientes'}
               </p>
             </div>
             <button
@@ -138,6 +201,16 @@ export function TomarAsistencia({
         </div>
 
         <div className="px-4 py-3 overflow-y-auto flex-1">
+          {puedeMarcar && !abierta && lista.length > 0 && (
+            <p className="text-xs text-aviso-fuerte bg-aviso-suave rounded-xl px-3 py-2 mb-3">
+              La lista se abre {ventana.cuando(classId, date, time)},{' '}
+              {ventana.minutos === 0
+                ? 'cuando empieza la clase'
+                : `${ventana.minutos} ${ventana.minutos === 1 ? 'minuto' : 'minutos'} antes de que empiece`}
+              . Hasta entonces se puede ver quién viene, pero no marcar.
+            </p>
+          )}
+
           {lista.length === 0 && (
             <div className="text-center py-10">
               <Users className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
@@ -183,6 +256,10 @@ export function TomarAsistencia({
                       {r.status === 'asistió' ? 'Presente' : 'Ausente'}
                       <Undo2 className="w-3.5 h-3.5" />
                     </button>
+                  ) : !abierta ? (
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {r.status === 'asistió' ? 'Presente' : r.status === 'ausente' ? 'Ausente' : '—'}
+                    </span>
                   ) : marcada ? (
                     // Sin permiso para deshacer: el botón cambia la marca
                     // en vez de borrarla.

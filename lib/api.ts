@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import type { ReglaDelCobro } from './precios'
 import type {
   Teacher,
   Plan,
@@ -118,6 +119,63 @@ export function reservaCerrada(
 ): boolean {
   if (fecha !== ahora.fecha) return fecha < ahora.fecha
   return enMinutos(hora) - minutosDeCorte <= enMinutos(ahora.hora)
+}
+
+/**
+ * Cuántos minutos antes del inicio se abre la lista de asistencia
+ * (`attendance_open_minutes`, 0085).
+ *
+ * Con `settingNum` y el mismo 30 por defecto que la base, a propósito: la
+ * función `asistencia_abre_minutos` de la 0085 copia lo que hace
+ * `Number()` acá —vacío es 0, lo que no es número es 30, negativo es 0—
+ * para que las dos mitades de la regla lean el mismo número. Sin la
+ * migración corrida la fila no viene y esto da 30: la pantalla ya espera
+ * la ventana aunque la base todavía acepte marcar a cualquier hora.
+ */
+export function minutosDeAsistencia(settings: Settings): number {
+  return Math.max(0, settingNum(settings, 'attendance_open_minutes', 30))
+}
+
+/**
+ * ¿Ya se puede marcar presente o ausente en esa clase?
+ *
+ * El 27/09 una profesora marcó ausente una reserva de 25 días adelante y
+ * la base lo aceptó: la persona perdía la clase por algo que no pasó, y
+ * la profesora no lo podía deshacer. Desde la 0085 la base lo rechaza
+ * para todos los roles; esto es para no ofrecer el botón que va a fallar.
+ *
+ * `hora` tiene que ser la de ESE día (la de la instancia si el estudio la
+ * corrió), porque la base compara contra `inicio_de_clase`.
+ *
+ * Por el reloj del navegador, truncado al minuto: puede abrir hasta un
+ * minuto DESPUÉS que la base, nunca antes, que es el lado seguro.
+ */
+export function asistenciaAbierta(
+  fecha: string,
+  hora: string,
+  minutosAntes: number,
+  ahora: { fecha: string; hora: string } = ahoraDelEstudio()
+): boolean {
+  return minutosHasta(fecha, hora || '00:00', ahora) <= Math.max(0, minutosAntes)
+}
+
+/**
+ * Desde cuándo se puede marcar esa clase, para decírselo a quien mira.
+ * Día y hora, porque con una ventana grande —o una clase temprano— la
+ * apertura cae el día anterior.
+ */
+export function aperturaDeAsistencia(
+  fecha: string,
+  hora: string,
+  minutosAntes: number
+): { fecha: string; hora: string } {
+  const [y, m, d] = fecha.split('-').map(Number)
+  // Date.UTC como calendario neutro, igual que `minutosHasta`: acá sólo
+  // se resta una distancia, y en UTC un día son 1440 minutos siempre.
+  const t = new Date(
+    Date.UTC(y, m - 1, d) + (enMinutos(hora || '00:00') - Math.max(0, minutosAntes)) * 60000
+  ).toISOString()
+  return { fecha: t.slice(0, 10), hora: t.slice(11, 16) }
 }
 
 /**
@@ -358,55 +416,12 @@ const EXPIRY_WARNING_DAYS = 5
 // ---------------------------------------------------------------
 export type Settings = Record<string, string>
 
-/**
- * El precio que se cobra según cómo paga el cliente.
- *
- * El ajuste vive en el medio de pago (0028) y no en el plan: es una
- * propiedad de cómo se paga, no de qué se compra. El redondeo es un
- * parámetro porque base × 0,95 da entero solo si la base es múltiplo de
- * 20 — con los precios de hoy nunca se nota, con el primer aumento sí.
- */
-export function precioConAjuste(
-  base: number,
-  ajustePct: number,
-  redondeo: string = 'cincuenta'
-): number {
-  const bruto = base * (1 + ajustePct / 100)
-  switch (redondeo) {
-    case 'cien':        return Math.round(bruto / 100) * 100
-    case 'cien_arriba': return Math.ceil(bruto / 100) * 100
-    case 'ninguno':     return Math.round(bruto * 100) / 100
-    // 'cincuenta' es el default y el que deja intacta la lista de precios
-    // publicada: sus doce valores son múltiplos de 50.
-    default:            return Math.round(bruto / 50) * 50
-  }
-}
-
-/**
- * El precio con una promoción aplicada.
- *
- * Espeja a `cobrar_cuota()` (0079) para que el número que la pantalla
- * anticipa sea el que la base va a cobrar. Quien manda es la base —el
- * monto se escribe allá— y esto es solo la vista previa: si algún día
- * divergen, gana la base y el comprobante muestra lo que cobró.
- *
- * El tope en cero es el mismo que el de allá: un monto fijo más grande
- * que la cuota no puede dejar una deuda negativa.
- */
-export function precioConPromo(
-  base: number,
-  tipo: 'porcentaje' | 'monto',
-  valor: number,
-  redondeo: string = 'cincuenta'
-): number {
-  const bruto = Math.max(0, tipo === 'porcentaje' ? base * (1 - valor / 100) : base - valor)
-  switch (redondeo) {
-    case 'cien':        return Math.round(bruto / 100) * 100
-    case 'cien_arriba': return Math.ceil(bruto / 100) * 100
-    case 'ninguno':     return Math.round(bruto * 100) / 100
-    default:            return Math.round(bruto / 50) * 50
-  }
-}
+// La cuenta del cobro —el ajuste del medio, la promo, el redondeo— vive
+// en `lib/precios.ts`, sin dependencias, para poder probarla contra la
+// base sin levantar la app. Se reexporta acá porque es de donde la
+// importan las pantallas.
+export { precioConAjuste, precioConPromo, precioDeCobro, cobroDeLaBase } from './precios'
+export type { PrecioDeCobro, PromoDelCobro, ReglaDelCobro } from './precios'
 
 export function settingNum(settings: Settings, key: string, fallback: number): number {
   const n = Number(settings[key])
@@ -2029,35 +2044,54 @@ function columnaDesconocida(mensaje: string): string | null {
  * subía y guardar un plan fallaba en la pantalla. Se parsea el nombre que
  * trae el mensaje en vez de mantener una lista, que hay que ampliar en cada
  * migración y falla justo el día que alguien se olvida.
+ *
+ * Devuelve cuántas filas tocó: un update que la RLS no deja pasar no da
+ * error, vuelve con cero filas (ver `updatePlan`).
  */
 async function escribirPlan(
-  escribir: (row: Record<string, unknown>) => PromiseLike<{ error: { message: string } | null }>,
+  escribir: (
+    row: Record<string, unknown>
+  ) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>,
   row: Record<string, unknown>
-): Promise<void> {
+): Promise<number> {
   const fila = { ...row }
   // Termina siempre: solo reintenta cuando saca una columna que el row
   // tenía, así que cada vuelta lo deja más chico. Y cualquier otro error
-  // —un CHECK, un permiso, la conexión— sube tal cual, como antes.
+  // —un CHECK, un permiso, la conexión— sube con su mensaje, como antes;
+  // el de la RLS, dicho en castellano.
   for (;;) {
-    const { error } = await escribir(fila)
-    if (!error) return
+    const { data, error } = await escribir(fila)
+    if (!error) return data?.length ?? 0
     const columna = columnaDesconocida(error.message)
-    if (!columna || !(columna in fila)) throw error
+    if (!columna || !(columna in fila)) throw errorDeLaBase(error, 'No se pudo guardar el plan')
     delete fila[columna]
   }
 }
 
 export async function createPlan(input: PlanInput): Promise<void> {
-  await escribirPlan((row) => supabase.from('plans').insert(row), planRow(input))
+  await escribirPlan((row) => supabase.from('plans').insert(row).select('id'), planRow(input))
 }
 
+// Desde la 0087 recepción no modifica ni da de baja planes. La pantalla ya
+// no le ofrece los botones, pero una pestaña abierta desde antes de la
+// migración todavía los tiene: sin mirar las filas, guardar cerraba el
+// formulario como si hubiera andado y el precio seguía siendo el viejo.
 export async function updatePlan(id: string, input: PlanInput): Promise<void> {
-  await escribirPlan((row) => supabase.from('plans').update(row).eq('id', id), planRow(input))
+  const filas = await escribirPlan(
+    (row) => supabase.from('plans').update(row).eq('id', id).select('id'),
+    planRow(input)
+  )
+  if (filas === 0) throw new Error('Tu rol no tiene permiso para modificar planes.')
 }
 
 export async function deactivatePlan(id: string): Promise<void> {
-  const { error } = await supabase.from('plans').update({ active: false }).eq('id', id)
-  if (error) throw error
+  const { data, error } = await supabase
+    .from('plans')
+    .update({ active: false })
+    .eq('id', id)
+    .select('id')
+  if (error) throw errorDeLaBase(error, 'No se pudo dar de baja el plan')
+  if (!data || data.length === 0) throw new Error('Tu rol no tiene permiso para dar de baja planes.')
 }
 
 /**
@@ -2356,7 +2390,73 @@ export async function promocionesPara(paymentId: string): Promise<PromoAplicable
 }
 
 /**
- * Cobrar una cuota. La cuenta la hace la base (0079).
+ * Con qué regla cobra la base una cuota con promo: si el recargo del
+ * medio va encima de la promo (0086) o si la promo lo reemplaza (0079).
+ *
+ * La pantalla anticipa el monto antes de cobrar, y con tarjeta las dos
+ * reglas dan números distintos ($78.750 contra $63.000 en una cuota de
+ * $70.000 con 10%). Anticipar la nueva antes de que corra la 0086 sería
+ * prometer un número que la base no cobra.
+ *
+ * Se le pregunta a `regla_del_cobro()` (0086), que lo deduce del cuerpo
+ * de `cobrar_cuota` —lo único que cambia, y que desde acá no se ve—. No
+ * alcanza con que exista `precio_de_cobro`: si alguien vuelve
+ * `cobrar_cuota` a la de la 0079 y la función pura queda, la pantalla
+ * prometería la regla nueva y la base cobraría la vieja. Sin la función
+ * (PGRST202, o 42883 si la pregunta llega a Postgres), la 0086 no corrió:
+ * la regla es la de la 0079. Es el mismo patrón que `miTopeDeFijos` con
+ * la 0082.
+ *
+ * Devuelve `null` cuando no se pudo saber (sin red, un error de la base,
+ * una regla que esta pantalla no conoce). No se adivina: la pantalla lo
+ * dice en vez de mostrar un número que puede no ser.
+ */
+export async function reglaDelCobro(): Promise<ReglaDelCobro | null> {
+  try {
+    const { data, error } = await supabase.rpc('regla_del_cobro')
+    if (error) {
+      return error.code === 'PGRST202' || error.code === '42883' ? 'reemplaza' : null
+    }
+    return data === 'respeta_recargo' || data === 'reemplaza' ? data : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Si el cobro de esa cuota se hizo con el cupón que se escribió.
+ *
+ * `cobrar_cuota` devuelve el nombre de la promo, no cuál era: desde la
+ * 0086, un cupón que no le gana al descuento del medio no se aplica y en
+ * su lugar puede entrar la automática, así que "hubo promo" no quiere
+ * decir "se usó el cupón". Se mira la promo que quedó en el cobro.
+ *
+ * `null` si no se pudo leer: quien pregunta no dice nada en vez de
+ * afirmar algo que no sabe.
+ */
+export async function cuponUsadoEnElCobro(paymentId: string, codigo: string): Promise<boolean | null> {
+  try {
+    const { data: pago, error } = await supabase
+      .from('payments')
+      .select('promocion_id')
+      .eq('id', paymentId)
+      .maybeSingle()
+    if (error || !pago) return null
+    if (!pago.promocion_id) return false
+    const { data: promo, error: errPromo } = await supabase
+      .from('promociones')
+      .select('codigo')
+      .eq('id', pago.promocion_id)
+      .maybeSingle()
+    if (errPromo || !promo) return null
+    return (promo.codigo ?? '').toUpperCase() === codigo.trim().toUpperCase()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Cobrar una cuota. La cuenta la hace la base (0079, 0086).
  *
  * Reemplaza al update directo que hacía el navegador: con promociones y
  * topes de uso, un monto calculado en el cliente no se puede hacer
@@ -3564,7 +3664,6 @@ export async function setPaymentMethodActive(code: string, active: boolean): Pro
 // ---------------------------------------------------------------
 // Parámetros del negocio (studio_settings — migración 0011)
 // ---------------------------------------------------------------
-/** Guarda solo las claves que cambiaron. */
 /**
  * Prender o apagar una regla (0081).
  *
@@ -3593,12 +3692,26 @@ export async function setSettingRige(key: string, rige: boolean): Promise<void> 
   }
 }
 
+/**
+ * Guarda solo las claves que cambiaron.
+ *
+ * Mira las filas por lo mismo que `setSettingRige`: desde la 0087 sólo el
+ * admin tiene `config.editar`, y una pestaña de recepción abierta desde
+ * antes de la migración seguiría mostrando "Guardado" sin haber guardado.
+ */
 export async function saveSettings(changes: Record<string, string>): Promise<void> {
   const entries = Object.entries(changes)
   if (!entries.length) return
   for (const [key, value] of entries) {
-    const { error } = await supabase.from('studio_settings').update({ value }).eq('key', key)
-    if (error) throw error
+    const { data, error } = await supabase
+      .from('studio_settings')
+      .update({ value })
+      .eq('key', key)
+      .select('key')
+    if (error) throw errorDeLaBase(error, 'No se pudo guardar')
+    if (!data || data.length === 0) {
+      throw new Error('Tu rol no tiene permiso para cambiar los parámetros del negocio.')
+    }
   }
 }
 

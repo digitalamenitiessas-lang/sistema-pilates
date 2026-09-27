@@ -22,7 +22,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import { disciplineStyle } from '@/lib/disciplines'
-import { TomarAsistencia } from '@/components/asistencia/tomar-asistencia'
+import { TomarAsistencia, useVentanaDeAsistencia } from '@/components/asistencia/tomar-asistencia'
 import { PanelDelCliente } from '@/components/agenda/panel-del-cliente'
 import { TurnosDeLaClase } from '@/components/agenda/turnos-de-la-clase'
 import {
@@ -514,6 +514,10 @@ function ClassDetailModal({
   const [tomandoAsistencia, setTomandoAsistencia] = useState(false)
   // La profesora puede tomar asistencia sin poder editar nada más.
   const puedeMarcarAsistencia = can('reservas.asistencia') || canWrite
+  // Y sólo desde un rato antes de que empiece (0085). Antes, el botón
+  // abre la lista para ver quién viene, sin marcar.
+  const ventana = useVentanaDeAsistencia()
+  const listaAbierta = ventana.abierta(cls.id, cls.date, cls.time)
 
   // Excepciones de esa fecha: suspender el día o cambiar la profesora
   // (migración 0018). Solo tocan ESE día, no la clase entera.
@@ -869,13 +873,20 @@ function ClassDetailModal({
           )}
 
           {puedeMarcarAsistencia && !cls.suspended && cls.conLista > 0 && (
-            <button
-              onClick={() => setTomandoAsistencia(true)}
-              className="w-full py-3 rounded-xl border-2 border-primary text-primary-fuerte text-sm font-bold flex items-center justify-center gap-2 hover:bg-primary/5 transition-colors"
-            >
-              <ClipboardCheck className="w-4 h-4" />
-              Tomar asistencia
-            </button>
+            <div className="space-y-1.5">
+              <button
+                onClick={() => setTomandoAsistencia(true)}
+                className="w-full py-3 rounded-xl border-2 border-primary text-primary-fuerte text-sm font-bold flex items-center justify-center gap-2 hover:bg-primary/5 transition-colors"
+              >
+                <ClipboardCheck className="w-4 h-4" />
+                {listaAbierta ? 'Tomar asistencia' : 'Ver la lista'}
+              </button>
+              {!listaAbierta && (
+                <p className="text-[11px] text-muted-foreground text-center">
+                  La asistencia se marca desde {ventana.cuando(cls.id, cls.date, cls.time)}.
+                </p>
+              )}
+            </div>
           )}
 
           {!canWrite ? null : cls.suspended ? (

@@ -77,6 +77,8 @@ import {
   setPromocionRige,
   deactivatePromocion,
   anunciarPromocion,
+  reglaDelCobro,
+  type ReglaDelCobro,
   type MpAccountInfo,
   type TeacherInput,
   type DisciplineInput,
@@ -1241,7 +1243,7 @@ function tituloGrupo(key: string) {
  * fila), así que sumar un parámetro nuevo no requiere tocar este archivo.
  */
 function SettingsSection({ group }: { group: SettingGroup }) {
-  const { refresh, canWrite, profile } = useData()
+  const { refresh, canWrite, can, permisosReady, profile } = useData()
   const { settingsMeta } = useStudio()
   const meta = settingsMeta.filter((s) => s.group === group)
   const info = tituloGrupo(group)
@@ -1256,10 +1258,17 @@ function SettingsSection({ group }: { group: SettingGroup }) {
   const [apagando, setApagando] = useState<string | null>(null)
 
   const esAdmin = profile?.role === 'admin'
+  // Desde la 0087 los parámetros y los datos del estudio los cambia quien
+  // tiene `config.editar`, que en el preset es sólo el admin. No va
+  // `can(...) || canWrite`: recepción tiene canWrite y seguiría viendo el
+  // Guardar. Sin respuesta del motor (la 0012 sin correr) se cae al rol; con
+  // la 0087 sin correr el grupo está en sombra y recepción edita como hasta
+  // hoy.
+  const puedeEditar = permisosReady ? can('config.editar') : canWrite
   const valueOf = (s: StudioSetting) => draft[s.key] ?? s.value
   // Los de control aflojan el arqueo, así que no viven en manos de quien
   // cierra la caja. La base lo exige igual con una política restrictiva.
-  const editable = (s: StudioSetting) => canWrite && (!s.soloAdmin || esAdmin)
+  const editable = (s: StudioSetting) => puedeEditar && (!s.soloAdmin || esAdmin)
   const dirty = Object.keys(draft).some((k) => draft[k] !== meta.find((s) => s.key === k)?.value)
 
   const set = (key: string, value: string) => {
@@ -1459,7 +1468,9 @@ function SettingsSection({ group }: { group: SettingGroup }) {
                 )}
               </div>
             )}
-            {s.soloAdmin && !esAdmin && (
+            {/* Sólo para quien puede editar los demás: a quien no puede
+                tocar ninguno ya se lo dice la línea de abajo. */}
+            {s.soloAdmin && !esAdmin && puedeEditar && (
               <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
                 <Lock className="w-3 h-3" />
                 Solo lo cambia el admin: afloja el control del arqueo.
@@ -1470,7 +1481,15 @@ function SettingsSection({ group }: { group: SettingGroup }) {
 
         {error && <p className="text-xs text-destructive-fuerte">{error}</p>}
 
-        {canWrite && (
+        {!puedeEditar && (
+          <p className="text-[11px] text-muted-foreground flex items-center gap-1 pt-1">
+            <Lock className="w-3 h-3" />
+            Solo lectura: tu rol no puede cambiar{' '}
+            {group === 'estudio' ? 'los datos del estudio' : 'estos parámetros'}.
+          </p>
+        )}
+
+        {puedeEditar && (
           <div className="flex items-center gap-3 pt-1">
             <button
               onClick={save}
@@ -2417,6 +2436,20 @@ function PromocionesSection() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [resultado, setResultado] = useState<string | null>(null)
+  // La regla con que la base combina la promo con el medio (0086). El
+  // texto de abajo la dice, y no puede decir la nueva mientras la base
+  // cobre con la vieja. `undefined` mientras se pregunta (no se dice
+  // ninguna); `null` si no se pudo saber (se dice sin afirmar cuál).
+  const [regla, setRegla] = useState<ReglaDelCobro | null | undefined>(undefined)
+  useEffect(() => {
+    let vivo = true
+    reglaDelCobro().then((r) => {
+      if (vivo) setRegla(r)
+    })
+    return () => {
+      vivo = false
+    }
+  }, [])
 
   const recargar = async () => {
     try {
@@ -2510,8 +2543,14 @@ function PromocionesSection() {
         <div className="px-5 py-4 space-y-2">
           <p className="text-[11px] text-muted-foreground pb-1">
             El descuento se aplica <strong>al cobrar la cuota</strong>, y lo
-            calcula la base: la pantalla no puede cobrar otra cosa. Una promo
-            reemplaza al ajuste del medio de pago, no se suman.
+            calcula la base: la pantalla no puede cobrar otra cosa.{' '}
+            {regla === 'respeta_recargo'
+              ? 'Si el medio de pago tiene recargo, se cobra encima del precio con la promo. Si tiene descuento, no se suman: queda el mayor.'
+              : regla === 'reemplaza'
+                ? 'Hoy una promo reemplaza al ajuste del medio de pago, también al recargo: falta correr la migración 0086.'
+                : regla === null
+                  ? 'Cómo se combina con el ajuste del medio de pago lo resuelve la base al cobrar.'
+                  : null}
           </p>
 
           {vivas.length === 0 && (

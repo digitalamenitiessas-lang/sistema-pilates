@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import { X, Loader2, Smartphone } from 'lucide-react'
 import { useData } from '@/lib/data-context'
-import { createStudent, createSystemUser, hoyISO, updateStudent, vigenciaHasta, cobrarCuota, AltaIncompleta } from '@/lib/api'
+import { createStudent, createSystemUser, hoyISO, updateStudent, vigenciaHasta, cobrarCuota, cuponUsadoEnElCobro, AltaIncompleta } from '@/lib/api'
 import { MethodPicker } from '@/components/pagos/pagos-page'
 import type { Student } from '@/lib/types'
 
@@ -220,10 +220,25 @@ export function AlumnoFormModal({ student, onClose }: AlumnoFormModalProps) {
       if (metodo && alta.paymentId && !cobroHecho) {
         try {
           const r = await cobrarCuota(alta.paymentId, metodo, cupon.trim() || null)
+          // Un cupón que la base aceptó y no aplicó (0086): con ese medio
+          // ya pagaba lo mismo o menos, y en su lugar pudo entrar la
+          // automática. Si no existiera o no le sirviera, el cobro habría
+          // rebotado con el motivo. Con promo en el cobro hay que mirar
+          // cuál quedó: el nombre solo no dice si era el cupón.
+          const cuponUsado = !cupon.trim()
+            ? null
+            : r.promo
+              ? await cuponUsadoEnElCobro(alta.paymentId, cupon)
+              : false
           cobro =
             `Cobrado: $${r.cobrado.toLocaleString('es-AR')}` +
             (r.promo ? ` con "${r.promo}"` : '') +
-            ` · comprobante N° ${String(r.comprobante).padStart(8, '0')}.`
+            ` · comprobante N° ${String(r.comprobante).padStart(8, '0')}.` +
+            (cuponUsado === false
+              ? r.promo
+                ? ' El cupón no se usó y queda para otra vez: con ese medio de pago convenía más la promo automática.'
+                : ' El cupón no se usó y queda para otra vez: con ese medio de pago ya pagaba lo mismo o menos, y los descuentos no se suman.'
+              : '')
           setCobroHecho(true)
           setCobroTexto(cobro)
         } catch (err) {

@@ -26,8 +26,34 @@ type Tab = 'planes' | 'membresias'
 // acá en adelante.
 const PLAN_COLORS = ['#847164', '#9AA08C', '#BCBAAE', '#B79B72', '#8792A0', '#A5786C']
 
+/**
+ * Qué puede hacer quien mira con los planes.
+ *
+ * Desde la 0087 recepción no crea, no modifica y no da de baja planes: es
+ * configuración de precios, no operación de mostrador. Sin el `|| canWrite`
+ * que usan otras pantallas, porque recepción TIENE canWrite y con eso los
+ * botones le seguirían apareciendo. Si el motor de permisos no respondió
+ * (la 0012 sin correr), se cae al rol de siempre. Y si la 0087 no corrió,
+ * el grupo sigue en sombra, `can()` responde el legado y recepción los ve
+ * como hasta hoy.
+ *
+ * Dar de baja pide las dos claves porque la base pide las dos: es un update
+ * `active = false`, que pasa por la permisiva de `planes.editar` y por la
+ * restrictiva de `planes.eliminar` (0013). Con sólo la segunda, la papelera
+ * aparecería y la base no tocaría ninguna fila.
+ */
+function usePermisosDePlanes() {
+  const { can, canWrite, permisosReady } = useData()
+  const puede = (clave: string) => (permisosReady ? can(clave) : canWrite)
+  return {
+    crear: puede('planes.crear'),
+    editar: puede('planes.editar'),
+    darDeBaja: puede('planes.editar') && puede('planes.eliminar'),
+  }
+}
+
 function PlanCard({ plan, onEdit, onDelete }: { plan: Plan; onEdit: () => void; onDelete: () => void }) {
-  const { canWrite } = useData()
+  const permisos = usePermisosDePlanes()
   const { memberships } = useStudio()
   const activeCount = memberships.filter(
     (m) => m.planId === plan.id && (m.status === 'activa' || m.status === 'por vencer')
@@ -135,20 +161,24 @@ function PlanCard({ plan, onEdit, onDelete }: { plan: Plan; onEdit: () => void; 
               {activeCount !== 1 ? 's' : ''} activo{activeCount !== 1 ? 's' : ''}
             </span>
           </div>
-          {canWrite && (
+          {(permisos.editar || permisos.darDeBaja) && (
             <div className="flex items-center gap-1">
-              <button
-                onClick={onEdit}
-                className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={onDelete}
-                className="w-8 h-8 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive-fuerte transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              {permisos.editar && (
+                <button
+                  onClick={onEdit}
+                  className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                </button>
+              )}
+              {permisos.darDeBaja && (
+                <button
+                  onClick={onDelete}
+                  className="w-8 h-8 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive-fuerte transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -432,11 +462,14 @@ function PlanFormModal({ plan, onClose }: { plan?: Plan; onClose: () => void }) 
 }
 
 export function PlanesPage() {
-  const { refresh, canWrite } = useData()
+  const { refresh } = useData()
+  const permisos = usePermisosDePlanes()
+  const soloLectura = !permisos.crear && !permisos.editar && !permisos.darDeBaja
   const { plans: PLANS, memberships, students } = useStudio()
   const [activeTab, setActiveTab] = useState<Tab>('planes')
   const [showForm, setShowForm] = useState(false)
   const [editingPlan, setEditingPlan] = useState<Plan | undefined>(undefined)
+  const [bajaError, setBajaError] = useState<string | null>(null)
 
   const activeMemberships = memberships.filter(
     (m) =>
@@ -446,8 +479,14 @@ export function PlanesPage() {
 
   const handleDelete = async (plan: Plan) => {
     if (!window.confirm(`¿Desactivar el plan "${plan.name}"? Las membresías existentes no se modifican.`)) return
-    await deactivatePlan(plan.id)
-    await refresh()
+    setBajaError(null)
+    try {
+      await deactivatePlan(plan.id)
+      await refresh()
+    } catch (err) {
+      // Antes el rechazo se perdía en la consola y el botón parecía muerto.
+      setBajaError(err instanceof Error ? err.message : 'No se pudo dar de baja el plan')
+    }
   }
 
   return (
@@ -479,7 +518,7 @@ export function PlanesPage() {
           </button>
         </div>
 
-        {activeTab === 'planes' && canWrite && (
+        {activeTab === 'planes' && permisos.crear && (
           <button
             onClick={() => {
               setEditingPlan(undefined)
@@ -494,6 +533,16 @@ export function PlanesPage() {
       </div>
 
       <div className="flex-1 overflow-auto p-4 md:p-6">
+        {activeTab === 'planes' && soloLectura && (
+          <p className="text-xs text-muted-foreground mb-4">
+            Solo lectura: tu rol no puede crear, modificar ni dar de baja planes.
+          </p>
+        )}
+        {activeTab === 'planes' && bajaError && (
+          <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2 mb-4">
+            {bajaError}
+          </p>
+        )}
         {activeTab === 'planes' && (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {PLANS.map((plan) => (

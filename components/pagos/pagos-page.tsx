@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 import { cn, numeroDeWhatsApp } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
-import { registerPayment, collectPayment, createMpLink, syncMpPayments, anularCobro, anularCuota, addDays, precioConAjuste, precioConPromo, settingText, esOferta, ofertaYaResuelta, hoyISO, promocionesPara, cobrarCuota, type PromoAplicable, type QuedaAlAnular, type ResultadoDeAnular } from '@/lib/api'
+import { registerPayment, collectPayment, createMpLink, syncMpPayments, anularCobro, anularCuota, addDays, precioConAjuste, precioConPromo, cobroDeLaBase, reglaDelCobro, settingText, esOferta, ofertaYaResuelta, hoyISO, promocionesPara, cobrarCuota, type PromoAplicable, type ReglaDelCobro, type QuedaAlAnular, type ResultadoDeAnular } from '@/lib/api'
 import type { Payment, PaymentMethod, Student } from '@/lib/types'
 
 type FilterStatus = 'todos' | 'pagado' | 'pendiente' | 'renovacion' | 'vencido'
@@ -596,6 +596,21 @@ export function CobrarModal({ payment, onClose }: { payment: Payment; onClose: (
       .catch(() => setPromos([]))
   }, [payment.id])
 
+  // Con qué regla combina la base la promo con el medio: la de la 0086
+  // (el recargo va encima) o, mientras no corra, la de la 0079 (la promo
+  // lo reemplaza). `undefined` mientras se pregunta; `null` si no se pudo
+  // saber.
+  const [regla, setRegla] = useState<ReglaDelCobro | null | undefined>(undefined)
+  useEffect(() => {
+    let vivo = true
+    reglaDelCobro().then((r) => {
+      if (vivo) setRegla(r)
+    })
+    return () => {
+      vivo = false
+    }
+  }, [])
+
   // La automática es la que se aplica sola, sin que nadie la pida. Si hay
   // más de una gana la que más descuenta, que es lo que hace la base.
   const automaticas = promos.filter((p) => !p.codigo)
@@ -614,28 +629,36 @@ export function CobrarModal({ payment, onClose }: { payment: Payment; onClose: (
     ? (paymentMethods.find((m) => m.code === method)?.ajustePct ?? 0)
     : 0
 
-  // El cupón escrito le gana a la automática: si alguien se tomó el
-  // trabajo de repartirlo, es porque vale más que lo que hay para todas.
-  // Y la promo REEMPLAZA al ajuste del medio, no se suma: son dos motivos
-  // distintos para tocar el mismo precio, y aplicarlos juntos descuenta
-  // dos veces. Es lo que hace `cobrar_cuota()` y acá solo se espeja.
-  const promoElegida =
-    cupon ??
-    (automaticas.length > 0
+  // La mejor automática es la que deja el precio más bajo, que es la mejor
+  // en cualquier medio: el recargo multiplica a todas por igual.
+  const automatica =
+    automaticas.length > 0
       ? automaticas.reduce((mejor, p) =>
           precioConPromo(payment.amount, p.tipo, p.valor, redondeo) <
           precioConPromo(payment.amount, mejor.tipo, mejor.valor, redondeo)
             ? p
             : mejor
         )
-      : undefined)
+      : undefined
 
-  const aCobrar = promoElegida
-    ? precioConPromo(payment.amount, promoElegida.tipo, promoElegida.valor, redondeo)
-    : ajuste === 0
-      ? payment.amount
-      : precioConAjuste(payment.amount, ajuste, redondeo)
+  // La cuenta y la elección son las de la base, con su regla
+  // (lib/precios.ts). El cupón escrito se prueba primero; si no le gana
+  // al medio, la automática. El recargo del medio va encima del precio con
+  // la promo; el descuento del medio no se suma, y si es igual o mayor
+  // que la promo, la promo no se aplica y no gasta el uso. Siempre con el
+  // redondeo: la base redondea aunque el medio no tenga ajuste.
+  const cobro = cobroDeLaBase(payment.amount, ajuste, cupon, automatica, redondeo, regla ?? 'respeta_recargo')
+  const precio = cobro.precio
+  const promoElegida = cobro.aplicada ?? undefined
+  // Mientras no se sepa la regla, si las dos dan distinto —el monto o la
+  // promo que se usa— no hay nada que se pueda prometer.
+  const conLaOtra = cobroDeLaBase(payment.amount, ajuste, cupon, automatica, redondeo, 'reemplaza')
+  const incierto =
+    (regla === null || regla === undefined) &&
+    (conLaOtra.precio.cobrado !== precio.cobrado || conLaOtra.aplicada?.id !== cobro.aplicada?.id)
+  const aCobrar = precio.cobrado
   const diferencia = aCobrar - payment.amount
+  const medio = method ? nombreDeMedio(method, paymentMethods).toLowerCase() : ''
 
   const handleSubmit = async () => {
     if (!method) return
@@ -713,53 +736,108 @@ export function CobrarModal({ payment, onClose }: { payment: Payment; onClose: (
                     donde no se pueda pasar por alto — quien cobra tiene que
                     poder explicárselo a la clienta que tiene enfrente. */}
                 <div className="flex items-baseline gap-2 mt-2 flex-wrap">
-                  {diferencia !== 0 && (
+                  {diferencia !== 0 && !incierto && (
                     <span className="text-base text-muted-foreground line-through tabular-nums">
                       ${payment.amount.toLocaleString('es-AR')}
                     </span>
                   )}
                   <span className="text-2xl font-bold text-foreground tabular-nums">
-                    ${aCobrar.toLocaleString('es-AR')}
+                    {incierto ? 'A confirmar' : `$${aCobrar.toLocaleString('es-AR')}`}
                   </span>
                 </div>
-                {promoElegida ? (
-                  <p className="text-xs font-semibold mt-2 rounded-lg px-2.5 py-1.5 inline-block bg-exito-suave text-exito-fuerte">
-                    {promoElegida.nombre}
-                    {promoElegida.codigo && (
-                      <span className="font-mono ml-1.5 opacity-80">{promoElegida.codigo}</span>
-                    )}
-                    <span className="block font-normal opacity-80">
-                      Paga ${Math.abs(diferencia).toLocaleString('es-AR')} menos que el precio
-                      de lista{ajuste !== 0 && ', y la promoción reemplaza al ajuste del medio'}
-                    </span>
-                    {/* La cuota reabierta trae la promo del cobro que se
-                        anuló (0083), y la base se la aplica aunque ya no
-                        esté en su ventana: sin decirlo, parece un error. */}
-                    {payment.promocionId === promoElegida.id && (
-                      <span className="block font-normal opacity-80 mt-0.5">
-                        Es la del cobro que se anuló: se respeta aunque ya no esté vigente.
-                      </span>
-                    )}
-                  </p>
-                ) : diferencia !== 0 && (
-                  <p
-                    className={cn(
-                      'text-xs font-semibold mt-2 rounded-lg px-2.5 py-1.5 inline-block',
-                      diferencia < 0
-                        ? 'bg-exito-suave text-exito-fuerte'
-                        : 'bg-aviso-suave text-aviso-fuerte'
-                    )}
-                  >
-                    {diferencia < 0 ? '−' : '+'}
-                    {Math.abs(ajuste).toLocaleString('es-AR')}%{' '}
-                    {diferencia < 0 ? 'de descuento' : 'de recargo'} por pagar con{' '}
-                    {nombreDeMedio(method, paymentMethods).toLowerCase()}
-                    <span className="block font-normal opacity-80">
-                      {diferencia < 0 ? 'Paga' : 'Paga'} ${Math.abs(diferencia).toLocaleString('es-AR')}{' '}
-                      {diferencia < 0 ? 'menos' : 'más'} que el precio de lista
-                    </span>
+                {incierto && (
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    No se pudo confirmar con la base cómo se combina la promo con el ajuste
+                    por pagar con {medio}. El monto cobrado sale en el comprobante.
                   </p>
                 )}
+                {/* LA PROMO Y EL MEDIO, CADA UNO EN SU RECUADRO (0086).
+                    Con tarjeta la promo baja la cuota y el recargo sube
+                    lo que queda: $70.000 → $63.000 → $78.750. En un solo
+                    renglón, "paga $8.750 más" al lado del nombre de una
+                    promo no se entiende; separados, cada número se explica
+                    solo y suma lo que dice el total. */}
+                {!incierto && promoElegida ? (
+                  <>
+                    <p className="text-xs font-semibold mt-2 rounded-lg px-2.5 py-1.5 inline-block bg-exito-suave text-exito-fuerte">
+                      {promoElegida.nombre}
+                      {promoElegida.codigo && (
+                        <span className="font-mono ml-1.5 opacity-80">{promoElegida.codigo}</span>
+                      )}
+                      <span className="block font-normal opacity-80">
+                        {precio.recargo > 0 && precio.conPromo !== null
+                          ? `Baja la cuota a $${precio.conPromo.toLocaleString('es-AR')}: $${precio.descuento.toLocaleString('es-AR')} menos que el precio de lista`
+                          : `Paga $${precio.descuento.toLocaleString('es-AR')} menos que el precio de lista`}
+                        {regla === 'reemplaza'
+                          ? ajuste !== 0 && ', y la promoción reemplaza al ajuste del medio'
+                          : ajuste < 0 && `. El descuento por ${medio} no se suma: queda el mayor, que es el de la promo`}
+                      </span>
+                      {/* La cuota reabierta trae la promo del cobro que se
+                          anuló (0083), y la base se la aplica aunque ya no
+                          esté en su ventana: sin decirlo, parece un error. */}
+                      {payment.promocionId === promoElegida.id && (
+                        <span className="block font-normal opacity-80 mt-0.5">
+                          Es la del cobro que se anuló: se respeta aunque ya no esté vigente.
+                        </span>
+                      )}
+                    </p>
+                    {precio.recargo > 0 && (
+                      <p className="text-xs font-semibold mt-2 rounded-lg px-2.5 py-1.5 inline-block bg-aviso-suave text-aviso-fuerte">
+                        +{ajuste.toLocaleString('es-AR')}% de recargo por pagar con {medio}
+                        <span className="block font-normal opacity-80">
+                          Va encima del precio con la promo: suma ${precio.recargo.toLocaleString('es-AR')}
+                        </span>
+                      </p>
+                    )}
+                  </>
+                ) : !incierto && (
+                  <>
+                    {diferencia !== 0 && ajuste !== 0 && (
+                      <p
+                        className={cn(
+                          'text-xs font-semibold mt-2 rounded-lg px-2.5 py-1.5 inline-block',
+                          diferencia < 0
+                            ? 'bg-exito-suave text-exito-fuerte'
+                            : 'bg-aviso-suave text-aviso-fuerte'
+                        )}
+                      >
+                        {diferencia < 0 ? '−' : '+'}
+                        {Math.abs(ajuste).toLocaleString('es-AR')}%{' '}
+                        {diferencia < 0 ? 'de descuento' : 'de recargo'} por pagar con {medio}
+                        <span className="block font-normal opacity-80">
+                          Paga ${Math.abs(diferencia).toLocaleString('es-AR')}{' '}
+                          {diferencia < 0 ? 'menos' : 'más'} que el precio de lista
+                        </span>
+                      </p>
+                    )}
+                    {/* La base redondea siempre, también sin ajuste: una
+                        cuota que no es múltiplo del redondeo cambia igual. */}
+                    {diferencia !== 0 && ajuste === 0 && (
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        Redondeado con el criterio de Configuración.
+                      </p>
+                    )}
+                  </>
+                )}
+                {/* Las promos que se probaron y no ganan (0086). Sin
+                    decirlo, quien cobra cree que se olvidó de aplicarlas;
+                    y a quien trajo un cupón le conviene saber que lo
+                    conserva. Si el cupón no gana, entra la automática. */}
+                {!incierto &&
+                  cobro.sinAplicar.map((p) => (
+                    <p key={p.id} className="text-[11px] text-muted-foreground mt-1.5">
+                      {p.codigo ? 'El cupón ' : 'La promo '}
+                      <span className="font-semibold text-foreground">{p.nombre}</span>{' '}
+                      no se aplica:{' '}
+                      {ajuste < 0
+                        ? `pagando con ${medio} el descuento del medio es igual o mayor, y no se suman.`
+                        : 'no cambia el precio de esta cuota.'}
+                      {p.codigo &&
+                        (promoElegida
+                          ? ` En su lugar va ${promoElegida.nombre}, y el cupón queda sin usar.`
+                          : ' Queda sin usar.')}
+                    </p>
+                  ))}
               </div>
 
               {/* Cobrar una renovación no es cobrar una deuda: es lo que

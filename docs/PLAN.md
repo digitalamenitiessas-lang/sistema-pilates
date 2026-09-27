@@ -1537,6 +1537,48 @@ Lo que **no** cierra: la permisiva de update no filtra por clase propia. Está
 anotado en §0 con su razón — esa pareja de políticas alcanza también a la
 cancelación de la alumna.
 
+**Corregido el 27/09 (T37) — `0085` escrita, sin correr.** La prueba en
+producción con la sesión de Ivana encontró que se podía marcar **una clase
+que no pasó**: tocó "Marcar ausente" en una reserva del 22/10 desde "Más
+adelante" y la base lo aceptó. La ausencia consume la clase y libera el
+lugar, y ella no lo podía deshacer. Ahora 'asistió' y 'ausente' se ponen
+**desde `attendance_open_minutes` antes del inicio** de ESE día (30 por
+defecto, en Configuración → Reservas; `inicio_de_clase`, así que una clase
+corrida de horario corre la lista con ella). Vale para **todos los roles**
+—no es un permiso sino un dato que no puede ser cierto; para "no viene"
+está cancelar—, y lo que entra sin sesión queda afuera, como en la `0038`.
+Ninguna función del servidor escribe esos estados. Deshacer una marca no
+tiene horario, pero sí cupo: si otra persona tomó el lugar que liberó el
+ausente, volver a 'confirmada' rebota con "La clase ya está completa" y lo
+que queda es cancelarla (la consulta y el paso están en la migración).
+
+De paso, **la profesora no podía marcar presente una reserva por
+excepción**: `consumir_clase` revalidaba la excepción como nueva y le pedía
+`reservas.excepcion`; y a quien la tiene, si la persona había comprado un
+plan en el medio, le pasaba la clase a ese plan. Ya no revalida al marcar
+una excepción **ya validada** que tenía su lugar. "Ya validada" es la firma
+`override_by`, y para que la firma signifique eso la base ahora la borra en
+todo alta —en las que no pasaban por la validación quedaba la que mandara
+el navegador: la espera, el alta ya marcada, el motor apagado— y un motivo
+de excepción pide `reservas.excepcion` en cualquier estado. Sin eso, el
+atajo habría regalado clases con una firma inventada. `consumir_clase` **se redefine entera**, copia de
+la `0084` con dos cambios marcados: va después de la `0084`, que ya corrió
+el 27/09 (corrida al revés, la `0084` deshace el arreglo y hay que volver a
+correr la `0085`). De ausente a presente sigue sin mirar el cupo, a
+propósito: si estuvo, estuvo.
+
+En pantalla, con el mismo número: Reservas esconde los botones de marcar
+fuera de la ventana, y la Agenda, el tablero y el "Tomar asistencia" de Hoy
+pasan a "Ver la lista" y dicen desde cuándo se marca; "sin marcar" cuenta
+sólo las clases con la lista abierta, y el encabezado de la lista muestra la
+hora de ese día. Probado en un Postgres local con las funciones de
+producción (las de la `0084`) y las políticas de la `0013`: 69 casos con
+sesión de profesora, admin, alumna, recepción sin `reservas.excepcion` y sin
+sesión; las lecturas raras del parámetro, dos corridas seguidas, las tres
+guardas y la vuelta atrás. La misma batería sin la `0085` reproduce los
+errores. **La reserva del 22/10 sigue en 'ausente'** —la migración no toca
+datos—. Falta ejercerlo en la pantalla con la sesión de la profesora.
+
 ### ✅ A la profesora también se le avisa (17/09) — `0060`
 
 Su campana no sonaba nunca. El camino corto era darle `avisos.ver`, y no servía
@@ -2200,6 +2242,111 @@ las fichas de todas las clientas (decisión del 27/09: queda así por
 ahora), y un "ausente" mal puesto no se puede volver a "sin marcar" desde
 ninguna pantalla.
 
+### 🟡 Las vistas no se escriben (27/09) — `0088` **escrita, sin correr** · va antes que la `0085`
+
+Lo encontró la revisión adversarial de la `0087` y se confirmó en
+producción el mismo día: con la llave pública —la que viaja en el
+navegador de cualquiera que abra la web— y sin sesión, un `PATCH` sobre
+`public_plans` o `public_studio_settings` volvía 200. Se probó con un id
+que no existe, así que no tocó nada; con uno real habría cambiado el
+precio de un plan o un dato del estudio, y por `public_payment_discounts`
+el ajuste con que se cobra cada medio de pago.
+
+Por qué: son vistas simples, que Postgres deja escribir pasando la
+escritura a la tabla; no tienen `security_invoker`, así que corren como su
+dueño y la RLS no se mira; y Supabase les da a `anon` y `authenticated`
+todos los privilegios por defecto. Estaba abierto desde la `0003`.
+
+El sistema no escribe nunca sobre una vista (se revisó todo `app/`, `lib/`
+y `components/`), así que la `0088` les saca la escritura **a todas las
+del esquema**, sin tocar quién las lee: un `grant select` parejo le habría
+dado lectura a `anon` sobre vistas que la `0073` cerró. No hay rastros de
+que se haya usado: precios, ajustes y datos del estudio están como el
+estudio los dejó, y las filas de `studio_settings` sin autor coinciden con
+las corridas de migraciones.
+
+Verificado en un Postgres local: antes, `anon` escribía por la vista aunque
+la tabla tuviera RLS; después, `anon` y `authenticated` reciben
+"permission denied for view", `anon` sigue leyendo `public_plans` y sigue
+sin leer `account_ledger`, corre dos veces y la comprobación final corta si
+queda una vista abierta. Falta correrla y repetir el `PATCH` desde afuera.
+
+**Lección para las próximas vistas**: toda vista nueva en `public` nace
+escribible para el navegador. O se crea con `security_invoker`, o se le
+deja sólo `select`.
+
+### 🟡 Los planes y los parámetros los cambia el admin (27/09) — `0087` **escrita, sin correr**
+
+Decisión de Matías del 27/09: **recepción deja de crear, modificar y dar de
+baja planes, y de cambiar los parámetros del negocio** —plazos, ventanas de
+pago, avisos, los datos del estudio y prender o apagar una regla—. Son
+`planes.crear`, `planes.editar`, `planes.eliminar` y `config.editar`.
+Destildarlas en la matriz no hacía nada: los grupos `Planes` y
+`Configuración` estaban en sombra, y en sombra `can()` responde el legado.
+La `0087` borra esas cuatro filas de recepción y **enciende los dos
+grupos**. Recepción sigue viendo planes y parámetros, entrando a
+Configuración y cobrando.
+
+**Lo que encontró la revisión: las vistas públicas se podían escribir.**
+`public_plans`, `public_studio_settings`, `public_disciplines` y
+`public_payment_discounts` son vistas simples sin `security_invoker`, con
+todos los privilegios por defecto para `anon` y `authenticated`. Postgres
+deja escribirlas solas, y la escritura toca la tabla con los permisos del
+dueño, sin RLS. O sea que **con la llave pública y sin sesión** se podía
+cambiar el precio de un plan, crear o borrar planes, reescribir los datos
+del estudio, prender `portal_autoregistro` o mover el `ajuste_pct` con que
+`cobrar_cuota` cobra. Venía de antes de esta migración, pero sin cerrarlo
+apagar las claves no frenaba a nadie. La `0087` les deja **sólo SELECT**,
+explícito, a las cinco `public_*` (la de horarios también, aunque con su
+join no se pueda escribir). La landing sigue leyendo igual. No se vuelve
+atrás con la vuelta atrás de las claves.
+
+Encender cambia sólo lo pedido porque **la migración lo comprueba adentro**
+en vez de suponerlo: compara matriz contra legado en cada clave en sombra
+de los dos grupos y rol por rol, mira las excepciones por persona (que
+encendidas pasan a regir), verifica que cada clave esté en el grupo por el
+que se la enciende, que toda política permisiva de escritura de `plans` y
+`studio_settings` sea **exactamente** su `can()` —una con la clave y un
+`or` al costado también corta— y que ninguna función `SECURITY DEFINER`
+abierta escriba esas tablas salvo `editar_disciplina`. Al final compara la
+tabla entera de la decisión y corta si queda alguna vista escribible sin
+`security_invoker` sobre `plans` o `studio_settings`, directa o a través de
+otra vista. `config.ver` y `planes.ver` quedan para los cuatro roles. La
+vuelta atrás va **por clave y no por grupo**: `promos.administrar` es de
+Planes, rige desde la `0079` con legado vacío, y devolver el grupo entero a
+sombra la dejaba sin nadie, ni el admin. El freno de mano
+(`modo = 'emergencia'`) le devuelve a recepción las cuatro claves, no la
+escritura por las vistas.
+
+En la pantalla, Planes y Configuración preguntan por la clave con
+`permisosReady ? can(...) : canWrite` —no `can(...) || canWrite`, que para
+recepción da siempre sí— y dicen en una línea que son de sólo lectura. La
+papelera de un plan pide `planes.editar` **y** `planes.eliminar`, porque la
+base pide las dos para una baja. Guardar un plan, darlo de baja o guardar
+parámetros ahora mira cuántas filas tocó: una pestaña abierta desde antes
+de correr la migración mostraba "Guardado" sin guardar. Y tres textos que
+le pedían a quien los leyera crear o reactivar un plan —la ventana de
+asignar plan y los dos avisos de renovación omitida— ya no lo piden:
+reactivar un plan dado de baja no existe en ninguna pantalla.
+
+**Verificado** en un Postgres local con las 84 migraciones del repo y los
+privilegios por defecto de Supabase, no contra Supabase: antes de la
+`0087` los cinco roles, `anon` incluido, escribían por las vistas; después
+todos rebotan con `42501` y siguen leyendo lo mismo. Con una sesión por
+rol, lo único que cambia en todo `mis_permisos()` son esas cuatro claves de
+recepción, y recepción pasa a rebotar en insertar (42501), modificar, dar
+de baja y borrar planes, y en cambiar valores, vigencias, datos del estudio
+e insertar o borrar parámetros (cero filas); el admin, todo como antes.
+Corre dos veces; corta sin dejar nada en 19 casos armados a propósito
+(matriz distinta del legado, excepción que cambiaría algo, grupo
+renombrado, política vieja, `FOR ALL`, la clave con un `or`, un `WITH
+CHECK` abierto, una función definer nueva, otra vista escribible sobre
+`plans` o sobre `public_plans`, sin el motor) y pasa en los que no cambian
+nada; la vuelta atrás deja `mis_permisos()` idéntico al de antes y
+`perm_diff()` en cero. **Falta** correrla, mirar la landing sin sesión, y
+cuando exista la primera cuenta de recepción, entrar con ella: el paso a
+paso está al final de la migración.
+
 ### 🟡 Anular un cobro no borra la deuda (27/09) — `0083` **corrida**, falta ejercerla en pantalla
 
 Salió de la auditoría del 25/09 (T26). **Anular desde Pagos tachaba el
@@ -2314,6 +2461,95 @@ de recepción, por la pantalla. El paso a paso:
    comprobante gastados no vuelven). `caja_control()`
    va a listar el arqueo como desactualizado sólo si la caja del día ya
    estaba cerrada cuando se anuló.
+
+### 🟡 La promo respeta el recargo de la tarjeta (27/09) — `0086` **escrita, sin correr**
+
+Visto en producción el 27/09: FE FLOW de $70.000 con una promo automática
+del 10% cobraba **$63.000 con tarjeta**, igual que en efectivo, cuando sin
+promo con tarjeta son $87.500. La regla de la `0079` ("la promo reemplaza
+al ajuste del medio") se comía el recargo, que existe para pagar la
+comisión. Decisión de Matías: **que respete el recargo**.
+
+> **Orden: primero el deploy, después la `0086`.** La pantalla de antes
+> anticipa la regla vieja sin preguntar: con la `0086` corrida mostraría
+> $63.000 con tarjeta y la base cobraría $78.750, y con tarjeta lo que dice
+> la pantalla es lo que se marca en el posnet. La pantalla nueva anda con
+> las dos bases. Mergear, esperar el deploy de Vercel, **recargar las
+> pestañas abiertas del mostrador** y recién ahí correrla.
+
+**La regla nueva**, en la base (`cobrar_cuota` hace la cuenta con
+`precio_de_cobro()`, una función pura):
+
+- **Recargo del medio**: va encima del precio con la promo. $70.000 →
+  $63.000 → **$78.750**. Con monto fijo igual: $65.000 → $81.250.
+- **Descuento del medio**: no se suman, queda el mayor. Con el 20% en
+  efectivo sigue siendo $56.000, como decidió el estudio el 23/09.
+- **Se corrigió un caso que la `0079` cobraba mal**: una promo más chica
+  que el efectivo (3% contra −5%) cobraba $67.900, **más** que los $66.500
+  sin promo, y encima gastaba el uso. Ahora cobra $66.500 y la promo no se
+  aplica ni gasta el uso. En el empate (5% contra −5%) también gana el medio.
+- **Un cupón que no gana no tapa a la automática**: con un cupón del 3%
+  escrito y una automática del 10%, en efectivo se aplica la del 10%
+  ($63.000) y el cupón queda sin usar. Antes, escribir el cupón salía más
+  caro que no escribirlo. Si el cupón gana, sigue siendo el que se aplica.
+- **La promo que no ganó queda anotada** (`payments.promocion_ofrecida_id`,
+  que no cuenta como uso) y `anular_cobro` se la pasa a la cuota reabierta.
+  Sin eso, la promesa de la `0083` se rompía: cobrado en efectivo con una
+  de pago temprano del 5%, anulado para corregir y vuelto a cobrar con
+  tarjeta fuera de la ventana, salía $87.500 en vez de $83.150.
+- El redondeo, una sola vez y al final, como siempre.
+
+**Qué guarda el cobro.** `precio_lista` igual que antes. `descuento`, con
+promo, es **lo que descontó la promo** (7.000 en el ejemplo, en cualquier
+medio); sin promo, lo que hizo el medio, como hasta hoy. El recargo que va
+encima de una promo se lee como `amount − (precio_lista − descuento)`
+(15.750). No tiene columna propia: habría que rellenar hacia atrás cobros
+de arqueos cerrados, y ninguno de los viejos combina promo con recargo.
+
+**La pantalla.** El "Cobrar" (el de Pagos, el de la Agenda y el de "Otro
+cobro" cuando salda una cuota) muestra la promo y el recargo en dos
+recuadros que suman el total, y nombra la promo o el cupón que no se
+aplica. La cuenta y la elección salieron a `lib/precios.ts` y se hacen en
+enteros, como `numeric`: la de coma flotante daba distinto que la base en
+25 de las 15.708 combinaciones probadas. De paso, la pantalla ahora
+redondea también sin ajuste, como la base. **Para saber qué regla
+anticipar** le pregunta a `regla_del_cobro()`, que la deduce del cuerpo de
+`cobrar_cuota`: sin la `0086` anticipa la de la `0079`, y si alguien vuelve
+`cobrar_cuota` a la vieja, también. Si no puede preguntar, dice "A
+confirmar" en vez de un número. El alta con "Paga ahora" no anticipa el
+monto (nunca lo hizo) y avisa si el cupón no se usó. Configuración →
+Promociones dice la regla que rige (y nada mientras pregunta). El anuncio
+por mail y campana agrega, con la regla nueva, que con efectivo no se suman
+y se aplica el mayor.
+
+**La guarda** compara el código entero de `cobrar_cuota` y `anular_cobro`
+(md5 sin comentarios ni espacios) contra el de la `0079`/`0083` y el de
+esta: si alguien las tocó después, corta. El SQL para mirarlo antes, sólo
+lectura, está en su punto 0.
+
+**Verificado** en un Postgres local con los archivos enteros de la `0079`
+y la `0083` y los disparadores reales del cobro (`0016`, `0020`, `0041`,
+`0084`), no contra Supabase. Por `cobrar_cuota`, antes y después de la
+`0086`: sin promo en los tres medios ($66.500 / $87.500 / $70.000,
+iguales), 10% ($63.000 / **$78.750** / $63.000), 3% en efectivo ($67.900
+→ **$66.500**, sin promo), $5.000 con tarjeta ($81.250), el 20% en
+efectivo ($56.000), 71.230 con los tres redondeos, un cupón de un uso que
+en efectivo no se gasta y con tarjeta sí, cupón 3% + automática 10%
+($67.900 → $63.000 en efectivo), y una renovación cobrada con promo y
+tarjeta (la membresía nace con $78.750). Anular para corregir con la de
+pago temprano al 5%, al 3% y con cupón: la cuota reabierta hereda la promo
+y con tarjeta cobra $83.150 / $84.900 / $84.900. La pantalla contra la
+base: las 15.708 combinaciones de `precio_de_cobro` y los cobros hechos en
+las tres bases (antes, después, y con la `cobrar_cuota` de la `0079` vuelta
+a pegar) dan igual, centavo por centavo y con la misma promo elegida. La
+`0086` corre dos veces seguidas; corta sin la `0079`, sin la `0083`, sobre
+una `cobrar_cuota` o una `anular_cobro` tocadas después (también fuera de
+las líneas que cambia) y sobre un arreglo posterior que siga usando
+`precio_de_cobro`; pasa si sólo cambió un comentario. La vuelta atrás de
+su final deja la `0079` y la `0083` como estaban y la `0086` vuelve a
+correr. **Falta** correrla y ejercerla por la pantalla con la sesión de
+recepción: el paso a paso está en el CÓMO VERIFICAR de la migración, y va
+con un cupón para no tocar los cobros de verdad.
 
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
