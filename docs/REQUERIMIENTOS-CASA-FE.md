@@ -8,7 +8,7 @@
 > **¿Buscás qué falta? Está en la §0, acá abajo.** Es la única lista al día; el
 > resto del documento es el análisis y la historia.
 
-## 0. LO QUE FALTA — la lista viva  ·  al 27/09/2026
+## 0. LO QUE FALTA — la lista viva  ·  al 28/09/2026
 
 > **Esta es la única lista al día.** Las secciones de abajo son el análisis y la
 > historia de cómo se llegó acá, y varias quedaron viejas a propósito: son la
@@ -152,6 +152,14 @@ agujero que venía de la `0003`: **las vistas públicas se podían escribir
 sin sesión**, precios y datos del estudio incluidos. Se confirmó en
 producción sin tocar nada y lo cierra la `0088`, que va antes que las
 otras.
+
+El **28/09** se hizo la **limpieza final**: se borraron los clientes,
+membresías, cobros, reservas, turnos fijos, avisos, cajas, gastos y
+promociones de prueba, y las cuentas de clientes de prueba. Quedaron los
+planes con sus precios, la grilla, las profesoras con sus cuentas, los
+parámetros, los medios de pago y las cuentas. Belén Bobba pasó de clienta a
+admin. La primera clienta real es CF-0001 y el primer comprobante #000001.
+**Desde acá los datos de producción son reales.**
 
 El **27/09** se escribió la `0083`, **que falta correr**: anular un cobro
 dejaba el mes sin deuda y sin plata —el caso del medio equivocado, que va a
