@@ -5,12 +5,12 @@ import {
   Bell, BellRing, CreditCard, UserPlus, CalendarClock, AlertTriangle,
   Loader2, RefreshCw, RefreshCwOff, Wallet, Scale, Coins,
   CalendarCheck, CalendarOff, UserCheck,
-  Tag,
+  Tag, ArrowLeft, Check, CheckCheck, ChevronRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useData } from '@/lib/data-context'
-import { fetchNotifications, markNotificationsRead } from '@/lib/api'
+import { fetchNotifications, markNotificationsRead, markNotificationUnread } from '@/lib/api'
 import { AvisosEnEsteCelu } from '@/components/pwa/avisos-en-este-celu'
 import type { AppNotification, NotificationType } from '@/lib/types'
 import type { PageKey } from './sidebar'
@@ -96,6 +96,39 @@ function estiloDeAviso(n: AppNotification): EstiloAviso {
   return n.studentId ? { ...GENERICO, page: 'alumnos' } : GENERICO
 }
 
+/** Cómo se nombra la pantalla a la que lleva un aviso, para el botón "Ir a". */
+const NOMBRE_DE_PANTALLA: Partial<Record<PageKey, string>> = {
+  dashboard: 'Inicio',
+  agenda: 'Agenda',
+  alumnos: 'Clientes',
+  planes: 'Planes',
+  reservas: 'Reservas',
+  pagos: 'Pagos',
+  caja: 'Caja',
+  gastos: 'Gastos',
+  personal: 'Personal',
+  reportes: 'Reportes',
+  configuracion: 'Configuración',
+}
+
+/** La fecha entera, para el detalle: "lun 28/09 · 10:15". */
+function fechaCompleta(iso: string): string {
+  const d = new Date(iso)
+  const dia = d.toLocaleDateString('es-AR', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+  })
+  const hora = d.toLocaleTimeString('es-AR', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  return `${dia} · ${hora}`
+}
+
 function relativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime()
   const mins = Math.floor(diffMs / 60000)
@@ -128,6 +161,8 @@ export function NotificationsBell({
   const [items, setItems] = useState<AppNotification[]>([])
   const [loading, setLoading] = useState(true)
   const [available, setAvailable] = useState(true)
+  // El aviso abierto en detalle, o null para la lista.
+  const [abierta, setAbierta] = useState<AppNotification | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
 
   const reload = useCallback(async () => {
@@ -171,19 +206,37 @@ export function NotificationsBell({
 
   const unread = items.filter((n) => !n.read)
 
+  // Hasta el 28/09 abrir la campana marcaba todo como leído, así que un
+  // aviso que no se alcanzaba a mirar quedaba perdido entre los viejos.
+  // Ahora se marca al abrir cada uno, o todos juntos con el botón.
   const toggle = () => {
-    const willOpen = !open
-    setOpen(willOpen)
-    if (willOpen && userId && unread.length > 0) {
-      // Marcar leídas al abrir; el resaltado de esta tanda se mantiene
-      // hasta el próximo cierre para que se vea qué era nuevo.
-      markNotificationsRead(userId, unread.map((n) => n.id)).catch(() => {})
-    }
+    setOpen(!open)
+    setAbierta(null)
   }
 
   const close = () => {
     setOpen(false)
-    setItems((prev) => prev.map((n) => ({ ...n, read: true })))
+    setAbierta(null)
+  }
+
+  const marcarLeidas = (ids: string[]) => {
+    if (!userId || ids.length === 0) return
+    setItems((prev) => prev.map((n) => (ids.includes(n.id) ? { ...n, read: true } : n)))
+    // Si la base no lo guarda, la próxima carga lo vuelve a mostrar sin leer:
+    // mejor eso que un aviso que se da por leído y no lo está.
+    markNotificationsRead(userId, ids).catch(() => reload())
+  }
+
+  const marcarNoLeida = (n: AppNotification) => {
+    if (!userId) return
+    setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: false } : x)))
+    setAbierta(null)
+    markNotificationUnread(userId, n.id).catch(() => reload())
+  }
+
+  const abrir = (n: AppNotification) => {
+    setAbierta(n)
+    if (!n.read) marcarLeidas([n.id])
   }
 
   if (!available) return null
@@ -206,12 +259,65 @@ export function NotificationsBell({
 
       {open && (
         <div className="fixed inset-x-3 top-16 sm:absolute sm:inset-x-auto sm:top-11 sm:right-0 z-50 w-auto sm:w-96 bg-card rounded-2xl border border-border shadow-2xl overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          {abierta ? (
+            (() => {
+              const { Icon, color, page } = estiloDeAviso(abierta)
+              const destino = onNavigate ? NOMBRE_DE_PANTALLA[page] : undefined
+              return (
+                <div>
+                  <div className="flex items-center justify-between gap-2 px-2 py-2 border-b border-border">
+                    <button
+                      onClick={() => setAbierta(null)}
+                      className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" /> Volver
+                    </button>
+                    <button
+                      onClick={() => marcarNoLeida(abierta)}
+                      className="px-2 py-1.5 rounded-lg text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                      Marcar como no leída
+                    </button>
+                  </div>
+                  <div className="px-4 py-4 space-y-3 max-h-[60vh] overflow-y-auto">
+                    <div className="flex items-start gap-3">
+                      <span className={cn('w-9 h-9 rounded-full flex items-center justify-center shrink-0', color)}>
+                        <Icon className="w-4 h-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-foreground">{abierta.title}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">{fechaCompleta(abierta.createdAt)}</p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-foreground whitespace-pre-line">{abierta.body}</p>
+                    {destino && (
+                      <button
+                        onClick={() => {
+                          close()
+                          onNavigate?.(page)
+                        }}
+                        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90"
+                      >
+                        Ir a {destino} <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })()
+          ) : (
+          <>
+          <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border">
             <h3 className="text-sm font-bold text-foreground">Notificaciones</h3>
-            {items.length > 0 && (
-              <span className="text-[11px] text-muted-foreground">
-                {unread.length > 0 ? `${unread.length} nueva${unread.length !== 1 ? 's' : ''}` : 'al día'}
-              </span>
+            {unread.length > 0 ? (
+              <button
+                onClick={() => marcarLeidas(unread.map((n) => n.id))}
+                className="flex items-center gap-1 text-[11px] font-semibold text-primary-fuerte hover:underline"
+              >
+                <CheckCheck className="w-3.5 h-3.5" /> Marcar todas como leídas
+              </button>
+            ) : (
+              items.length > 0 && <span className="text-[11px] text-muted-foreground">al día</span>
             )}
           </div>
 
@@ -227,44 +333,60 @@ export function NotificationsBell({
               </div>
             ) : (
               items.map((n) => {
-                const { Icon, color, page } = estiloDeAviso(n)
+                const { Icon, color } = estiloDeAviso(n)
                 return (
-                  <button
+                  <div
                     key={n.id}
-                    onClick={() => {
-                      close()
-                      onNavigate?.(page)
-                    }}
                     className={cn(
-                      'w-full flex items-start gap-3 px-4 py-3 text-left border-b border-border last:border-b-0 hover:bg-muted/60 transition-colors',
+                      'flex items-start border-b border-border last:border-b-0',
                       !n.read && 'bg-primary/[0.04]'
                     )}
                   >
-                    <span
-                      className={cn(
-                        'w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5',
-                        color
-                      )}
+                    <button
+                      onClick={() => abrir(n)}
+                      className="flex-1 min-w-0 flex items-start gap-3 pl-4 pr-2 py-3 text-left hover:bg-muted/60 transition-colors"
                     >
-                      <Icon className="w-4 h-4" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center justify-between gap-2">
-                        <span className={cn('text-sm text-foreground truncate', !n.read && 'font-semibold')}>
-                          {n.title}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground shrink-0">
-                          {relativeTime(n.createdAt)}
-                        </span>
+                      <span
+                        className={cn(
+                          'w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5',
+                          color
+                        )}
+                      >
+                        <Icon className="w-4 h-4" />
                       </span>
-                      <span className="block text-xs text-muted-foreground mt-0.5">{n.body}</span>
-                    </span>
-                    {!n.read && <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-2" aria-hidden="true" />}
-                  </button>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center justify-between gap-2">
+                          <span className={cn('text-sm text-foreground truncate', !n.read && 'font-semibold')}>
+                            {n.title}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground shrink-0">
+                            {relativeTime(n.createdAt)}
+                          </span>
+                        </span>
+                        <span className="block text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.body}</span>
+                      </span>
+                    </button>
+                    {/* Marcarla sin abrirla. Va aparte del botón de la fila
+                        para que tocar el tilde no abra el detalle. */}
+                    {!n.read ? (
+                      <button
+                        onClick={() => marcarLeidas([n.id])}
+                        className="shrink-0 w-9 h-9 mt-2 mr-2 rounded-lg flex items-center justify-center text-primary-fuerte hover:bg-muted"
+                        aria-label={`Marcar como leída: ${n.title}`}
+                        title="Marcar como leída"
+                      >
+                        <Check className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <span className="shrink-0 w-9 mr-2" aria-hidden="true" />
+                    )}
+                  </div>
                 )
               })
             )}
           </div>
+          </>
+          )}
 
           {/* El interruptor es el mismo que usa el Perfil de la clienta
               (`avisos-en-este-celu.tsx`): una sola lógica de push, dos

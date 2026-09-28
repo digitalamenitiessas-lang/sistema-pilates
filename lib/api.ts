@@ -4042,6 +4042,19 @@ export async function markNotificationsRead(userId: string, ids: string[]): Prom
   if (error) throw error
 }
 
+/**
+ * Vuelve un aviso a "no leído": borra la lectura propia. La política de la
+ * 0007 deja a cada uno manejar sólo las suyas, así que no toca las de nadie.
+ */
+export async function markNotificationUnread(userId: string, id: string): Promise<void> {
+  const { error } = await supabase
+    .from('notification_reads')
+    .delete()
+    .eq('notification_id', id)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
 // ---------------------------------------------------------------
 // Web Push: suscripción del dispositivo actual
 // ---------------------------------------------------------------
