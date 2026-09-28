@@ -81,7 +81,12 @@ hay que saber para no romperlo:
   reservas de sus clases y no las del estudio entero— y **`reservas.asistencia`**
   (`0059`), que le alcanza para marcar presente y ausente pero no para
   desmarcar, porque volver a 'confirmada' lo manda la restrictiva a
-  `reservas.editar`.
+  `reservas.editar`. Desde el 27/09 **`Planes` y `Configuración` rigen**
+  (`0087`) y **recepción no tiene `planes.crear`, `planes.editar`,
+  `planes.eliminar` ni `config.editar`**: los precios, los planes, los
+  parámetros y los datos del estudio los cambia el admin. `planes.ver` y
+  `config.ver` siguen para los cuatro roles, porque el portal y la
+  profesora los leen.
 - El encendido va grupo por grupo: `update permission_keys set
   enforce_mode = 'activo' where grupo = '...'`, y se revierte igual. Ojo
   que ese grupo va por su tercer nombre: `Alumnos` (0012) → `Clientas`
@@ -166,6 +171,12 @@ resultado contra la base — no contra la pantalla.
   `StudioData.denied` dice qué quedó fuera de alcance, y las pantallas
   distinguen "no tenés acceso" de "está vacío" en vez de mostrar un $0 que
   miente.
+- **Toda vista nueva en `public` nace escribible para el navegador**, y
+  sin RLS si no tiene `security_invoker`: Supabase les da a `anon` y
+  `authenticated` todos los privilegios por defecto. Así estuvieron las
+  vistas `public_*` desde la `0003` hasta la `0088` (27/09): con la llave
+  pública y sin sesión se podía cambiar el precio de un plan. O se crea con
+  `security_invoker`, o se le deja sólo `select`.
 - RLS filtra **filas, no columnas**. Por eso lo sensible vive en tablas
   satélite (`student_private`). Si mañana hay sueldos, van en
   `teacher_private`, no como columna de `teachers`.
