@@ -2551,6 +2551,42 @@ correr. **Falta** correrla y ejercerla por la pantalla con la sesión de
 recepción: el paso a paso está en el CÓMO VERIFICAR de la migración, y va
 con un cupón para no tocar los cobros de verdad.
 
+### 🟡 Lo que pidió el estudio al abrir (29/09) — `0089` **escrita, sin correr**
+
+Tres pedidos de la dueña del primer día:
+
+**"Ingresar" en la web.** Estaba escondido desde el 16/09, para no ofrecer
+la puerta a un sistema que todavía no se usaba. Volvió el botón de la barra
+y el "Acceso al sistema" del pie.
+
+**El ícono de WhatsApp.** Un botón redondo fijo en la esquina, en la web y
+en el portal (arriba de la barra de pestañas). Usa el mismo número y la
+misma normalización que los demás botones, y sin número cargado no aparece.
+El logo es el de Simple Icons, CC0.
+
+**A dónde transferir.** Los campos de alias y CBU existían desde la `0020`
+y no los veía nadie más que el staff. El estudio tiene dos cuentas, Galicia
+(`casafe.galicia`) y BBVA (`casafe.bbva`), y cada medio de pago deposita en
+una cuenta fija, así que Matías eligió dos medios: la `0089` renombra la
+"Cuenta bancaria" a Banco Galicia (conserva su id y sus cobros), agrega
+Banco BBVA, renombra "Transferencia" a "Transferencia Galicia" (el código
+sigue siendo `transferencia`) y agrega "Transferencia BBVA". Y crea la vista
+`cuentas_para_transferir`: nombre, banco, titular, alias y CBU de las
+cuentas de banco y billetera que tengan alguno de los dos cargado. Sin
+`security_invoker` a propósito —la clienta no lee `accounts`, que tiene
+saldos— y sólo `select`, sólo para `authenticated` (la lección de la
+`0088`). El portal la muestra, con botón de copiar, donde decía "pedí el
+link de pago", y los mails de cuota del proceso diario suman el bloque "También
+podés pagar por transferencia". En Configuración → Cuentas un aviso dice
+que ese dato sale para afuera. Con cuatro medios, el cobro los pone de a dos
+por fila en el celular.
+
+Verificado: `tsc` y `next build`; la `0089` en un Postgres local (dos
+corridas, la vista con las dos cuentas, los dos medios con su cuenta,
+`authenticated` lee y no escribe, `anon` no lee, la tabla sigue cerrada).
+Falta correrla y verlo en pantalla. Queda aparte lo que pidió como
+"asistencia personal": se le preguntó qué quiere decir.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.
