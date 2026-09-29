@@ -179,6 +179,29 @@ export async function GET(request: Request) {
   }
 
   const settings = await loadSettings(admin)
+
+  // A dónde transferir (0089): las cuentas con alias o CBU que el estudio
+  // cargó en Configuración → Cuentas. Va en los mails de cuota para que la
+  // clienta tenga el dato donde lee el monto. Sin la 0089, o sin cuentas
+  // cargadas, queda vacío y los mails dicen lo de siempre.
+  const transferenciaHtml = await (async () => {
+    const { data } = await admin.from('cuentas_para_transferir').select('*')
+    const cuentas = (data ?? []) as Array<{ name: string; bank_name: string; holder: string; alias: string; cbu: string }>
+    if (cuentas.length === 0) return ''
+    const esc = (t: string) =>
+      String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string)
+    const filas = cuentas
+      .map((c) => {
+        const partes = [
+          c.alias?.trim() ? `alias <strong>${esc(c.alias.trim())}</strong>` : '',
+          c.cbu?.trim() ? `CBU <strong>${esc(c.cbu.trim())}</strong>` : '',
+        ].filter(Boolean).join(' · ')
+        const quien = [c.bank_name || c.name, c.holder].filter(Boolean).map(esc).join(' · ')
+        return `<li>${quien}: ${partes}</li>`
+      })
+      .join('')
+    return `<p>También podés pagar por transferencia:</p><ul>${filas}</ul><p>Cuando transfieras, mandanos el comprobante para que lo registremos.</p>`
+  })()
   const renewalInvoiceDays = num(settings, 'renewal_invoice_days', RENEWAL_INVOICE_DAYS)
   const renewalCatchupDays = num(settings, 'renewal_catchup_days', RENEWAL_CATCHUP_DAYS)
   // Si la 0041 todavía no corrió, la clave no existe y queda un recordatorio
@@ -565,6 +588,7 @@ export async function GET(request: Request) {
           `¡Hola ${student.name.split(' ')[0]}!`,
           `<p>Tu membresía <strong>${plan.name}</strong> vence el <strong>${formatDate(m.end_date)}</strong>. Te dejamos lista la cuota del período siguiente: <strong>${formatAmount(plan.price)}</strong>, y la podés pagar hasta el <strong>${formatDate(limite)}</strong>.</p>
            ${mpLink ? `<p><a href="${mpLink}" style="${BOTON_PAGAR}">Pagar online</a></p>` : '<p>Podés abonarla en el estudio.</p>'}
+           ${transferenciaHtml}
            <p>Pagarla antes no te quita días: el período nuevo arranca el ${formatDate(limite)}, cuando termina el que estás usando.</p>
            <p>Si no la pagás, el período nuevo no se crea: hasta que renueves no podemos anotarte en clases nuevas, y los días y horarios que venís usando quedan disponibles para quien los reserve primero.</p>`
         ),
@@ -824,6 +848,7 @@ export async function GET(request: Request) {
           ? `<p>Tu membresía <strong>${plan}</strong> venció el <strong>${formatDate(m.end_date)}</strong>, y sin una membresía vigente no podemos anotarte en clases nuevas.</p>
              <p>La cuota de renovación —<strong>${formatAmount(pagable.amount)}</strong>— se puede pagar <strong>${plazo}</strong>. El período nuevo arranca el día que la pagues.</p>
              ${pagable.mp_link ? `<p><a href="${pagable.mp_link}" style="${BOTON_PAGAR}">Pagar online</a></p>` : '<p>Podés abonarla en el estudio.</p>'}
+             ${transferenciaHtml}
              <p>Pasado el ${formatDate(pagable.due_date)} la cuota se da de baja y hay que armar la renovación de nuevo en el estudio. Y tené en cuenta que los días y horarios que venías usando quedan disponibles para quien los reserve primero.</p>`
           : `<p>Tu membresía <strong>${plan}</strong> venció el <strong>${formatDate(m.end_date)}</strong> y no se renovó, y sin una membresía vigente no podemos anotarte en clases nuevas.</p>
              <p>Para volver a anotarte hay que renovarla: pasá por el estudio o escribinos y la dejamos lista. Tené en cuenta que los días y horarios que venías usando quedan disponibles para quien los reserve primero.</p>
@@ -906,6 +931,7 @@ export async function GET(request: Request) {
           `¡Hola ${student.name.split(' ')[0]}!`,
           `<p>Tenés pendiente el pago de <strong>${p.concept || 'tu cuota'}</strong> por <strong>${formatAmount(p.amount)}</strong>.</p>
            ${p.mp_link ? `<p><a href="${p.mp_link}" style="${BOTON_PAGAR}">Pagar online</a></p>` : ''}
+           ${transferenciaHtml}
            <p>Si ya lo abonaste, ignorá este aviso. ¡Gracias!</p>`
         ),
       })

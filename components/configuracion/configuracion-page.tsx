@@ -1916,6 +1916,13 @@ function CuentaFormModal({
                   <input value={alias} onChange={(e) => setAlias(e.target.value)} className={inputClass} />
                 </div>
               </div>
+              {/* Desde la 0089 este dato sale para afuera: conviene que quien
+                  lo carga lo sepa antes de guardarlo. */}
+              <p className="text-[11px] text-muted-foreground">
+                El alias y el CBU de las cuentas de banco y billetera se les muestran a los clientes
+                en su portal y en los mails de la cuota, para que sepan a dónde transferir. Si una
+                cuenta no tiene ninguno de los dos, no aparece.
+              </p>
             </>
           )}
 

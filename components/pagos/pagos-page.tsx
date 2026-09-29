@@ -214,7 +214,7 @@ export function MethodPicker({ value, onChange }: { value: Method | null; onChan
   }
 
   return (
-    <div className={cn('grid gap-2', medios.length >= 4 ? 'grid-cols-4' : 'grid-cols-3')}>
+    <div className={cn('grid gap-2', medios.length >= 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3')}>
       {medios.map((m) => {
         const Icon = iconoDeMedio(m.code)
         return (

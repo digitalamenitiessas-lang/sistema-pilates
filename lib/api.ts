@@ -4042,6 +4042,32 @@ export async function markNotificationsRead(userId: string, ids: string[]): Prom
   if (error) throw error
 }
 
+/** Una cuenta a la que la clienta puede transferir (0089). */
+export interface CuentaParaTransferir {
+  name: string
+  bankName: string
+  holder: string
+  alias: string
+  cbu: string
+}
+
+/**
+ * Los alias y CBU que el estudio cargó en Configuración → Cuentas, para
+ * mostrarle a la clienta a dónde transferir. Sin la 0089 la vista no existe
+ * y vuelve vacío: el portal sigue diciendo lo de siempre, sin datos.
+ */
+export async function fetchCuentasParaTransferir(): Promise<CuentaParaTransferir[]> {
+  const { data, error } = await supabase.from('cuentas_para_transferir').select('*')
+  if (error || !data) return []
+  return data.map((c) => ({
+    name: c.name ?? '',
+    bankName: c.bank_name ?? '',
+    holder: c.holder ?? '',
+    alias: (c.alias ?? '').trim(),
+    cbu: (c.cbu ?? '').trim(),
+  }))
+}
+
 /**
  * Vuelve un aviso a "no leído": borra la lectura propia. La política de la
  * 0007 deja a cada uno manejar sólo las suyas, así que no toca las de nadie.

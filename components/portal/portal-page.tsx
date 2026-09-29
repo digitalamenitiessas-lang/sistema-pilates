@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { cn, DIAS, numeroDeWhatsApp } from '@/lib/utils'
 import { Sello } from '@/components/layout/logotipo'
+import { WhatsAppFlotante } from '@/components/ui/whatsapp-flotante'
 import { supabase } from '@/lib/supabase'
 import { useData, useStudio } from '@/lib/data-context'
 import { disciplineStyle } from '@/lib/disciplines'
@@ -61,6 +62,8 @@ import {
   esOferta,
   ordenDeCobro,
   hoyISO,
+  fetchCuentasParaTransferir,
+  type CuentaParaTransferir,
 } from '@/lib/api'
 import type { Discipline, Membership, Reservation, Student } from '@/lib/types'
 
@@ -1165,16 +1168,76 @@ function OfrecerTurnoFijo({
  * WhatsApp hecho link y el mensaje ya escrito. Sin número cargado queda
  * sólo la recepción: ofrecer un canal sin dar cómo llegar era lo que había.
  */
+/** Un dato con su botón de copiar. En el celular copiar es lo que se hace. */
+function DatoCopiable({ etiqueta, valor }: { etiqueta: string; valor: string }) {
+  const [copiado, setCopiado] = useState(false)
+  const copiar = () => {
+    navigator.clipboard
+      ?.writeText(valor)
+      .then(() => {
+        setCopiado(true)
+        setTimeout(() => setCopiado(false), 1800)
+      })
+      .catch(() => {})
+  }
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <p className="text-[11px] min-w-0">
+        <span className="text-muted-foreground">{etiqueta} </span>
+        <span className="font-semibold text-foreground break-all select-all">{valor}</span>
+      </p>
+      <button
+        type="button"
+        onClick={copiar}
+        className="shrink-0 px-2 py-1 rounded-md border border-border bg-card text-[10px] font-semibold text-foreground hover:bg-muted"
+      >
+        {copiado ? 'Copiado' : 'Copiar'}
+      </button>
+    </div>
+  )
+}
+
+/**
+ * A dónde transferir: las cuentas con alias o CBU que el estudio cargó en
+ * Configuración → Cuentas (0089). Sin ninguna cargada no se dibuja.
+ */
+function DatosParaTransferir({ cuentas }: { cuentas: CuentaParaTransferir[] }) {
+  if (cuentas.length === 0) return null
+  return (
+    <div className="mt-2 rounded-xl border border-border bg-card/70 p-2.5 space-y-2">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+        Para pagar por transferencia
+      </p>
+      {cuentas.map((c) => (
+        <div key={c.alias || c.cbu} className="space-y-1">
+          <p className="text-[11px] font-semibold text-foreground">
+            {c.bankName || c.name}
+            {c.holder ? <span className="font-normal text-muted-foreground"> · {c.holder}</span> : null}
+          </p>
+          {c.alias && <DatoCopiable etiqueta="Alias" valor={c.alias} />}
+          {c.cbu && <DatoCopiable etiqueta="CBU" valor={c.cbu} />}
+        </div>
+      ))}
+      <p className="text-[10px] text-muted-foreground">
+        Cuando transfieras, mandanos el comprobante para que lo registremos.
+      </p>
+    </div>
+  )
+}
+
 function PedirLinkDePago({
   verbo,
   href,
   className,
+  cuentas,
 }: {
   verbo: 'renovar' | 'abonar'
   href: string | null
   className: string
+  cuentas: CuentaParaTransferir[]
 }) {
   return (
+    <>
     <p className={cn('text-[10px] mt-1', className)}>
       {href ? (
         <>
@@ -1188,6 +1251,8 @@ function PedirLinkDePago({
         `Podés ${verbo} en recepción.`
       )}
     </p>
+    <DatosParaTransferir cuentas={cuentas} />
+    </>
   )
 }
 
@@ -1309,6 +1374,12 @@ export function PortalPage() {
   const quienEscribe = me ? `${me.name}${miCredencial ? ` (${miCredencial})` : ''}` : ''
   const escribirAlEstudio = (texto: string) =>
     waEstudio ? `https://wa.me/${waEstudio}?text=${encodeURIComponent(texto)}` : null
+
+  // A dónde transferir (0089). Se pide una vez: son datos del estudio.
+  const [cuentasParaTransferir, setCuentasParaTransferir] = useState<CuentaParaTransferir[]>([])
+  useEffect(() => {
+    fetchCuentasParaTransferir().then(setCuentasParaTransferir)
+  }, [])
   const classesLeft = ms ? ms.classesTotal - ms.classesUsed : 0
 
   // Las fechas que el estudio suspendió, con su motivo, para las clases
@@ -2114,6 +2185,7 @@ export function PortalPage() {
                         .join(' y ')}. ¿Me pasan el link de pago?`
                     )}
                     className="text-info-fuerte"
+                    cuentas={cuentasParaTransferir}
                   />
                 )}
               </>
@@ -2188,6 +2260,7 @@ export function PortalPage() {
                     .join(' y ')}. ¿Me pasan el link de pago?`
                 )}
                 className="text-aviso-fuerte"
+                cuentas={cuentasParaTransferir}
               />
             )}
           </div>
@@ -2548,6 +2621,13 @@ export function PortalPage() {
         </p>
       </main>
 
+      {/* Arriba de la barra de pestañas y a la derecha, donde no tapa el
+          botón central. Mismo número y mensaje que el pie. */}
+      <WhatsAppFlotante
+        href={escribirAlEstudio(`Hola, soy ${quienEscribe}. Tengo una consulta.`)}
+        className="right-4"
+        style={{ bottom: 'calc(88px + env(safe-area-inset-bottom, 0px))' }}
+      />
       <BarraPestanas activa={pestana} onCambiar={setPestana} pendientes={myUpcoming.length} />
     </div>
   )
