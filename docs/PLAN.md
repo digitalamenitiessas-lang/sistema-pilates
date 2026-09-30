@@ -2587,6 +2587,71 @@ corridas, la vista con las dos cuentas, los dos medios con su cuenta,
 Falta correrla y verlo en pantalla. Queda aparte lo que pidió como
 "asistencia personal": se le preguntó qué quiere decir.
 
+### ✅ Un cambio de plan antes de arrancar, a mano (30/09) — arreglo de datos, sin migración
+
+Patricia Prieto quería otro plan antes de empezar. La ficha tenía dos FE
+START: una del 05/11 al 04/12, cargada con la fecha mal y ya cancelada
+("Eligio mal el plan"), y otra del 30/09 al 29/10. El estudio pidió
+borrarle todo y asignarle de cero un FE START desde el 08/10, para que ella
+elija su horario fijo desde el portal.
+
+La pantalla no alcanzaba. El mostrador le había dado el fijo del jueves
+19:00 cuando su único plan era el de noviembre, así que las cuatro reservas
+(05, 12, 19 y 26/11) salieron contra ese plan. Al cancelarlo, **las reservas y
+el fijo siguieron vivos**: ocupaban cupo real en esa clase, y el fijo le
+llenaba el tope de 1 por semana al plan siguiente. "Deshacer" la rechazaba
+por las reservas.
+
+Se hizo con un script en el SQL Editor, con guardas por id y por conteo:
+borra las 4 reservas, las 2 cuotas (una anulada y otra pendiente, ninguna
+cobrada) y las 2 membresías, y libera el fijo (no lo borra, `0048`).
+Verificado contra la base: la ficha y el acceso intactos, nada de ella
+salvo el fijo `liberado`, y Lucía y Carolina Prieto, que comparten la
+clase, sin cambios. El plan nuevo lo asigna la dueña desde la ficha,
+**después** del script: con la membresía de octubre viva, el modal encolaba
+el nuevo al 30/10.
+
+El defecto de fondo quedó en la §0 de `REQUERIMIENTOS-CASA-FE.md`: cancelar
+y deshacer no sueltan las reservas futuras ni el fijo.
+
+### ✅ La liquidación dice por qué no deja cerrar (30/09) — sin migración
+
+La dueña quiso cerrar el período para pagar los primeros días y "no me
+deja". La causa: `teacher_pay` estaba vacía, así que las tres daban $0. El
+"Cerrar" de cada fila se apagaba en $0 sin explicar nada, y "Cerrar el
+período de todos" mostraba "Se cerraron 0.", porque `cerrar_liquidaciones`
+(`0055`) saltea los totales en cero sin anotarlos.
+
+- **Cada fila en $0 dice por qué** donde estaba el botón: sin tarifa
+  cargada, la tarifa rige desde una fecha posterior al período, tiene
+  clases y no tarifa por clase (o horas y no tarifa por hora), no trabajó,
+  o da negativo por los ajustes. Si a alguna le falta la tarifa, un
+  recuadro abajo de la tabla dice dónde se carga y que el "desde" tiene que
+  ser el primer día que se le paga o uno anterior (`tarifa_vigente` no
+  cubre los días previos).
+- **"Cerrar el período de todos"** mira antes de llamar a la base. Si todas
+  dan $0 lo dice y no pregunta. Si cierra algunas, nombra a las que quedaron
+  afuera por $0, además de las que ya salteaba la base.
+- **La tabla se recalcula sola** al cargar una tarifa, unas horas o un
+  ajuste. Antes seguía en $0 hasta que alguien cambiara las fechas: justo el
+  primer paso que se le pide a quien la ve en cero.
+
+Además apareció otro problema: con el período 01/09–30/09 la tabla decía
+**132 clases** para Giuliana y para Ivana. `sesiones_dictadas` cuenta toda
+la grilla no suspendida y no sabe que el estudio abrió el 29/09. Cerrar
+septiembre entero les habría pagado un mes de clases que no se dieron. Se
+le indicó a la dueña cerrar desde el 29/09 y pagar las horas de
+pre-apertura del 28/09 con un ajuste. El parámetro de fecha de inicio quedó
+en la §0.
+
+Verificado en local contra la base, con la sesión del admin. El período
+29/09–30/09 da 12 clases y 3 horas a Giuliana e Ivana, y 0 a Leandro, las
+tres con "Sin tarifa cargada". "Cerrar el período de todos" da el mensaje
+nuevo y no crea ninguna liquidación. Una hora de prueba a Leandro cambió su
+fila sin tocar las fechas y, borrada, volvió a 0; las 4 horas de septiembre
+quedaron como estaban. `tsc` y `next build` pasan. No se ejercieron los
+motivos que necesitan una tarifa cargada, porque una tarifa no se borra.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock.
 - [ ] Metas de venta con tablero.

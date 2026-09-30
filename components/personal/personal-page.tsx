@@ -77,6 +77,41 @@ function ultimoDiaAbierto(): string {
   return diaDeLaFecha(hoy) === 6 ? addDays(hoy, -1) : hoy
 }
 
+/**
+ * Por qué una fila no se puede cerrar, dicho donde estaría el botón.
+ *
+ * Antes había un "Cerrar" apagado y nada más, y fue lo primero que vio
+ * la dueña el 30/09: ninguna profesora tenía tarifa cargada, todo daba
+ * $0 y la pantalla no decía por qué. La base saltea igual los totales en
+ * cero (0055); esto es para que se entienda antes de apretar.
+ */
+function porQueNoSeCierra(
+  f: FilaLiquidacion,
+  suyas: CondicionPago[],
+  hasta: string
+): string | null {
+  // Cortos a propósito: van en la columna del botón, y el detalle de qué
+  // hacer está en el recuadro de abajo de la tabla.
+  if (f.total > 0) return null
+  if (f.total < 0) return 'Negativo por ajustes'
+  if (suyas.length === 0) return 'Sin tarifa cargada'
+  // La tarifa rige desde su fecha en adelante: una cargada con "desde"
+  // posterior al período no cubre ninguno de sus días.
+  const vigentes = suyas.filter((c) => c.desde <= hasta)
+  if (vigentes.length === 0) {
+    const primera = suyas.reduce((min, c) => (c.desde < min ? c.desde : min), suyas[0].desde)
+    return `Tarifa desde el ${fecha(primera)}`
+  }
+  if (f.clases > 0 && !vigentes.some((c) => c.modalidad === 'por_clase')) {
+    return 'Sin tarifa por clase'
+  }
+  if (f.horas > 0 && !vigentes.some((c) => c.modalidad === 'por_hora')) {
+    return 'Sin tarifa por hora'
+  }
+  if (f.clases === 0 && f.horas === 0) return 'Sin trabajo en el período'
+  return 'Da $0'
+}
+
 // ─────────────────────────────────────────────────────────────────────
 
 function Liquidacion({
@@ -84,6 +119,8 @@ function Liquidacion({
   hasta,
   cerradas,
   ultimos,
+  condiciones,
+  version,
   onCerrar,
 }: {
   desde: string
@@ -92,6 +129,15 @@ function Liquidacion({
   cerradas: LiquidacionCerrada[]
   /** Hasta cuándo se liquidó por última vez a cada una (0055) */
   ultimos: Map<string, string>
+  /** Las tarifas de todas, para decir por qué una fila da $0 */
+  condiciones: CondicionPago[]
+  /**
+   * Sube cada vez que se carga una tarifa, unas horas o un ajuste. Sin
+   * esto la tabla seguía en $0 después de fijar la tarifa, hasta que
+   * alguien cambiara las fechas: justo el primer paso que se le pide a
+   * quien la ve en cero.
+   */
+  version: number
   onCerrar: () => void
 }) {
   const [filas, setFilas] = useState<FilaLiquidacion[] | null>(null)
@@ -107,7 +153,7 @@ function Liquidacion({
         setFilas([])
         setError(e instanceof Error ? e.message : 'No se pudo calcular la liquidación')
       })
-  }, [desde, hasta])
+  }, [desde, hasta, version])
 
   // Ya cerrada para ESTE período exacto. Cerrar el mismo mes dos veces lo
   // rechaza la base igual; esto es para no ofrecerlo.
@@ -155,6 +201,10 @@ function Liquidacion({
   }
 
   const total = filas.reduce((a, f) => a + f.total, 0)
+  const suyas = (id: string) => condiciones.filter((c) => c.teacherId === id)
+  const faltaTarifa = filas.some(
+    (f) => f.total <= 0 && suyas(f.teacherId).length === 0 && !yaCerrada(f.teacherId)
+  )
 
   return (
     <div className="space-y-3">
@@ -174,7 +224,9 @@ function Liquidacion({
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {filas.map((f) => (
+            {filas.map((f) => {
+              const motivo = porQueNoSeCierra(f, suyas(f.teacherId), hasta)
+              return (
               <tr key={f.teacherId}>
                 <td className="px-4 py-3 text-foreground">
                   {f.profesora}
@@ -215,9 +267,13 @@ function Liquidacion({
                     >
                       liquidada hasta el {fecha(ultimos.get(f.teacherId)!)}
                     </span>
+                  ) : motivo ? (
+                    <span className="inline-block w-[5.5rem] text-[10px] font-semibold leading-tight text-aviso-fuerte">
+                      {motivo}
+                    </span>
                   ) : (
                     <button
-                      disabled={cerrando === f.teacherId || f.total <= 0}
+                      disabled={cerrando === f.teacherId}
                       onClick={() => cerrar(f)}
                       className="px-2.5 py-1 rounded-lg bg-primary/10 text-primary-fuerte text-[10px] font-semibold hover:bg-primary/20 disabled:opacity-40 whitespace-nowrap"
                     >
@@ -226,7 +282,8 @@ function Liquidacion({
                   )}
                 </td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -235,6 +292,15 @@ function Liquidacion({
         <p className="text-xs text-muted-foreground">{filas.length} en el período</p>
         <p className="text-sm font-bold text-foreground tabular-nums">{plata(total)}</p>
       </div>
+
+      {faltaTarifa && (
+        <p className="mx-4 text-xs text-aviso-fuerte bg-aviso-suave rounded-xl px-3.5 py-2.5">
+          Para que la liquidación sume plata hay que cargar cuánto se le paga a cada una en{' '}
+          <span className="font-semibold">Condiciones de pago</span>, más abajo en esta pantalla. La
+          fecha &ldquo;desde&rdquo; tiene que ser el primer día que se le paga, o uno anterior: la
+          tarifa no cubre los días previos a esa fecha.
+        </p>
+      )}
 
       {/* Este texto decía "cuando le pagues, cargalo en Gastos", y era
           cierto hasta que existió el botón de pagar. Desde la 0054 el
@@ -267,7 +333,7 @@ function Liquidacion({
 
 // ─────────────────────────────────────────────────────────────────────
 
-function Condiciones() {
+function Condiciones({ onCambio }: { onCambio?: () => void }) {
   const { teachers } = useStudio()
   const [filas, setFilas] = useState<CondicionPago[] | null>(null)
   const [abierto, setAbierto] = useState(false)
@@ -306,6 +372,7 @@ function Condiciones() {
       setConfirmando(false)
       setMonto('')
       cargar()
+      onCambio?.()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar')
     } finally {
@@ -458,7 +525,15 @@ function Condiciones() {
  * navegador y los dos se esquivan; un ajuste de sueldo sin explicación es
  * exactamente lo que nadie va a poder reconstruir seis meses después.
  */
-function Ajustes({ desde, hasta }: { desde: string; hasta: string }) {
+function Ajustes({
+  desde,
+  hasta,
+  onCambio,
+}: {
+  desde: string
+  hasta: string
+  onCambio?: () => void
+}) {
   const { can, canWrite } = useData()
   const { teachers } = useStudio()
   const [filas, setFilas] = useState<AjusteLiquidacion[] | null>(null)
@@ -494,6 +569,7 @@ function Ajustes({ desde, hasta }: { desde: string; hasta: string }) {
       setMonto('')
       setMotivo('')
       cargar()
+      onCambio?.()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar')
     } finally {
@@ -506,6 +582,7 @@ function Ajustes({ desde, hasta }: { desde: string; hasta: string }) {
     try {
       await borrarAjuste(id)
       cargar()
+      onCambio?.()
     } catch (e) {
       // Acá vive el rechazo del período ya liquidado, con el texto que
       // escribió la base: dice qué período y qué hacer.
@@ -626,7 +703,15 @@ function Ajustes({ desde, hasta }: { desde: string; hasta: string }) {
   )
 }
 
-function Horas({ desde, hasta }: { desde: string; hasta: string }) {
+function Horas({
+  desde,
+  hasta,
+  onCambio,
+}: {
+  desde: string
+  hasta: string
+  onCambio?: () => void
+}) {
   const { can, canWrite } = useData()
   const { teachers } = useStudio()
   const [filas, setFilas] = useState<HorasTrabajadas[] | null>(null)
@@ -663,6 +748,7 @@ function Horas({ desde, hasta }: { desde: string; hasta: string }) {
       setHoras('')
       setDetalle('')
       cargar()
+      onCambio?.()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar')
     } finally {
@@ -674,6 +760,7 @@ function Horas({ desde, hasta }: { desde: string; hasta: string }) {
     try {
       await borrarHoras(id)
       cargar()
+      onCambio?.()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo borrar')
     }
@@ -1111,6 +1198,7 @@ export function PersonalPage() {
   const [ultimos, setUltimos] = useState<Map<string, string>>(new Map())
   const [cerrandoTodas, setCerrandoTodas] = useState(false)
   const [avisoCierre, setAvisoCierre] = useState<string | null>(null)
+  const [version, setVersion] = useState(0)
 
   const recargar = useCallback(() => {
     if (!veSueldos) return
@@ -1120,20 +1208,49 @@ export function PersonalPage() {
   }, [desde, hasta, veSueldos])
   useEffect(recargar, [recargar])
 
+  /** Una tarifa, unas horas o un ajuste nuevos cambian lo que se liquida. */
+  const cambioLoQueSeLiquida = useCallback(() => {
+    setVersion((v) => v + 1)
+    recargar()
+  }, [recargar])
+
   // Dónde terminó el último cierre de cualquiera: es el arranque natural
   // del período siguiente, y evita tener que acordarse.
   const ultimoCierre = [...ultimos.values()].sort().pop()
 
   const cerrarElMes = async () => {
+    setAvisoCierre(null)
+    // La base saltea en silencio a quien da $0 (0055), y la pantalla
+    // decía "Se cerraron 0." sin nombrar a nadie. Se mira antes: si no
+    // hay nada para cerrar, se dice por qué y ni se pregunta.
+    let sinMonto: string[] = []
+    try {
+      const filas = await fetchLiquidacion(desde, hasta)
+      sinMonto = filas.filter((f) => f.total <= 0).map((f) => f.profesora)
+      if (filas.length > 0 && sinMonto.length === filas.length) {
+        setAvisoCierre(
+          condiciones.length === 0
+            ? 'No hay nada para cerrar: todas dan $0 porque falta cargar cuánto se le paga a cada una, en Condiciones de pago.'
+            : 'No hay nada para cerrar: todas dan $0 en el período. La fila de cada una dice por qué.'
+        )
+        return
+      }
+    } catch {
+      // Si el cálculo falla acá, lo va a decir el cierre de abajo.
+    }
+
     if (!window.confirm(`Cerrar la liquidación de todos del ${fecha(desde)} al ${fecha(hasta)}?`)) return
     setCerrandoTodas(true)
-    setAvisoCierre(null)
     try {
       const r = await cerrarTodas(desde, hasta)
+      const afuera = [
+        ...r.salteadas,
+        ...(sinMonto.length > 0 ? [`${sinMonto.join(', ')}: da $0 en el período`] : []),
+      ]
       setAvisoCierre(
-        r.salteadas.length === 0
+        afuera.length === 0
           ? `Se cerraron ${r.cerradas}.`
-          : `Se cerraron ${r.cerradas}. Quedaron afuera: ${r.salteadas.join(' · ')}`
+          : `Se cerraron ${r.cerradas}. Quedaron afuera: ${afuera.join(' · ')}`
       )
       recargar()
     } catch (e) {
@@ -1207,6 +1324,8 @@ export function PersonalPage() {
                 hasta={hasta}
                 cerradas={cerradas}
                 ultimos={ultimos}
+                condiciones={condiciones}
+                version={version}
                 onCerrar={recargar}
               />
               {veSueldos && (
@@ -1251,14 +1370,14 @@ export function PersonalPage() {
 
         <SeccionPlegable id="horas" titulo="Horas trabajadas" icono={Clock}>
           <div className="px-5 py-3">
-            <Horas desde={desde} hasta={hasta} />
+            <Horas desde={desde} hasta={hasta} onCambio={cambioLoQueSeLiquida} />
           </div>
         </SeccionPlegable>
 
         {veSueldos && (
           <SeccionPlegable id="ajustes" titulo="Ajustes manuales" icono={Wallet}>
             <div className="px-5 py-3">
-              <Ajustes desde={desde} hasta={hasta} />
+              <Ajustes desde={desde} hasta={hasta} onCambio={cambioLoQueSeLiquida} />
             </div>
           </SeccionPlegable>
         )}
@@ -1266,7 +1385,7 @@ export function PersonalPage() {
         {veSueldos && (
           <SeccionPlegable id="condiciones" titulo="Condiciones de pago" icono={Users}>
             <div className="px-5 py-3">
-              <Condiciones />
+              <Condiciones onCambio={cambioLoQueSeLiquida} />
             </div>
           </SeccionPlegable>
         )}
