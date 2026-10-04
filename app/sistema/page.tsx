@@ -20,6 +20,7 @@ import { CajaPage } from '@/components/caja/caja-page'
 import { GastosPage } from '@/components/gastos/gastos-page'
 import { PersonalPage } from '@/components/personal/personal-page'
 import { ReportesPage } from '@/components/reportes/reportes-page'
+import { ProductosPage } from '@/components/productos/productos-page'
 import { DataProvider, useData } from '@/lib/data-context'
 
 const PAGE_COMPONENTS: Record<PageKey, React.ComponentType<{ onNavigate: (page: PageKey) => void }>> = {
@@ -29,6 +30,7 @@ const PAGE_COMPONENTS: Record<PageKey, React.ComponentType<{ onNavigate: (page: 
   planes: PlanesPage,
   reservas: ReservasPage,
   pagos: PagosPage,
+  productos: ProductosPage,
   caja: CajaPage,
   gastos: GastosPage,
   personal: PersonalPage,

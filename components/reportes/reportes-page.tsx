@@ -17,6 +17,7 @@ import {
   reporteOcupacionPor,
   reportePorMedio,
   reporteResultado,
+  reporteVentasProductos,
   type Rango,
 } from '@/lib/reportes-api'
 
@@ -36,6 +37,13 @@ interface Reporte<T = Record<string, unknown>> {
   descripcion: string
   /** Qué permiso hace falta para que devuelva algo */
   necesita?: string
+  /**
+   * El reporte ni siquiera se ofrece sin esta clave (sin el perdón de
+   * `canWrite` que tiene `necesita`). Para un módulo que el rol no ve: el
+   * de ventas de productos, a recepción antes de la 0090, le mostraba un
+   * botón que terminaba en un error técnico.
+   */
+  soloSi?: string
   cargar: (r: { desde: string; hasta: string }) => Promise<T[]>
   columnas: Array<Columna<T> & { alinearDerecha?: boolean; render?: (f: T) => string }>
   /** Columna que se suma al pie */
@@ -48,7 +56,9 @@ const REPORTES: Array<Reporte<any>> = [
     key: 'cobros',
     nombre: 'Cobros',
     grupo: 'Plata',
-    descripcion: 'Todo lo que entró, con su medio, cuenta y comprobante',
+    // Hasta la 0090 decía "Todo lo que entró": desde que las ventas de
+    // productos entran a la caja por su lado, dejó de ser cierto.
+    descripcion: 'Los cobros a clientes, con su medio, cuenta y comprobante. Las ventas de productos tienen su propio reporte.',
     necesita: 'finanzas.ver',
     cargar: reporteCobros,
     columnas: [
@@ -130,6 +140,36 @@ const REPORTES: Array<Reporte<any>> = [
       { titulo: 'Monto', valor: (f) => f.monto, numero: true, alinearDerecha: true, render: (f) => plata(f.monto) },
     ],
     totalizar: (filas) => plata(filas.reduce((a, f) => a + f.monto, 0)),
+  },
+  {
+    key: 'ventas-productos',
+    nombre: 'Ventas de productos',
+    grupo: 'Plata',
+    descripcion: 'Lo vendido en consignación, con el reparto entre el estudio y el proveedor',
+    necesita: 'inventario.ver',
+    soloSi: 'inventario.ver',
+    cargar: reporteVentasProductos,
+    columnas: [
+      { titulo: 'Fecha', valor: (f) => f.fecha, render: (f) => fecha(f.fecha) },
+      { titulo: 'N°', valor: (f) => `V-${f.numero}` },
+      { titulo: 'Producto', valor: (f) => f.producto },
+      { titulo: 'Aroma', valor: (f) => f.aroma },
+      { titulo: 'Cant.', valor: (f) => f.cantidad, numero: true, alinearDerecha: true, render: (f) => String(f.cantidad) },
+      { titulo: 'Medio', valor: (f) => f.medio },
+      { titulo: 'Cliente', valor: (f) => f.cliente },
+      { titulo: 'Cobrado', valor: (f) => f.cobrado, numero: true, alinearDerecha: true, render: (f) => plata(f.cobrado) },
+      { titulo: 'Estudio', valor: (f) => f.estudio, numero: true, alinearDerecha: true, render: (f) => plata(f.estudio) },
+      { titulo: 'Proveedor $', valor: (f) => f.proveedorMonto, numero: true, alinearDerecha: true, render: (f) => plata(f.proveedorMonto) },
+      { titulo: 'Proveedor', valor: (f) => f.proveedor },
+      { titulo: 'Estado', valor: (f) => f.estado },
+    ],
+    // Las anuladas se listan para que se vean, pero no son plata.
+    totalizar: (filas) => {
+      const vivas = filas.filter((f) => !f.anulada)
+      const suma = (k: 'cobrado' | 'estudio' | 'proveedorMonto') =>
+        vivas.reduce((a: number, f: Record<string, number>) => a + f[k], 0)
+      return `Cobrado ${plata(suma('cobrado'))} · estudio ${plata(suma('estudio'))} · proveedores ${plata(suma('proveedorMonto'))}`
+    },
   },
   {
     key: 'altas',
@@ -360,7 +400,7 @@ export function ReportesPage() {
               {g}
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {REPORTES.filter((r) => r.grupo === g).map((r) => (
+              {REPORTES.filter((r) => r.grupo === g && (!r.soloSi || can(r.soloSi))).map((r) => (
                 <button
                   key={r.key}
                   onClick={() => setActivo(r.key)}

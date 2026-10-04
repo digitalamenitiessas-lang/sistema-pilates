@@ -16,6 +16,7 @@ import {
   Receipt,
   BarChart3,
   BriefcaseBusiness,
+  ShoppingBag,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Logotipo, Sello } from '@/components/layout/logotipo'
@@ -37,6 +38,7 @@ export type PageKey =
   | 'planes'
   | 'reservas'
   | 'pagos'
+  | 'productos'
   | 'caja'
   | 'gastos'
   | 'personal'
@@ -56,6 +58,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'planes', label: 'Planes', icon: BookOpen },
   { key: 'reservas', label: 'Reservas', icon: ClipboardList },
   { key: 'pagos', label: 'Pagos', icon: CreditCard },
+  { key: 'productos', label: 'Productos', icon: ShoppingBag },
   { key: 'caja', label: 'Caja', icon: Wallet },
   { key: 'gastos', label: 'Gastos', icon: Receipt },
   { key: 'personal', label: 'Personal', icon: BriefcaseBusiness },
@@ -96,6 +99,11 @@ export function Sidebar({
     // que hasta que la migración corra `can()` dice que no y el módulo
     // no aparece. No se ofrece una pantalla que la base no sabe servir.
     if (item.key === 'personal') return can('personal.ver')
+    // Productos (0090): quien ve o quien vende, y sin `canWrite` —el
+    // filtro termina en `return true`, así que sin esta línea la profesora
+    // lo vería—. Mientras la 0090 no corrió, sólo el admin lo ve (por el
+    // legado de `inventario.ver`) y la pantalla le dice que falta.
+    if (item.key === 'productos') return can('inventario.ver') || can('inventario.vender')
     if (item.key === 'reportes') return can('reportes.ver') || canWrite
     return true
   })

@@ -2939,7 +2939,10 @@ const MOTIVO_BLOQUEO: Record<string, string> = {
   fija: 'La necesitan todos para que el portal y la web funcionen',
   estructural: 'Tildarla dejaría a alguien elevarse a sí mismo',
   servicio: 'Es del sistema (procesos automáticos), no de una persona',
-  futuro: 'El módulo todavía no existe',
+  // Decía "El módulo todavía no existe". Desde la 0090 el módulo de
+  // Inventario existe y "Ver costos" sigue reservada (en consignación no
+  // hay costo): el candado tiene que servir para cualquier clave futura.
+  futuro: 'Todavía no tiene efecto en el sistema',
 }
 
 function PermisosSection() {

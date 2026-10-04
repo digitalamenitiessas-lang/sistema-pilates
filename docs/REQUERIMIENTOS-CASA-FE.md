@@ -8,7 +8,7 @@
 > **¿Buscás qué falta? Está en la §0, acá abajo.** Es la única lista al día; el
 > resto del documento es el análisis y la historia.
 
-## 0. LO QUE FALTA — la lista viva  ·  al 30/09/2026
+## 0. LO QUE FALTA — la lista viva  ·  al 04/10/2026
 
 > **Esta es la única lista al día.** Las secciones de abajo son el análisis y la
 > historia de cómo se llegó acá, y varias quedaron viejas a propósito: son la
@@ -20,7 +20,9 @@
 
 ### Dónde quedó todo, contra las 10 prioridades del estudio
 
-**Nueve en verde.** La única afuera es Inventario, que Matías excluyó (§7).
+**Nueve en verde.** La única afuera es Inventario, que Matías excluyó (§7)
+—y que el 04/10 volvió en parte: el estudio pidió vender productos en
+consignación, ver más abajo—.
 El 15/09 entraron diez migraciones —`0046` a `0055`— y pasaron a verde la 3
 (ficha), la 4 (tablero), la 6 (personal) y la 10 (notificaciones).
 
@@ -170,6 +172,24 @@ saldó una cuota, como un "Otro cobro", y una cuota pendiente se puede
 anular sin cancelar el período. El detalle y el paso a paso para
 verificarla, en `PLAN.md`.
 
+El **04/10** quedó escrita la **`0090`, que falta correr**: productos en
+consignación. El estudio vende difusores y sprays que deja un proveedor; de
+cada venta el 30% es del estudio (configurable por proveedor) y el resto se le
+rinde. Recepción vende —producto, cantidad, aroma obligatorio, medio de pago y,
+si hay, la ficha de quien compra— y el precio sale de la lista de cada medio,
+que carga el admin. La plata entra a la caja como una quinta rama del libro
+(`origen 'venta'`), así que suma en el cajón y cuadra en el cierre; la parte
+del proveedor sale como gasto cuando el admin registra el pago. Stock con
+historia (ingreso, devolución al proveedor, ajuste con motivo), anulación con
+motivo sólo admin, rendición que se puede anular desde el módulo, reporte
+"Ventas de productos" y las compras en la ficha. **Cambio visible**:
+"Ingresos" de Pagos y del tablero incluyen lo vendido en bruto. El pago al
+proveedor queda con la fecha de la última venta que cubre: con el resultado
+"devengado" el 70% cae en el mes de las ventas; "por lo pagado", en el mes en
+que se le paga, así que conviene rendir mes por mes. El detalle, lo
+verificado y el orden del domingo, en `PLAN.md`. Para que el lunes se pueda
+vender, el admin tiene que cargar el proveedor real y la mercadería.
+
 ### Lo que falta construir
 
 | | Qué | Tamaño |
@@ -200,6 +220,7 @@ verificarla, en `PLAN.md`.
 | — | Foto del comprobante de gasto (primer uso de Storage) · avisos de caja en el proceso diario | chico |
 | — | **Fichaje de entrada y salida** de las profesoras. Se apoya en `staff_work_logs` sin rehacer nada, pero necesita que tengan cuenta | chico |
 | — | Congelar la membresía (`freeze_max_days` existe y no rige) · baja de clienta con motivo · cumpleaños del mes | mediano |
+| — | **Productos, fase 2** (después de correr la `0090`): las ventas en "Cobrado en el turno" del cierre y en "Cobrado hoy" del tablero (hoy suman en el cajón y en el esperado, pero el desglose por medio es sólo de cobros, y sumarlas toca `cerrar_caja`); stock por aroma, si el estudio lo pide; y un aviso en "Otro cobro" para que una venta de producto no se cargue ahí, donde no entra en la rendición al proveedor | chico |
 
 ### Lo que falta encender, y no es desarrollo
 
@@ -436,7 +457,7 @@ subdeclarar lo que el sistema hace.
 | 7 · Dashboard principal | 🟡 | **La mitad de plata entró** (`0020`): lo que entró y salió en el mes, el gasto de hoy, el resultado y el saldo cuenta por cuenta, con "Sin acceso" cuando al rol le falta un permiso en vez de un cero que miente. **Falta**: los contadores comerciales —pases de prueba, renovadas, canceladas, cumpleaños |
 | 8 · Caja diaria y cuentas | 🟢 | **Hecho** (`0020`): cuentas con saldo, apertura y cierre con arqueo, movimientos y transferencias internas. El libro se deriva de los cobros: no hay dos verdades para la misma plata |
 | 9 · Gastos y egresos | 🟢 | **Hecho** (`0020`): los catorce campos, los siete filtros y el total del filtro a la vista. **Queda** adjuntar la foto del comprobante, que es el primer uso de Storage |
-| 10 · Productos e inventario | ⚫ | **Fuera del alcance** (§7) |
+| 10 · Productos e inventario | 🟡 | **Fuera del alcance** (§7), salvo lo que el estudio pidió el 04/10: venta en consignación con stock por producto, precios por medio de pago, proveedores y rendición (`0090`, escrita y sin correr). Sin variantes, sin inventario físico, sin costos |
 | 11 · Personal, roles y permisos | 🟡 | El motor de permisos por rol y por persona, con las políticas de la base preguntándole (`0012`–`0014`); la baja lógica de accesos (`0015`); anular un movimiento con motivo. **Falta**: la ficha laboral y el historial de actividad, que van con la sección 12 |
 | 12 · Horas trabajadas y remuneraciones | 🔴 | **Sin empezar, y está DENTRO del alcance**: es lo único nuevo que Matías aprobó (§7, Paso 10 de §9). `teachers` no tiene una sola columna laboral. Junto con el Agregado 2, es la deuda real del proyecto |
 | 13 · Landing administrable | 🟡 | Los datos del estudio salen de la base y los cargó el estudio (`0011`+`0033`), así que la web ya muestra los reales. **Falta** todo el editor: textos, imágenes, banners, las secciones nuevas, y borrador con vista previa y publicación |

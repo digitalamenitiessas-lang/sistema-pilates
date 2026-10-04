@@ -50,6 +50,7 @@ import type {
 } from '@/lib/types'
 import { AlumnoFormModal } from './alumno-form-modal'
 import { AsignarPlanModal } from './asignar-plan-modal'
+import { ComprasDeCliente } from '@/components/productos/compras-de-cliente'
 
 /**
  * Los cinco estados, escritos una vez. 'futura' no está en la base —la
@@ -1502,6 +1503,12 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                   </div>
                   )
                 })
+              )}
+              {/* Las compras de productos (0090), aparte: no son cuotas ni
+                  deuda. Para quien ve o vende productos; sin la 0090 el
+                  bloque no aparece. */}
+              {(can('inventario.ver') || can('inventario.vender')) && (
+                <ComprasDeCliente studentId={student.id} />
               )}
             </div>
           )}
