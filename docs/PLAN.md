@@ -2551,7 +2551,7 @@ correr. **Falta** correrla y ejercerla por la pantalla con la sesión de
 recepción: el paso a paso está en el CÓMO VERIFICAR de la migración, y va
 con un cupón para no tocar los cobros de verdad.
 
-### 🟡 Lo que pidió el estudio al abrir (29/09) — `0089` **escrita, sin correr**
+### ✅ Lo que pidió el estudio al abrir (29/09) — `0089` **corrida y verificada**
 
 Tres pedidos de la dueña del primer día:
 
@@ -2652,8 +2652,174 @@ fila sin tocar las fechas y, borrada, volvió a 0; las 4 horas de septiembre
 quedaron como estaban. `tsc` y `next build` pasan. No se ejercieron los
 motivos que necesitan una tarifa cargada, porque una tarifa no se borra.
 
+### 🟡 Productos en consignación (04/10) — `0090` **escrita, sin correr**
+
+Lo pidió el estudio: vende difusores y sprays que deja un proveedor, y de
+cada venta el 30% es del estudio y el 70% del proveedor. Hay que saber
+cuánto se le debe. Los precios son por medio de pago y los dio el estudio
+(Difusor $30.000 / $31.500 / $37.500 en 3 cuotas; Spray $18.500 / $19.500 /
+$23.200): **no** salen de los ajustes del medio.
+
+**La plata.** Tabla propia, `ventas_productos`, y una **quinta rama
+`'venta'` en `account_ledger`**: la caja entera sale de ese libro, así que
+una venta en efectivo suma en "Caja del mostrador", en `saldo_cuenta`, en
+`caja_dia`, en el turno y en el esperado del cierre, sin tocar ninguna de
+esas funciones. Además suma en `resultado_mensual` y `monthly_revenue`. Se
+descartó `payments` (`student_id` NOT NULL, se anularía desde Pagos sin
+devolver stock, la clienta lo lee, dispara el aviso de pago) y
+`account_movements` (no entra al resultado, su CHECK obligaba a mentir). La
+venta guarda la foto del precio, del % y del reparto. El 30% es **sobre lo
+cobrado** y configurable por proveedor; la comisión de la tarjeta la
+absorbe el estudio. Al rendir, la parte del proveedor sale como **gasto**
+en "Rendiciones a proveedores" (el patrón de `pagar_liquidacion`). La plata
+sale el día que se registra (`paid_at`), pero la fecha del comprobante del
+gasto es la de la **última venta** que cubre: con el resultado
+"devengado", rendir el 4/10 lo de septiembre deja el 70% en septiembre y
+ese mes queda con el 30%. Con el resultado "por lo pagado", septiembre
+muestra el 100% como ingreso y octubre el 70% como egreso: el 30% queda en
+el mes sólo si se rinde dentro del mismo mes. Si una rendición junta dos
+meses, el costo entero cae en el de la última venta (la hoja lo avisa).
+`monthly_revenue` y `resultado_mensual` suman las ventas sólo para quien
+tiene `finanzas.ver`, la clave que ya gobernaba esas dos vistas.
+
+**Las tres vistas existentes** se recrean con la huella comparada contra
+la versión del repo (si producción no coincide, corta y pide la
+definición), con foto antes y después comparada con `except all` en los dos
+sentidos —hoy no hay ventas, así que cualquier diferencia aborta— y con
+`set local lock_timeout = '5s'` para no colgar la Caja de nadie.
+
+**Lo que hace la pantalla** (Productos, después de Pagos, para quien tiene
+`inventario.ver` o `inventario.vender`): arriba las tarjetas para vender con
+stock y precios; la venta pide cantidad, **aroma obligatorio** (con los
+aromas que carga el admin y los ya vendidos como sugerencia, que se copian
+tal cual), medio y, opcional, la ficha o el nombre de quien compra. Ventas
+del período con su estado (a rendir, rendida, anulada, todo del estudio);
+rendir por proveedor con casillas y "Registrar el pago al proveedor"; pagos
+anteriores con "Anular este pago"; productos y precios, cargar mercadería,
+devolver al proveedor y ajustar con motivo; movimientos de stock;
+proveedores. Ninguna confirmación es un cartel nativo. Reporte "Ventas de
+productos" y bloque "Compras de productos" en la pestaña Pagos de la ficha.
+La descripción del reporte "Cobros" dejó de decir "Todo lo que entró".
+
+**Lo que protege la base.** Todo se escribe por funciones `security
+definer` que piden su clave: `vender_producto` (stock con la fila
+bloqueada, idempotente con una llave del navegador que nunca viaja nula, y
+la misma llave con otro producto se rechaza), `anular_venta` (sólo
+`status`, así que se comporta como anular un cobro en un turno cerrado:
+arqueo desactualizado en `caja_control`; no se anula lo ya rendido),
+`rendir_proveedor`, `anular_rendicion` (anula el gasto; "rendida" se
+calcula del gasto vivo, así que las ventas vuelven solas a pendientes),
+`mover_stock`, `guardar_producto` y `guardar_proveedor`. Un disparador
+nuevo en `expenses` (`expenses_rendicion_fija`) impide cambiarle el monto o
+pasar a pendiente el gasto de una rendición —recepción tiene
+`gastos.editar` y el formulario de Gastos reescribe el monto—; para
+cualquier otro gasto no hace nada. Las siete tablas con RLS y sólo SELECT
+para `authenticated`; la secuencia de `numero` cerrada; las dos vistas
+nuevas `security_invoker` y sólo SELECT.
+
+**Permisos.** `inventario.ver` y `inventario.vender` para admin y
+recepción; `gestionar`, `anular` y `rendir` sólo admin. Las cinco nacen
+en `activo` con el legado igual a la matriz (en modo emergencia el
+mostrador sigue vendiendo). `ver_costos` queda `futuro`, sólo cambia su
+ayuda. `perm_diff()` no suma filas: se compara contra una foto tomada al
+empezar.
+
+**Se siembran** Difusor y Spray con sus cuatro precios ("3 cuotas" =
+Tarjeta; las dos transferencias, el mismo), stock 0 y **sin proveedor**: no
+se pueden vender hasta que el admin cargue el proveedor y la mercadería.
+
+**Lo que corrigió la revisión** (antes de correrla):
+
+- **El precio cobrado y el registrado podían ser distintos.** La pantalla
+  leía la lista al abrirse y la venta tomaba la de ese momento: si el admin
+  cambiaba un precio desde otro lado, se le cobraba a quien compra el viejo
+  y la base registraba el nuevo (el cajón no cuadraba y el 70% salía de
+  plata que no entró). Ahora `vender_producto` recibe el precio que se vio
+  (`p_precio_esperado`, un control y no la fuente) y corta si no coincide;
+  la hoja relee la lista al abrirse y después de cualquier error.
+- **La llave de la venta vivía en la hoja**: con la respuesta perdida,
+  cerrar y volver a abrir armaba otra y se podía cobrar dos veces. Ahora la
+  llave pendiente de cada producto vive fuera de la hoja hasta que una
+  venta se confirma, y un error sin respuesta dice que no se sabe si quedó
+  y que volver a tocar "Cobrar" no cobra dos veces.
+- **El NIVEL 1 de la vuelta atrás se deshacía con el freno de mano**:
+  borraba la matriz, pero en emergencia rige el legado, que la `0090` deja
+  igual a la matriz. Ahora vacía también el legado.
+- **Sin `finanzas.ver`, "Ingresos" mostraba sólo lo de productos** (las
+  ventas también se abren con `caja.ver`): la rama de ventas de
+  `monthly_revenue` y `resultado_mensual` pide `finanzas.ver`. La caja no
+  lleva ese filtro, porque la lee `cerrar_caja`.
+- La ayuda de `inventario.ver` avisa que las ventas también las ve quien
+  tiene la caja o la información financiera. El candado de las claves
+  `futuro` dice "Todavía no tiene efecto en el sistema" (decía "El módulo
+  todavía no existe", falso para `ver_costos`).
+- **Pantalla:** el error y lo que falta van en el pie de la hoja, junto a
+  los botones (en el teléfono quedaban fuera de la vista y el botón
+  parecía muerto); las hojas releen la lista cuando la base dice que no
+  ("La lista cambió" ya no es un bucle); el reporte de ventas no se ofrece
+  a quien no tiene `inventario.ver` y la ficha no muestra el bloque hasta
+  tener respuesta; la tarjeta de Pagos dice "Cobros y ventas de
+  productos"; recepción ve lo pendiente de rendir sin casillas; y al admin
+  la tarjeta le dice qué falta ("elegir el proveedor y cargar la
+  mercadería") con los botones ahí mismo.
+
+Verificado en un Postgres 17 local con `0001`–`0089` y datos previos:
+
+- Sin las previas corta en la guarda con su mensaje y no deja nada (bases
+  hasta `0011`, `0019` y `0073`).
+- El ensayo con `rollback` no deja nada y el `select` final muestra las
+  tres claves en sombra y `modulo = f`; la de verdad, seis claves con cinco
+  en `activo`, `perm_diff = 0` y `modulo = t`; la segunda corrida enciende
+  0 y no cambia nada. Libro, resultado, ingresos y saldos idénticos antes y
+  después; lo que ven admin, recepción, profesora y clienta de esas vistas,
+  idéntico (anon da error antes y después).
+- Recepción vende en los cuatro medios: Difusor $30.000 en efectivo → $9.000
+  / $21.000 a Caja del mostrador; $31.500 por Galicia y por BBVA → $9.450 /
+  $22.050 a cada banco; $37.500 con tarjeta → $11.250 / $26.250 a Tarjetas a
+  acreditar. Mercado Pago, aroma vacío o en blanco, cantidad 0 o más que el
+  stock: rechazados. El reintento con la misma llave devuelve la misma venta.
+- Recepción no anula, no rinde, no carga precios, stock ni proveedores, y no
+  escribe ninguna tabla directo. Profesora y clienta leen 0 filas y no
+  venden. Las vistas nuevas no se escriben ni con sesión; `anon` no lee.
+- Dos ventas a la vez de la última unidad: la segunda espera y responde
+  "Quedan 0 de Spray".
+- La caja: `saldo_cuenta`, `caja_dia`, el libro del turno y `cerrar_caja`
+  (ingresos $120.000, esperado $115.000) incluyen las ventas; las filas
+  previas del libro, iguales una por una. `resultado_mensual` y
+  `monthly_revenue` dan lo mismo.
+- Anular una venta de un turno cerrado devuelve el stock, la saca del libro
+  y `caja_control` marca "arqueo desactualizado" por $30.000. Lo rendido no
+  se anula. Rendir tres ventas creó el gasto por $70.350 (el 70% de
+  $100.500) en "Rendiciones a proveedores"; recepción no pudo cambiarle el
+  monto ni pasarlo a pendiente desde Gastos, sí las notas; anularlo desde el
+  módulo devolvió las ventas a "a rendir" y se volvió a rendir.
+- La vuelta atrás de nivel 2 (comentada al pie) corta con ventas cobradas y,
+  sin ventas, deja las vistas como la plantilla, `perm_diff = 0` y la `0090`
+  se vuelve a aplicar limpia.
+- Lo de la revisión, en otra base limpia: con el precio cambiado por el
+  admin, cobrar con el viejo corta ("ahora es $33.000") y no graba nada; con
+  el nuevo y la misma llave pasa, y repetir la llave con el viejo devuelve
+  la venta ya hecha. Una venta llevada al 30/09 y rendida el 4/10: gasto con
+  fecha 30/09 y `paid_date` 4/10, septiembre con ingreso $99.000 y
+  devengado $69.300. Recepción sin `finanzas.ver`: `monthly_revenue` 0
+  filas, `resultado_mensual` 0 (antes de la revisión, $66.000 de puros
+  productos). El NIVEL 1 tal cual el pie y después emergencia: recepción no
+  vende, el admin no ajusta stock; restituidos matriz y legado vuelve a
+  andar, `perm_diff = 0`.
+- `tsc --noEmit` y `next build` pasan. La pantalla se miró a 375 px contra
+  un Supabase de mentira (sin tocar producción): el admin sin la `0090` ve
+  el cartel de que falta; recepción sin la `0090` no ve el ítem; la
+  profesora nunca; recepción con la `0090` vende y ve, sin anular ni
+  cargar; sin scroll horizontal.
+
+**Falta**: correrla (ensayo con `rollback`, después `commit`), mergear,
+que el admin cargue el proveedor real, su % y los aromas, y la mercadería.
+La primera venta real se verifica contra la base (`ventas_productos_estado`
+y el libro por `origen = 'venta'`). Avisarle al estudio el cambio de
+"Ingresos" en Pagos y el tablero, y que conviene rendir mes por mes.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
-- [ ] Inventario y venta de productos (POS) con stock.
+- [ ] Inventario y venta de productos (POS) con stock. *(La consignación —sin variantes ni inventario físico— es la `0090`.)*
 - [ ] Metas de venta con tablero.
 - [ ] Tiquetera (requiere impresora térmica comprada).
 
@@ -2720,7 +2886,7 @@ motivos que necesitan una tarifa cargada, porque una tarifa no se borra.
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a **`0088`** ✅. **El 27/09 a la tarde corrieron la `0088`, la `0085` y la `0087`, y después del deploy del PR #58 la `0086`**, en ese orden: la `0088` primero porque cerraba un agujero abierto, y la `0086` después del deploy porque con la pantalla vieja el cobro habría anticipado otro número. Verificado en producción: escribir en las vistas `public_*` con la llave pública da 401 y leerlas sigue en 200 (`0088`); el admin no puede marcar ausente una clase del 22/10 y sí una del 25/09 (`0085`); Planes y Configuración rigen con las cuatro claves sólo para admin (`0087`); y una cuota de $70.000 con promo del 10% se cobró $78.750 con tarjeta, por la pantalla y en la base (`0086`). La **`0082`, la `0083` y la `0084` corrieron el 27/09**, en ese orden. Verificado contra la base con la sesión del admin: existen `mi_tope_de_fijos` (0082) y `anular_cuota` (0083, rechaza un id inexistente con "Esa cuota no existe."), los diez cobros tienen `origen = 'cuota'`, y `pesos()` (0084) da "$42.750", "-$1.000", "$1.234,50" y "$0". **La `0084` cortó en el primer intento**, y el chequeo inicial hizo su trabajo: la versión viva de `guard_periodo_liquidacion` no es la de la `0055` del repo —no dice `FM999,999,999`—, así que esa migración se corrió desde otra copia o la función se tocó a mano. Se sacó de la `0084`, que no tenía nada que arreglarle, y la segunda corrida pasó. Ojo que **la `0054` y la `0055` no figuraban en este registro**: la que está en producción no es necesariamente la del repo, y conviene compararla antes de volver a redefinirla. Las `0076` a `0081` corrieron entre el 23 y el 24/09, cada una anotada en su bloque. La **`0075` corrió el 22/09** y se verificó en los tres puntos de su bloque: la vista conserva sus once columnas, sigue siendo `security_invoker` —sin sesión la lectura muere en `permission denied for function can`, que sólo pasa si la política corre como quien pregunta— y el medio sale con su nombre: se cargó un gasto con `method = 'efectivo'` y el libro mostró **Efectivo**. El gasto de prueba se borró. La **`0074` corrió el 22/09** y se verificó ejerciendo lo que venía a habilitar: un medio inventado rebota con `23503` (clave ajena) y no con `23514` (el CHECK viejo), y con la cuenta "Macro" y el medio "Débito" creados desde Configuración se cobraron $70.000 que fueron solos a esa cuenta. Todo revertido. La **`0073` corrió el 22/09** y se verificó de las dos maneras que hacían falta: las seis puertas cerradas con la llave pública, y con sesión de admin los cinco cortes de Ocupación dando los mismos números y el descuento de clases todavía andando (se reservó una clase, `classes_used` pasó de 3 a 4, se borró la reserva y volvió a 3). La **`0072` corrió el 22/09**; el agujero que cierra se reprodujo antes de escribir el arreglo. La **`0071` corrió el 19/09** y se verificó por los tres rechazos, que es lo que importa de esa función. La **`0070` y la `0069` corrieron el 18/09**. La **`0068` a la `0061` corrieron el 17/09**. La **`0060` corrió el 17/09** y se verificó suspendiendo una clase con la profesora logueada: le llegó a la campana sin recargar y siguió sin ver los avisos de staff. La **`0059` corrió el 17/09**; probarla encontró que la pantalla ofrecía deshacer una marca sin permiso. La **`0058` corrió el 16/09** y hubo que corregir el cupo dos veces: la Agenda tenía su propia cuenta y era la que se veía. La **`0057` corrió el 16/09 en el segundo intento** —la primera abortó por un `group_key` inexistente, y la envoltura `begin/commit` no dejó nada a medias—. La **`0056` corrió el 16/09** y se verificó moviendo el descuento a -8 y a 0 con la web abierta: la línea siguió al número y desapareció al apagarlo; el dato quedó restaurado en -5. La **`0053` corrió el 15/09**. La **`0052` corrió el 15/09** y se corrigió una redacción; es idempotente. La **`0051` corrió el 15/09** y se corrigió dos veces sobre la marcha —los nombres en castellano y el día en el corte por clase—; es idempotente, todo `create or replace`. La **`0050` corrió el 15/09**, se corrigió la clave foránea del autor y se volvió a correr; es idempotente a propósito. La **`0048` y la `0049` corrieron el 15/09** y se verificaron ejerciéndolas: el cupo rechazó el noveno turno fijo, un pausado quedó fuera de la liberación automática, y el interruptor encendido liberó exactamente uno. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **No queda ninguna migración sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Migraciones aplicadas | `0001` a **`0089`** ✅. La **`0089` corrió el 29/09** y se verificó contra la base: la vista `cuentas_para_transferir` devuelve Banco Galicia (`casafe.galicia`) y Banco BBVA (`casafe.bbva`), y los medios quedaron Transferencia Galicia y Transferencia BBVA. **El 27/09 a la tarde corrieron la `0088`, la `0085` y la `0087`, y después del deploy del PR #58 la `0086`**, en ese orden: la `0088` primero porque cerraba un agujero abierto, y la `0086` después del deploy porque con la pantalla vieja el cobro habría anticipado otro número. Verificado en producción: escribir en las vistas `public_*` con la llave pública da 401 y leerlas sigue en 200 (`0088`); el admin no puede marcar ausente una clase del 22/10 y sí una del 25/09 (`0085`); Planes y Configuración rigen con las cuatro claves sólo para admin (`0087`); y una cuota de $70.000 con promo del 10% se cobró $78.750 con tarjeta, por la pantalla y en la base (`0086`). La **`0082`, la `0083` y la `0084` corrieron el 27/09**, en ese orden. Verificado contra la base con la sesión del admin: existen `mi_tope_de_fijos` (0082) y `anular_cuota` (0083, rechaza un id inexistente con "Esa cuota no existe."), los diez cobros tienen `origen = 'cuota'`, y `pesos()` (0084) da "$42.750", "-$1.000", "$1.234,50" y "$0". **La `0084` cortó en el primer intento**, y el chequeo inicial hizo su trabajo: la versión viva de `guard_periodo_liquidacion` no es la de la `0055` del repo —no dice `FM999,999,999`—, así que esa migración se corrió desde otra copia o la función se tocó a mano. Se sacó de la `0084`, que no tenía nada que arreglarle, y la segunda corrida pasó. Ojo que **la `0054` y la `0055` no figuraban en este registro**: la que está en producción no es necesariamente la del repo, y conviene compararla antes de volver a redefinirla. Las `0076` a `0081` corrieron entre el 23 y el 24/09, cada una anotada en su bloque. La **`0075` corrió el 22/09** y se verificó en los tres puntos de su bloque: la vista conserva sus once columnas, sigue siendo `security_invoker` —sin sesión la lectura muere en `permission denied for function can`, que sólo pasa si la política corre como quien pregunta— y el medio sale con su nombre: se cargó un gasto con `method = 'efectivo'` y el libro mostró **Efectivo**. El gasto de prueba se borró. La **`0074` corrió el 22/09** y se verificó ejerciendo lo que venía a habilitar: un medio inventado rebota con `23503` (clave ajena) y no con `23514` (el CHECK viejo), y con la cuenta "Macro" y el medio "Débito" creados desde Configuración se cobraron $70.000 que fueron solos a esa cuenta. Todo revertido. La **`0073` corrió el 22/09** y se verificó de las dos maneras que hacían falta: las seis puertas cerradas con la llave pública, y con sesión de admin los cinco cortes de Ocupación dando los mismos números y el descuento de clases todavía andando (se reservó una clase, `classes_used` pasó de 3 a 4, se borró la reserva y volvió a 3). La **`0072` corrió el 22/09**; el agujero que cierra se reprodujo antes de escribir el arreglo. La **`0071` corrió el 19/09** y se verificó por los tres rechazos, que es lo que importa de esa función. La **`0070` y la `0069` corrieron el 18/09**. La **`0068` a la `0061` corrieron el 17/09**. La **`0060` corrió el 17/09** y se verificó suspendiendo una clase con la profesora logueada: le llegó a la campana sin recargar y siguió sin ver los avisos de staff. La **`0059` corrió el 17/09**; probarla encontró que la pantalla ofrecía deshacer una marca sin permiso. La **`0058` corrió el 16/09** y hubo que corregir el cupo dos veces: la Agenda tenía su propia cuenta y era la que se veía. La **`0057` corrió el 16/09 en el segundo intento** —la primera abortó por un `group_key` inexistente, y la envoltura `begin/commit` no dejó nada a medias—. La **`0056` corrió el 16/09** y se verificó moviendo el descuento a -8 y a 0 con la web abierta: la línea siguió al número y desapareció al apagarlo; el dato quedó restaurado en -5. La **`0053` corrió el 15/09**. La **`0052` corrió el 15/09** y se corrigió una redacción; es idempotente. La **`0051` corrió el 15/09** y se corrigió dos veces sobre la marcha —los nombres en castellano y el día en el corte por clase—; es idempotente, todo `create or replace`. La **`0050` corrió el 15/09**, se corrigió la clave foránea del autor y se volvió a correr; es idempotente a propósito. La **`0048` y la `0049` corrieron el 15/09** y se verificaron ejerciéndolas: el cupo rechazó el noveno turno fijo, un pausado quedó fuera de la liberación automática, y el interruptor encendido liberó exactamente uno. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **La `0090` (04/10) está escrita y sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
 | Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |

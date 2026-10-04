@@ -104,6 +104,7 @@ const NOMBRE_DE_PANTALLA: Partial<Record<PageKey, string>> = {
   planes: 'Planes',
   reservas: 'Reservas',
   pagos: 'Pagos',
+  productos: 'Productos',
   caja: 'Caja',
   gastos: 'Gastos',
   personal: 'Personal',

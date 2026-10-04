@@ -60,7 +60,7 @@ const ICONO_CONOCIDO: Record<string, React.ComponentType<{ className?: string }>
   mercadopago: Wallet,
 }
 
-function iconoDeMedio(code: string | null | undefined): React.ComponentType<{ className?: string }> {
+export function iconoDeMedio(code: string | null | undefined): React.ComponentType<{ className?: string }> {
   return (code && ICONO_CONOCIDO[code]) || DollarSign
 }
 
@@ -70,7 +70,7 @@ function iconoDeMedio(code: string | null | undefined): React.ComponentType<{ cl
  * catálogo sin correr— se muestra el código crudo: feo, pero cierto, y
  * mucho mejor que un `undefined` en la fila de un cobro real.
  */
-function nombreDeMedio(code: string | null | undefined, medios: PaymentMethod[]): string {
+export function nombreDeMedio(code: string | null | undefined, medios: PaymentMethod[]): string {
   if (!code) return '—'
   return medios.find((m) => m.code === code)?.name ?? code
 }
@@ -184,7 +184,7 @@ function PaymentStatusBadge({ pago }: { pago: Payment }) {
  * mismas tres de siempre. La diferencia es que cuando el estudio agregue
  * Débito, aparece solo.
  */
-function mediosParaCobrar(medios: PaymentMethod[]): PaymentMethod[] {
+export function mediosParaCobrar(medios: PaymentMethod[]): PaymentMethod[] {
   return medios
     .filter((m) => m.active && m.isManual)
     .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -1725,7 +1725,11 @@ export function PagosPage() {
       icon: TrendingUp,
       label: `Ingresos ${currentMonth?.month ?? ''}`,
       value: `$${(currentMonthRevenue / 1000).toFixed(0)}k`,
-      sub: 'Cobrado este mes',
+      // Sale de monthly_revenue, que desde la 0090 suma también las ventas
+      // de productos (enteras, con la parte del proveedor). La lista y la
+      // distribución por medio de esta pantalla son sólo cobros: el rótulo
+      // lo dice para que los números no parezcan no cerrar.
+      sub: 'Cobros y ventas de productos',
       color: 'var(--exito)',
     },
     {
@@ -2036,7 +2040,7 @@ export function PagosPage() {
               <TrendingUp className="w-4 h-4 text-primary-fuerte" />
               Evolución de ingresos
             </h3>
-            <p className="text-xs text-muted-foreground mb-5">Últimos 6 meses</p>
+            <p className="text-xs text-muted-foreground mb-5">Últimos 6 meses · cobros y ventas de productos</p>
 
             <div className="space-y-3">
               {monthlyRevenue.map((m, i) => {

@@ -8,6 +8,7 @@
 // información financiera recibe cero filas de los reportes de plata. La
 // pantalla distingue eso de "no hubo movimientos".
 import { supabase } from './supabase'
+import { fetchVentas } from './inventario-api'
 
 export interface Rango {
   desde: string
@@ -200,6 +201,55 @@ export async function reportePorMedio(r: Rango): Promise<FilaMedio[]> {
     acum.set(k, prev)
   }
   return [...acum.values()].sort((a, b) => b.monto - a.monto)
+}
+
+export interface FilaVentaProducto {
+  fecha: string
+  numero: number
+  producto: string
+  aroma: string
+  cantidad: number
+  medio: string
+  cliente: string
+  cobrado: number
+  estudio: number
+  proveedorMonto: number
+  proveedor: string
+  estado: string
+  anulada: boolean
+}
+
+const ESTADO_VENTA: Record<string, string> = {
+  a_rendir: 'A rendir',
+  rendida: 'Rendida',
+  anulada: 'Anulada',
+  sin_parte: 'Todo del estudio',
+}
+
+/**
+ * Las ventas de productos en consignación (0090), con el reparto. Van
+ * aparte de "Cobros" porque no son cobros a clientes: la mitad larga de
+ * esa plata es del proveedor. Las anuladas se listan (con su estado) pero
+ * no suman al pie. Si la 0090 no corrió, tira el aviso en vez de un
+ * reporte vacío que parecería "no hubo ventas".
+ */
+export async function reporteVentasProductos(r: Rango): Promise<FilaVentaProducto[]> {
+  const ventas = await fetchVentas(r)
+  return ventas.map((v) => ({
+    fecha: v.paidDate,
+    numero: v.numero,
+    producto: v.productoNombre,
+    aroma: v.aroma,
+    cantidad: v.cantidad,
+    medio: v.medio,
+    cliente: v.compradorNombre,
+    cobrado: v.monto,
+    estudio: v.parteEstudio,
+    proveedorMonto: v.parteProveedor,
+    proveedor: v.proveedorNombre,
+    estado: ESTADO_VENTA[v.estado] ?? v.estado,
+    anulada: v.status === 'anulado',
+  }))
 }
 
 // ---------------------------------------------------------------

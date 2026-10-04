@@ -3045,8 +3045,11 @@ export async function moverVencimiento(
  * pantalla se lee "No se pudo crear la reserva", que no dice qué hacer.
  *
  * Descubierto al probar la reserva de un cliente sin membresía (15/09).
+ *
+ * Exportada desde la 0090: Productos (lib/inventario-api.ts) muestra los
+ * mensajes de sus funciones con la misma red.
  */
-function errorDeLaBase(error: { message?: string } | null, sino: string): Error {
+export function errorDeLaBase(error: { message?: string } | null, sino: string): Error {
   const msg = error?.message?.trim()
   if (!msg) return new Error(sino)
 

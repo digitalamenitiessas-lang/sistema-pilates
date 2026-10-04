@@ -716,9 +716,12 @@ export interface AccountBalance {
   veGastos: boolean
 }
 
-/** Una línea del libro: un cobro, un gasto o un movimiento manual. */
+/**
+ * Una línea del libro: un cobro, un gasto, un movimiento manual o, desde
+ * la 0090, la venta de un producto en consignación.
+ */
 export interface LedgerEntry {
-  origen: 'cobro' | 'gasto' | 'movimiento'
+  origen: 'cobro' | 'gasto' | 'movimiento' | 'venta'
   refId: string
   accountId: string
   at: string
@@ -810,4 +813,150 @@ export interface Expense {
   tags: string[]
   notes: string
   voidReason: string
+}
+
+// ---------------------------------------------------------------
+// Productos en consignación (0090)
+// ---------------------------------------------------------------
+
+/** Quien deja la mercadería. El % es la parte del ESTUDIO sobre lo cobrado. */
+export interface Proveedor {
+  id: string
+  nombre: string
+  contacto: string
+  notas: string
+  pctEstudio: number
+  active: boolean
+}
+
+export interface Producto {
+  id: string
+  nombre: string
+  descripcion: string
+  proveedorId: string | null
+  stock: number
+  /** Con esta cantidad o menos, la tarjeta avisa que hay que reponer */
+  stockAviso: number
+  /** Los aromas que trae: las sugerencias del primer día */
+  aromas: string[]
+  active: boolean
+  sortOrder: number
+  /** Precio por código de medio. Un medio sin precio no se ofrece al vender. */
+  precios: Record<string, number>
+}
+
+/**
+ * 'sin_parte': la venta es de un proveedor con 100% para el estudio, así
+ * que no hay nada que rendirle a nadie.
+ */
+export type EstadoVenta = 'a_rendir' | 'rendida' | 'anulada' | 'sin_parte'
+
+/** Una venta, con la foto de precio y reparto con que se hizo. */
+export interface VentaProducto {
+  id: string
+  numero: number
+  paidAt: string
+  paidDate: string
+  productoId: string
+  productoNombre: string
+  proveedorId: string
+  proveedorNombre: string
+  aroma: string
+  cantidad: number
+  precioUnitario: number
+  monto: number
+  pctEstudio: number
+  parteEstudio: number
+  parteProveedor: number
+  method: string
+  medio: string
+  accountId: string
+  studentId: string | null
+  compradorNombre: string
+  notas: string
+  vendidoPorNombre: string
+  status: 'pagado' | 'anulado'
+  voidReason: string
+  anuladoAt: string | null
+  rendicionId: string | null
+  estado: EstadoVenta
+}
+
+export interface MovimientoStock {
+  id: string
+  productoId: string
+  at: string
+  tipo: 'ingreso' | 'devolucion' | 'ajuste' | 'venta' | 'anulacion'
+  /** Con signo: lo que sumó o restó */
+  cantidad: number
+  stockResultante: number
+  motivo: string
+  ventaId: string | null
+  proveedorId: string | null
+}
+
+/** El pago a un proveedor: un gasto en "Rendiciones a proveedores". */
+export interface Rendicion {
+  id: string
+  proveedorId: string
+  proveedorNombre: string
+  expenseId: string
+  ventas: number
+  cobrado: number
+  total: number
+  desde: string
+  hasta: string
+  method: string | null
+  accountId: string | null
+  notas: string
+  createdAt: string
+  /** false = el gasto se anuló y esas ventas volvieron a pendientes */
+  vigente: boolean
+  /** El monto del gasto, o null para quien no ve los gastos */
+  gastoMonto: number | null
+}
+
+/** Lo que devuelve la base al vender. */
+export interface VentaRegistrada {
+  ventaId: string
+  numero: number
+  cobrado: number
+  precioUnitario: number
+  cantidad: number
+  parteEstudio: number
+  parteProveedor: number
+  medio: string
+  cuenta: string
+  stockRestante: number
+  paidAt: string
+  /** true = era un reintento: la venta ya estaba hecha y no se cobró dos veces */
+  repetida: boolean
+}
+
+export interface VentaAnulada {
+  ventaId: string
+  numero: number
+  anulado: number
+  devuelto: number
+  stockRestante: number
+  /** La venta era de un turno ya cerrado: Caja marca el arqueo desactualizado */
+  turnoCerrado: boolean
+  cuenta: string
+}
+
+export interface RendicionRegistrada {
+  rendicionId: string
+  expenseId: string
+  total: number
+  ventas: number
+  cobrado: number
+}
+
+export interface RendicionAnulada {
+  rendicionId: string
+  expenseId: string
+  ventas: number
+  total: number
+  turnoCerrado: boolean
+  cuenta: string
 }
