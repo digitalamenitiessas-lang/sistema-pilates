@@ -2652,6 +2652,31 @@ fila sin tocar las fechas y, borrada, volvió a 0; las 4 horas de septiembre
 quedaron como estaban. `tsc` y `next build` pasan. No se ejercieron los
 motivos que necesitan una tarifa cargada, porque una tarifa no se borra.
 
+### ✅ La Agenda no pide elegir a quien ya está anotada (05/10) — sin migración
+
+El mostrador reportó: "nos sale seleccionar cliente pero ya está
+seleccionado, no podemos reservar". No era un error de datos. Florencia
+Lobos ya tenía los cinco martes reservados: darle el horario fijo desde el
+panel de la clase la anota en esa fecha. Pero después de anotar a alguien
+el selector vuelve a vacío, el recuadro verde con su nombre y un tilde se
+leía como "la elegida", y "Reservar lugar" se dejaba apretar y contestaba
+"Seleccioná un cliente primero".
+
+- El recuadro verde dice **"Ya está en la clase"** (o "Ya están") arriba de
+  los nombres.
+- Sin cliente elegido, el botón queda **apagado y dice "Elegí a quién
+  anotar"** en vez de "Reservar lugar". Lo mismo "Lista de espera" con la
+  clase completa.
+
+Verificado en local contra producción con la sesión del admin y **sin
+escribir nada**. En la clase del martes 06/10 a las 17:00, con el selector
+vacío el botón dice "Elegí a quién anotar" y está apagado; con una clienta
+elegida pasa a "Reservar lugar" con su color, y al vaciarlo vuelve. Florencia
+no figura en el selector porque ya tiene lugar. Contra la base no se creó
+ninguna reserva durante la prueba. El rótulo verde no se vio en pantalla: sólo
+aparece después de anotar a alguien, y eso es una reserva real que le avisa a
+la clienta. `tsc` y `next build` pasan.
+
 ### 🟡 Productos en consignación (04/10) — `0090` **escrita, sin correr**
 
 Lo pidió el estudio: vende difusores y sprays que deja un proveedor, y de
