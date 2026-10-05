@@ -897,6 +897,13 @@ function ClassDetailModal({
             <>
               {anotadas.length > 0 && (
                 <div className="rounded-xl bg-exito-suave px-3 py-2.5 space-y-1">
+                  {/* Sin este rótulo el nombre con el tilde se leía como "la
+                      elegida": el 05/10 el mostrador le dio el fijo a una
+                      clienta, la vio acá, apretó Reservar y le pidió
+                      elegir a alguien que ya estaba anotada. */}
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-exito-fuerte/80">
+                    {anotadas.length === 1 ? 'Ya está en la clase' : 'Ya están en la clase'}
+                  </p>
                   {anotadas.map((a, i) => (
                     <p key={i} className="text-xs font-semibold text-exito-fuerte flex items-center gap-1.5">
                       <Check className="w-3.5 h-3.5 shrink-0" />
@@ -1029,26 +1036,31 @@ function ClassDetailModal({
                 </div>
               )}
 
+              {/* Sin cliente elegido el botón se apaga y lo dice, en vez de
+                  dejarse apretar para contestar con un error. Después de
+                  anotar a alguien el selector vuelve a vacío, así que este
+                  es el estado en el que queda el panel la mayor parte del
+                  tiempo. */}
               <div className="flex gap-2 pt-1">
                 <button
-                  disabled={isFull || saving}
+                  disabled={isFull || saving || !studentId}
                   onClick={() => reserve(false)}
                   className={cn(
                     'flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2',
-                    isFull
+                    isFull || !studentId
                       ? 'bg-muted text-muted-foreground cursor-not-allowed'
                       : 'text-primary-foreground'
                   )}
-                  style={!isFull ? { backgroundColor: colors.dot } : {}}
+                  style={!isFull && studentId ? { backgroundColor: colors.dot } : {}}
                 >
                   {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {isFull ? 'Clase completa' : 'Reservar lugar'}
+                  {isFull ? 'Clase completa' : !studentId ? 'Elegí a quién anotar' : 'Reservar lugar'}
                 </button>
                 {isFull && (
                   <button
-                    disabled={saving}
+                    disabled={saving || !studentId}
                     onClick={() => reserve(true)}
-                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-aviso-suave text-aviso-fuerte transition-colors hover:bg-aviso/30 flex items-center justify-center gap-2"
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-aviso-suave text-aviso-fuerte transition-colors hover:bg-aviso/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                     Lista de espera
