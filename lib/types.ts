@@ -216,6 +216,32 @@ export interface FilaLiquidacion {
 }
 
 /**
+ * Una clase dictada del período y si se le paga a quien la dio (0091,
+ * `clases_a_pagar`). La regla la pone la base con el parámetro
+ * `payroll_only_booked_classes`: la pantalla muestra lo que la base
+ * decidió, no lo recalcula.
+ */
+export interface ClaseAPagar {
+  classId: string
+  fecha: string
+  titulo: string
+  /** HH:MM */
+  hora: string
+  teacherId: string | null
+  /** Las reservas que armaron la clase: confirmadas, asistencias, ausencias y canceladas fuera de plazo */
+  reservas: number
+  /**
+   * false: tuvo reservas en una fecha que la grilla de hoy no tiene (la
+   * clase se cambió de día o se dio de baja). Nunca se paga sola: está
+   * para que se vea, y si se dio va como ajuste.
+   */
+  enGrilla: boolean
+  cuenta: boolean
+  /** Por qué no se paga ('nadie anotado', 'no está en la grilla ese día'); null si se paga */
+  motivo: string | null
+}
+
+/**
  * Una liquidación **cerrada** (0054). Distinta de `FilaLiquidacion`, que
  * es el cálculo vivo: esta es la foto del día que se cerró, y no se
  * recalcula. Un total que cambia para atrás no es un registro.
@@ -234,8 +260,9 @@ export interface LiquidacionCerrada {
   total: number
   /**
    * Lo que daría hoy el mismo período. Si difiere del congelado, es que
-   * se cargó algo después de cerrar — y eso hay que mostrarlo, no
-   * elegir por el estudio cuál de los dos vale.
+   * algo cambió después de cerrar —una clase, una reserva, una tarifa, un
+   * ajuste o, desde la 0091, la regla de qué clases se pagan— y eso hay
+   * que mostrarlo, no elegir por el estudio cuál de los dos vale.
    */
   totalHoy: number
   estado: 'cerrada' | 'pagada' | 'anulada'

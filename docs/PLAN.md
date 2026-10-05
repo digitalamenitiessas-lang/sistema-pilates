@@ -2843,6 +2843,129 @@ La primera venta real se verifica contra la base (`ventas_productos_estado`
 y el libro por `origen = 'venta'`). Avisarle al estudio el cambio de
 "Ingresos" en Pagos y el tablero, y que conviene rendir mes por mes.
 
+### 🟡 La clase sin nadie anotado no se paga (05/10) — `0091` **escrita, sin correr**
+
+Desde el 01/10 las tres profesoras cobran $10.000 por clase, y `liquidacion()`
+contaba como dictada toda clase activa de la grilla que no estuviera
+suspendida, hubiera o no alguien anotado. En el estudio, por ahora, se va
+sólo si hay alguien: del 01/10 al 03/10 la grilla tiene 28 clases ($280.000)
+y hubo reservas sólo el 01/10 (5) y el 03/10 (1). Decisión de Matías: "hacé
+lo de la liquidación".
+
+- **Es un parámetro**: `payroll_only_booked_classes`, "Pagar sólo las clases
+  con alguien anotado", booleano, **prendido**, `solo_admin`, en un grupo
+  nuevo (`personal`, "Personal y liquidación" en Configuración → Reglas del
+  negocio). La lista de grupos es cerrada desde la `0020` y se le suma ése.
+  Apagado —o sin la fila— se paga toda la grilla, como hasta hoy.
+- **Qué arma una clase**: una reserva confirmada, asistió, ausente o
+  cancelada fuera de plazo (recuperos y excepciones incluidos). No cuentan
+  la lista de espera, el lugar ofrecido, las canceladas en plazo ni las
+  suspendidas.
+- **`sesiones_dictadas` no se tocó**: la usa `reporte_ocupacion`, y sacarle
+  las clases vacías inflaría la ocupación. Función nueva
+  `clases_a_pagar(desde, hasta)` —cada clase, sus reservas, si se paga y por
+  qué— y `liquidacion()` es la de la `0065` con el `from` de las clases
+  cambiado. Reemplazos, horas, mensual y ajustes, igual.
+- **Un período se cierra cuando terminó**: con la regla, el número de hoy
+  depende de las reservas del momento (antes sólo de la grilla, que no
+  cambia en el día). Cerrar a mediodía hasta hoy dejaba afuera las clases de
+  la tarde y pagaba reservas que después se cancelan a tiempo, y ese día ya
+  no se puede volver a liquidar (`0055`). Mientras rige, un disparador nuevo
+  sobre `teacher_settlements` (`guard_liquidacion_terminada`, sólo al
+  insertar) rechaza un cierre cuyo "hasta" sea hoy o después, en el día del
+  estudio. Es un disparador aparte y no un cambio en `cerrar_liquidacion` /
+  `cerrar_liquidaciones`, que son de la familia de la `0054` y la `0055`
+  —fuera del registro—: no pisa nada y frena por los dos caminos.
+- **Las reservas que caen fuera de la grilla**: `sesiones_dictadas` arma las
+  fechas con el día de la semana *actual* de cada clase activa. Si una clase
+  se cambia de día o se da de baja, sus fechas viejas desaparecen; con la
+  regla, una clase que se dio con gente dejaría de pagarse sin que nadie lo
+  vea. `clases_a_pagar` las devuelve aparte (`en_grilla = false`, nunca se
+  pagan solas: una reserva vieja que quedó en un día al que la clase ya no
+  va también cae ahí) y Personal las muestra; si se dieron, van como
+  ajuste. El arreglo de fondo —la historia de la grilla— quedó en la §0.
+- **Guarda por huella** (la de la `0086`) sobre `liquidacion` (0065 o 0091),
+  `sesiones_dictadas` (0073, se usa sin pisar), `clases_a_pagar` y
+  `guard_liquidacion_terminada` (nuevas) y la lista de grupos (0020): si no
+  coincide, corta y dice qué consulta de sólo lectura mandar. Hay además un
+  **prevuelo** de una sola consulta, que también dice si falta alguna tabla,
+  columna o función de las que la `0091` necesita.
+- **Se comprueba sola**: saca una foto de `liquidacion()` antes de pisarla
+  (01/09–hoy, el mes con dos para adelante y el año) y con el parámetro
+  apagado la nueva tiene que dar lo mismo fila por fila; si no, corta. Para
+  calcular usa la sesión de una cuenta admin, `set_config(..., true)`. Al
+  final muestra un resumen por profesora: grilla, se pagan, sin nadie,
+  reservas fuera de la grilla, y los montos pagando toda la grilla y con la
+  regla.
+- **Lo cerrado no cambia**: ningún `insert` ni `update` sobre
+  `teacher_settlements`. Sólo se mueve el "hoy daría" de
+  `liquidaciones_cerradas`, que se calcula al leer.
+- **Pantalla**: Personal dice la regla que rige (y lo de siempre si la `0091`
+  no corrió); la columna Clases agrega "N sin nadie" y "N fuera de la
+  grilla"; cada fila tiene "Ver clases" con las que se pagan y las que no,
+  por día y con el motivo de la base; la fila en $0 por clases vacías dice
+  "Clases sin nadie anotado" y no "Sin trabajo" (y mientras el detalle no
+  llegó, o si falló, "Sin clases que se paguen", sin afirmar ninguna de las
+  dos). Con la regla y un período que llega hasta hoy, la fila dice "El
+  período no terminó", "Cerrar el período de todos" no se ofrece y hay un
+  botón "Llevarlo hasta ayer". El detalle se pide de a mil filas (PostgREST
+  corta ahí). Los dos `window.confirm` de cerrar pasaron a la página, y
+  "Cerrar el período de todos" vuelve a mirar quién da $0 justo antes de
+  cerrar. Configuración titula el grupo y el candado dice el motivo de cada
+  grupo (antes decía "afloja el control del arqueo" en cualquiera).
+
+Verificado en un Postgres 17 local con `0001`–`0090` y datos armados, sin
+tocar producción:
+
+- Del 01/10 al 03/10, prendido: 27 clases, se pagan 8. Cuentan dos
+  asistencias, una ausente, una cancelada fuera de plazo, una confirmada, un
+  recupero, una excepción y el reemplazo con gente (a Leandro, no a Ivana);
+  no cuentan la cancelada en plazo, la "en plazo sin cupo", la lista de
+  espera, la ofrecida ni el reemplazo vacío; la suspendida no aparece.
+  Ivana $30.000, Leandro $20.000, turno tarde $30.000 (antes $90.000,
+  $60.000 y $120.000).
+- Apagado, y también sin la fila: la liquidación idéntica a la de antes en
+  los cuatro períodos probados. Prendido: horas, por horas, mensual,
+  ajustes, ausencias, tardanzas y el total sin las clases, idénticos.
+  `reporte_ocupacion` idéntico en los cinco cortes.
+- Lo cerrado intacto fila por fila (md5 de cada fila); la de octubre
+  cerrada con la regla vieja sigue en $120.000 y "hoy daría" $30.000.
+- Corre dos veces; la segunda no pisa el valor que eligió el estudio ni el
+  sello de la fila. Corta sin dejar nada sin la `0065`, con la
+  `sesiones_dictadas` de la `0051`, con `liquidacion` o `sesiones_dictadas`
+  tocadas a mano, con otra lista de grupos, con otra `clases_a_pagar` y sin
+  ninguna cuenta admin. La vuelta atrás del pie deja `liquidacion`
+  byte por byte como la `0065`, y la `0091` se vuelve a aplicar limpia.
+- `anon` no la ejecuta; alumna, profesora y recepción reciben "No tenés
+  permiso para ver las remuneraciones". Profesora y recepción leen el
+  parámetro y no lo cambian (0 filas); el admin sí.
+- Cerrar hasta hoy, o hasta el 31/10, con la regla prendida: rechazado con
+  el motivo, por una persona y por "todas" (cerradas 0, el motivo en
+  salteadas), y también un `insert` directo sin sesión. Hasta ayer entra;
+  apagada la regla, o sin la fila, hasta hoy entra como antes; una cerrada
+  hasta hoy con la regla apagada se anula igual después de prenderla.
+- Una clase pasada de los jueves a los miércoles: su jueves 01/10 con dos
+  asistencias aparece `en_grilla = false`, no se paga, y con la regla
+  apagada no aparece. Una dada de baja con una reserva, igual; una dada de
+  baja y suspendida ese día, no aparece.
+- El orden de `clases_a_pagar` es total: de a mil filas, como la pantalla, y
+  con 104 pares de clases a la misma fecha, hora y título, las páginas
+  juntas dan las 3.391 filas del año sin repetir ni saltear.
+- El prevuelo da `ok` en todo antes y después, y `NO COINCIDE` con la
+  definición en cada caso de los de arriba, con la base en sólo lectura. En
+  una base hasta la `0080` dice "faltan: studio_settings.encendible" (antes
+  daba `ok` en todo y la migración cortaba igual).
+- `tsc --noEmit` y `next build` pasan. La tabla de liquidación se renderizó
+  con `react-dom/server` en once estados (sin la `0091`, prendida, apagada,
+  cargando, con error, hasta hoy, con clases fuera de la grilla) y el botón
+  de cerrar todas en tres; **la pantalla entera no se miró en un
+  navegador** (el servidor de desarrollo apunta a producción).
+
+**Falta**: mergear y esperar el deploy, correr el prevuelo, correrla y
+verificar en producción que del 01/10 al 03/10 queden sólo las clases con
+reservas. **No cerrar liquidaciones de octubre antes**: quedarían congeladas
+con toda la grilla.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock. *(La consignación —sin variantes ni inventario físico— es la `0090`.)*
 - [ ] Metas de venta con tablero.
@@ -2911,7 +3034,7 @@ y el libro por `origen = 'venta'`). Avisarle al estudio el cambio de
 
 | Ítem | Estado |
 |---|---|
-| Migraciones aplicadas | `0001` a **`0089`** ✅. La **`0089` corrió el 29/09** y se verificó contra la base: la vista `cuentas_para_transferir` devuelve Banco Galicia (`casafe.galicia`) y Banco BBVA (`casafe.bbva`), y los medios quedaron Transferencia Galicia y Transferencia BBVA. **El 27/09 a la tarde corrieron la `0088`, la `0085` y la `0087`, y después del deploy del PR #58 la `0086`**, en ese orden: la `0088` primero porque cerraba un agujero abierto, y la `0086` después del deploy porque con la pantalla vieja el cobro habría anticipado otro número. Verificado en producción: escribir en las vistas `public_*` con la llave pública da 401 y leerlas sigue en 200 (`0088`); el admin no puede marcar ausente una clase del 22/10 y sí una del 25/09 (`0085`); Planes y Configuración rigen con las cuatro claves sólo para admin (`0087`); y una cuota de $70.000 con promo del 10% se cobró $78.750 con tarjeta, por la pantalla y en la base (`0086`). La **`0082`, la `0083` y la `0084` corrieron el 27/09**, en ese orden. Verificado contra la base con la sesión del admin: existen `mi_tope_de_fijos` (0082) y `anular_cuota` (0083, rechaza un id inexistente con "Esa cuota no existe."), los diez cobros tienen `origen = 'cuota'`, y `pesos()` (0084) da "$42.750", "-$1.000", "$1.234,50" y "$0". **La `0084` cortó en el primer intento**, y el chequeo inicial hizo su trabajo: la versión viva de `guard_periodo_liquidacion` no es la de la `0055` del repo —no dice `FM999,999,999`—, así que esa migración se corrió desde otra copia o la función se tocó a mano. Se sacó de la `0084`, que no tenía nada que arreglarle, y la segunda corrida pasó. Ojo que **la `0054` y la `0055` no figuraban en este registro**: la que está en producción no es necesariamente la del repo, y conviene compararla antes de volver a redefinirla. Las `0076` a `0081` corrieron entre el 23 y el 24/09, cada una anotada en su bloque. La **`0075` corrió el 22/09** y se verificó en los tres puntos de su bloque: la vista conserva sus once columnas, sigue siendo `security_invoker` —sin sesión la lectura muere en `permission denied for function can`, que sólo pasa si la política corre como quien pregunta— y el medio sale con su nombre: se cargó un gasto con `method = 'efectivo'` y el libro mostró **Efectivo**. El gasto de prueba se borró. La **`0074` corrió el 22/09** y se verificó ejerciendo lo que venía a habilitar: un medio inventado rebota con `23503` (clave ajena) y no con `23514` (el CHECK viejo), y con la cuenta "Macro" y el medio "Débito" creados desde Configuración se cobraron $70.000 que fueron solos a esa cuenta. Todo revertido. La **`0073` corrió el 22/09** y se verificó de las dos maneras que hacían falta: las seis puertas cerradas con la llave pública, y con sesión de admin los cinco cortes de Ocupación dando los mismos números y el descuento de clases todavía andando (se reservó una clase, `classes_used` pasó de 3 a 4, se borró la reserva y volvió a 3). La **`0072` corrió el 22/09**; el agujero que cierra se reprodujo antes de escribir el arreglo. La **`0071` corrió el 19/09** y se verificó por los tres rechazos, que es lo que importa de esa función. La **`0070` y la `0069` corrieron el 18/09**. La **`0068` a la `0061` corrieron el 17/09**. La **`0060` corrió el 17/09** y se verificó suspendiendo una clase con la profesora logueada: le llegó a la campana sin recargar y siguió sin ver los avisos de staff. La **`0059` corrió el 17/09**; probarla encontró que la pantalla ofrecía deshacer una marca sin permiso. La **`0058` corrió el 16/09** y hubo que corregir el cupo dos veces: la Agenda tenía su propia cuenta y era la que se veía. La **`0057` corrió el 16/09 en el segundo intento** —la primera abortó por un `group_key` inexistente, y la envoltura `begin/commit` no dejó nada a medias—. La **`0056` corrió el 16/09** y se verificó moviendo el descuento a -8 y a 0 con la web abierta: la línea siguió al número y desapareció al apagarlo; el dato quedó restaurado en -5. La **`0053` corrió el 15/09**. La **`0052` corrió el 15/09** y se corrigió una redacción; es idempotente. La **`0051` corrió el 15/09** y se corrigió dos veces sobre la marcha —los nombres en castellano y el día en el corte por clase—; es idempotente, todo `create or replace`. La **`0050` corrió el 15/09**, se corrigió la clave foránea del autor y se volvió a correr; es idempotente a propósito. La **`0048` y la `0049` corrieron el 15/09** y se verificaron ejerciéndolas: el cupo rechazó el noveno turno fijo, un pausado quedó fuera de la liberación automática, y el interruptor encendido liberó exactamente uno. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **La `0090` (04/10) está escrita y sin correr** | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
+| Migraciones aplicadas | `0001` a **`0089`** ✅. La **`0089` corrió el 29/09** y se verificó contra la base: la vista `cuentas_para_transferir` devuelve Banco Galicia (`casafe.galicia`) y Banco BBVA (`casafe.bbva`), y los medios quedaron Transferencia Galicia y Transferencia BBVA. **El 27/09 a la tarde corrieron la `0088`, la `0085` y la `0087`, y después del deploy del PR #58 la `0086`**, en ese orden: la `0088` primero porque cerraba un agujero abierto, y la `0086` después del deploy porque con la pantalla vieja el cobro habría anticipado otro número. Verificado en producción: escribir en las vistas `public_*` con la llave pública da 401 y leerlas sigue en 200 (`0088`); el admin no puede marcar ausente una clase del 22/10 y sí una del 25/09 (`0085`); Planes y Configuración rigen con las cuatro claves sólo para admin (`0087`); y una cuota de $70.000 con promo del 10% se cobró $78.750 con tarjeta, por la pantalla y en la base (`0086`). La **`0082`, la `0083` y la `0084` corrieron el 27/09**, en ese orden. Verificado contra la base con la sesión del admin: existen `mi_tope_de_fijos` (0082) y `anular_cuota` (0083, rechaza un id inexistente con "Esa cuota no existe."), los diez cobros tienen `origen = 'cuota'`, y `pesos()` (0084) da "$42.750", "-$1.000", "$1.234,50" y "$0". **La `0084` cortó en el primer intento**, y el chequeo inicial hizo su trabajo: la versión viva de `guard_periodo_liquidacion` no es la de la `0055` del repo —no dice `FM999,999,999`—, así que esa migración se corrió desde otra copia o la función se tocó a mano. Se sacó de la `0084`, que no tenía nada que arreglarle, y la segunda corrida pasó. Ojo que **la `0054` y la `0055` no figuraban en este registro**: la que está en producción no es necesariamente la del repo, y conviene compararla antes de volver a redefinirla. Las `0076` a `0081` corrieron entre el 23 y el 24/09, cada una anotada en su bloque. La **`0075` corrió el 22/09** y se verificó en los tres puntos de su bloque: la vista conserva sus once columnas, sigue siendo `security_invoker` —sin sesión la lectura muere en `permission denied for function can`, que sólo pasa si la política corre como quien pregunta— y el medio sale con su nombre: se cargó un gasto con `method = 'efectivo'` y el libro mostró **Efectivo**. El gasto de prueba se borró. La **`0074` corrió el 22/09** y se verificó ejerciendo lo que venía a habilitar: un medio inventado rebota con `23503` (clave ajena) y no con `23514` (el CHECK viejo), y con la cuenta "Macro" y el medio "Débito" creados desde Configuración se cobraron $70.000 que fueron solos a esa cuenta. Todo revertido. La **`0073` corrió el 22/09** y se verificó de las dos maneras que hacían falta: las seis puertas cerradas con la llave pública, y con sesión de admin los cinco cortes de Ocupación dando los mismos números y el descuento de clases todavía andando (se reservó una clase, `classes_used` pasó de 3 a 4, se borró la reserva y volvió a 3). La **`0072` corrió el 22/09**; el agujero que cierra se reprodujo antes de escribir el arreglo. La **`0071` corrió el 19/09** y se verificó por los tres rechazos, que es lo que importa de esa función. La **`0070` y la `0069` corrieron el 18/09**. La **`0068` a la `0061` corrieron el 17/09**. La **`0060` corrió el 17/09** y se verificó suspendiendo una clase con la profesora logueada: le llegó a la campana sin recargar y siguió sin ver los avisos de staff. La **`0059` corrió el 17/09**; probarla encontró que la pantalla ofrecía deshacer una marca sin permiso. La **`0058` corrió el 16/09** y hubo que corregir el cupo dos veces: la Agenda tenía su propia cuenta y era la que se veía. La **`0057` corrió el 16/09 en el segundo intento** —la primera abortó por un `group_key` inexistente, y la envoltura `begin/commit` no dejó nada a medias—. La **`0056` corrió el 16/09** y se verificó moviendo el descuento a -8 y a 0 con la web abierta: la línea siguió al número y desapareció al apagarlo; el dato quedó restaurado en -5. La **`0053` corrió el 15/09**. La **`0052` corrió el 15/09** y se corrigió una redacción; es idempotente. La **`0051` corrió el 15/09** y se corrigió dos veces sobre la marcha —los nombres en castellano y el día en el corte por clase—; es idempotente, todo `create or replace`. La **`0050` corrió el 15/09**, se corrigió la clave foránea del autor y se volvió a correr; es idempotente a propósito. La **`0048` y la `0049` corrieron el 15/09** y se verificaron ejerciéndolas: el cupo rechazó el noveno turno fijo, un pausado quedó fuera de la liberación automática, y el interruptor encendido liberó exactamente uno. La **`0047` corrió el 15/09** y se verificó moviendo un vencimiento desde Agenda: la base selló quién y cuándo, y las otras once membresías siguieron sin sello pese a tener reservas nuevas. La **`0046` corrió el 15/09** y se verificó ejerciéndola desde el sistema, no consultando el esquema: se anotó un cliente por excepción (quedó con `membership_id` nulo, o sea sin descontar) y se repuso una clase perdida (`classes_used` no se movió). El tope nace en `rige = false` y **se encendió el 15/09** al terminar de verificar. La `0043` **corrió el 11/09 y nadie lo anotó**: se descubrió el mismo día consultando la base, no el documento — `studio_parking` aparece en `public_studio_settings`, y esa vista es una proyección pelada (`select key, value ... where is_public`), así que si la fila está es porque existe. La **`0044` corrió el 11/09** y se verificó igual, contra la vista pública: `studio_address` vuelve con sus dos saltos de línea en el orden que pidió la clienta, `studio_hours` con la línea en blanco que separa los dos bloques, y `public_disciplines` devuelve **dos** filas — Pilates Reformer (10) y Pilates Embarazadas (20), cada una con la bajada textual de su referencia. La **`0045` corrió el 11/09**: `studio_whatsapp` vuelve `5493816249107` —trece dígitos, 54 / 9 / 381 / 6249107— y el link se abrió a mano contra el chat real del estudio, que es lo único de esa migración que la base no puede verificar sola. **La `0090` (04/10) está escrita y sin correr**, y **la `0091` (05/10) también**: va después del deploy y con su prevuelo | **Anotarlo acá cada vez**: entre el 26/08 y el 09/09 el registro quedó en `0009` con 24 migraciones corridas, y eso dejó a ciegas todo un relevamiento |
 | Motor de consumo (`0029`) | ✅ **Encendido el 09/09**. `consumo_rige()` da `true`, `cancel_hours = 3`, `consumo_control()` cero descuadres. La base valida la membresía al reservar y descuenta la clase; el navegador ya no descuenta (se desplegó antes, así que no hubo cobro doble). Freno de mano: `update studio_settings set rige = false where key = 'class_consumption'` |
 | Datos de prueba | ✅ **Borrados el 09/09** con la `0027`. Queda a mano en el dashboard: borrar `camila.portal@pilatestudio.com` de Authentication → Users, y decidir si `admin@pilatestudio.com` se queda con ese mail (**no borrarlo sin crear otro admin antes**) |
 | Deploy | Vercel, auto-deploy desde `main` ✅ · npm (adiós pnpm) · cron diario en `vercel.json` |
