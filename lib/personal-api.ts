@@ -13,6 +13,7 @@
 import { supabase } from './supabase'
 import type {
   AjusteLiquidacion,
+  ClaseAPagar,
   CondicionPago,
   HorasTrabajadas,
   FilaLiquidacion,
@@ -188,7 +189,9 @@ export async function borrarHoras(id: string): Promise<void> {
 /**
  * Se deriva entera en la base: las clases dictadas salen de la agenda
  * —con la profesora del día y sin las suspendidas— y cada una se paga
- * con la tarifa que regía ESE día, no con la de hoy.
+ * con la tarifa que regía ESE día, no con la de hoy. Desde la 0091, con
+ * `payroll_only_booked_classes` prendido, sólo las que tuvieron alguien
+ * anotado (ver `fetchClasesAPagar`).
  */
 export async function fetchLiquidacion(
   desde: string,
@@ -214,6 +217,60 @@ export async function fetchLiquidacion(
     ausencias: Number(f.ausencias ?? 0),
     tardanzas: Number(f.tardanzas ?? 0),
     total: Number(f.total ?? 0),
+  }))
+}
+
+/**
+ * Qué clases del período se pagan y cuáles no (0091).
+ *
+ * Es la misma función de la que la liquidación saca las clases, así que
+ * el detalle y el número no pueden decir cosas distintas.
+ *
+ * `null` quiere decir una sola cosa: la 0091 no corrió y la función no
+ * existe. Ahí rige la regla de antes —toda la grilla que no se suspendió—
+ * y la pantalla la explica así. Cualquier otro error se tira: tragarlo y
+ * devolver `null` haría que la pantalla explicara una regla que no es la
+ * que está calculando la base.
+ *
+ * Paginado y contando: es una fila por clase de la grilla, unas 64 por
+ * semana, y PostgREST corta en mil sin avisar. Un período de cuatro meses
+ * ya pasa, y cortado el detalle contaba de menos las clases sin nadie y
+ * contradecía la columna Clases, que sale de `liquidacion()` y no se
+ * corta. El orden se pide explícito y termina en la clase, así cada
+ * página sigue a la anterior sin repetir ni saltear.
+ */
+export async function fetchClasesAPagar(
+  desde: string,
+  hasta: string
+): Promise<ClaseAPagar[] | null> {
+  const filas: Record<string, unknown>[] = []
+  let total = Infinity
+  while (filas.length < total) {
+    const { data, error, count } = await supabase
+      .rpc('clases_a_pagar', { p_desde: desde, p_hasta: hasta }, { count: 'exact' })
+      .order('fecha')
+      .order('hora')
+      .order('titulo')
+      .order('class_id')
+      .range(filas.length, filas.length + 999)
+    if (error?.code === 'PGRST202' || error?.code === '42883') return null
+    // Con el texto de la base: es el que dice qué pasó ("No tenés permiso…").
+    if (error) throw new Error(error.message || 'No se pudo traer el detalle de las clases')
+    if (!data || data.length === 0) break
+    filas.push(...(data as Record<string, unknown>[]))
+    total = count ?? filas.length
+  }
+
+  return filas.map((c) => ({
+    classId: String(c.class_id),
+    fecha: String(c.fecha),
+    titulo: String(c.titulo ?? ''),
+    hora: String(c.hora ?? '').slice(0, 5),
+    teacherId: (c.teacher_id as string | null) ?? null,
+    reservas: Number(c.reservas ?? 0),
+    enGrilla: c.en_grilla !== false,
+    cuenta: c.cuenta === true,
+    motivo: (c.motivo as string | null) ?? null,
   }))
 }
 

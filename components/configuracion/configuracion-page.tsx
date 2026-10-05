@@ -1230,7 +1230,19 @@ const NOMBRE_GRUPO: Record<string, { title: string; help: string }> = {
   avisos: { title: 'Avisos automáticos', help: 'Con cuánta anticipación sale cada recordatorio' },
   caja: { title: 'Caja y arqueo', help: 'Cómo se cierra la caja y qué diferencia se tolera' },
   gastos: { title: 'Gastos', help: 'Cómo se cargan los egresos del estudio' },
+  personal: { title: 'Personal y liquidación', help: 'Qué clases se pagan a quien las da' },
   general: { title: 'General', help: '' },
+}
+
+/**
+ * Por qué un parámetro lo cambia sólo el admin, dicho a quien puede
+ * editar los demás. Por grupo: el de caja afloja el arqueo, el de
+ * personal cambia lo que se le paga al equipo. Un grupo que no esté acá
+ * dice sólo que es del admin, en vez de dar un motivo que no es el suyo.
+ */
+const POR_QUE_SOLO_ADMIN: Record<string, string> = {
+  caja: 'afloja el control del arqueo',
+  personal: 'cambia lo que se le paga al equipo',
 }
 
 function tituloGrupo(key: string) {
@@ -1473,7 +1485,8 @@ function SettingsSection({ group }: { group: SettingGroup }) {
             {s.soloAdmin && !esAdmin && puedeEditar && (
               <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
                 <Lock className="w-3 h-3" />
-                Solo lo cambia el admin: afloja el control del arqueo.
+                Solo lo cambia el admin
+                {POR_QUE_SOLO_ADMIN[s.group] ? `: ${POR_QUE_SOLO_ADMIN[s.group]}.` : '.'}
               </p>
             )}
           </div>

@@ -12,11 +12,17 @@
  * agenda, con la profesora de cada fecha y sin las suspendidas. Pedirle
  * al mostrador que copie un dato que el sistema ya tiene es abrir la
  * puerta a que los dos números no coincidan.
+ *
+ * Desde la 0091 hay además una regla sobre cuáles se pagan: con
+ * `payroll_only_booked_classes` prendido, sólo las que tuvieron alguien
+ * anotado. La decide la base (`clases_a_pagar`); esta pantalla la explica
+ * y muestra el detalle, sin recalcular nada.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import {
   Loader2, Plus, Trash2, Users, Clock, Wallet, Lock, AlertTriangle, Check, IdCard,
+  ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { cn, nombreDelDia } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
@@ -32,6 +38,7 @@ import {
   cargarAjuste,
   borrarAjuste,
   fetchLiquidacion,
+  fetchClasesAPagar,
   fetchLiquidacionesCerradas,
   cerrarLiquidacion,
   pagarLiquidacion,
@@ -43,6 +50,7 @@ import { fetchAccounts } from '@/lib/caja-api'
 import type { Account } from '@/lib/types'
 import type {
   AjusteLiquidacion,
+  ClaseAPagar,
   CondicionPago,
   HorasTrabajadas,
   FilaLiquidacion,
@@ -88,7 +96,14 @@ function ultimoDiaAbierto(): string {
 function porQueNoSeCierra(
   f: FilaLiquidacion,
   suyas: CondicionPago[],
-  hasta: string
+  hasta: string,
+  /**
+   * Las clases suyas del período que no se pagan, por motivo (0091).
+   * `null` quiere decir "no se sabe": la regla rige y el detalle todavía
+   * no llegó, o falló. Sin la regla no hace falta el detalle y llega en
+   * cero, porque ahí cero clases es que no tenía ninguna.
+   */
+  noSePagan: { sinNadie: number; fuera: number } | null = { sinNadie: 0, fuera: 0 }
 ): string | null {
   // Cortos a propósito: van en la columna del botón, y el detalle de qué
   // hacer está en el recuadro de abajo de la tabla.
@@ -108,8 +123,116 @@ function porQueNoSeCierra(
   if (f.horas > 0 && !vigentes.some((c) => c.modalidad === 'por_hora')) {
     return 'Sin tarifa por hora'
   }
-  if (f.clases === 0 && f.horas === 0) return 'Sin trabajo en el período'
+  // Con la regla de la 0091 una persona puede tener clases en la grilla y
+  // ninguna que se pague. "Sin trabajo" diría que no tenía clases, y sí
+  // tenía: lo que no tuvieron es gente. Y mientras no se sabe —el detalle
+  // no llegó—, no se afirma ninguna de las dos cosas.
+  if (f.clases === 0 && f.horas === 0) {
+    if (!noSePagan) return 'Sin clases que se paguen'
+    if (noSePagan.sinNadie > 0) return 'Clases sin nadie anotado'
+    if (noSePagan.fuera > 0) return 'Clases fuera de la grilla'
+    return 'Sin trabajo en el período'
+  }
   return 'Da $0'
+}
+
+/** La regla con la que la base contó las clases del período. */
+type ReglaDeClases =
+  /** La 0091 no corrió: toda la grilla, y la pantalla lo dice como antes */
+  | 'previa'
+  /** `payroll_only_booked_classes` apagado: toda la grilla */
+  | 'grilla'
+  /** Prendido: sólo las clases con alguien anotado */
+  | 'con_anotados'
+
+const DIA_CORTO = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+
+/** "Jue 01/10" */
+function diaYFecha(iso: string): string {
+  return `${DIA_CORTO[diaDeLaFecha(iso)] ?? ''} ${iso.slice(8, 10)}/${iso.slice(5, 7)}`
+}
+
+/**
+ * Las clases de una persona agrupadas por día: un renglón por fecha.
+ * Un mes son más de cien clases, y una por renglón no se lee.
+ */
+function porDia(clases: ClaseAPagar[]): [string, ClaseAPagar[]][] {
+  const m = new Map<string, ClaseAPagar[]>()
+  for (const c of clases) m.set(c.fecha, [...(m.get(c.fecha) ?? []), c])
+  return [...m.entries()].sort(([a], [b]) => a.localeCompare(b))
+}
+
+/**
+ * El detalle de las clases de una persona en el período: cuáles se pagan
+ * y cuáles no, y por qué. Sale de `clases_a_pagar`, la misma función que
+ * usa la liquidación, así que no puede contradecir el número de arriba.
+ */
+function DetalleDeClases({ clases }: { clases: ClaseAPagar[] }) {
+  const pagan = clases.filter((c) => c.cuenta)
+  // Agrupadas por el motivo que da la base, y no con uno escrito acá: hoy
+  // hay uno solo ("nadie anotado"), pero si mañana hay otro, la pantalla
+  // lo dice tal cual en vez de meterlo bajo un rótulo que no es el suyo.
+  const porMotivo = new Map<string, ClaseAPagar[]>()
+  for (const c of clases.filter((x) => !x.cuenta)) {
+    const m = c.motivo ?? 'sin motivo'
+    porMotivo.set(m, [...(porMotivo.get(m) ?? []), c])
+  }
+
+  if (clases.length === 0) {
+    return <p className="text-[11px] text-muted-foreground">No dio clases de la grilla en el período.</p>
+  }
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="text-[11px] font-semibold text-foreground mb-1">
+          Se pagan · {pagan.length}
+        </p>
+        {pagan.length === 0 ? (
+          <p className="text-[11px] text-muted-foreground">Ninguna.</p>
+        ) : (
+          <div className="space-y-0.5">
+            {porDia(pagan).map(([dia, cs]) => (
+              <p key={dia} className="text-[11px] text-muted-foreground">
+                <span className="font-semibold text-foreground tabular-nums">{diaYFecha(dia)}</span>{' '}
+                {cs.map((c) => `${c.hora} (${c.reservas})`).join(' · ')}
+              </p>
+            ))}
+            <p className="text-[10px] text-muted-foreground pt-0.5">
+              Entre paréntesis, cuántas reservas tuvo cada una.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {[...porMotivo.entries()].map(([motivo, cs]) => {
+        // Las que tuvieron gente en un día que la grilla de hoy no tiene.
+        // Se muestran con sus reservas: es lo que hace pensar que se dieron.
+        const fuera = cs.every((c) => !c.enGrilla)
+        return (
+          <div key={motivo}>
+            <p className="text-[11px] font-semibold text-aviso-fuerte mb-1">
+              No se pagan · {cs.length} · {motivo}
+            </p>
+            <div className="space-y-0.5">
+              {porDia(cs).map(([dia, delDia]) => (
+                <p key={dia} className="text-[11px] text-muted-foreground">
+                  <span className="font-semibold tabular-nums">{diaYFecha(dia)}</span>{' '}
+                  {delDia.map((c) => (fuera ? `${c.hora} (${c.reservas})` : c.hora)).join(' · ')}
+                </p>
+              ))}
+              {fuera && (
+                <p className="text-[10px] text-muted-foreground pt-0.5">
+                  Tuvieron reservas, pero ese día la clase ya no figura en la grilla: se cambió de día o
+                  se dio de baja. La liquidación no las cuenta. Si se dieron, se pagan con un ajuste.
+                </p>
+              )}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -140,19 +263,59 @@ function Liquidacion({
   version: number
   onCerrar: () => void
 }) {
+  const { settings } = useStudio()
   const [filas, setFilas] = useState<FilaLiquidacion[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [cerrando, setCerrando] = useState<string | null>(null)
+  /**
+   * El detalle de clases (0091). `undefined` mientras carga o si falló
+   * —el error va aparte, en `errorDetalle`—; `null` si la 0091 no corrió y
+   * la función no existe, y entonces la pantalla se comporta como antes.
+   * Un error nunca se guarda como lista vacía: eso diría "no tuvo clases"
+   * al lado de una columna que dice que tuvo.
+   */
+  const [detalle, setDetalle] = useState<ClaseAPagar[] | null | undefined>(undefined)
+  const [errorDetalle, setErrorDetalle] = useState<string | null>(null)
+  /** De quién está abierto el detalle de clases */
+  const [abierta, setAbierta] = useState<string | null>(null)
+  /**
+   * A quién se le está por cerrar la liquidación. Era un `window.confirm`,
+   * y los carteles nativos los descartan solos el navegador de Instagram
+   * y el panel de vista previa: el botón parecía no hacer nada.
+   */
+  const [confirmando, setConfirmando] = useState<string | null>(null)
+  // Aparte del error de carga: si el cierre falla, la tabla tiene que
+  // seguir a la vista con el motivo arriba, no desaparecer.
+  const [errorCierre, setErrorCierre] = useState<string | null>(null)
 
   useEffect(() => {
+    let vigente = true
     setFilas(null)
     setError(null)
+    setDetalle(undefined)
+    setErrorDetalle(null)
+    setConfirmando(null)
+    setErrorCierre(null)
     fetchLiquidacion(desde, hasta)
-      .then(setFilas)
+      .then((f) => {
+        if (vigente) setFilas(f)
+      })
       .catch((e) => {
+        if (!vigente) return
         setFilas([])
         setError(e instanceof Error ? e.message : 'No se pudo calcular la liquidación')
       })
+    fetchClasesAPagar(desde, hasta)
+      .then((d) => {
+        if (vigente) setDetalle(d)
+      })
+      .catch((e) => {
+        if (!vigente) return
+        setErrorDetalle(e instanceof Error ? e.message : 'No se pudo traer el detalle de las clases')
+      })
+    return () => {
+      vigente = false
+    }
   }, [desde, hasta, version])
 
   // Ya cerrada para ESTE período exacto. Cerrar el mismo mes dos veces lo
@@ -172,22 +335,16 @@ function Liquidacion({
     return !!ultimo && desde <= ultimo
   }
 
+  /** Se llama desde la confirmación de la página, no desde el botón de la fila. */
   const cerrar = async (f: FilaLiquidacion) => {
-    if (
-      !window.confirm(
-        `Cerrar la liquidación de ${f.profesora} por ${plata(f.total)}?\n\n` +
-          'El número queda fijo: si después se carga una clase o cambia una tarifa, ' +
-          'este total no se mueve.'
-      )
-    )
-      return
     setCerrando(f.teacherId)
-    setError(null)
+    setErrorCierre(null)
     try {
       await cerrarLiquidacion(f.teacherId, desde, hasta)
+      setConfirmando(null)
       onCerrar()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo cerrar')
+      setErrorCierre(e instanceof Error ? e.message : 'No se pudo cerrar')
     } finally {
       setCerrando(null)
     }
@@ -206,8 +363,60 @@ function Liquidacion({
     (f) => f.total <= 0 && suyas(f.teacherId).length === 0 && !yaCerrada(f.teacherId)
   )
 
+  // Las clases de cada persona, tal como las devolvió la base.
+  const clasesDe = new Map<string, ClaseAPagar[]>()
+  for (const c of detalle ?? []) {
+    if (c.teacherId) clasesDe.set(c.teacherId, [...(clasesDe.get(c.teacherId) ?? []), c])
+  }
+  /** Las de la grilla que no se pagan por no tener a nadie */
+  const sinNadie = (id: string) =>
+    (clasesDe.get(id) ?? []).filter((c) => c.enGrilla && !c.cuenta).length
+  /** Las que tuvieron gente en un día que la grilla de hoy no tiene */
+  const fueraDeGrilla = (id: string) => (clasesDe.get(id) ?? []).filter((c) => !c.enGrilla).length
+  const totalFuera = (detalle ?? []).filter((c) => !c.enGrilla && c.teacherId).length
+
+  /**
+   * Con qué regla contó la base. Si alguna clase vino marcada como que no
+   * se paga, la regla está prendida, diga lo que diga el paquete del
+   * estudio (que puede tener unos minutos). Si no, manda el parámetro:
+   * sin la fila —la 0091 no corrió, o se volvió atrás— la base cuenta
+   * toda la grilla, que es lo que dice el texto de siempre.
+   */
+  const configurada = settings['payroll_only_booked_classes']
+  const regla: ReglaDeClases =
+    detalle === null
+      ? 'previa'
+      : (detalle ?? []).some((c) => !c.cuenta)
+        ? 'con_anotados'
+        : configurada === undefined
+          ? 'previa'
+          : configurada === 'true'
+            ? 'con_anotados'
+            : 'grilla'
+
+  /**
+   * Con la regla, un período que llega hasta hoy o después todavía no se
+   * puede cerrar: sus clases pueden sumar o perder reservas, y lo cerrado
+   * no se mueve. La base lo rechaza igual (0091); esto es para no ofrecer
+   * el botón y decir por qué.
+   */
+  const noTermino = regla === 'con_anotados' && hasta >= hoyISO()
+
+  /** Lo que `porQueNoSeCierra` necesita saber de las clases que no se pagan. */
+  const noSePagan = (id: string) =>
+    regla !== 'con_anotados'
+      ? { sinNadie: 0, fuera: 0 }
+      : Array.isArray(detalle)
+        ? { sinNadie: sinNadie(id), fuera: fueraDeGrilla(id) }
+        : null
+
   return (
     <div className="space-y-3">
+      {errorCierre && (
+        <p className="mx-4 text-xs text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">
+          {errorCierre}
+        </p>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -225,9 +434,13 @@ function Liquidacion({
           </thead>
           <tbody className="divide-y divide-border">
             {filas.map((f) => {
-              const motivo = porQueNoSeCierra(f, suyas(f.teacherId), hasta)
+              const vacias = sinNadie(f.teacherId)
+              const fuera = fueraDeGrilla(f.teacherId)
+              const motivo = porQueNoSeCierra(f, suyas(f.teacherId), hasta, noSePagan(f.teacherId))
+              const verDetalle = abierta === f.teacherId && Array.isArray(detalle)
               return (
-              <tr key={f.teacherId}>
+              <Fragment key={f.teacherId}>
+              <tr>
                 <td className="px-4 py-3 text-foreground">
                   {f.profesora}
                   {(f.ausencias > 0 || f.tardanzas > 0) && (
@@ -237,8 +450,42 @@ function Liquidacion({
                       {f.tardanzas > 0 && `${f.tardanzas} tardanza${f.tardanzas === 1 ? '' : 's'}`}
                     </span>
                   )}
+                  {/* Sin la 0091 no hay detalle que mostrar: el botón no
+                      aparece, en vez de abrir algo vacío. */}
+                  {Array.isArray(detalle) && (
+                    <button
+                      type="button"
+                      onClick={() => setAbierta(verDetalle ? null : f.teacherId)}
+                      aria-expanded={verDetalle}
+                      className="mt-0.5 flex items-center gap-0.5 text-[10px] font-semibold text-primary-fuerte hover:underline"
+                    >
+                      {verDetalle ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                      {verDetalle ? 'Ocultar clases' : 'Ver clases'}
+                    </button>
+                  )}
                 </td>
-                <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{f.clases}</td>
+                <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                  {f.clases}
+                  {/* Las que la grilla tenía y no se pagan (0091). Sin esto
+                      el número baja de un día para el otro y no se entiende
+                      por qué. */}
+                  {vacias > 0 && (
+                    <span
+                      className="block text-[10px] text-aviso-fuerte whitespace-nowrap"
+                      title="Clases de la grilla sin nadie anotado: no se pagan"
+                    >
+                      {vacias} sin nadie
+                    </span>
+                  )}
+                  {fuera > 0 && (
+                    <span
+                      className="block text-[10px] text-aviso-fuerte whitespace-nowrap"
+                      title="Tuvieron reservas en un día que la grilla de hoy no tiene: no se pagan solas"
+                    >
+                      {fuera} fuera de la grilla
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-right tabular-nums">{plata(f.montoClases)}</td>
                 <td className="px-4 py-3 text-right tabular-nums text-muted-foreground hidden md:table-cell">{f.horas}</td>
                 <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">{plata(f.montoHoras)}</td>
@@ -271,17 +518,64 @@ function Liquidacion({
                     <span className="inline-block w-[5.5rem] text-[10px] font-semibold leading-tight text-aviso-fuerte">
                       {motivo}
                     </span>
+                  ) : noTermino ? (
+                    <span
+                      className="inline-block w-[5.5rem] text-[10px] font-semibold leading-tight text-muted-foreground"
+                      title="Con la regla de pagar sólo las clases con alguien anotado, el período se cierra cuando terminó"
+                    >
+                      El período no terminó
+                    </span>
                   ) : (
                     <button
-                      disabled={cerrando === f.teacherId}
-                      onClick={() => cerrar(f)}
+                      disabled={cerrando === f.teacherId || confirmando === f.teacherId}
+                      onClick={() => {
+                        setConfirmando(f.teacherId)
+                        setErrorCierre(null)
+                      }}
                       className="px-2.5 py-1 rounded-lg bg-primary/10 text-primary-fuerte text-[10px] font-semibold hover:bg-primary/20 disabled:opacity-40 whitespace-nowrap"
                     >
-                      {cerrando === f.teacherId ? '…' : 'Cerrar'}
+                      Cerrar
                     </button>
                   )}
                 </td>
               </tr>
+              {confirmando === f.teacherId && (
+                <tr className="bg-primary/5">
+                  <td colSpan={9} className="px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="flex-1 min-w-[14rem] text-[11px] text-foreground">
+                        ¿Cerrar la liquidación de <span className="font-semibold">{f.profesora}</span>{' '}
+                        por <span className="font-semibold">{plata(f.total)}</span>? El número queda
+                        fijo: si después cambia una clase, una reserva o una tarifa, este total no se
+                        mueve.
+                      </p>
+                      <button
+                        disabled={cerrando === f.teacherId}
+                        onClick={() => cerrar(f)}
+                        className="shrink-0 h-7 px-3 rounded-lg bg-primary text-primary-foreground text-[11px] font-semibold hover:opacity-90 disabled:opacity-40 flex items-center gap-1.5"
+                      >
+                        {cerrando === f.teacherId && <Loader2 className="w-3 h-3 animate-spin" />}
+                        Sí, cerrar
+                      </button>
+                      <button
+                        disabled={cerrando === f.teacherId}
+                        onClick={() => setConfirmando(null)}
+                        className="shrink-0 h-7 px-3 rounded-lg text-[11px] font-semibold text-muted-foreground hover:bg-muted disabled:opacity-40"
+                      >
+                        No
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              {verDetalle && (
+                <tr className="bg-muted/20">
+                  <td colSpan={9} className="px-4 py-3">
+                    <DetalleDeClases clases={clasesDe.get(f.teacherId) ?? []} />
+                  </td>
+                </tr>
+              )}
+              </Fragment>
               )
             })}
           </tbody>
@@ -310,13 +604,67 @@ function Liquidacion({
           salir el sueldo DOS VECES del libro: el gasto del botón y el
           cargado a mano, los dos legítimos a los ojos del sistema.
           Encontrado el 17/09 revisando el módulo antes de que lo usen. */}
+      {/* De dónde salen las clases depende de la regla que configuró el
+          estudio (0091). El texto la dice tal cual, porque es lo primero
+          que se lee cuando el número no es el que se esperaba. */}
       <p className="text-[11px] text-muted-foreground px-4">
-        Este cálculo sale de las clases que figuran dictadas en la agenda y de las condiciones que
-        regían cada día. <span className="font-semibold">Liquidar no es pagar</span>: primero se
+        {regla === 'previa' && (
+          <>
+            Este cálculo sale de las clases que figuran dictadas en la agenda y de las condiciones
+            que regían cada día.
+          </>
+        )}
+        {regla === 'con_anotados' && (
+          <>
+            Este cálculo sale de las clases de la agenda que tuvieron{' '}
+            <span className="font-semibold">al menos una reserva</span> —confirmada, con asistencia,
+            con ausencia o cancelada fuera de plazo— y de las condiciones que regían cada día. Las
+            clases sin nadie anotado no se pagan, y tampoco las que sólo tuvieron cancelaciones a
+            tiempo o lista de espera. La regla se cambia en Configuración → Personal y liquidación.
+          </>
+        )}
+        {regla === 'grilla' && (
+          <>
+            Este cálculo sale de <span className="font-semibold">todas las clases de la grilla</span>{' '}
+            que no se suspendieron, haya o no reservas, y de las condiciones que regían cada día.
+            Para pagar sólo las clases con alguien anotado, se prende en Configuración → Personal y
+            liquidación.
+          </>
+        )}{' '}
+        <span className="font-semibold">Liquidar no es pagar</span>: primero se
         cierra el período y después se usa <span className="font-semibold">Registrar el pago</span>,
         que carga el gasto en el libro por vos. No hace falta cargarlo a mano en Gastos — si lo
         hacés, el sueldo sale dos veces.
       </p>
+      {errorDetalle && (
+        <p className="text-[11px] text-aviso-fuerte px-4">
+          No se pudo traer el detalle de qué clases se pagan: {errorDetalle}
+        </p>
+      )}
+      {/* Antes de la 0091 el número de hoy era el de mañana: la grilla no
+          cambia en el día. Con la regla, las clases que no pasaron se
+          cuentan con las reservas de este momento. */}
+      {noTermino && (
+        <p className="mx-4 text-[11px] text-foreground bg-muted rounded-xl px-3.5 py-2.5">
+          El período llega hasta el <span className="font-semibold">{fecha(hasta)}</span>, que
+          todavía no terminó: las clases que no pasaron se cuentan con las reservas de este momento, y
+          pueden cambiar. Por eso, mientras se paguen sólo las clases con alguien anotado, se cierra
+          hasta el día de ayer o antes.
+        </p>
+      )}
+      {/* Una clase que se cambió de día o se dio de baja deja sus fechas
+          viejas fuera de la grilla de hoy: con gente o sin gente, la
+          liquidación no las ve (0091). Se avisa acá para que no se pierdan
+          sin que nadie lo decida. */}
+      {totalFuera > 0 && (
+        <p className="mx-4 text-[11px] text-aviso-fuerte bg-aviso-suave rounded-xl px-3.5 py-2.5">
+          {totalFuera === 1
+            ? 'Hay 1 clase con reservas en un día que la grilla de hoy no tiene'
+            : `Hay ${totalFuera} clases con reservas en días que la grilla de hoy no tiene`}
+          : la clase se cambió de día o se dio de baja. La liquidación no las cuenta. Si se dieron,
+          se pagan con un ajuste. Están en &ldquo;Ver clases&rdquo; de cada persona.
+        </p>
+      )}
       {/* El prorrateo del mensual (0064) tiene que estar escrito donde se
           mira el número: si alguien cierra una quincena y ve la mitad del
           sueldo, sin esta línea parece un error. Antes el mes entero se
@@ -988,12 +1336,16 @@ function Cerradas({
               </div>
 
               {/* La diferencia, que es el motivo por el que se guardan las
-                  dos cifras. Solo si la hay y si no está anulada. */}
+                  dos cifras. Solo si la hay y si no está anulada. Desde la
+                  0091 no hace falta "cargar" nada para que aparezca: también
+                  la mueve una reserva cambiada después o la regla de qué
+                  clases se pagan, así que el texto no dice que se cargó algo. */}
               {c.estado !== 'anulada' && Math.abs(dif) >= 1 && (
                 <p className="text-[11px] text-aviso-fuerte bg-aviso-suave rounded-lg px-2.5 py-1.5 flex items-start gap-1.5">
                   <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
                   <span>
-                    Se cargó algo después de cerrar: hoy el período daría{' '}
+                    Algo cambió después de cerrar —una clase, una reserva, una tarifa, un ajuste o la
+                    regla de qué clases se pagan—: hoy el período daría{' '}
                     <span className="font-semibold">{plata(c.totalHoy)}</span>, {dif > 0 ? 'o sea' : 'o sea'}{' '}
                     {plata(Math.abs(dif))} {dif > 0 ? 'de más' : 'de menos'}. El total cerrado no se
                     toca: si corresponde, cerrale un ajuste aparte.
@@ -1188,10 +1540,20 @@ function Fichas({ condiciones }: { condiciones: CondicionPago[] }) {
 
 export function PersonalPage() {
   const { can, canWrite } = useData()
+  const { settings } = useStudio()
   const [desde, setDesde] = useState(inicioDeMes())
   const [hasta, setHasta] = useState(hoyISO())
 
   const veSueldos = can('personal.remuneracion')
+
+  /**
+   * Con la regla de la 0091 prendida, un período que llega hasta hoy o
+   * después no se cierra: la base lo rechaza, porque las clases que no
+   * pasaron todavía pueden sumar o perder reservas. Sin la fila —la 0091
+   * no corrió— no hay regla ni freno, como antes.
+   */
+  const ayer = addDays(hoyISO(), -1)
+  const noTermino = settings['payroll_only_booked_classes'] === 'true' && hasta >= hoyISO()
 
   const [cerradas, setCerradas] = useState<LiquidacionCerrada[]>([])
   const [condiciones, setCondiciones] = useState<CondicionPago[]>([])
@@ -1199,6 +1561,18 @@ export function PersonalPage() {
   const [cerrandoTodas, setCerrandoTodas] = useState(false)
   const [avisoCierre, setAvisoCierre] = useState<string | null>(null)
   const [version, setVersion] = useState(0)
+  /**
+   * La confirmación de "Cerrar el período de todos", en la página. Era un
+   * `window.confirm`, que el navegador de Instagram y el panel de vista
+   * previa descartan solos. Guarda a quiénes la base va a saltear por $0,
+   * para nombrarlas después.
+   */
+  const [confirmandoTodas, setConfirmandoTodas] = useState<{ sinMonto: string[] } | null>(null)
+
+  // Una confirmación es de un período: si cambian las fechas, ya no vale.
+  useEffect(() => {
+    setConfirmandoTodas(null)
+  }, [desde, hasta])
 
   const recargar = useCallback(() => {
     if (!veSueldos) return
@@ -1239,8 +1613,22 @@ export function PersonalPage() {
       // Si el cálculo falla acá, lo va a decir el cierre de abajo.
     }
 
-    if (!window.confirm(`Cerrar la liquidación de todos del ${fecha(desde)} al ${fecha(hasta)}?`)) return
+    setConfirmandoTodas({ sinMonto })
+  }
+
+  const confirmarCerrarTodas = async () => {
+    if (!confirmandoTodas) return
     setCerrandoTodas(true)
+    // Se vuelve a mirar quién da $0 justo antes de cerrar, y no se usa el
+    // del primer clic: entre los dos pudo cargarse algo, y el aviso de
+    // después tiene que nombrar a las que la base salteó de verdad.
+    let sinMonto = confirmandoTodas.sinMonto
+    try {
+      const filas = await fetchLiquidacion(desde, hasta)
+      sinMonto = filas.filter((f) => f.total <= 0).map((f) => f.profesora)
+    } catch {
+      // Se queda con la del primer clic; si el cierre falla, lo dice abajo.
+    }
     try {
       const r = await cerrarTodas(desde, hasta)
       const afuera = [
@@ -1257,6 +1645,7 @@ export function PersonalPage() {
       setAvisoCierre(e instanceof Error ? e.message : 'No se pudieron cerrar')
     } finally {
       setCerrandoTodas(false)
+      setConfirmandoTodas(null)
     }
   }
 
@@ -1330,14 +1719,65 @@ export function PersonalPage() {
               />
               {veSueldos && (
                 <div className="px-4 pt-3 flex flex-wrap items-center gap-2">
-                  <button
-                    disabled={cerrandoTodas}
-                    onClick={cerrarElMes}
-                    className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {cerrandoTodas && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                    Cerrar el período de todos
-                  </button>
+                  {noTermino ? (
+                    // No se ofrece lo que la base va a rechazar, y se dice
+                    // por qué con la salida a mano.
+                    <div className="w-full flex flex-wrap items-center gap-2">
+                      <button
+                        disabled
+                        className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold opacity-50"
+                      >
+                        Cerrar el período de todos
+                      </button>
+                      <p className="flex-1 min-w-[14rem] text-[11px] text-muted-foreground">
+                        El período no terminó: mientras se paguen sólo las clases con alguien anotado, se
+                        cierra hasta el día de ayer o antes.
+                      </p>
+                      {desde <= ayer && (
+                        <button
+                          onClick={() => setHasta(ayer)}
+                          className="px-3 py-2 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:bg-muted"
+                        >
+                          Llevarlo hasta ayer ({fecha(ayer)})
+                        </button>
+                      )}
+                    </div>
+                  ) : confirmandoTodas ? (
+                    <div className="w-full flex flex-wrap items-center gap-2 rounded-xl bg-primary/5 px-3 py-2">
+                      <p className="flex-1 min-w-[14rem] text-[11px] text-foreground">
+                        ¿Cerrar la liquidación de todos del{' '}
+                        <span className="font-semibold">{fecha(desde)}</span> al{' '}
+                        <span className="font-semibold">{fecha(hasta)}</span>? Se cierran las que dan
+                        más de $0, y cada total queda fijo.
+                        {confirmandoTodas.sinMonto.length > 0 &&
+                          ` Quedan afuera por dar $0: ${confirmandoTodas.sinMonto.join(', ')}.`}
+                      </p>
+                      <button
+                        disabled={cerrandoTodas}
+                        onClick={confirmarCerrarTodas}
+                        className="shrink-0 h-7 px-3 rounded-lg bg-primary text-primary-foreground text-[11px] font-semibold hover:opacity-90 disabled:opacity-40 flex items-center gap-1.5"
+                      >
+                        {cerrandoTodas && <Loader2 className="w-3 h-3 animate-spin" />}
+                        Sí, cerrar
+                      </button>
+                      <button
+                        disabled={cerrandoTodas}
+                        onClick={() => setConfirmandoTodas(null)}
+                        className="shrink-0 h-7 px-3 rounded-lg text-[11px] font-semibold text-muted-foreground hover:bg-muted disabled:opacity-40"
+                      >
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      disabled={cerrandoTodas}
+                      onClick={cerrarElMes}
+                      className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {cerrandoTodas && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      Cerrar el período de todos
+                    </button>
+                  )}
                   {avisoCierre && <p className="text-[11px] text-muted-foreground">{avisoCierre}</p>}
                 </div>
               )}
