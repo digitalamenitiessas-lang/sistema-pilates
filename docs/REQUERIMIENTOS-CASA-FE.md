@@ -114,6 +114,18 @@ tres horas devuelve la clase hasta dos veces por mes; de ahí en más se
 pierde. No tuvo efecto retroactivo: no había ninguna cancelación en plazo
 viva cuando se prendió.
 
+**El 06/10 el estudio lo apagó.** Lo acordado con la dueña era otra cosa:
+cancelar con más de tres horas devuelve la clase **siempre**, y la clienta
+se reanota según la disponibilidad. Con el tope prendido, quien cambió
+todos sus turnos perdió las clases desde la tercera cancelación (una
+clienta perdió 11). Se apagó `cancel_free_max` y se pasaron a "en plazo"
+las 17 cancelaciones que el tope había sellado como perdidas, por SQL y
+soltando el candado de la 0072 dentro de la transacción (los tres planes
+bajaron exactamente lo que tenían que bajar). Antes, el 01/10, ya se había
+corregido así un caso suelto. **No volver a prenderlo sin hablarlo con el
+estudio.** El botón para devolver una clase perdida desde la pantalla sigue
+pendiente (T85 del seguimiento).
+
 El **25/09** no hubo migración: se auditó el sistema entero antes del
 arranque del lunes —ocho ángulos, cada uno con un verificador que
 intentaba refutarlo— y se cerraron las dos trampas del mostrador que
