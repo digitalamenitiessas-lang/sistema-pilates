@@ -159,6 +159,17 @@ export function RendirModal({
         <p className="text-2xl font-bold text-foreground tabular-nums">{plata(total)}</p>
       </div>
 
+      {/* Una rendición que mezcla las dos bases no cierra con "el 70% de lo
+          cobrado", y hay que decirlo. No se dice cuáles son "las de antes":
+          las de antes de la 0092 y las de un proveedor que después pasó a
+          'cobrado' se ven igual. */}
+      {ventas.some((v) => v.comisionSobre === 'efectivo') && ventas.some((v) => v.comisionSobre === 'cobrado') && (
+        <p className="text-xs text-aviso-fuerte bg-aviso-suave rounded-xl px-3 py-2.5">
+          Hay ventas calculadas sobre lo cobrado y otras sobre el precio de efectivo. Cada renglón de la lista dice
+          sobre qué se calculó.
+        </p>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className={labelClass}>Con qué se le paga *</label>

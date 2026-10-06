@@ -153,7 +153,10 @@ const REPORTES: Array<Reporte<any>> = [
       { titulo: 'Fecha', valor: (f) => f.fecha, render: (f) => fecha(f.fecha) },
       { titulo: 'N°', valor: (f) => `V-${f.numero}` },
       { titulo: 'Producto', valor: (f) => f.producto },
-      { titulo: 'Aroma', valor: (f) => f.aroma },
+      // "Detalle" y no "Aroma": el nombre del dato lo pone cada producto
+      // (0092), y en un aro es el código de la pieza.
+      { titulo: 'Letra', valor: (f) => f.letra },
+      { titulo: 'Detalle', valor: (f) => f.aroma },
       { titulo: 'Cant.', valor: (f) => f.cantidad, numero: true, alinearDerecha: true, render: (f) => String(f.cantidad) },
       { titulo: 'Medio', valor: (f) => f.medio },
       { titulo: 'Cliente', valor: (f) => f.cliente },
@@ -161,6 +164,7 @@ const REPORTES: Array<Reporte<any>> = [
       { titulo: 'Estudio', valor: (f) => f.estudio, numero: true, alinearDerecha: true, render: (f) => plata(f.estudio) },
       { titulo: 'Proveedor $', valor: (f) => f.proveedorMonto, numero: true, alinearDerecha: true, render: (f) => plata(f.proveedorMonto) },
       { titulo: 'Proveedor', valor: (f) => f.proveedor },
+      { titulo: 'Base', valor: (f) => f.base },
       { titulo: 'Estado', valor: (f) => f.estado },
     ],
     // Las anuladas se listan para que se vean, pero no son plata.

@@ -17,12 +17,21 @@
  * Si la 0090 todavía no corrió, las lecturas tiran `FALTA` en vez de
  * devolver una lista vacía: "no hay productos" y "falta la migración" no
  * pueden verse igual.
+ *
+ * La 0092 (precio por letra, el dato configurable y la parte del estudio
+ * sobre el precio de efectivo) se corre DESPUÉS del deploy, así que esto
+ * anda con las dos bases. Se sabe si corrió leyendo `proveedor_letras`
+ * (`fetchLetras` devuelve null si no existe), y los parámetros nuevos de
+ * las funciones viajan sólo cuando hacen falta: con la base vieja, un
+ * parámetro de más hace que PostgREST no encuentre la función.
  */
 
 import { supabase } from './supabase'
 import { errorDeLaBase } from './api'
 import type {
+  ComisionSobre,
   EstadoVenta,
+  LetrasPorProveedor,
   MovimientoStock,
   Producto,
   Proveedor,
@@ -40,6 +49,22 @@ export function sinInventario(error: { code?: string } | null): boolean {
 }
 
 export const FALTA = 'Para usar Productos falta correr la migración 0090.'
+
+/** Se intentó vender por letra y la base no tiene la 0092. */
+export const FALTA_0092 = 'Para vender por letra falta correr la migración 0092.'
+
+/**
+ * Se mandó algo de la 0092 (la regla, las letras, el dato) y la base no
+ * tiene la función que lo recibe: no corrió, o se volvió atrás. No es "falta
+ * la 0090", que es lo que diría `sinInventario`.
+ */
+const FALTA_0092_GUARDAR =
+  'La base no tiene la migración 0092 (o se volvió atrás): sobre qué se calcula la parte del estudio, los precios por letra y el dato que se pide al vender no se pueden cambiar. Sin tocar eso, lo demás se guarda.'
+
+/** La tabla no existe (Postgres o PostgREST): la migración que la crea no corrió. */
+function sinTabla(error: { code?: string } | null): boolean {
+  return error?.code === '42P01' || error?.code === 'PGRST205'
+}
 
 /** Lo que tira una lectura: FALTA si es la migración, el error de la base si no. */
 function errorDeLectura(error: { code?: string; message?: string }, sino: string): Error {
@@ -109,6 +134,9 @@ export async function fetchProductos(): Promise<Producto[]> {
         (x) => [x.method, Number(x.precio)]
       )
     ),
+    // Sin la 0092 las columnas no vienen: precio fijo y "Aroma", como hoy.
+    precioPorLetra: p.precio_por_letra === true,
+    datoVenta: (p.dato_venta as string | null | undefined)?.trim() || 'Aroma',
   }))
 }
 
@@ -121,8 +149,32 @@ export async function fetchProveedores(): Promise<Proveedor[]> {
     contacto: p.contacto ?? '',
     notas: p.notas ?? '',
     pctEstudio: Number(p.pct_estudio),
+    // Sin la columna rige la regla de la 0090, sobre lo cobrado: la vista
+    // previa del reparto tiene que coincidir con lo que la base va a anotar.
+    comisionSobre: p.comision_sobre === 'efectivo' ? 'efectivo' : 'cobrado',
     active: !!p.active,
   }))
+}
+
+/**
+ * Los precios por letra de todos los proveedores (0092). null = la 0092
+ * todavía no corrió (la tabla no existe), y la pantalla se comporta como
+ * antes. Cualquier otro error se tira: un corte de red no puede pasar por
+ * "no corrió", porque escondería las letras de algo que sí se vende así.
+ */
+export async function fetchLetras(): Promise<LetrasPorProveedor | null> {
+  const { data, error } = await supabase.from('proveedor_letras').select('proveedor_id, letra, method, precio')
+  if (error) {
+    if (sinTabla(error)) return null
+    throw errorDeLaBase(error, 'No se pudieron leer los precios por letra')
+  }
+  const out: LetrasPorProveedor = {}
+  for (const f of (data ?? []) as Array<{ proveedor_id: string; letra: string; method: string; precio: number | string }>) {
+    const prov = (out[f.proveedor_id] ??= {})
+    const letra = (prov[f.letra] ??= {})
+    letra[f.method] = Number(f.precio)
+  }
+  return out
 }
 
 function mapVenta(v: Record<string, unknown>): VentaProducto {
@@ -136,10 +188,15 @@ function mapVenta(v: Record<string, unknown>): VentaProducto {
     proveedorId: String(v.proveedor_id),
     proveedorNombre: String(v.proveedor_nombre ?? ''),
     aroma: String(v.aroma ?? ''),
+    // Sin la 0092 estas columnas no vienen: era aroma, sin letra, sobre lo cobrado.
+    letra: (v.letra as string | null | undefined) ?? null,
+    datoNombre: String(v.dato_nombre ?? 'Aroma'),
     cantidad: Number(v.cantidad),
     precioUnitario: Number(v.precio_unitario),
     monto: Number(v.amount),
     pctEstudio: Number(v.pct_estudio),
+    precioBase: v.precio_base != null ? Number(v.precio_base) : Number(v.precio_unitario),
+    comisionSobre: v.comision_sobre === 'efectivo' ? 'efectivo' : 'cobrado',
     parteEstudio: Number(v.parte_estudio),
     parteProveedor: Number(v.parte_proveedor),
     method: String(v.method),
@@ -216,10 +273,15 @@ function claveDeAroma(a: string): string {
  * Se sugieren TAL CUAL están escritos: tocar un chip copia "Lavanda" y no
  * "lavanda", así la rendición al proveedor no sale partida en tres. La
  * lista del producto va entera; los vendidos completan hasta 8.
+ *
+ * Un producto por letra (un aro) no sugiere lo ya vendido: ahí el dato es
+ * el código de UNA pieza, y tocar un código vendido invita a registrar dos
+ * veces la misma. Las sugerencias cargadas a mano en el producto, sí.
  */
 export async function fetchAromas(producto: Producto): Promise<string[]> {
   const vistos = new Set(producto.aromas.map(claveDeAroma))
   const lista = [...producto.aromas]
+  if (producto.precioPorLetra) return lista
   const { data, error } = await supabase
     .from('ventas_productos')
     .select('aroma')
@@ -239,6 +301,34 @@ export async function fetchAromas(producto: Producto): Promise<string[]> {
   }
   const vendidos = [...veces.values()].sort((a, b) => b.n - a.n).map((x) => x.texto)
   return [...lista, ...vendidos.slice(0, Math.max(0, 8 - lista.length))]
+}
+
+/**
+ * Si ese código ya se vendió en este producto: un aviso suave, no un
+ * freno (puede ser una pieza repetida de verdad). Sin tildes ni
+ * mayúsculas, como las sugerencias. Si no se puede leer, no avisa.
+ */
+export async function buscarCodigoVendido(
+  productoId: string,
+  codigo: string
+): Promise<{ numero: number; paidDate: string } | null> {
+  const k = claveDeAroma(codigo)
+  if (k.length < 2) return null
+  // ilike sin comodines: el % y el _ del código se escapan.
+  const patron = codigo.trim().replace(/\s+/g, ' ').replace(/[\\%_]/g, (c) => `\\${c}`)
+  const { data, error } = await supabase
+    .from('ventas_productos')
+    .select('numero, paid_date, aroma')
+    .eq('producto_id', productoId)
+    .eq('status', 'pagado')
+    .ilike('aroma', patron)
+    .order('paid_at', { ascending: false })
+    .limit(5)
+  if (error || !data) return null
+  const f = (data as Array<{ numero: number; paid_date: string; aroma: string }>).find(
+    (x) => claveDeAroma(x.aroma) === k
+  )
+  return f ? { numero: Number(f.numero), paidDate: String(f.paid_date) } : null
 }
 
 export async function fetchMovimientos(productoId?: string | null, limite = 60): Promise<MovimientoStock[]> {
@@ -336,6 +426,12 @@ export async function venderProducto(input: {
    * de registrar un monto distinto del que se le cobró a quien compra.
    */
   precioEsperado: number
+  /**
+   * La letra de la etiqueta, sólo para un producto por letra (0092). Va
+   * sólo si viene: con la base vieja, un parámetro de más hace que
+   * PostgREST no encuentre la función y no vende ni el difusor.
+   */
+  letra?: string | null
 }): Promise<VentaRegistrada> {
   const { data, error } = await supabase.rpc('vender_producto', {
     p_producto: input.productoId,
@@ -347,9 +443,15 @@ export async function venderProducto(input: {
     p_notas: input.notas ?? '',
     p_idem: input.idem,
     p_precio_esperado: input.precioEsperado,
+    ...(input.letra ? { p_letra: input.letra } : {}),
   })
-  if (error) throw errorDeAccion(error, 'No se pudo registrar la venta', VENTA_SIN_RESPUESTA)
+  if (error) {
+    // Con letra y sin la función de 10 parámetros: falta la 0092, no la 0090.
+    if (input.letra && error.code === 'PGRST202') throw new Error(FALTA_0092)
+    throw errorDeAccion(error, 'No se pudo registrar la venta', VENTA_SIN_RESPUESTA)
+  }
   const f = primera(data)
+  const texto = (x: unknown) => (x === null || x === undefined ? null : String(x))
   return {
     ventaId: String(f.venta_id),
     numero: Number(f.numero),
@@ -363,6 +465,11 @@ export async function venderProducto(input: {
     stockRestante: Number(f.stock_restante),
     paidAt: String(f.paid_at),
     repetida: !!f.repetida,
+    letra: texto(f.letra),
+    dato: texto(f.dato),
+    datoNombre: texto(f.dato_nombre),
+    precioBase: f.precio_base === null || f.precio_base === undefined ? null : Number(f.precio_base),
+    comisionSobre: f.comision_sobre === 'efectivo' || f.comision_sobre === 'cobrado' ? f.comision_sobre : null,
   }
 }
 
@@ -456,6 +563,9 @@ export async function moverStock(
  * `precios`: por código de medio, un número lo crea o lo cambia y `null`
  * lo borra (ese medio deja de ofrecerse). Un código que no viene no se
  * toca. `aromas` sin pasar = no se tocan.
+ *
+ * `precioPorLetra` y `datoVenta` (0092) viajan sólo si vienen: el
+ * formulario los pone únicamente cuando la base tiene la 0092 y cambiaron.
  */
 export async function guardarProducto(input: {
   id: string | null
@@ -466,6 +576,8 @@ export async function guardarProducto(input: {
   stockAviso: number
   precios: Record<string, number | null>
   aromas?: string[]
+  precioPorLetra?: boolean
+  datoVenta?: string
 }): Promise<string> {
   const { data, error } = await supabase.rpc('guardar_producto', {
     p_id: input.id,
@@ -476,11 +588,24 @@ export async function guardarProducto(input: {
     p_stock_aviso: input.stockAviso,
     p_precios: input.precios,
     p_aromas: input.aromas ?? null,
+    ...(input.precioPorLetra !== undefined ? { p_precio_por_letra: input.precioPorLetra } : {}),
+    ...(input.datoVenta !== undefined ? { p_dato_venta: input.datoVenta } : {}),
   })
-  if (error) throw errorDeAccion(error, 'No se pudo guardar el producto')
+  if (error) {
+    if (error.code === 'PGRST202' && (input.precioPorLetra !== undefined || input.datoVenta !== undefined)) {
+      throw new Error(FALTA_0092_GUARDAR)
+    }
+    throw errorDeAccion(error, 'No se pudo guardar el producto')
+  }
   return String(data)
 }
 
+/**
+ * `comisionSobre` y `letras` (0092) viajan sólo si vienen. `letras` cambia
+ * SÓLO lo que trae, igual que los precios de un producto: una letra en
+ * null se borra entera, un medio en null se borra, y lo que no viene no
+ * se toca.
+ */
 export async function guardarProveedor(input: {
   id: string | null
   nombre: string
@@ -488,6 +613,8 @@ export async function guardarProveedor(input: {
   notas: string
   pctEstudio: number
   activo: boolean
+  comisionSobre?: ComisionSobre
+  letras?: Record<string, Record<string, number | null> | null>
 }): Promise<string> {
   const { data, error } = await supabase.rpc('guardar_proveedor', {
     p_id: input.id,
@@ -496,7 +623,14 @@ export async function guardarProveedor(input: {
     p_notas: input.notas,
     p_pct_estudio: input.pctEstudio,
     p_activo: input.activo,
+    ...(input.comisionSobre !== undefined ? { p_comision_sobre: input.comisionSobre } : {}),
+    ...(input.letras !== undefined ? { p_letras: input.letras } : {}),
   })
-  if (error) throw errorDeAccion(error, 'No se pudo guardar el proveedor')
+  if (error) {
+    if (error.code === 'PGRST202' && (input.comisionSobre !== undefined || input.letras !== undefined)) {
+      throw new Error(FALTA_0092_GUARDAR)
+    }
+    throw errorDeAccion(error, 'No se pudo guardar el proveedor')
+  }
   return String(data)
 }

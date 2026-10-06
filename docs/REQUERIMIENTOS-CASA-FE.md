@@ -8,7 +8,7 @@
 > **¿Buscás qué falta? Está en la §0, acá abajo.** Es la única lista al día; el
 > resto del documento es el análisis y la historia.
 
-## 0. LO QUE FALTA — la lista viva  ·  al 05/10/2026
+## 0. LO QUE FALTA — la lista viva  ·  al 06/10/2026
 
 > **Esta es la única lista al día.** Las secciones de abajo son el análisis y la
 > historia de cómo se llegó acá, y varias quedaron viejas a propósito: son la
@@ -114,6 +114,18 @@ tres horas devuelve la clase hasta dos veces por mes; de ahí en más se
 pierde. No tuvo efecto retroactivo: no había ninguna cancelación en plazo
 viva cuando se prendió.
 
+**El 06/10 el estudio lo apagó.** Lo acordado con la dueña era otra cosa:
+cancelar con más de tres horas devuelve la clase **siempre**, y la clienta
+se reanota según la disponibilidad. Con el tope prendido, quien cambió
+todos sus turnos perdió las clases desde la tercera cancelación (una
+clienta perdió 11). Se apagó `cancel_free_max` y se pasaron a "en plazo"
+las 17 cancelaciones que el tope había sellado como perdidas, por SQL y
+soltando el candado de la 0072 dentro de la transacción (los tres planes
+bajaron exactamente lo que tenían que bajar). Antes, el 01/10, ya se había
+corregido así un caso suelto. **No volver a prenderlo sin hablarlo con el
+estudio.** El botón para devolver una clase perdida desde la pantalla sigue
+pendiente (T85 del seguimiento).
+
 El **25/09** no hubo migración: se auditó el sistema entero antes del
 arranque del lunes —ocho ángulos, cada uno con un verificador que
 intentaba refutarlo— y se cerraron las dos trampas del mostrador que
@@ -172,7 +184,7 @@ saldó una cuota, como un "Otro cobro", y una cuota pendiente se puede
 anular sin cancelar el período. El detalle y el paso a paso para
 verificarla, en `PLAN.md`.
 
-El **04/10** quedó escrita la **`0090`, que falta correr**: productos en
+El **04/10** se escribió y **se corrió la `0090`** (verificado en producción: el menú muestra Productos): productos en
 consignación. El estudio vende difusores y sprays que deja un proveedor; de
 cada venta el 30% es del estudio (configurable por proveedor) y el resto se le
 rinde. Recepción vende —producto, cantidad, aroma obligatorio, medio de pago y,
@@ -189,6 +201,24 @@ proveedor queda con la fecha de la última venta que cubre: con el resultado
 que se le paga, así que conviene rendir mes por mes. El detalle, lo
 verificado y el orden del domingo, en `PLAN.md`. Para que el lunes se pueda
 vender, el admin tiene que cargar el proveedor real y la mercadería.
+
+El **06/10** quedó escrita la **`0092`, que falta correr y va después del
+deploy**: llega Accesorios Chini (aros, collares, anillos, pulseras) y cada
+pieza trae una **letra** que define el precio por medio de pago y un
+**código**. La lista de letras es del proveedor (una sola para los cuatro
+productos); al vender se elige la letra, el precio sale solo y el código se
+escribe a mano, como el aroma del difusor —el nombre de ese dato es
+configurable por producto: "Aroma", "Código"—. Y la parte del estudio pasa a
+calcularse **sobre el precio de efectivo**, cobre como cobre: el estudio lo
+confirmó para los difusores ("desde ese valor el 30% es del estudio"), así
+que un difusor con tarjeta le deja al proveedor $21.000 y no $26.250; el
+recargo queda entero para el estudio. Es configurable por proveedor ("sobre
+el efectivo" / "sobre lo cobrado"). Para Chini venía en el pedido ("la
+comisión siempre sobre precio de efectivo"). Las ventas ya hechas no se
+recalculan, y al 06/10 no había ninguna. El prevuelo
+del encabezado dice si algún producto no tiene precio en efectivo: la
+migración corta si lo hay, para que no deje de venderse sin aviso. El
+detalle y lo verificado, en `PLAN.md`.
 
 ### Lo que falta construir
 
@@ -334,6 +364,9 @@ Todas tienen un valor por defecto andando y se ajustan desde Configuración.
 - **El ciclo de pago del 1 al 9**: derogado el 09/09.
 - **El plazo de cancelación**: 3 horas. Ya rige.
 - **Los tres precios por medio de pago**: −5% / base / +25%. Cargados y andando.
+- **El 30% de los difusores y de Chini** (06/10): sobre el precio de efectivo, cobre como cobre; el recargo es del estudio. Lo aplica la `0092`.
+- **Las ventas de difusores anteriores a la `0092`** (06/10): no había ninguna, así que no hay nada calculado con la regla vieja.
+- **Chini** (06/10): stock por producto (un número para aros, otro para collares…), la letra se elige de una lista al vender y el código se escribe a mano.
 
 ## 1. El titular
 
@@ -460,7 +493,7 @@ subdeclarar lo que el sistema hace.
 | 7 · Dashboard principal | 🟡 | **La mitad de plata entró** (`0020`): lo que entró y salió en el mes, el gasto de hoy, el resultado y el saldo cuenta por cuenta, con "Sin acceso" cuando al rol le falta un permiso en vez de un cero que miente. **Falta**: los contadores comerciales —pases de prueba, renovadas, canceladas, cumpleaños |
 | 8 · Caja diaria y cuentas | 🟢 | **Hecho** (`0020`): cuentas con saldo, apertura y cierre con arqueo, movimientos y transferencias internas. El libro se deriva de los cobros: no hay dos verdades para la misma plata |
 | 9 · Gastos y egresos | 🟢 | **Hecho** (`0020`): los catorce campos, los siete filtros y el total del filtro a la vista. **Queda** adjuntar la foto del comprobante, que es el primer uso de Storage |
-| 10 · Productos e inventario | 🟡 | **Fuera del alcance** (§7), salvo lo que el estudio pidió el 04/10: venta en consignación con stock por producto, precios por medio de pago, proveedores y rendición (`0090`, escrita y sin correr). Sin variantes, sin inventario físico, sin costos |
+| 10 · Productos e inventario | 🟡 | **Fuera del alcance** (§7), salvo lo que el estudio pidió el 04/10: venta en consignación con stock por producto, precios por medio de pago, proveedores y rendición (`0090`, corrida el 04/10); precio por letra del proveedor, el dato configurable y la parte del estudio sobre el efectivo (`0092`, 06/10, escrita y sin correr). Sin variantes, sin inventario físico, sin costos |
 | 11 · Personal, roles y permisos | 🟡 | El motor de permisos por rol y por persona, con las políticas de la base preguntándole (`0012`–`0014`); la baja lógica de accesos (`0015`); anular un movimiento con motivo. **Falta**: la ficha laboral y el historial de actividad, que van con la sección 12 |
 | 12 · Horas trabajadas y remuneraciones | 🔴 | **Sin empezar, y está DENTRO del alcance**: es lo único nuevo que Matías aprobó (§7, Paso 10 de §9). `teachers` no tiene una sola columna laboral. Junto con el Agregado 2, es la deuda real del proyecto |
 | 13 · Landing administrable | 🟡 | Los datos del estudio salen de la base y los cargó el estudio (`0011`+`0033`), así que la web ya muestra los reales. **Falta** todo el editor: textos, imágenes, banners, las secciones nuevas, y borrador con vista previa y publicación |

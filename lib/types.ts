@@ -846,15 +846,29 @@ export interface Expense {
 // Productos en consignación (0090)
 // ---------------------------------------------------------------
 
-/** Quien deja la mercadería. El % es la parte del ESTUDIO sobre lo cobrado. */
+/**
+ * Sobre qué precio se calcula la parte del estudio (0092): el de efectivo
+ * de la misma pieza, cobre como cobre, o lo que se cobró (la regla de la
+ * 0090). Sin la 0092 vale siempre 'cobrado', que es lo que rige.
+ */
+export type ComisionSobre = 'efectivo' | 'cobrado'
+
+/** Quien deja la mercadería. El % es la parte del ESTUDIO, sobre la base que dice `comisionSobre`. */
 export interface Proveedor {
   id: string
   nombre: string
   contacto: string
   notas: string
   pctEstudio: number
+  comisionSobre: ComisionSobre
   active: boolean
 }
+
+/**
+ * La lista de precios por letra de cada proveedor (0092):
+ * proveedor → letra → código del medio → precio.
+ */
+export type LetrasPorProveedor = Record<string, Record<string, Record<string, number>>>
 
 export interface Producto {
   id: string
@@ -864,12 +878,19 @@ export interface Producto {
   stock: number
   /** Con esta cantidad o menos, la tarjeta avisa que hay que reponer */
   stockAviso: number
-  /** Los aromas que trae: las sugerencias del primer día */
+  /** Las sugerencias del dato que se pide al vender (los aromas que trae, por ejemplo) */
   aromas: string[]
   active: boolean
   sortOrder: number
   /** Precio por código de medio. Un medio sin precio no se ofrece al vender. */
   precios: Record<string, number>
+  /**
+   * El precio sale de la letra de la etiqueta, con la lista del proveedor
+   * (0092). Los `precios` propios se conservan pero no se usan.
+   */
+  precioPorLetra: boolean
+  /** Cómo se llama el dato que se escribe al vender: "Aroma", "Código"… */
+  datoVenta: string
 }
 
 /**
@@ -888,11 +909,19 @@ export interface VentaProducto {
   productoNombre: string
   proveedorId: string
   proveedorNombre: string
+  /** El dato que se escribió al vender (aroma, código): la columna se llama así desde la 0090 */
   aroma: string
+  /** La letra de la etiqueta, si el precio salió de ahí */
+  letra: string | null
+  /** Cómo se llamaba el dato ("Aroma" en todo lo anterior a la 0092) */
+  datoNombre: string
   cantidad: number
   precioUnitario: number
   monto: number
   pctEstudio: number
+  /** El precio unitario sobre el que se calculó el reparto (lo cobrado antes de la 0092) */
+  precioBase: number
+  comisionSobre: ComisionSobre
   parteEstudio: number
   parteProveedor: number
   method: string
@@ -958,6 +987,16 @@ export interface VentaRegistrada {
   paidAt: string
   /** true = era un reintento: la venta ya estaba hecha y no se cobró dos veces */
   repetida: boolean
+  /**
+   * Lo que registró la base (0092). El comprobante se arma con esto y no
+   * con lo que muestra la pantalla: en un reintento puede haber otra pieza
+   * elegida. Con la base vieja llegan vacíos y se completan con la pantalla.
+   */
+  letra: string | null
+  dato: string | null
+  datoNombre: string | null
+  precioBase: number | null
+  comisionSobre: ComisionSobre | null
 }
 
 export interface VentaAnulada {

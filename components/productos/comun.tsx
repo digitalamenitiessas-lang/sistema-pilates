@@ -12,8 +12,39 @@
 
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import type { VentaProducto } from '@/lib/types'
 
 export const plata = (n: number) => `$${Math.round(n).toLocaleString('es-AR')}`
+
+/**
+ * El reparto de una venta: la misma cuenta que `reparto_de_venta` en la
+ * base (0092), para la vista previa. `base` es lo cobrado (la regla de la
+ * 0090) o el precio de efectivo de la misma pieza, ya multiplicado por la
+ * cantidad. El redondeo del % queda del lado del estudio y el proveedor
+ * se lleva el resto de la base; el recargo del medio, entero al estudio.
+ */
+export function reparto(cobrado: number, base: number, pct: number): { estudio: number; proveedor: number } {
+  const proveedor = base - Math.round(base * pct) / 100
+  return { proveedor, estudio: cobrado - proveedor }
+}
+
+/** Lo que identifica la pieza vendida: "Lavanda", o "Letra A · AR-0012". */
+export function detalleVenta(v: Pick<VentaProducto, 'letra' | 'aroma'>): string {
+  return [v.letra && `Letra ${v.letra}`, v.aroma].filter(Boolean).join(' · ')
+}
+
+/** Las letras en el orden de la etiqueta: K antes que AA. */
+export function ordenarLetras(ls: string[]): string[] {
+  return [...ls].sort((a, b) => a.length - b.length || a.localeCompare(b))
+}
+
+/** Sobre qué se calculó la parte del estudio de una venta, en palabras. */
+export function textoBase(v: Pick<VentaProducto, 'comisionSobre' | 'precioBase' | 'pctEstudio'>): string {
+  const prov = Math.round((100 - v.pctEstudio) * 100) / 100
+  return v.comisionSobre === 'efectivo'
+    ? `${prov}% de ${plata(v.precioBase)} en efectivo`
+    : `${prov}% de lo cobrado`
+}
 
 /** El `T00:00` evita que un ISO suelto se lea como UTC y muestre el día anterior. */
 export const fechaCorta = (iso: string) =>

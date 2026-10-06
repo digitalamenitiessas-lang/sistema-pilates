@@ -13,7 +13,7 @@ import { ShoppingBag } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FALTA, fetchVentasDeCliente } from '@/lib/inventario-api'
 import type { VentaProducto } from '@/lib/types'
-import { momento, plata } from './comun'
+import { detalleVenta, momento, plata } from './comun'
 
 /**
  * Si una ficha ya descubrió que la 0090 no corrió, las siguientes no lo
@@ -68,7 +68,7 @@ export function ComprasDeCliente({ studentId }: { studentId: string }) {
             <div key={v.id} className="bg-card rounded-xl border border-border p-4 flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">
-                  {v.productoNombre} · {v.aroma}
+                  {v.productoNombre} · {detalleVenta(v)}
                   {v.cantidad > 1 && ` ×${v.cantidad}`}
                 </p>
                 <p className="text-xs text-muted-foreground">

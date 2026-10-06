@@ -14,6 +14,10 @@
  * La plata de una venta entra entera a la caja (la quinta rama del libro,
  * `origen 'venta'`); la parte del proveedor sale después como gasto,
  * cuando se le paga desde "Rendir a proveedores".
+ *
+ * Con la 0092 un producto puede venderse por letra (la lista es del
+ * proveedor) y el reparto puede salir del precio de efectivo. Si la 0092
+ * no corrió, `letras` queda en null y todo se ve y se manda como antes.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -41,6 +45,7 @@ import { addDays, hoyISO } from '@/lib/api'
 import { fetchAccounts } from '@/lib/caja-api'
 import {
   FALTA,
+  fetchLetras,
   fetchMovimientos,
   fetchProductos,
   fetchProveedores,
@@ -51,6 +56,7 @@ import {
 import type {
   Account,
   EstadoVenta,
+  LetrasPorProveedor,
   MovimientoStock,
   Producto,
   Proveedor,
@@ -58,7 +64,7 @@ import type {
   VentaProducto,
 } from '@/lib/types'
 import { mediosParaCobrar } from '@/components/pagos/pagos-page'
-import { fechaCorta, fechaLarga, momento, plata } from './comun'
+import { detalleVenta, fechaCorta, fechaLarga, momento, ordenarLetras, plata, textoBase } from './comun'
 import { VenderModal } from './vender-modal'
 import { AnularVentaModal } from './anular-venta-modal'
 import { RendirModal } from './rendir-modal'
@@ -134,6 +140,14 @@ export function ProductosPage() {
   const [rendiciones, setRendiciones] = useState<Rendicion[]>([])
   const [movimientos, setMovimientos] = useState<MovimientoStock[]>([])
   const [cuentas, setCuentas] = useState<Account[]>([])
+  // Las listas por letra (0092). null: la 0092 no corrió, o todavía no se
+  // leyeron (un producto por letra no se ofrece hasta que estén).
+  const [letras, setLetras] = useState<LetrasPorProveedor | null>(null)
+  const [errorLetras, setErrorLetras] = useState<string | null>(null)
+  // true sólo cuando la base CONTESTÓ que la tabla no existe. Con letras en
+  // null y esto en false no se sabe (no se leyeron, o falló la lectura), y
+  // los formularios no afirman ninguna regla.
+  const [sin0092, setSin0092] = useState(false)
   const [falta, setFalta] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [errorVentas, setErrorVentas] = useState<string | null>(null)
@@ -168,13 +182,14 @@ export function ProductosPage() {
         setProductos([])
         return
       }
-      const [prov, hoyV, pend, rend, mov, ctas] = await Promise.allSettled([
+      const [prov, hoyV, pend, rend, mov, ctas, lets] = await Promise.allSettled([
         veProveedores ? fetchProveedores() : Promise.resolve([] as Proveedor[]),
         fetchVentas({ desde: hoy, hasta: hoy }),
         veRendiciones ? fetchVentasARendir() : Promise.resolve([] as VentaProducto[]),
         veRendiciones ? fetchRendiciones() : Promise.resolve([] as Rendicion[]),
         veMovimientos ? fetchMovimientos(null, 80) : Promise.resolve([] as MovimientoStock[]),
         necesitaCuentas ? fetchAccounts() : Promise.resolve([] as Account[]),
+        fetchLetras(),
       ])
       if (!vivo) return
       const fallas: string[] = []
@@ -188,6 +203,15 @@ export function ProductosPage() {
       tomar(rend, setRendiciones)
       tomar(mov, setMovimientos)
       tomar(ctas, setCuentas)
+      // Un error al leer las letras no es "la 0092 no corrió" (eso da null):
+      // los productos por letra no se ofrecen y se dice por qué.
+      if (lets.status === 'fulfilled') {
+        setLetras(lets.value)
+        setSin0092(lets.value === null)
+        setErrorLetras(null)
+      } else {
+        setErrorLetras(lets.reason instanceof Error ? lets.reason.message : String(lets.reason))
+      }
       setError(fallas.length > 0 ? [...new Set(fallas)].join(' · ') : null)
     })()
     return () => {
@@ -224,8 +248,43 @@ export function ProductosPage() {
     fetchProductos()
       .then(setProductos)
       .catch(() => {})
+    // Los precios por letra también pueden haber cambiado.
+    fetchLetras()
+      .then((l) => {
+        setLetras(l)
+        setSin0092(l === null)
+        setErrorLetras(null)
+      })
+      .catch(() => {})
   }
   const proveedorDe = (id: string | null) => (id ? proveedores.find((p) => p.id === id) ?? null : null)
+  const hay0092 = letras !== null
+  /** Por qué no se sabe si corrió la 0092; null si se sabe (sí o no). */
+  const letrasSinLeer = hay0092 || sin0092 ? null : errorLetras ?? 'todavía se están leyendo'
+  /** La lista por letra de un proveedor (letra → medio → precio). */
+  const letrasDe = (id: string | null) => (id && letras ? letras[id] ?? {} : {})
+  /** "A $15.600 … K $38.000" en efectivo, o null si no hay. */
+  const rangoLetras = (id: string | null) => {
+    const ls = letrasDe(id)
+    const orden = ordenarLetras(Object.keys(ls))
+    const efe = orden.filter((l) => ls[l].efectivo !== undefined)
+    if (orden.length === 0) return null
+    return {
+      n: orden.length,
+      primera: orden[0],
+      ultima: orden[orden.length - 1],
+      min: efe.length ? Math.min(...efe.map((l) => ls[l].efectivo)) : null,
+      max: efe.length ? Math.max(...efe.map((l) => ls[l].efectivo)) : null,
+      desde: efe.length ? `${efe[0]} ${plata(ls[efe[0]].efectivo)}` : null,
+      hasta: efe.length > 1 ? `${efe[efe.length - 1]} ${plata(ls[efe[efe.length - 1]].efectivo)}` : null,
+    }
+  }
+  // Un producto por letra se vende si su proveedor tiene alguna letra con
+  // precio en algún medio del mostrador.
+  const mediosConPrecio = (p: Producto) =>
+    p.precioPorLetra
+      ? medios.filter((m) => Object.values(letrasDe(p.proveedorId)).some((l) => l[m.code] !== undefined))
+      : medios.filter((m) => p.precios[m.code] !== undefined)
   const nombreCuenta = (id: string | null) => (id ? cuentas.find((c) => c.id === id)?.name ?? null : null)
   const nombreProducto = (id: string) => productos?.find((p) => p.id === id)?.nombre ?? 'Producto'
 
@@ -301,6 +360,7 @@ export function ProductosPage() {
           <VenderModal
             producto={p}
             proveedor={proveedorDe(p.proveedorId)}
+            letras={p.precioPorLetra ? letrasDe(p.proveedorId) : {}}
             onClose={cerrar}
             onVendido={recargar}
             onFallo={recargar}
@@ -351,6 +411,8 @@ export function ProductosPage() {
           <ProductoFormModal
             producto={modal.producto}
             proveedores={proveedores}
+            letras={letras}
+            letrasSinLeer={letrasSinLeer}
             onClose={cerrar}
             onGuardado={() => {
               cerrar()
@@ -375,6 +437,8 @@ export function ProductosPage() {
         return (
           <ProveedorFormModal
             proveedor={modal.proveedor}
+            letras={hay0092 ? letrasDe(modal.proveedor?.id ?? null) : null}
+            letrasSinLeer={letrasSinLeer}
             onClose={cerrar}
             onGuardado={() => {
               cerrar()
@@ -406,18 +470,37 @@ export function ProductosPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             {activos.map((p) => {
-              const conPrecio = medios.filter((m) => p.precios[m.code] !== undefined)
+              const conPrecio = mediosConPrecio(p)
+              const prov = proveedorDe(p.proveedorId)
+              const rango = p.precioPorLetra ? rangoLetras(p.proveedorId) : null
               // Qué le falta para venderse. A quien lo puede completar se le
               // dice qué hacer y se le da el botón ahí mismo (Difusor y Spray
               // nacen sin proveedor y sin stock: si el admin no los completa,
               // el mostrador no vende); al resto, a quién pedírselo.
               const sinFicha = !p.proveedorId || conPrecio.length === 0
+              // Por letra, los precios son del proveedor: se cargan ahí.
+              const faltanLetras = p.precioPorLetra && !!p.proveedorId && conPrecio.length === 0
               const faltanAca: string[] = []
               if (!p.proveedorId) faltanAca.push(puedeGestionar ? 'elegir el proveedor' : 'el proveedor')
-              if (conPrecio.length === 0) faltanAca.push(puedeGestionar ? 'cargar los precios' : 'los precios')
+              if (conPrecio.length === 0 && !(p.precioPorLetra && letras === null))
+                faltanAca.push(
+                  faltanLetras
+                    ? puedeGestionar
+                      ? 'cargar las letras del proveedor'
+                      : 'los precios'
+                    : puedeGestionar
+                      ? 'cargar los precios'
+                      : 'los precios'
+                )
               if (p.stock <= 0) faltanAca.push(puedeGestionar ? 'cargar la mercadería' : 'stock')
-              const motivo =
-                faltanAca.length === 0
+              // Un producto por letra sin las letras leídas no se ofrece: el
+              // precio sale de ahí.
+              const sinLetrasLeidas = p.precioPorLetra && letras === null
+              const motivo = sinLetrasLeidas
+                ? errorLetras
+                  ? `No se pudieron leer los precios por letra: ${errorLetras}`
+                  : 'Cargando los precios por letra…'
+                : faltanAca.length === 0
                   ? null
                   : `Para vender falta ${faltanAca.join(' y ')}${puedeGestionar ? '.' : ': lo carga quien administra.'}`
               return (
@@ -447,7 +530,23 @@ export function ProductosPage() {
                     </span>
                   </div>
 
-                  {conPrecio.length > 0 ? (
+                  {p.precioPorLetra ? (
+                    rango ? (
+                      <p className="text-xs text-muted-foreground">
+                        Por letra (efectivo):{' '}
+                        <span className="font-semibold text-foreground tabular-nums">
+                          {rango.desde ?? rango.primera}
+                          {rango.hasta && ` … ${rango.hasta}`}
+                        </span>
+                        <span className="block text-[11px]">
+                          {rango.n} {rango.n === 1 ? 'letra' : 'letras'} de {prov?.nombre ?? 'su proveedor'} · al
+                          vender se pide {p.datoVenta.toLowerCase()}
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground">Sin precios por letra</p>
+                    )
+                  ) : conPrecio.length > 0 ? (
                     // Una columna: en dos, "Transferencia Galicia" y
                     // "Transferencia BBVA" se cortaban igual en el celular.
                     <div className="space-y-1">
@@ -477,13 +576,21 @@ export function ProductosPage() {
                     {motivo && <p className="text-[11px] font-semibold text-aviso-fuerte">{motivo}</p>}
                     {puedeGestionar && (sinFicha || p.stock <= 0) && (
                       <div className="flex flex-wrap gap-1.5">
-                        {sinFicha && (
+                        {sinFicha && !sinLetrasLeidas && (
                           <button
-                            onClick={() => setModal({ tipo: 'producto', producto: p })}
+                            onClick={() =>
+                              faltanLetras && prov
+                                ? setModal({ tipo: 'proveedor', proveedor: prov })
+                                : setModal({ tipo: 'producto', producto: p })
+                            }
                             className="px-2.5 py-1.5 rounded-lg border border-border text-[11px] font-semibold text-foreground hover:bg-muted inline-flex items-center gap-1"
                           >
                             <Pencil className="w-3 h-3" />
-                            {!p.proveedorId ? 'Elegir el proveedor' : 'Cargar los precios'}
+                            {!p.proveedorId
+                              ? 'Elegir el proveedor'
+                              : faltanLetras
+                                ? `Cargar las letras de ${prov?.nombre ?? 'su proveedor'}`
+                                : 'Cargar los precios'}
                           </button>
                         )}
                         {p.stock <= 0 && (
@@ -602,7 +709,7 @@ export function ProductosPage() {
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-foreground">
                             <span className="text-muted-foreground tabular-nums">V-{v.numero}</span> ·{' '}
-                            {v.productoNombre} · {v.aroma}
+                            {v.productoNombre} · {detalleVenta(v)}
                             {v.cantidad > 1 && ` ×${v.cantidad}`}
                           </p>
                           <p className="text-[11px] text-muted-foreground">
@@ -632,8 +739,13 @@ export function ProductosPage() {
                       </div>
                       {!anulada && (
                         <p className="text-[11px] text-muted-foreground">
-                          Estudio {plata(v.parteEstudio)} ({v.pctEstudio}%) · {v.proveedorNombre}{' '}
-                          {plata(v.parteProveedor)}
+                          {/* La explicación va del lado del proveedor, como en
+                              Rendir: con tarjeta o transferencia la parte del
+                              estudio es el 30% del efectivo MÁS el recargo, y
+                              un "30%" pegado a ese número no cierra. */}
+                          Estudio {plata(v.parteEstudio)} · {v.proveedorNombre} {plata(v.parteProveedor)} (
+                          {textoBase(v)}
+                          {v.cantidad > 1 && v.comisionSobre === 'efectivo' && ` ×${v.cantidad}`})
                         </p>
                       )}
                       {anulada && v.voidReason && (
@@ -746,11 +858,12 @@ export function ProductosPage() {
                               )}
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm text-foreground">
-                                  {fechaCorta(v.paidDate)} · {v.productoNombre} · {v.aroma}
+                                  {fechaCorta(v.paidDate)} · {v.productoNombre} · {detalleVenta(v)}
                                   {v.cantidad > 1 && ` ×${v.cantidad}`}
                                 </p>
                                 <p className="text-[11px] text-muted-foreground">
-                                  V-{v.numero} · cobrado {plata(v.monto)} en {v.medio}
+                                  V-{v.numero} · cobrado {plata(v.monto)} en {v.medio} · {textoBase(v)}
+                                  {v.cantidad > 1 && v.comisionSobre === 'efectivo' && ` ×${v.cantidad}`}
                                 </p>
                               </div>
                               <p className="text-sm font-semibold text-foreground tabular-nums shrink-0">
@@ -860,7 +973,9 @@ export function ProductosPage() {
             // proveedor o de precios: es lo primero que tiene que completar
             // el admin (si ya plegó secciones antes, manda lo que recordó).
             abiertaPorDefecto={activos.some(
-              (p) => !p.proveedorId || !medios.some((m) => p.precios[m.code] !== undefined)
+              // Un producto por letra con las letras todavía sin leer no
+              // cuenta como "sin precios": se abriría para siempre.
+              (p) => !p.proveedorId || (!(p.precioPorLetra && letras === null) && mediosConPrecio(p).length === 0)
             )}
             accion={
               <button
@@ -890,18 +1005,41 @@ export function ProductosPage() {
                             {prov ? `${prov.nombre} · ${prov.pctEstudio}% estudio` : 'Sin proveedor'} · stock{' '}
                             {p.stock} · avisa con {p.stockAviso}
                           </p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {Object.keys(p.precios).length === 0
-                              ? 'Sin precios'
-                              : Object.entries(p.precios)
-                                  .map(
-                                    ([c, n]) =>
-                                      `${paymentMethods.find((m) => m.code === c)?.name ?? c} ${plata(n)}`
-                                  )
-                                  .join(' · ')}
-                          </p>
+                          {p.precioPorLetra ? (
+                            <p className="text-[11px] text-muted-foreground">
+                              {(() => {
+                                const r = rangoLetras(p.proveedorId)
+                                const de = prov?.nombre ?? 'su proveedor'
+                                if (!r) return `Precio por letra de ${de} · todavía sin letras`
+                                return `Precio por letra de ${de} · ${r.n} ${r.n === 1 ? 'letra' : 'letras'}${
+                                  r.min !== null && r.max !== null
+                                    ? `, de ${plata(r.min)} a ${plata(r.max)} en efectivo`
+                                    : ''
+                                }`
+                              })()}
+                            </p>
+                          ) : (
+                            <p className="text-[11px] text-muted-foreground">
+                              {Object.keys(p.precios).length === 0
+                                ? 'Sin precios'
+                                : Object.entries(p.precios)
+                                    .map(
+                                      ([c, n]) =>
+                                        `${paymentMethods.find((m) => m.code === c)?.name ?? c} ${plata(n)}`
+                                    )
+                                    .join(' · ')}
+                            </p>
+                          )}
+                          {hay0092 && (
+                            <p className="text-[11px] text-muted-foreground">Al vender se pide: {p.datoVenta}</p>
+                          )}
                           {p.aromas.length > 0 && (
-                            <p className="text-[11px] text-muted-foreground">Aromas: {p.aromas.join(', ')}</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {p.datoVenta.toLowerCase() === 'aroma'
+                                ? 'Aromas'
+                                : `Sugerencias de ${p.datoVenta.toLowerCase()}`}
+                              : {p.aromas.join(', ')}
+                            </p>
                           )}
                         </div>
                       </div>
@@ -1017,9 +1155,18 @@ export function ProductosPage() {
                       </p>
                       <p className="text-[11px] text-muted-foreground">
                         {p.pctEstudio}% para el estudio · {Math.round((100 - p.pctEstudio) * 100) / 100}% para el
-                        proveedor
+                        proveedor, sobre {p.comisionSobre === 'efectivo' ? 'el precio de efectivo' : 'lo cobrado'}
                         {p.contacto && ` · ${p.contacto}`}
                       </p>
+                      {(() => {
+                        const r = rangoLetras(p.id)
+                        return r ? (
+                          <p className="text-[11px] text-muted-foreground">
+                            Letras {r.primera}
+                            {r.n > 1 && `–${r.ultima}`} ({r.n})
+                          </p>
+                        ) : null
+                      })()}
                       {p.notas && <p className="text-[11px] text-muted-foreground">{p.notas}</p>}
                     </div>
                     {puedeGestionar && (

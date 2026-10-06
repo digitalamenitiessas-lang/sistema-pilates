@@ -2966,6 +2966,176 @@ verificar en producción que del 01/10 al 03/10 queden sólo las clases con
 reservas. **No cerrar liquidaciones de octubre antes**: quedarían congeladas
 con toda la grilla.
 
+### 🟡 El precio por letra y la parte del estudio sobre el efectivo (06/10) — `0092` **escrita, sin correr**
+
+Llega un proveedor nuevo, **Accesorios Chini**: aros, collares, anillos y
+pulseras. Cada pieza trae una **letra** (A..K), que define el precio según el
+medio (efectivo / transferencia +10% / tarjeta +30%), y un **código**. Al
+vender se elige la letra y se escribe el código, "para tener registrado bien
+qué aro vendo". Y sobre la plata: el estudio **confirmó el 06/10 que con los
+difusores el 30% es sobre el precio de efectivo** ("Sí, desde ese valor el
+30% es del estudio"), y para Chini venía en el pedido ("la comisión
+siempre sobre precio de efectivo"). Igual es configurable por proveedor.
+
+- **Una fórmula, dos bases**: `proveedor = base − round(base × % / 100, 2)` y
+  `estudio = cobrado − proveedor`. Con base = lo cobrado es exactamente la
+  `0090`. La cuenta vive en `reparto_de_venta` (pura, cerrada al navegador),
+  y la migración la prueba con los números del estudio antes del `commit`
+  (aro A con tarjeta: $20.280 → proveedor $10.920, estudio $9.360; difusor
+  con tarjeta: $37.500 → $21.000 / $16.500, antes $26.250 / $11.250).
+- **Sobre qué se calcula es del proveedor** (`proveedores.comision_sobre`:
+  `efectivo` | `cobrado`), nace en `efectivo` para todos. Nivel 0 de la
+  vuelta atrás: ponerle `cobrado` desde la pantalla.
+- **La letra es del proveedor**, no del producto: tabla nueva
+  `proveedor_letras` (proveedor × letra × medio → precio), RLS, sólo
+  `select` para `authenticated` (con `inventario.ver`, `vender` o
+  `gestionar`), nada para `anon`; se escribe sólo desde `guardar_proveedor`.
+  El producto dice si su precio sale de ahí (`productos.precio_por_letra`) y
+  cómo se llama el dato que se escribe al vender (`productos.dato_venta`:
+  "Aroma", "Código"). El dato se sigue guardando en `ventas_productos.aroma`
+  (el libro de la caja arma su concepto con esa columna: "Venta: Aros ·
+  AR-0012", sin la letra; aceptado).
+- **La foto de la venta suma** `letra`, `dato_nombre`, `precio_base` y
+  `comision_sobre`, y un CHECK nuevo (`venta_reparto_regla`) exige que el
+  reparto salga de esa foto. Las ventas viejas quedan con esas columnas en
+  null y la vista `ventas_productos_estado` las completa (`'Aroma'`, lo
+  cobrado): es exacto, antes de la `0092` siempre fue así. **Las ventas ya
+  hechas no se recalculan**, y no hace falta: al 06/10 no había ninguna
+  venta en producción (consulta de sólo lectura que corrió Matías; la misma
+  está en el pie de la migración, CÓMO VERIFICAR 5).
+- **Funciones**: `vender_producto` (10 parámetros, `p_letra` al final; el
+  `returns table` suma letra, dato, dato_nombre, precio_base y
+  comision_sobre **al final**), `guardar_producto` (10: `p_precio_por_letra`,
+  `p_dato_venta`), `guardar_proveedor` (8: `p_comision_sobre`, `p_letras`,
+  que cambia sólo lo que viene). Las firmas viejas se borran en la misma
+  transacción (una sola por nombre: PostgREST no queda con dos candidatas) y
+  las llamadas viejas con argumentos con nombre caen en las nuevas.
+  - Venta: letra normalizada (`" c "` → `C`); sin letra, letra que no está
+    en la lista, letra en un producto de precio fijo y dato vacío cortan con
+    su mensaje; con proveedor sobre el efectivo y sin precio de efectivo,
+    corta; si en un medio sale menos que el 70% del efectivo (al proveedor
+    le tocaría más de lo cobrado), corta.
+  - **Reintento con la misma llave**: devuelve la venta ya hecha, como la
+    `0090`, **aunque ahora lleguen otra letra, otro código, otro medio u otra
+    cantidad** (una llave, una venta como mucho). Cortar con error —como
+    estaba en el primer borrador— invitaba a cobrar dos veces la misma pieza
+    después de corregir un código mal escrito, y dejaba trabada la pestaña
+    vieja. El comprobante sale de lo que devolvió la base, y si no coincide
+    con lo elegido avisa qué quedó registrado y que corregirlo es anular esa
+    venta.
+  - Guardar un producto de precio fijo sin precio en efectivo, una letra sin
+    efectivo, o pasar un proveedor a `efectivo` con productos sin ese precio:
+    se rechaza al guardar, no en el mostrador.
+- **Siembra**: Accesorios Chini (id fijo `d0…921`, 30%, sobre el efectivo)
+  con las 44 letras (11 × 4 medios; las dos transferencias, el mismo
+  precio), y Aros, Collares, Anillos y Pulseras (`b0…921`–`924`) por letra,
+  pidiendo "Código", stock 0. Si ya hay un proveedor con "Chini" como
+  palabra se usa ése; con dos o más, corta. Si ya hay un producto con ese
+  nombre, no lo toca y lo informa. Las letras se siembran sólo si Chini no
+  tiene ninguna: otra corrida no devuelve lo que el admin borró.
+- **Guardas** (todas cortan sin dejar nada): huella de las tres funciones
+  (la de la `0090` del repo o la de esta) y ninguna otra sobrecarga, la
+  vista de ventas viva (`0090` o `0092`), columnas que usan las funciones,
+  medio `efectivo` existente y manual, Chini ambiguo, `proveedor_letras`
+  ajena, y **ningún producto activo de precio fijo con precios y sin el de
+  efectivo** (con la regla nueva dejaría de venderse sin que nadie lo
+  decida). Foto de las ventas y del libro (con control de filas): idénticos
+  después. `perm_diff()` sin filas nuevas. Lock de las cuatro tablas de una
+  vez, en el orden de la venta, para no trabarse con una venta en curso.
+- **Ayuda de los permisos**: `inventario.vender` ("completa el dato…, la
+  letra…") e `inventario.gestionar` ("…sobre qué precio se calcula y su lista
+  de precios por letra"), sólo si el texto era el de la `0090`. Ninguna
+  clave nueva.
+- **Pantalla**: el front anda con las dos bases (sabe si corrió leyendo
+  `proveedor_letras`: 42P01/PGRST205 = no). Vender un aro: grilla de letras
+  con el precio del medio elegido, código obligatorio (sin sugerir códigos
+  vendidos; avisa si el código ya se vendió en ese producto), de a una pieza,
+  vista previa "para el estudio $9.360 · para Accesorios Chini $10.920 (70%
+  del precio de efectivo)". Proveedor: "sobre el precio de efectivo / lo que
+  se cobró" con un ejemplo vivo, y la tabla de letras (sólo se desplaza la
+  tabla; las dos transferencias se escriben juntas mientras coincidan; viaja
+  sólo lo que cambió). Producto: "Un precio por medio de pago / Por letra" y
+  el nombre del dato. Ventas, rendir, anular, compras de la ficha y el
+  reporte muestran "Letra A · AR-0012" y sobre qué se calculó (del lado del
+  proveedor: "70% de $15.600 en efectivo"; la parte del estudio con
+  recargo no es "el 30%" de nada en pantalla); el reporte pasa la columna
+  "Aroma" a "Detalle" y suma "Letra" y "Base". La regla, las letras y el
+  dato **viajan sólo si cambiaron**: guardar un precio o un nombre anda igual
+  con las funciones de la `0090`. Si las letras no se pudieron leer, los
+  formularios no afirman ninguna regla. "Otra venta" conserva quién compra.
+
+Verificado en un Postgres 17 local con `0001`–`0091`, datos de antes hechos
+con las funciones de la `0090` (proveedor al 30%, tres ventas, una rendida) y
+sin tocar producción (161 comprobaciones: 104 en una misma base y 57 que
+necesitan una base propia cada una):
+
+- Ensayo con `rollback`: nada aplicado. Dos y tres corridas: mismos
+  proveedores, letras (44) y productos; la K borrada no vuelve.
+- Ventas viejas intactas (montos y reparto), en la vista con `cobrado` /
+  `Aroma` / base = precio; el libro idéntico.
+- Difusor en efectivo, Galicia, BBVA y tarjeta (admin y recepción): 9.000 /
+  10.500 / 10.500 / 16.500 para el estudio, siempre 21.000 al proveedor. Aro A
+  con tarjeta: 20.280 → 9.360 / 10.920, letra A, "Código", stock 5 → 4, libro
+  "Venta: Aros · AR-0012". Letra " c " con BBVA ×2: C, 44.000 → 16.000 /
+  28.000. Con el proveedor en `cobrado`: 11.250 / 26.250 (la `0090`).
+- Los errores, cada uno con su mensaje y sin escribir nada: sin letra, letra
+  Z, letra en el difusor, código vacío, código de 61, precio esperado viejo
+  (con y sin letra), stock que no alcanza, medio a menos del 70% del
+  efectivo, misma llave con otro producto. Misma llave con otra letra, otro
+  código, otro medio u otra cantidad: devuelve la venta hecha (la A con
+  tarjeta por $20.280, el difusor por 1) y no graba otra.
+- La llamada del front viejo (9 argumentos con nombre) vende con la regla
+  nueva; un reintento de una venta de la `0090` devuelve la misma. Las
+  firmas viejas de `guardar_*` (6 y 8 con nombre) no tocan la regla, las
+  letras, `precio_por_letra` ni el dato.
+- `guardar_proveedor`: agrega "l" como L, borra K, saca la tarjeta de A;
+  rechaza "a" y "A" juntas, Mercado Pago, letra sin efectivo, "A B",
+  negativos, un `p_letras` que no es objeto y una regla inválida. Pasar a
+  `cobrado` acepta una letra sin efectivo; volver a `efectivo` con ella, o
+  con un producto sin efectivo, se rechaza.
+- Recepción lee las 44 letras y no las escribe (ni por función ni directo).
+  Profesora y alumna leen 0; `anon` recibe "permission denied" en la tabla,
+  la vista y las cuatro funciones; `reparto_de_venta` ni con sesión.
+- Anular un aro devuelve el stock y lo saca del libro; rendir A + C×2 a
+  Chini: gasto de $38.920 ("Cobrado $64.280, parte del estudio $25.360");
+  anular la rendición las devuelve a "a rendir". `perm_diff()` en 0.
+- Cortan sin dejar nada: `vender_producto` con un cambio de código (un
+  comentario de más NO corta), otra sobrecarga de `guardar_proveedor`, la
+  vista de ventas tocada, dos "chini", Spray sin precio en efectivo,
+  `efectivo` no manual. Con un "Chini Accesorios" a mano lo usa; con "Aro"
+  a mano no crea Aros y lo dice; "Bochini" no es Chini; un Chini dado de
+  baja no recibe nada; sin BBVA manual siembra 33.
+- Una sesión que vendió y anuló antes de la `0092` sigue vendiendo (con la
+  regla nueva) y anulando después, sin reconectar.
+- **Volver a correr la `0090` encima de la `0092` aborta** con "cannot drop
+  columns from view" y no deja nada (una sobrecarga por nombre). Es lo que
+  se quiere: **no "arreglarlo" borrando la vista**. La vuelta atrás nivel 1
+  del pie (corrida tal cual sale del comentario) deja las tres funciones con
+  la huella de la `0090`, la vista con `security_invoker`, la llamada de 9
+  argumentos vendiendo sobre lo cobrado, **todos los proveedores y el
+  default en `cobrado`** y las dos ayudas de vuelta en la de la `0090`
+  (`perm_diff()` en 0); guardar un proveedor sin los parámetros nuevos anda;
+  y la `0092` se vuelve a correr limpia sin volver a sembrar letras (el
+  default vuelve a `efectivo`; los proveedores quedan en `cobrado` hasta que
+  se los cambie desde Proveedores).
+- El prevuelo largo (aparte, sólo lectura) corre antes y después de la
+  `0092`, y marca Spray sin efectivo, dos "Chini" y una vista ajena sobre la
+  de ventas.
+- `tsc --noEmit` y `next build` pasan. **La pantalla se miró contra
+  producción SIN la 0092** (sesión de admin, sólo lectura, 06/10): Productos
+  carga, el proveedor CASADEY dice "sobre lo cobrado" y no ofrece letras, el
+  Difusor se edita como siempre y la hoja de venta con tarjeta muestra
+  $11.250 / $26.250, que es lo que la base vieja registraría. El único error
+  es el 404 de `proveedor_letras`, que es justamente cómo la pantalla sabe
+  que la 0092 no corrió. **Con la 0092 corrida falta mirarla**.
+
+**Falta**: mergear y esperar el deploy; correr el prevuelo del encabezado
+(si lista un producto "sin precio en efectivo", cargárselo antes); correr
+la `0092` fuera del horario del mostrador; verificar en pantalla con la
+sesión del admin (Proveedores → Chini con su tabla, Aros con la letra) y
+con la de recepción (vender sin poder tocar la tabla); y que el estudio
+cargue la mercadería de Chini.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock. *(La consignación —sin variantes ni inventario físico— es la `0090`.)*
 - [ ] Metas de venta con tablero.
