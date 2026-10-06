@@ -207,7 +207,10 @@ export interface FilaVentaProducto {
   fecha: string
   numero: number
   producto: string
+  /** El dato que se escribió al vender: aroma, código… (el nombre lo pone cada producto) */
   aroma: string
+  /** La letra de la etiqueta, si el precio salió de ahí (0092) */
+  letra: string
   cantidad: number
   medio: string
   cliente: string
@@ -215,6 +218,8 @@ export interface FilaVentaProducto {
   estudio: number
   proveedorMonto: number
   proveedor: string
+  /** Sobre qué se calculó la parte del estudio: "70% de $15.600 en efectivo" o "70% de lo cobrado" */
+  base: string
   estado: string
   anulada: boolean
 }
@@ -240,6 +245,7 @@ export async function reporteVentasProductos(r: Rango): Promise<FilaVentaProduct
     numero: v.numero,
     producto: v.productoNombre,
     aroma: v.aroma,
+    letra: v.letra ?? '',
     cantidad: v.cantidad,
     medio: v.medio,
     cliente: v.compradorNombre,
@@ -247,6 +253,12 @@ export async function reporteVentasProductos(r: Rango): Promise<FilaVentaProduct
     estudio: v.parteEstudio,
     proveedorMonto: v.parteProveedor,
     proveedor: v.proveedorNombre,
+    base:
+      v.comisionSobre === 'efectivo'
+        ? `${Math.round((100 - v.pctEstudio) * 100) / 100}% de $${Math.round(v.precioBase).toLocaleString('es-AR')} en efectivo${
+            v.cantidad > 1 ? ` ×${v.cantidad}` : ''
+          }`
+        : `${Math.round((100 - v.pctEstudio) * 100) / 100}% de lo cobrado`,
     estado: ESTADO_VENTA[v.estado] ?? v.estado,
     anulada: v.status === 'anulado',
   }))

@@ -18,6 +18,7 @@ import {
   BotonPrincipal,
   BotonSecundario,
   Chips,
+  detalleVenta,
   Hoja,
   inputClass,
   labelClass,
@@ -90,7 +91,7 @@ export function AnularVentaModal({
   return (
     <Hoja
       titulo={`Anular la venta V-${venta.numero}`}
-      subtitulo={`${momento(venta.paidAt)} · ${venta.productoNombre} · ${venta.aroma}${
+      subtitulo={`${momento(venta.paidAt)} · ${venta.productoNombre} · ${detalleVenta(venta)}${
         venta.cantidad > 1 ? ` ×${venta.cantidad}` : ''
       } · ${plata(venta.monto)} en ${venta.medio}`}
       ocupado={guardando}
