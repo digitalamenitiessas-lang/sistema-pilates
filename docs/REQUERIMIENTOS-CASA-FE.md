@@ -202,8 +202,8 @@ que se le paga, así que conviene rendir mes por mes. El detalle, lo
 verificado y el orden del domingo, en `PLAN.md`. Para que el lunes se pueda
 vender, el admin tiene que cargar el proveedor real y la mercadería.
 
-El **06/10** quedó escrita la **`0092`, que falta correr y va después del
-deploy**: llega Accesorios Chini (aros, collares, anillos, pulseras) y cada
+El **06/10** se escribió y **se corrió la `0092`** (verificada en
+producción con la sesión del admin): llega Accesorios Chini (aros, collares, anillos, pulseras) y cada
 pieza trae una **letra** que define el precio por medio de pago y un
 **código**. La lista de letras es del proveedor (una sola para los cuatro
 productos); al vender se elige la letra, el precio sale solo y el código se
@@ -493,7 +493,7 @@ subdeclarar lo que el sistema hace.
 | 7 · Dashboard principal | 🟡 | **La mitad de plata entró** (`0020`): lo que entró y salió en el mes, el gasto de hoy, el resultado y el saldo cuenta por cuenta, con "Sin acceso" cuando al rol le falta un permiso en vez de un cero que miente. **Falta**: los contadores comerciales —pases de prueba, renovadas, canceladas, cumpleaños |
 | 8 · Caja diaria y cuentas | 🟢 | **Hecho** (`0020`): cuentas con saldo, apertura y cierre con arqueo, movimientos y transferencias internas. El libro se deriva de los cobros: no hay dos verdades para la misma plata |
 | 9 · Gastos y egresos | 🟢 | **Hecho** (`0020`): los catorce campos, los siete filtros y el total del filtro a la vista. **Queda** adjuntar la foto del comprobante, que es el primer uso de Storage |
-| 10 · Productos e inventario | 🟡 | **Fuera del alcance** (§7), salvo lo que el estudio pidió el 04/10: venta en consignación con stock por producto, precios por medio de pago, proveedores y rendición (`0090`, corrida el 04/10); precio por letra del proveedor, el dato configurable y la parte del estudio sobre el efectivo (`0092`, 06/10, escrita y sin correr). Sin variantes, sin inventario físico, sin costos |
+| 10 · Productos e inventario | 🟡 | **Fuera del alcance** (§7), salvo lo que el estudio pidió el 04/10: venta en consignación con stock por producto, precios por medio de pago, proveedores y rendición (`0090`, corrida el 04/10); precio por letra del proveedor, el dato configurable y la parte del estudio sobre el efectivo (`0092`, corrida el 06/10). Sin variantes, sin inventario físico, sin costos |
 | 11 · Personal, roles y permisos | 🟡 | El motor de permisos por rol y por persona, con las políticas de la base preguntándole (`0012`–`0014`); la baja lógica de accesos (`0015`); anular un movimiento con motivo. **Falta**: la ficha laboral y el historial de actividad, que van con la sección 12 |
 | 12 · Horas trabajadas y remuneraciones | 🔴 | **Sin empezar, y está DENTRO del alcance**: es lo único nuevo que Matías aprobó (§7, Paso 10 de §9). `teachers` no tiene una sola columna laboral. Junto con el Agregado 2, es la deuda real del proyecto |
 | 13 · Landing administrable | 🟡 | Los datos del estudio salen de la base y los cargó el estudio (`0011`+`0033`), así que la web ya muestra los reales. **Falta** todo el editor: textos, imágenes, banners, las secciones nuevas, y borrador con vista previa y publicación |

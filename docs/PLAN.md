@@ -2966,7 +2966,7 @@ verificar en producción que del 01/10 al 03/10 queden sólo las clases con
 reservas. **No cerrar liquidaciones de octubre antes**: quedarían congeladas
 con toda la grilla.
 
-### 🟡 El precio por letra y la parte del estudio sobre el efectivo (06/10) — `0092` **escrita, sin correr**
+### 🟡 El precio por letra y la parte del estudio sobre el efectivo (06/10) — `0092` **corrida el 06/10 y verificada**
 
 Llega un proveedor nuevo, **Accesorios Chini**: aros, collares, anillos y
 pulseras. Cada pieza trae una **letra** (A..K), que define el precio según el
@@ -3127,14 +3127,23 @@ necesitan una base propia cada una):
   Difusor se edita como siempre y la hoja de venta con tarjeta muestra
   $11.250 / $26.250, que es lo que la base vieja registraría. El único error
   es el 404 de `proveedor_letras`, que es justamente cómo la pantalla sabe
-  que la 0092 no corrió. **Con la 0092 corrida falta mirarla**.
+  que la 0092 no corrió.
+- **Corrida en producción el 06/10** (PR #65 mergeado y desplegado antes).
+  El prevuelo dio todo BIEN. El resumen: Accesorios Chini nuevo, 30% sobre
+  el efectivo, 44 precios; CASADEY pasó a "sobre el precio de efectivo";
+  Aros, Collares, Anillos y Pulseras por letra, piden Código, stock 0;
+  Difusor y Spray sin cambios ("se puede vender"); perm_diff 0; una
+  sobrecarga por función. **En pantalla, con la sesión del admin y sin
+  escribir nada**: la ficha de Chini muestra los 44 precios iguales a la
+  tabla del estudio (leídos uno por uno), los cuatro accesorios dicen "Por
+  letra (efectivo): A $15.600 … K $38.000" con Vender apagado hasta que
+  haya stock, y la hoja del Difusor con tarjeta muestra estudio $16.500 /
+  CASADEY $21.000 (70% del precio de efectivo). Ningún 4xx.
 
-**Falta**: mergear y esperar el deploy; correr el prevuelo del encabezado
-(si lista un producto "sin precio en efectivo", cargárselo antes); correr
-la `0092` fuera del horario del mostrador; verificar en pantalla con la
-sesión del admin (Proveedores → Chini con su tabla, Aros con la letra) y
-con la de recepción (vender sin poder tocar la tabla); y que el estudio
-cargue la mercadería de Chini.
+**Falta**: que el estudio cargue la mercadería de Chini; recién con stock
+se puede mirar la hoja de venta por letra en producción (en local está
+probada). Y mirarla con una sesión de recepción cuando exista (T02): en
+local, recepción vende y no puede tocar la tabla.
 
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock. *(La consignación —sin variantes ni inventario físico— es la `0090`.)*
