@@ -3145,6 +3145,69 @@ se puede mirar la hoja de venta por letra en producción (en local está
 probada). Y mirarla con una sesión de recepción cuando exista (T02): en
 local, recepción vende y no puede tocar la tabla.
 
+### 🟡 Los feriados (08/10) — `0093` **corrida el 08/10**, `0094` **escrita, sin correr**
+
+Pedido del estudio: "que en Configuración pueda poner que tal día es feriado,
+que ese día esté cerrado y no se pueda reservar; y si había una reserva, que
+se cancele directamente y se le libere ese cupo a la clienta". Disparado por
+el lunes 12/10.
+
+- **Reutiliza la suspensión de siempre** (`class_occurrences`, 0018): cargar
+  un feriado suspende cada clase del día y marca esas filas con
+  `feriado_id`. Así valen sin reescribirlas la base que no deja confirmar,
+  `consumo_contadas` que no descuenta, el aviso "Se suspendió una clase tuya…
+  No se te descuenta la clase" y la liquidación que no la paga.
+- **Cancela las reservas del día**: primero la lista de espera y después las
+  confirmadas, así nadie recibe "se liberó un lugar". Como la fecha ya está
+  suspendida, `consumir_clase` las sella sin plazo (`cancel_kind` nulo): no
+  se cuentan ni gastan devolución.
+- **Quitar** deshace sólo lo del feriado (una suspensión a mano o un
+  reemplazo de profesora se respetan) y avisa a quien da la clase y a quien
+  tenía reserva ("se vuelve a dictar, reservala de nuevo"). Las reservas
+  canceladas no vuelven solas.
+- **Una clase creada o movida después** queda cerrada sola (trigger en
+  `class_sessions`, salvo las especiales: si el estudio crea un taller un
+  día cerrado es porque lo quiere dar).
+- Sólo de hoy en adelante; hoy, sólo lo que no empezó (por hora o porque ya
+  tiene asistencia tomada). Hasta 62 días por carga. La lista de espera
+  tampoco se puede tomar en una fecha suspendida (`enforce_class_capacity`).
+- Pide `config.editar` (sólo admin). Pantalla: Configuración → "Feriados y
+  días cerrados", con la confirmación en la pantalla (cuántas reservas se
+  cancelan) y las vacaciones en un renglón.
+
+**La `0094`** sale de la revisión adversarial de la 0093, que Matías corrió
+antes de que terminara: el recupero agendado en un día cerrado se perdía
+para siempre (lo seguían contando `recupero_elegible` y el índice único de
+la 0046), volver a cargar una fecha la cerraba entera de nuevo (reabría lo
+que se reabrió a mano y cancelaba en silencio), el aviso no se repetía tras
+quitar y volver a cargar, quitar no le avisaba a nadie, la profesora recibía
+un aviso por clase (594 en unas vacaciones de 62 días; ahora 1 por carga),
+la especial creada en vacaciones nacía suspendida, la clase con asistencia
+tomada se suspendía igual, una reserva hecha durante la carga quedaba viva
+(lock de `reservations` mientras se carga) y `quitar_feriado` podía tocar
+otra fecha.
+
+**Lo que la revisión encontró y queda a propósito**: el tope de devoluciones
+(0076) cuenta una cancelación a tiempo de una fecha que después se suspendió
+—hoy el tope está apagado; si se prende, hay que arreglar `consumir_clase` y
+`consecuenciaDeCancelar`—; y una suspensión en el mismo día devuelve también
+una clase perdida que ya se había recuperado (pasa con cualquier suspensión).
+
+**Verificado**: en un Postgres local, 0001..0094 + datos: 47 comprobaciones
+(permisos de cada rol, anon, cancelación sin descontar, sin "lugar liberado",
+aviso a clientas y a la profesora, no se reserva ni se entra en la lista,
+clase nueva/movida/dada de baja, reabrir a mano, reemplazo y suspensión a
+mano respetados, quitar, rangos, fechas pasadas, hoy) más los escenarios del
+revisor re-corridos contra la 0094 (recupero, aviso repetido, 62 días de
+vacaciones, clase nueva, forja de `feriado_id`, hoy con asistencia). Las dos
+migraciones se corren dos veces sin error y cortan enteras si una función
+no es la del repo. En pantalla contra producción, sin la 0093, la sección
+avisa que falta la migración; con la 0093 corrida muestra el formulario.
+tsc y next build pasan.
+
+**Falta**: correr la 0094, deploy, y una prueba en producción con OK de
+Matías (un domingo sin clases, cargar y quitar).
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock. *(La consignación —sin variantes ni inventario físico— es la `0090`.)*
 - [ ] Metas de venta con tablero.

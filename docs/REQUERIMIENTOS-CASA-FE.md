@@ -8,7 +8,7 @@
 > **¿Buscás qué falta? Está en la §0, acá abajo.** Es la única lista al día; el
 > resto del documento es el análisis y la historia.
 
-## 0. LO QUE FALTA — la lista viva  ·  al 06/10/2026
+## 0. LO QUE FALTA — la lista viva  ·  al 08/10/2026
 
 > **Esta es la única lista al día.** Las secciones de abajo son el análisis y la
 > historia de cómo se llegó acá, y varias quedaron viejas a propósito: son la
@@ -219,6 +219,15 @@ recalculan, y al 06/10 no había ninguna. El prevuelo
 del encabezado dice si algún producto no tiene precio en efectivo: la
 migración corta si lo hay, para que no deje de venderse sin aviso. El
 detalle y lo verificado, en `PLAN.md`.
+
+El **08/10** se escribieron los **feriados**: `0093` (corrida el 08/10) y
+`0094` (ajustes de la revisión, falta correr). Configuración → "Feriados y
+días cerrados": el admin carga un día o un rango; se suspenden todas las
+clases, no se puede reservar, las reservas de ese día se cancelan sin
+descontar la clase y a cada persona le queda un aviso en el portal. Quitar
+un feriado reabre las clases y avisa, pero las reservas canceladas no
+vuelven solas. Queda latente: si se vuelve a prender el tope de devoluciones
+(0076), cuenta una cancelación a tiempo de un día que después se cerró.
 
 ### Lo que falta construir
 
@@ -1244,7 +1253,7 @@ Resend ya anda en producción. El cron diario no alcanza: una cancelación a 3
 horas del plazo hay que avisarla en minutos.
 
 **Paso 5 — Feriados y suspensión masiva.** Hoy un lunes feriado con 8 clases son
-8 clics.
+8 clics. *(Hecho el 08/10: `0093`/`0094`, Configuración → Feriados.)*
 
 **Paso 6 — Vigencia y horarios fijos.** Acá entra la respuesta que falta.
 
