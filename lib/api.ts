@@ -17,6 +17,7 @@ import type {
   Role,
   Room,
   ClassOccurrence,
+  Feriado,
   DisciplineItem,
   PaymentMethod,
   StudioSetting,
@@ -848,7 +849,23 @@ export async function fetchStudioData(): Promise<StudioData> {
       .select('*, teachers(name)')
       .gte('date', desde)
       .lte('date', hasta)
-    occurrences = (occRes.data ?? []).map((o) => ({
+    // Los feriados se cargan con meses de anticipación (vacaciones de
+    // enero en octubre): sin esto, más allá de los 60 días la Agenda y el
+    // portal ofrecerían reservar una clase que la base después rechaza.
+    // Sólo las del feriado, que son pocas; sin la 0093 la columna no
+    // existe, la consulta falla y no se suma nada.
+    let occFeriados: NonNullable<typeof occRes.data> = []
+    try {
+      const r = await supabase
+        .from('class_occurrences')
+        .select('*, teachers(name)')
+        .gt('date', hasta)
+        .not('feriado_id', 'is', null)
+      if (!r.error) occFeriados = r.data ?? []
+    } catch {
+      // sin la 0093: no hay feriados que traer
+    }
+    occurrences = [...(occRes.data ?? []), ...occFeriados].map((o) => ({
       id: o.id,
       classId: o.class_id,
       date: o.date,
@@ -858,6 +875,7 @@ export async function fetchStudioData(): Promise<StudioData> {
       startTime: o.start_time ? String(o.start_time).slice(0, 5) : null,
       capacity: o.capacity,
       reason: o.reason ?? '',
+      feriadoId: o.feriado_id ?? null,
     }))
     disciplines = (discRes.data ?? []).map((d) => ({
       id: d.id,
@@ -2122,8 +2140,13 @@ export function clasesRecuperables(
   if (!tope?.rige) return []
 
   const laAusenciaConsume = settingBool(settings, 'absence_consumes_class', true)
+  // Un recupero cancelado por una suspensión (un feriado: cancel_kind
+  // nulo) no cuenta como usado, igual que en `recupero_elegible` (0094).
   const yaRepuestas = new Set(
-    reservations.map((r) => r.recoversReservationId).filter(Boolean) as string[]
+    reservations
+      .filter((r) => !(r.status === 'cancelada' && !r.cancelKind))
+      .map((r) => r.recoversReservationId)
+      .filter(Boolean) as string[]
   )
   const periodo = new Map(memberships.map((m) => [m.id, m]))
 
@@ -4333,6 +4356,59 @@ export async function setClassDateTeacher(
       { onConflict: 'class_id,date' }
     )
   if (error) throw error
+}
+
+// ---------------------------------------------------------------
+// Feriados (migración 0093)
+//
+// La base hace todo: suspende cada clase del día, cancela las reservas y
+// avisa. La pantalla sólo carga, quita y muestra.
+// ---------------------------------------------------------------
+
+/** El mensaje que escribió la base, o que falta la 0093 si la función no existe. */
+function errorDeFeriado(error: { code?: string; message?: string }, sino: string): Error {
+  if (error.code === 'PGRST202' || error.code === '42883') {
+    return new Error('Para cargar feriados falta correr la migración 0093.')
+  }
+  return errorDeLaBase(error, sino)
+}
+
+/** null = la 0093 todavía no corrió (la tabla no existe). */
+export async function fetchFeriados(): Promise<Feriado[] | null> {
+  const { data, error } = await supabase.from('feriados').select('*').order('fecha')
+  if (error?.code === '42P01' || error?.code === 'PGRST205') return null
+  if (error) throw errorDeLaBase(error, 'No se pudieron leer los feriados')
+  return (data ?? []).map((f) => ({ id: f.id, fecha: f.fecha, nombre: f.nombre ?? '' }))
+}
+
+export interface FeriadoCargado {
+  fecha: string
+  clases: number
+  reservas: number
+  yaEstaba: boolean
+}
+
+export async function cargarFeriados(
+  desde: string,
+  hasta: string | null,
+  nombre: string
+): Promise<FeriadoCargado[]> {
+  const { data, error } = await supabase.rpc('cargar_feriados', {
+    p_desde: desde,
+    p_hasta: hasta || desde,
+    p_nombre: nombre.trim(),
+  })
+  if (error) throw errorDeFeriado(error, 'No se pudo cerrar ese día')
+  return ((data ?? []) as { fecha: string; clases: number; reservas: number; ya_estaba: boolean }[]).map(
+    (r) => ({ fecha: r.fecha, clases: r.clases, reservas: r.reservas, yaEstaba: r.ya_estaba })
+  )
+}
+
+/** Devuelve cuántas clases volvieron a la grilla. */
+export async function quitarFeriado(fecha: string): Promise<number> {
+  const { data, error } = await supabase.rpc('quitar_feriado', { p_fecha: fecha })
+  if (error) throw errorDeFeriado(error, 'No se pudo quitar el feriado')
+  return Number(data ?? 0)
 }
 
 /** Saca la excepción: ese día vuelve a ser una clase común. */

@@ -33,8 +33,9 @@ import {
   Tag,
   Send,
   KeyRound,
+  CalendarOff,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, nombreDelDia } from '@/lib/utils'
 import { useData, useStudio } from '@/lib/data-context'
 import {
   SeccionPlegable,
@@ -78,6 +79,13 @@ import {
   deactivatePromocion,
   anunciarPromocion,
   reglaDelCobro,
+  fetchFeriados,
+  cargarFeriados,
+  quitarFeriado,
+  hoyISO,
+  addDays,
+  diasHasta,
+  diaDeLaFecha,
   type ReglaDelCobro,
   type MpAccountInfo,
   type TeacherInput,
@@ -97,6 +105,7 @@ import type {
   AccountKind,
   Discipline,
   DisciplineItem,
+  Feriado,
   PermissionKey,
   PermissionMatrix,
   Profile,
@@ -2435,6 +2444,455 @@ function PromocionFormModal({
 }
 
 /**
+ * "lunes 12/10" a partir de un ISO, armado por partes: `toLocaleDateString`
+ * con es-AR escribe "12-10", y con año "lunes, 12/10/2026". Y nunca
+ * `new Date(iso)`: un ISO suelto se lee como UTC y en este huso lo corre
+ * al domingo.
+ */
+function fechaDelFeriado(iso: string, conAnio = false): string {
+  const [y, m, d] = iso.split('-')
+  return `${nombreDelDia(diaDeLaFecha(iso)).toLowerCase()} ${d}/${m}${conAnio ? `/${y}` : ''}`
+}
+
+/** Días seguidos con el mismo nombre (unas vacaciones) van en un solo renglón. */
+interface TramoDeFeriados {
+  desde: string
+  hasta: string
+  nombre: string
+  fechas: string[]
+}
+
+function agruparFeriados(lista: Feriado[]): TramoDeFeriados[] {
+  const tramos: TramoDeFeriados[] = []
+  for (const f of lista) {
+    const ultimo = tramos[tramos.length - 1]
+    if (ultimo && ultimo.nombre === f.nombre && diasHasta(f.fecha, ultimo.hasta) === 1) {
+      ultimo.hasta = f.fecha
+      ultimo.fechas.push(f.fecha)
+    } else {
+      tramos.push({ desde: f.fecha, hasta: f.fecha, nombre: f.nombre, fechas: [f.fecha] })
+    }
+  }
+  return tramos
+}
+
+function textoDelTramo(t: { desde: string; hasta: string }, conAnio = false): string {
+  return t.desde === t.hasta
+    ? fechaDelFeriado(t.desde, conAnio)
+    : `del ${fechaDelFeriado(t.desde)} al ${fechaDelFeriado(t.hasta, conAnio)}`
+}
+
+/**
+ * Feriados y días cerrados (0093). La base hace el trabajo —suspende cada
+ * clase del día, cancela las reservas y deja el aviso en el portal—; acá
+ * se carga, se quita y se ve qué pasó. Pide `config.editar`, la misma
+ * clave que exige la base: hoy es sólo del admin. Sin la 0093 corrida, la
+ * sección lo dice.
+ *
+ * Los textos no prometen más de lo que pasa: el aviso queda en la
+ * campanita del portal (no es un mail ni un push), y a quien no usa el
+ * portal hay que avisarle por otro lado. Por eso la confirmación dice
+ * cuántas reservas se van a cancelar.
+ *
+ * Las confirmaciones van en la pantalla y no con window.confirm: el
+ * navegador de Instagram y el panel de vista previa los descartan solos.
+ */
+function FeriadosSection() {
+  const { can, refresh } = useData()
+  const { reservations } = useStudio()
+  const puedeEditar = can('config.editar')
+  // undefined mientras se lee; null si la tabla no existe todavía.
+  const [feriados, setFeriados] = useState<Feriado[] | null | undefined>(undefined)
+  const [errorLectura, setErrorLectura] = useState<string | null>(null)
+  const [desde, setDesde] = useState('')
+  const [hasta, setHasta] = useState('')
+  const [varios, setVarios] = useState(false)
+  const [nombre, setNombre] = useState('Feriado')
+  const [confirmandoCarga, setConfirmandoCarga] = useState(false)
+  const [quitando, setQuitando] = useState<string | null>(null)
+  const [verPasados, setVerPasados] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [resultado, setResultado] = useState<string | null>(null)
+
+  // Un error de lectura no se muestra como "no hay feriados": un catch que
+  // devuelve una lista vacía no falla, miente.
+  const recargar = async () => {
+    try {
+      setFeriados(await fetchFeriados())
+      setErrorLectura(null)
+    } catch (err) {
+      setErrorLectura(err instanceof Error ? err.message : 'No se pudieron leer los feriados')
+    }
+  }
+  useEffect(() => {
+    void recargar()
+  }, [])
+
+  const hoy = hoyISO()
+  const lista = feriados ?? []
+  const proximos = agruparFeriados(lista.filter((f) => f.fecha >= hoy))
+  const pasados = agruparFeriados(lista.filter((f) => f.fecha < hoy)).reverse()
+
+  const hastaReal = varios && hasta ? hasta : desde
+  const cantidadDeDias = desde && hastaReal ? diasHasta(hastaReal, desde) + 1 : 0
+  const faltaDato = !desde
+    ? 'Elegí la fecha.'
+    : desde < hoy
+      ? 'Esa fecha ya pasó.'
+      : varios && !hasta
+        ? 'Elegí hasta qué día.'
+        : varios && hasta < desde
+          ? 'El "hasta" es anterior al primer día.'
+          : cantidadDeDias > 62
+            ? `Son ${cantidadDeDias} días: se cargan hasta 62 de una vez. Para un cierre más largo, cargalo en partes.`
+            : diasHasta(hastaReal) > 730
+              ? 'Los feriados se cargan hasta dos años para adelante.'
+              : null
+
+  const tramo = { desde, hasta: hastaReal }
+  const varioDias = desde !== hastaReal
+  const yaCerrados = lista.filter((f) => desde && f.fecha >= desde && f.fecha <= hastaReal)
+  // Lo que se va a cancelar, contado con lo que ya tiene la pantalla. La
+  // base cancela también la lista de espera y lo 'ofrecido'.
+  const aCancelar = desde
+    ? reservations.filter(
+        (r) =>
+          r.date >= desde &&
+          r.date <= hastaReal &&
+          (r.status === 'confirmada' || r.status === 'lista de espera')
+      ).length
+    : 0
+
+  const cargar = async () => {
+    setBusy(true)
+    setError(null)
+    setResultado(null)
+    try {
+      const r = await cargarFeriados(desde, varios ? hasta : null, nombre)
+      const nuevos = r.filter((x) => !x.yaEstaba)
+      const clases = nuevos.reduce((a, x) => a + x.clases, 0)
+      const reservas = r.reduce((a, x) => a + x.reservas, 0)
+      const partes: string[] = [`Listo: cerrado ${textoDelTramo(tramo)}.`]
+      if (nuevos.length > 0) {
+        partes.push(
+          clases === 0
+            ? 'Ese día no había clases en la grilla.'
+            : clases === 1
+              ? 'Se suspendió 1 clase.'
+              : `Se suspendieron ${clases} clases.`
+        )
+      }
+      if (r.length > nuevos.length) {
+        partes.push(
+          nuevos.length === 0
+            ? 'Ya estaba cargado: se le cambió el nombre.'
+            : 'Algunos días ya estaban cargados: se les cambió el nombre.'
+        )
+      }
+      partes.push(
+        reservas === 0
+          ? 'No había reservas que cancelar.'
+          : `${reservas === 1 ? 'Se canceló 1 reserva' : `Se cancelaron ${reservas} reservas`}: ` +
+              'la clase vuelve a su plan y el aviso queda en su portal.'
+      )
+      setResultado(partes.join(' '))
+      setConfirmandoCarga(false)
+      setDesde('')
+      setHasta('')
+      setVarios(false)
+      setNombre('Feriado')
+      await recargar()
+      await refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo cerrar ese día')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const quitar = async (t: TramoDeFeriados) => {
+    setBusy(true)
+    setError(null)
+    setResultado(null)
+    let reabiertas = 0
+    try {
+      for (const f of t.fechas.filter((x) => x >= hoy)) {
+        reabiertas += await quitarFeriado(f)
+      }
+      setResultado(
+        `${t.desde === t.hasta ? 'El' : 'Desde el'} ${textoDelTramo(t)} ` +
+          (reabiertas === 0
+            ? 'ya no figura como cerrado (no tenía clases suspendidas).'
+            : `vuelve a tener clases (${reabiertas === 1 ? '1 clase' : `${reabiertas} clases`}).`) +
+          ' Las reservas que se habían cancelado no vuelven solas.'
+      )
+      setQuitando(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo quitar el feriado')
+    } finally {
+      await recargar()
+      await refresh()
+      setBusy(false)
+    }
+  }
+
+  return (
+    <SeccionPlegable
+      id="feriados"
+      icono={CalendarOff}
+      colorIcono="bg-aviso/15 text-aviso-fuerte"
+      titulo="Feriados y días cerrados"
+      ayuda="Los días que el estudio no abre: no se puede reservar y lo reservado se cancela"
+      resumen={
+        feriados ? <Conteo n={proximos.length} singular="próximo" plural="próximos" /> : undefined
+      }
+    >
+      <div className="px-5 py-4 space-y-3">
+        {feriados === null ? (
+          <p className="text-xs text-muted-foreground">
+            Para cargar feriados falta correr la migración 0093.
+          </p>
+        ) : errorLectura && feriados === undefined ? (
+          <p className="text-xs text-destructive-fuerte">{errorLectura}</p>
+        ) : (
+          <>
+            <p className="text-[11px] text-muted-foreground">
+              Ese día se suspenden <strong>todas las clases</strong> y nadie puede reservar, ni desde
+              el portal ni desde el mostrador. Las reservas que ya había se cancelan y la clase{' '}
+              <strong>vuelve a su plan</strong>: no se le descuenta a nadie. A cada persona le queda un
+              aviso en su portal (no es un mail): a quien no lo usa, conviene avisarle por otro lado.
+              Esas clases no se liquidan.
+            </p>
+
+            {puedeEditar ? (
+              <fieldset disabled={busy || feriados === undefined} className="rounded-xl border border-border p-3 space-y-2.5">
+                <div className={cn('grid gap-2', varios ? 'grid-cols-2' : 'grid-cols-1')}>
+                  <div className="min-w-0">
+                    <label htmlFor="feriado-desde" className={labelClass}>
+                      {varios ? 'Desde' : 'Fecha'}
+                    </label>
+                    <input
+                      id="feriado-desde"
+                      type="date"
+                      min={hoy}
+                      value={desde}
+                      onChange={(e) => {
+                        setDesde(e.target.value)
+                        setConfirmandoCarga(false)
+                      }}
+                      className={inputClass}
+                    />
+                  </div>
+                  {varios && (
+                    <div className="min-w-0">
+                      <label htmlFor="feriado-hasta" className={labelClass}>
+                        Hasta
+                      </label>
+                      <input
+                        id="feriado-hasta"
+                        type="date"
+                        min={desde || hoy}
+                        max={desde ? addDays(desde, 61) : undefined}
+                        value={hasta}
+                        onChange={(e) => {
+                          setHasta(e.target.value)
+                          setConfirmandoCarga(false)
+                        }}
+                        className={inputClass}
+                      />
+                    </div>
+                  )}
+                </div>
+                <label className="flex items-center gap-2 text-xs text-foreground py-1">
+                  <input
+                    type="checkbox"
+                    checked={varios}
+                    onChange={(e) => {
+                      setVarios(e.target.checked)
+                      setConfirmandoCarga(false)
+                    }}
+                    className="accent-primary w-4 h-4"
+                  />
+                  Son varios días seguidos (vacaciones)
+                </label>
+                <div>
+                  <label htmlFor="feriado-nombre" className={labelClass}>
+                    Qué ve el cliente
+                  </label>
+                  <input
+                    id="feriado-nombre"
+                    value={nombre}
+                    maxLength={80}
+                    onChange={(e) => setNombre(e.target.value)}
+                    placeholder="Ej.: Feriado, Vacaciones de invierno"
+                    className={inputClass}
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Va en el aviso de cada clase, por ejemplo: No se dicta Pilates Reformer del{' '}
+                    {desde ? `${desde.slice(8, 10)}/${desde.slice(5, 7)}` : '12/10'} a las 19:00:{' '}
+                    {nombre.trim() || 'Feriado'}. No se te descuenta la clase.
+                  </p>
+                </div>
+
+                {confirmandoCarga ? (
+                  <div className="rounded-lg bg-aviso/10 p-2.5 space-y-2">
+                    <p className="text-[11px] text-foreground">
+                      Se cierra <strong>{textoDelTramo(tramo)}</strong>: se suspenden todas las clases
+                      {aCancelar === 0
+                        ? ' (no hay reservas para cancelar).'
+                        : ` y se ${aCancelar === 1 ? 'cancela 1 reserva' : `cancelan ${aCancelar} reservas`} de ${varioDias ? 'esos días' : 'ese día'}. Las reservas canceladas no vuelven aunque después quites el feriado.`}
+                    </p>
+                    {yaCerrados.length > 0 && (
+                      <p className="text-[11px] text-foreground">
+                        {yaCerrados.length === 1 && !varioDias
+                          ? 'Ese día ya está cerrado: '
+                          : `${yaCerrados.length === 1 ? 'Un día ya está cerrado' : `${yaCerrados.length} días ya están cerrados`}: `}
+                        sólo cambia el nombre. Lo que se haya reabierto desde la Agenda sigue abierto.
+                      </p>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setConfirmandoCarga(false)}
+                        className="flex-1 h-9 rounded-lg border border-border text-xs font-semibold text-foreground hover:bg-card disabled:opacity-40"
+                      >
+                        Volver
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cargar}
+                        className="flex-1 h-9 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-1.5"
+                      >
+                        {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                        Sí, cerrar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      disabled={!!faltaDato}
+                      onClick={() => {
+                        setResultado(null)
+                        setError(null)
+                        setConfirmandoCarga(true)
+                      }}
+                      className="w-full h-10 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 disabled:opacity-40"
+                    >
+                      Cerrar {varios ? 'esos días' : 'ese día'}
+                    </button>
+                    {desde && faltaDato && (
+                      <p className="text-[11px] text-muted-foreground">{faltaDato}</p>
+                    )}
+                  </>
+                )}
+              </fieldset>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">
+                Tu rol puede ver los feriados pero no cargarlos: los carga quien administra.
+              </p>
+            )}
+
+            <div aria-live="polite" className="space-y-1">
+              {resultado && <p className="text-xs text-exito-fuerte">{resultado}</p>}
+              {error && <p className="text-xs text-destructive-fuerte">{error}</p>}
+              {errorLectura && feriados !== undefined && (
+                <p className="text-xs text-destructive-fuerte">{errorLectura}</p>
+              )}
+            </div>
+
+            {feriados === undefined ? (
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Cargando…
+              </p>
+            ) : proximos.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No hay feriados cargados para adelante.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {proximos.map((t) => (
+                  <div key={t.desde} className="rounded-xl border border-border px-3 py-2 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="flex-1 min-w-0 text-sm text-foreground">
+                        <span className="capitalize">{textoDelTramo(t, true)}</span>
+                        {t.nombre && <span className="text-muted-foreground"> · {t.nombre}</span>}
+                      </span>
+                      {puedeEditar && quitando !== t.desde && (
+                        <button
+                          disabled={busy}
+                          onClick={() => {
+                            setResultado(null)
+                            setError(null)
+                            setQuitando(t.desde)
+                          }}
+                          className="w-9 h-9 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive-fuerte shrink-0 disabled:opacity-40"
+                          aria-label={`Quitar el feriado ${textoDelTramo(t)}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    {quitando === t.desde && (
+                      <div className="rounded-lg bg-muted/60 p-2.5 space-y-2">
+                        <p className="text-[11px] text-foreground">
+                          Las clases {t.fechas.length > 1 ? 'de esos días' : 'de ese día'} vuelven a la
+                          grilla y se puede reservar. Las reservas que se cancelaron{' '}
+                          <strong>no vuelven solas</strong>, y no le llega ningún aviso a nadie: ni a los
+                          clientes ni a quien da esas clases. Avisales vos.
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            disabled={busy}
+                            onClick={() => setQuitando(null)}
+                            className="flex-1 h-9 rounded-lg border border-border text-xs font-semibold text-foreground hover:bg-card disabled:opacity-40"
+                          >
+                            Volver
+                          </button>
+                          <button
+                            disabled={busy}
+                            onClick={() => quitar(t)}
+                            className="flex-1 h-9 rounded-lg bg-destructive/10 text-destructive-fuerte text-xs font-semibold hover:bg-destructive/20 disabled:opacity-40 flex items-center justify-center gap-1.5"
+                          >
+                            {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                            Quitar el feriado
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {pasados.length > 0 && (
+              <div>
+                <button
+                  onClick={() => setVerPasados((v) => !v)}
+                  className="text-xs font-semibold text-muted-foreground hover:text-foreground py-2"
+                >
+                  {verPasados ? 'Ocultar los anteriores' : `Ver los anteriores (${pasados.length})`}
+                </button>
+                {verPasados && (
+                  <ul className="space-y-0.5">
+                    {pasados.map((t) => (
+                      <li key={t.desde} className="text-[11px] text-muted-foreground">
+                        <span className="capitalize">{textoDelTramo(t, true)}</span>
+                        {t.nombre && ` · ${t.nombre}`}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </SeccionPlegable>
+  )
+}
+
+/**
  * Las promociones del estudio.
  *
  * Nacen APAGADAS y la pantalla lo dice: una promo cargada a medias no
@@ -3208,6 +3666,7 @@ export function ConfiguracionPage() {
 
         <BloqueDeSecciones icono={Building2} titulo="El estudio">
           <SettingsSection group="estudio" />
+          <FeriadosSection />
         </BloqueDeSecciones>
 
         <BloqueDeSecciones icono={SlidersHorizontal} titulo="Reglas del negocio">

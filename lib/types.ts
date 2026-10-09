@@ -21,6 +21,22 @@ export interface ClassOccurrence {
   startTime: string | null
   capacity: number | null
   reason: string
+  /**
+   * El feriado que la suspendió (0093), o null si la suspensión es a mano
+   * o la fila es sólo un reemplazo. Sin la 0093 corrida, siempre null.
+   */
+  feriadoId?: string | null
+}
+
+/**
+ * Un día en que el estudio cierra (0093). Cargarlo suspende todas las
+ * clases de esa fecha y cancela sus reservas; se administra desde
+ * Configuración → Feriados.
+ */
+export interface Feriado {
+  id: string
+  fecha: string
+  nombre: string
 }
 
 /** Disciplina del catálogo (tabla disciplines, migración 0011). */

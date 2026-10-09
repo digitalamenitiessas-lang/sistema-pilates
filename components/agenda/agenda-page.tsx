@@ -64,6 +64,8 @@ type WeekClass = ClassSession & {
   /** La profesora de siempre, para saber a quién se vuelve */
   titularName?: string
   occurrenceReason?: string
+  /** La suspendió un feriado de Configuración (0093), no se suspendió a mano */
+  feriado?: boolean
 }
 
 function shortDate(iso: string): string {
@@ -821,9 +823,15 @@ function ClassDetailModal({
               {cls.suspended ? (
                 <div className="space-y-2">
                   <p className="text-xs text-foreground">
-                    Suspendida
+                    {cls.feriado ? 'Día cerrado' : 'Suspendida'}
                     {cls.occurrenceReason && `: ${cls.occurrenceReason}`}
                   </p>
+                  {cls.feriado && (
+                    <p className="text-[11px] text-muted-foreground leading-tight">
+                      Es un feriado de Configuración → Feriados. “Volver a dictarla” abre sólo esta
+                      clase; el resto del día sigue cerrado.
+                    </p>
+                  )}
                   <button
                     disabled={dayBusy}
                     onClick={reactivar}
@@ -861,10 +869,13 @@ function ClassDetailModal({
                 </>
               )}
 
-              {cls.enrolled > 0 && (
+              {!cls.suspended && cls.enrolled > 0 && (
                 <p className="text-[11px] text-muted-foreground leading-tight">
-                  Hay {cls.enrolled} {cls.enrolled === 1 ? 'reserva' : 'reservas'} para ese día. Suspender
-                  no las cancela: avisales vos y decidí si les devolvés la clase.
+                  Hay {cls.enrolled} {cls.enrolled === 1 ? 'reserva' : 'reservas'} para ese día.
+                  Suspender no las cancela: no se les descuenta la clase y les queda un aviso en el
+                  portal.
+                  {can('config.editar') &&
+                    ' Para cerrar el día entero y cancelar sus reservas, Configuración → Feriados.'}
                 </p>
               )}
 
@@ -1152,6 +1163,7 @@ export function AgendaPage() {
           teacherName: occ?.teacherId ? occ.teacherName : c.teacherName,
           titularName: c.teacherName,
           suspended: occ?.status === 'suspendida',
+          feriado: occ?.status === 'suspendida' && !!occ?.feriadoId,
           substitute: !!occ?.teacherId,
           occurrenceReason: occ?.reason ?? '',
           // El cupo lo dice la base; si la vista no contestó, se deriva de
