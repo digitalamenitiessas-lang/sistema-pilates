@@ -305,6 +305,14 @@ export function RegistrarPagoModal({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [receiptNumber, setReceiptNumber] = useState<number | null>(null)
+  /**
+   * Con una cuota abierta, guardar pide un segundo paso. El aviso de
+   * arriba existía desde el 25/09 y el 01/10 igual se cargó por acá la
+   * transferencia de una cuota pendiente: la cuota quedó como deuda con
+   * la plata ya entrada. Un cartel se pasa de largo; un "¿es por otra
+   * cosa?" con el botón de cobrar la cuota al lado, no.
+   */
+  const [confirmandoAparte, setConfirmandoAparte] = useState(false)
 
   const selectedStudent = students.find((s) => s.id === studentId)
 
@@ -343,7 +351,17 @@ export function RegistrarPagoModal({
     ? deLista
     : precioConAjuste(deLista, ajuste, settingText(settings, 'price_rounding', 'cincuenta'))
 
+  // La cuota que más se parece a lo que se está por cobrar: mismo concepto
+  // o mismo monto. Es la que se ofrece cobrar en la confirmación.
+  const parecida =
+    abiertas.find(
+      (p) =>
+        (!!p.planName && p.planName.trim().toLowerCase() === concept.trim().toLowerCase()) ||
+        p.amount === deLista
+    ) ?? abiertas[0]
+
   const applyPlanDefaults = (id: string) => {
+    setConfirmandoAparte(false)
     setStudentId(id)
     const student = students.find((s) => s.id === id)
     if (student?.membership) {
@@ -355,6 +373,10 @@ export function RegistrarPagoModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!studentId || !method) return
+    if (abiertas.length > 0 && !confirmandoAparte) {
+      setConfirmandoAparte(true)
+      return
+    }
     setSaving(true)
     setError(null)
     try {
@@ -540,23 +562,59 @@ export function RegistrarPagoModal({
               )}
             </div>
 
-            <div className="flex gap-3 px-6 py-4 border-t border-border shrink-0">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={saving || !studentId || !method}
-                className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
-              >
-                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                Cobrar
-              </button>
-            </div>
+            {confirmandoAparte && parecida ? (
+              <div className="px-6 py-4 border-t border-border shrink-0 space-y-3 bg-aviso-suave">
+                <p className="text-sm text-foreground">
+                  <strong>Este cobro no salda la cuota.</strong> {selectedStudent?.name ?? 'Esta persona'}{' '}
+                  va a seguir debiendo {parecida.planName || 'la cuota'} de $
+                  {parecida.amount.toLocaleString('es-AR')}
+                  {esOferta(parecida) ? ', y el plan no se renueva' : ''}. Si viene a pagar eso, cobrá la
+                  cuota.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCuota(parecida)}
+                    className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+                  >
+                    Cobrar la cuota
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="flex-1 py-2.5 rounded-xl border border-border bg-card text-sm font-semibold text-foreground hover:bg-muted transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                  >
+                    {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Sí, es otra cosa
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setConfirmandoAparte(false)}
+                  className="w-full text-xs text-muted-foreground underline hover:text-foreground"
+                >
+                  Volver
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-3 px-6 py-4 border-t border-border shrink-0">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving || !studentId || !method}
+                  className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {abiertas.length > 0 ? 'Cobrar aparte' : 'Cobrar'}
+                </button>
+              </div>
+            )}
           </form>
         )}
       </div>

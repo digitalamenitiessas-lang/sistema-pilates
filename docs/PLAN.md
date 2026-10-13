@@ -3205,8 +3205,31 @@ no es la del repo. En pantalla contra producción, sin la 0093, la sección
 avisa que falta la migración; con la 0093 corrida muestra el formulario.
 tsc y next build pasan.
 
-**Falta**: correr la 0094, deploy, y una prueba en producción con OK de
-Matías (un domingo sin clases, cargar y quitar).
+**En producción (10/10)**: el estudio cargó el lunes 12/10 desde
+Configuración. Con la sesión del admin y sin tocar nada: la sección lo
+lista ("Lunes 12/10/2026 · Feriado"), las 12 clases del lunes figuran
+tachadas en 0/8 y el detalle dice "Día cerrado: Feriado" con la nota de
+Configuración.
+
+**Falta**: confirmar que corrió la 0094.
+
+### ✅ "Otro cobro" pide confirmar si hay una cuota abierta (10/10)
+
+El síntoma: a María Luz de la Rosa le figuraba una cuota pendiente de un
+mes que ya había pagado. La transferencia del 01/10 se cargó por "Otro
+cobro" —que no salda ninguna cuota— y la cuota del período quedó abierta,
+con la plata ya entrada. Se anuló la cuota por SQL (lo mismo que hace
+`anular_cuota`, 0083), con guardias sobre los dos ids.
+
+El formulario ya avisaba desde el 25/09 ("Tiene una cuota sin cobrar…
+Cobrar esta"), y aun así pasó: el botón de abajo decía "Cobrar" igual. Ahora,
+con una cuota u oferta abierta, ese botón dice "Cobrar aparte" y antes de
+guardar pide un segundo paso —"Este cobro no salda la cuota: va a seguir
+debiendo…"— con "Cobrar la cuota" (abre el cobro de esa cuota) y "Sí, es
+otra cosa". Verificado con la sesión del admin contra producción, sin
+guardar: Sofia Garcia (FE BALANCE pendiente) → "Cobrar aparte" → la
+confirmación; "Cobrar la cuota" abre el cobro de su cuota; se cerró sin
+cobrar y la cuota siguió pendiente.
 
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock. *(La consignación —sin variantes ni inventario físico— es la `0090`.)*
