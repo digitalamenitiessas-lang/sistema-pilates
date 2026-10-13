@@ -2019,7 +2019,13 @@ export function PagosPage() {
                           <td className="px-4 py-3">
                             <PaymentStatusBadge pago={p} />
                           </td>
-                          <td className="px-4 py-3">
+                          {/* Pegada a la derecha: con el panel de ingresos al
+                              lado la tabla no entra en una notebook, y los
+                              botones —anular la cuota, el link, el WhatsApp—
+                              quedaban del borde para afuera, sin que nada
+                              dijera que había que deslizar (13/10: "no
+                              aparece ese ícono"). */}
+                          <td className="px-3 py-3 sticky right-0 bg-card shadow-[-8px_0_8px_-8px_rgb(0_0_0/0.15)]">
                             {/* Un cobro ya hecho se puede anular; el
                                 comprobante emitido queda igual. */}
                             {p.status === 'pagado' && puedeAnular && (
