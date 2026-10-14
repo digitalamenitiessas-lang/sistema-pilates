@@ -926,7 +926,10 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
       setSavingAutoRenew(false)
     }
   }
-  const classesLeft = ms ? ms.classesTotal - ms.classesUsed : 0
+  // Una cancelada no deja clases para usar: la base no reserva contra ella
+  // (membresia_para pide 'activa'). Con sólo un período cancelado la ficha
+  // decía "7 clases rest." (14/10).
+  const classesLeft = ms && ms.status !== 'cancelada' ? ms.classesTotal - ms.classesUsed : 0
   const attended = reservations.filter((r) => r.status === 'asistió').length
   /**
    * "¿Cuándo vuelve?" — una de las seis preguntas que el estudio pidió

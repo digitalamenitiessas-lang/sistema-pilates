@@ -59,10 +59,15 @@ export function AsignarPlanModal({ student, onClose }: AsignarPlanModalProps) {
     .filter(
       (m) =>
         m.studentId === student.id &&
-        // El trigger pide status = 'activa' y end_date >= el día que entra:
-        // en la base los únicos estados guardados son 'activa' y
-        // 'suspendida', y 'vencida' se deriva de la fecha al leer.
+        // El trigger pide status = 'activa' y end_date >= el día que entra.
+        // En la base se guardan 'activa', 'suspendida' y, desde la 0069,
+        // 'cancelada'; 'vencida' se deriva de la fecha al leer. Faltaba la
+        // cancelada: el 14/10, a una clienta con el período recién
+        // cancelado la pantalla le decía que el plan nuevo "se encola
+        // detrás" del cancelado y no la dejaba elegir el día de arranque,
+        // cuando la base lo iba a arrancar en la fecha pedida.
         m.status !== 'suspendida' &&
+        m.status !== 'cancelada' &&
         m.endDate >= hoy &&
         !esPrueba(m.planId)
     )
