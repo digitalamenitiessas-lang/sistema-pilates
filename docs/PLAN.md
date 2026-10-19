@@ -3231,6 +3231,33 @@ guardar: Sofia Garcia (FE BALANCE pendiente) → "Cobrar aparte" → la
 confirmación; "Cobrar la cuota" abre el cobro de su cuota; se cerró sin
 cobrar y la cuota siguió pendiente.
 
+### ✅ El front se mudó de Vercel a la VPS (19/10)
+
+Vercel dio de baja el plan gratis por pasar el límite y el sistema quedó
+fuera de servicio. Se mudó **sólo el front** a la VPS compartida
+(2.25.185.242, Ubuntu 24.04, 1 núcleo), con el mismo esquema que Citify y
+Malala: usuario `casafe`, `casafe.service` (Next en 127.0.0.1:3050, techo de
+1 GB, prioridad baja), `/etc/casafe/app.env` (640, sin comillas), Caddy
+(`casafe.caddy` + la provisoria `casafe-temporal.caddy`) y el proceso diario
+en `/etc/cron.d/casafe` (09:00 UTC, directo a 127.0.0.1). Copias sin claves
+en `deploy/`.
+
+El dominio pasó del DNS de Vercel a **Cloudflare** (delegado en NIC.ar el
+19/10), con los registros de Resend copiados (MX/TXT de `send` y el DKIM).
+Certificados de Let's Encrypt para `casafepilates.com.ar` y `www`.
+
+**La base se queda en Supabase**: las consultas las hace el navegador
+directo a San Pablo; traerla a la VPS (Boston) las haría más lentas. Malala
+sí trajo su base porque consulta desde el servidor.
+
+**Deploy desde ahora**: `ssh root@2.25.185.242 casafe-redeploy` después de
+cada merge. Verificado: dominio y `www` con HTTPS, `/sistema`, el manifest,
+los registros de mail desde un resolver público, las 12 variables idénticas
+en el proceso, y los demás servicios de la VPS activos.
+
+**Falta**: borrar o pausar el proyecto en Vercel (si vuelve, su cron
+correría en paralelo); sacar la dirección provisoria en unos días.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock. *(La consignación —sin variantes ni inventario físico— es la `0090`.)*
 - [ ] Metas de venta con tablero.

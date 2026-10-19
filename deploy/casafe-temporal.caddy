@@ -1,0 +1,14 @@
+# ---------------------------------------------------------------------------
+# Casa Fe — direccion PROVISORIA mientras casafepilates.com.ar sigue con el
+# DNS de Vercel (19/10/2026). sslip.io resuelve casafe-2-25-185-242.sslip.io
+# a 2.25.185.242 sin configurar nada, asi Caddy puede sacar el certificado.
+#
+# Cuando el dominio apunte aca: importar casafe.caddy y sacar este import.
+# ---------------------------------------------------------------------------
+
+casafe-2-25-185-242.sslip.io {
+	reverse_proxy 127.0.0.1:3050 {
+		header_up X-Real-IP {remote_host}
+	}
+	encode zstd gzip
+}
