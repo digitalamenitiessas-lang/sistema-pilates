@@ -1,0 +1,14 @@
+# /etc/cron.d/casafe — proceso diario de Casa Fe (antes, el cron de Vercel).
+#
+# Pega directo a la app en 127.0.0.1:3050 (no depende del DNS ni de Caddy).
+# El header Authorization sale de /etc/casafe/cron.curlrc (0600 root).
+#
+# DESACTIVADO hasta el cambio de dominio: mientras Vercel pueda volver a
+# correr el suyo, los dos mandarian los avisos. Para activarlo, sacar el #
+# de la linea de abajo.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+MAILTO=""
+
+# 06:00 ART (09:00 UTC): avisos de vencimiento, cuotas, recordatorios y push.
+0 9 * * * root curl -fsS --max-time 600 -K /etc/casafe/cron.curlrc http://127.0.0.1:3050/api/cron/diario >> /var/log/casafe-cron.log 2>&1; echo >> /var/log/casafe-cron.log

@@ -1,0 +1,38 @@
+# /etc/systemd/system/casafe.service
+#
+# Casa Fe (Next.js) en el VPS compartido. Vivia en Vercel hasta el 19/10/2026,
+# cuando se cayo el plan gratis. La base sigue en Supabase.
+# Mismo patron que citify.service: next start detras del Caddy nativo.
+[Unit]
+Description=Casa Fe (Next.js) — sistema del estudio de Pilates
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=casafe
+Group=casafe
+WorkingDirectory=/home/casafe/sistema-pilates
+EnvironmentFile=/etc/casafe/app.env
+Environment=PATH=/opt/node22/bin:/usr/local/bin:/usr/bin:/bin
+Environment=NEXT_TELEMETRY_DISABLED=1
+ExecStart=/opt/node22/bin/node /home/casafe/sistema-pilates/node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3050
+Restart=always
+RestartSec=5
+
+# 1 nucleo y ~17 servicios: prioridad baja, y techo de memoria para que si
+# algo se desboca muera Casa Fe y no el resto.
+Nice=10
+CPUWeight=50
+IOWeight=50
+MemoryMax=1G
+MemoryHigh=768M
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/casafe/sistema-pilates/.next
+
+[Install]
+WantedBy=multi-user.target

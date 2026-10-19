@@ -1,0 +1,30 @@
+# ---------------------------------------------------------------------------
+# Casa Fe — se agrega al Caddy del VPS (/etc/caddy/casafe.caddy).
+#
+# NO toca los bloques existentes: Caddy rutea por nombre de dominio y cada
+# sitio tiene su propio certificado.
+#
+# Para activarlo, agregar al final de /etc/caddy/Caddyfile:
+#     import /etc/caddy/casafe.caddy
+# validar y recargar:
+#     caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy
+#
+# NO activarlo antes de que los dos nombres resuelvan a este servidor
+# (dig +short casafepilates.com.ar www.casafepilates.com.ar): Caddy pide los
+# certificados apenas levanta el bloque, y suficientes fallos seguidos hacen
+# que Let's Encrypt bloquee el dominio.
+# ---------------------------------------------------------------------------
+
+casafepilates.com.ar {
+	reverse_proxy 127.0.0.1:3050 {
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		header_up Host {host}
+	}
+	encode zstd gzip
+}
+
+www.casafepilates.com.ar {
+	redir https://casafepilates.com.ar{uri} permanent
+}
