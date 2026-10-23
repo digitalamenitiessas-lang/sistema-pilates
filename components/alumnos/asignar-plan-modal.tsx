@@ -176,8 +176,9 @@ export function AsignarPlanModal({ student, onClose }: AsignarPlanModalProps) {
               <span className="font-semibold">{plan.name}</span> no es el plan del último período que
               ya tiene asignado ({ultima.planName}), así que esto es un cambio de plan — y el cambio
               de plan también se encola: paga hoy y lo empieza a usar el {fecha(arranca)}. Hasta ese
-              día sigue con las clases de los períodos que ya tiene asignados. El sistema todavía no
-              sabe adelantar un cambio de plan: decíselo antes de cobrarle.
+              día sigue con las clases de los períodos que ya tiene asignados. Para que el plan nuevo
+              arranque hoy, cerrá esta ventana y usá <strong>«Cambiar plan»</strong> en la pestaña
+              Membresía de la ficha.
             </p>
           )}
 

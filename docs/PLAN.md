@@ -3258,6 +3258,26 @@ en el proceso, y los demás servicios de la VPS activos.
 **Falta**: borrar o pausar el proyecto en Vercel (si vuelve, su cron
 correría en paralelo); sacar la dirección provisoria en unos días.
 
+### 🟡 Cambiar de plan desde hoy (23/10) — `0095` **escrita, sin correr**
+
+Una clienta con FE START usó sus 4 clases antes de fin de mes y quiso pasar
+a FE FLOW; "Asignar plan" sólo encolaba el cambio para el mes siguiente. El
+estudio eligió "plan nuevo desde hoy" (y no "subir pagando la diferencia").
+
+`cambiar_plan_desde_hoy(membresía, plan)` (membresias.asignar +
+membresias.editar), en una transacción: el período vigente termina ayer
+(con motivo, como el Vencimiento de la 0047), se anula su oferta de
+renovación, el plan nuevo arranca hoy y queda su cuota de lista (las promos
+al cobrar). Las reservas ya hechas siguen en el período viejo. Corta con
+mensaje si hay cuota sin cobrar, si ya tiene el período siguiente, si es un
+pase de prueba o si el período empezó hoy. En la ficha, "Cambiar plan"
+abre la ventana nueva cuando hay un período corriendo; muestra cuántas
+clases sin usar se pierden y ofrece "Cobrar ahora".
+
+**Verificado**: 22 comprobaciones en el Postgres local (`casafe-harness`,
+ahora fuera de /tmp), la guardia de huella cancelando sin dejar nada, la
+ventana con los datos reales de una clienta sin confirmar. tsc y build.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock. *(La consignación —sin variantes ni inventario físico— es la `0090`.)*
 - [ ] Metas de venta con tablero.

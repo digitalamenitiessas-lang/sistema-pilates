@@ -50,6 +50,7 @@ import type {
 } from '@/lib/types'
 import { AlumnoFormModal } from './alumno-form-modal'
 import { AsignarPlanModal } from './asignar-plan-modal'
+import { CambiarPlanModal } from './cambiar-plan-modal'
 import { ComprasDeCliente } from '@/components/productos/compras-de-cliente'
 
 /**
@@ -858,6 +859,9 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
   const [activeTab, setActiveTab] = useState('resumen')
   const [showEdit, setShowEdit] = useState(false)
   const [showAssignPlan, setShowAssignPlan] = useState(false)
+  // El período que se cambia se fija al abrir: al confirmar, `ms` pasa a
+  // ser el nuevo y la ventana tiene que seguir mostrando el resultado.
+  const [cambiandoPlan, setCambiandoPlan] = useState<Membership | null>(null)
   const [showPortalAccess, setShowPortalAccess] = useState(false)
   const [aCancelar, setACancelar] = useState<Membership | null>(null)
   const [aDeshacer, setADeshacer] = useState<Membership | null>(null)
@@ -1625,7 +1629,21 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                   {canWrite && (
                     <div className="flex gap-3">
                       <button
-                        onClick={() => setShowAssignPlan(true)}
+                        onClick={() => {
+                          // Con un período corriendo hoy (que no sea un pase de
+                          // prueba), cambiar es "desde hoy" (0095), que es lo que
+                          // eligió el estudio el 23/10. Si no hay nada corriendo,
+                          // asignar ya arranca hoy.
+                          const hoy = hoyISO()
+                          const corriendo =
+                            ms.status !== 'cancelada' &&
+                            ms.status !== 'suspendida' &&
+                            ms.startDate <= hoy &&
+                            ms.endDate >= hoy &&
+                            !data?.plans.find((p) => p.id === ms.planId)?.isTrial
+                          if (corriendo) setCambiandoPlan(ms)
+                          else setShowAssignPlan(true)
+                        }}
                         className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors"
                       >
                         Cambiar plan
@@ -1728,6 +1746,9 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
 
       {showEdit && <AlumnoFormModal student={student} onClose={() => setShowEdit(false)} />}
       {showAssignPlan && <AsignarPlanModal student={student} onClose={() => setShowAssignPlan(false)} />}
+      {cambiandoPlan && (
+        <CambiarPlanModal student={student} membresia={cambiandoPlan} onClose={() => setCambiandoPlan(null)} />
+      )}
       {showPortalAccess && (
         <PortalAccessModal student={student} onClose={() => setShowPortalAccess(false)} />
       )}
