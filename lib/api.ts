@@ -1757,6 +1757,39 @@ export async function assignMembership(
   return null
 }
 
+/**
+ * Cambiar de plan desde hoy (0095): el período vigente termina ayer, el
+ * plan nuevo arranca hoy y queda su cuota para cobrar. Todo lo decide la
+ * base, en una sola transacción; acá sólo se llama y se traducen los
+ * errores.
+ */
+export interface CambioDePlan {
+  membresiaNueva: string
+  cuota: string | null
+  desde: string
+  hasta: string
+  clasesPerdidas: number
+}
+
+export async function cambiarPlanDesdeHoy(membresiaId: string, planId: string): Promise<CambioDePlan> {
+  const { data, error } = await supabase.rpc('cambiar_plan_desde_hoy', {
+    p_membresia: membresiaId,
+    p_plan: planId,
+  })
+  if (error?.code === 'PGRST202' || error?.code === '42883') {
+    throw new Error('Para cambiar de plan desde hoy falta correr la migración 0095.')
+  }
+  if (error) throw errorDeLaBase(error, 'No se pudo cambiar el plan')
+  const f = (Array.isArray(data) ? data[0] : data) as Record<string, unknown>
+  return {
+    membresiaNueva: String(f.membresia_nueva),
+    cuota: f.cuota == null ? null : String(f.cuota),
+    desde: String(f.desde),
+    hasta: String(f.hasta),
+    clasesPerdidas: Number(f.clases_perdidas ?? 0),
+  }
+}
+
 export interface NewPaymentInput {
   studentId: string
   membershipId?: string
