@@ -3278,6 +3278,23 @@ clases sin usar se pierden y ofrece "Cobrar ahora".
 ahora fuera de /tmp), la guardia de huella cancelando sin dejar nada, la
 ventana con los datos reales de una clienta sin confirmar. tsc y build.
 
+### 🟡 Renovar antes, con las clases agotadas (28/10) — `0096` **escrita, sin correr**
+
+Dos clientas usaron las 8 clases antes de fin de mes y "Renovar membresía"
+sólo encolaba el mes nuevo para cuando venciera el actual. Regla propuesta
+por Matías: con el período agotado, se puede renovar desde hoy. La `0096`
+deja que `cambiar_plan_desde_hoy` (0095) acepte el MISMO plan sólo si el
+período está agotado (con clases sin usar corta y dice cuántas quedan), con
+el motivo "Renovó antes". En "Renovar membresía", si el período que corre
+está agotado, es el último y su cuota está cobrada, la ventana pregunta
+"¿Desde cuándo arranca?" (desde hoy / cuando termine este mes) y no deja
+asignar hasta elegir.
+
+**Verificado**: 8 comprobaciones nuevas en el Postgres local más la prueba
+entera de la 0095 sobre la 0096; la ventana contra producción con una
+clienta real en 8/8, eligiendo "Desde hoy" sin confirmar (el botón pasa a
+"Renovar desde hoy") y cerrando con Cancelar. tsc y next build.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock. *(La consignación —sin variantes ni inventario físico— es la `0090`.)*
 - [ ] Metas de venta con tablero.

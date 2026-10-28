@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { X, Loader2, BookOpen } from 'lucide-react'
 import { cn, cuantoDura } from '@/lib/utils'
 import { useData } from '@/lib/data-context'
-import { assignMembership, addDays, hoyISO, vigenciaHasta } from '@/lib/api'
+import { assignMembership, addDays, hoyISO, vigenciaHasta, cambiarPlanDesdeHoy, esOferta } from '@/lib/api'
 import type { Membership, Student } from '@/lib/types'
 
 interface AsignarPlanModalProps {
@@ -84,12 +84,56 @@ export function AsignarPlanModal({ student, onClose }: AsignarPlanModalProps) {
   // único honesto es que quien cobra lo sepa antes de cobrar.
   const cambioDePlan = !!plan && !!ultima && !!arranca && ultima.planId !== plan.id
 
+  /**
+   * Renovar antes (0096). Si el período que corre hoy ya no tiene clases
+   * —las usó todas antes de fin de mes—, el plan nuevo puede arrancar hoy
+   * en vez de encolarse: el actual termina ayer. Sólo cuando ese período es
+   * el último que tiene (nada pagado por adelantado) y su cuota está
+   * cobrada, que es lo mismo que exige la base.
+   */
+  const corriendo = memberships.find(
+    (m) =>
+      m.studentId === student.id &&
+      m.status !== 'suspendida' &&
+      m.status !== 'cancelada' &&
+      m.startDate <= hoy &&
+      m.endDate >= hoy &&
+      !esPrueba(m.planId)
+  )
+  const pagos = data?.payments ?? []
+  const cuotaSinCobrar =
+    !!corriendo &&
+    pagos.some(
+      (p) =>
+        p.membershipId === corriendo.id &&
+        (p.status === 'pendiente' || p.status === 'vencido') &&
+        !esOferta(p)
+    )
+  const puedeDesdeHoy =
+    !!plan &&
+    !plan.isTrial &&
+    seEncola &&
+    !!corriendo &&
+    !!ultima &&
+    ultima.id === corriendo.id &&
+    corriendo.classesUsed >= corriendo.classesTotal &&
+    corriendo.startDate < hoy
+  /** null = todavía no eligió; sólo cuenta cuando `puedeDesdeHoy`. */
+  const [desdeHoy, setDesdeHoy] = useState<boolean | null>(null)
+  const eligioHoy = puedeDesdeHoy && desdeHoy === true
+  // Mientras no elige, el detalle de la fila ("No se puede elegir…") confunde.
+  const mostrarFila = !puedeDesdeHoy || desdeHoy === false
+
   const handleSubmit = async () => {
     if (!planId) return
     setSaving(true)
     setError(null)
     try {
-      await assignMembership(student.id, planId, plans, settings, desde)
+      if (eligioHoy && corriendo) {
+        await cambiarPlanDesdeHoy(corriendo.id, planId)
+      } else {
+        await assignMembership(student.id, planId, plans, settings, desde)
+      }
       await refresh()
       onClose()
     } catch (err) {
@@ -171,7 +215,50 @@ export function AsignarPlanModal({ student, onClose }: AsignarPlanModalProps) {
           {error && (
             <p className="text-sm text-destructive-fuerte bg-destructive/10 rounded-xl px-3 py-2">{error}</p>
           )}
-          {cambioDePlan && plan && ultima && arranca && (
+          {puedeDesdeHoy && corriendo && plan && (
+            <div className="rounded-xl border border-primary/30 bg-primary/5 px-3.5 py-3 space-y-2">
+              <p className="text-xs text-foreground">
+                Ya usó las {corriendo.classesTotal} clases de su {corriendo.planName}, que vence el{' '}
+                {fecha(corriendo.endDate)}. ¿Desde cuándo arranca el {plan.name}?
+              </p>
+              <button
+                type="button"
+                disabled={cuotaSinCobrar}
+                onClick={() => setDesdeHoy(true)}
+                className={cn(
+                  'w-full text-left rounded-lg border px-3 py-2 text-xs transition-colors disabled:opacity-50',
+                  desdeHoy === true ? 'border-primary bg-card' : 'border-border hover:bg-card'
+                )}
+              >
+                <span className="font-semibold text-foreground">Desde hoy ({fecha(hoy)})</span>
+                <span className="block text-muted-foreground">
+                  {corriendo.planId === plan.id
+                    ? 'Este mes termina ayer y el nuevo'
+                    : `El ${corriendo.planName} termina ayer y el ${plan.name}`}{' '}
+                  vale hasta el {fecha(vigenciaHasta(hoy, plan))}. Desde ahora renueva el día{' '}
+                  {Number(hoy.slice(8, 10))} de cada mes.
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDesdeHoy(false)}
+                className={cn(
+                  'w-full text-left rounded-lg border px-3 py-2 text-xs transition-colors',
+                  desdeHoy === false ? 'border-primary bg-card' : 'border-border hover:bg-card'
+                )}
+              >
+                <span className="font-semibold text-foreground">Cuando termine este mes ({fecha(arranqueReal)})</span>
+                <span className="block text-muted-foreground">Hasta ese día no tiene clases para reservar.</span>
+              </button>
+              {cuotaSinCobrar && (
+                <p className="text-[11px] text-aviso-fuerte">
+                  Para arrancar hoy, primero cobrá o anulá la cuota de este mes en Pagos.
+                </p>
+              )}
+            </div>
+          )}
+
+          {mostrarFila && cambioDePlan && plan && ultima && arranca && (
             <p className="text-[11px] text-aviso-fuerte bg-aviso-suave border border-aviso/40 rounded-xl px-3 py-2.5">
               <span className="font-semibold">{plan.name}</span> no es el plan del último período que
               ya tiene asignado ({ultima.planName}), así que esto es un cambio de plan — y el cambio
@@ -182,7 +269,7 @@ export function AsignarPlanModal({ student, onClose }: AsignarPlanModalProps) {
             </p>
           )}
 
-          {plan && (
+          {plan && mostrarFila && (
             <div className="rounded-xl border border-border px-3.5 py-3">
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
                 Arranca el
@@ -211,7 +298,7 @@ export function AsignarPlanModal({ student, onClose }: AsignarPlanModalProps) {
             </div>
           )}
 
-          {plans.length > 0 && (
+          {plans.length > 0 && mostrarFila && (
             <p className="text-[11px] text-muted-foreground pt-1">
               {!plan
                 ? 'Elegí un plan para ver desde qué día va a estar vigente.'
@@ -236,11 +323,11 @@ export function AsignarPlanModal({ student, onClose }: AsignarPlanModalProps) {
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!planId || saving}
+            disabled={!planId || saving || (puedeDesdeHoy && desdeHoy === null)}
             className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-            Asignar
+            {eligioHoy ? 'Renovar desde hoy' : 'Asignar'}
           </button>
         </div>
       </div>
