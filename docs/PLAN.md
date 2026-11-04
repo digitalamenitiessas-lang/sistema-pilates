@@ -3258,7 +3258,7 @@ en el proceso, y los demás servicios de la VPS activos.
 **Falta**: borrar o pausar el proyecto en Vercel (si vuelve, su cron
 correría en paralelo); sacar la dirección provisoria en unos días.
 
-### 🟡 Cambiar de plan desde hoy (23/10) — `0095` **escrita, sin correr**
+### ✅ Cambiar de plan desde hoy (23/10) — `0095` corrida
 
 Una clienta con FE START usó sus 4 clases antes de fin de mes y quiso pasar
 a FE FLOW; "Asignar plan" sólo encolaba el cambio para el mes siguiente. El
@@ -3278,7 +3278,7 @@ clases sin usar se pierden y ofrece "Cobrar ahora".
 ahora fuera de /tmp), la guardia de huella cancelando sin dejar nada, la
 ventana con los datos reales de una clienta sin confirmar. tsc y build.
 
-### 🟡 Renovar antes, con las clases agotadas (28/10) — `0096` **escrita, sin correr**
+### ✅ Renovar antes, con las clases agotadas (28/10) — `0096` corrida
 
 Dos clientas usaron las 8 clases antes de fin de mes y "Renovar membresía"
 sólo encolaba el mes nuevo para cuando venciera el actual. Regla propuesta
@@ -3294,6 +3294,42 @@ asignar hasta elegir.
 entera de la 0095 sobre la 0096; la ventana contra producción con una
 clienta real en 8/8, eligiendo "Desde hoy" sin confirmar (el botón pasa a
 "Renovar desde hoy") y cerrando con Cancelar. tsc y next build.
+
+### 🟡 Dar de baja a un cliente (03/11) — `0097` **escrita, sin correr**
+
+El estudio pidió "eliminar clientes que no van a venir, para que no se
+mezclen con los demás". Se construyó una **baja**, no un borrado: cada
+ficha tiene atados cobros, arqueos firmados y asistencias, y borrarla
+descuadraría la caja de esos días. La baja es `active = false`, que ya
+saca la ficha de la lista, del buscador y de los selectores
+(`fetchStudioData` trae sólo activas).
+
+`dar_de_baja_cliente(ficha, motivo, anular_deuda)` (`alumnos.eliminar`), en
+una transacción: cancela las reservas de clases que no empezaron (primero la
+lista de espera; las confirmadas le avisan a quien espera ese lugar), libera
+los turnos fijos activos y pausados, anula las ofertas de renovación,
+cancela los períodos que no empezaron y no están cobrados con su cuota, y
+—sólo si se elige— anula la deuda que queda. No toca los cobros ni el
+período que corre; un período futuro ya cobrado se informa y queda. La
+ficha guarda `baja_at`, `baja_motivo` y `baja_by`. `reactivar_cliente`
+(misma clave) la vuelve a prender, salvo que haya otra ficha activa con el
+mismo DNI (un duplicado unido, como el de Florencia). Un trigger impide
+reservar o tomar un turno fijo con una ficha de baja.
+
+Pantalla: "Dar de baja" en la ficha, con dos pasos dentro de la ventana
+(no `window.confirm`): el resumen con números de lo que se suelta, el
+motivo opcional y la casilla de anular la deuda; y el "¿Seguro?". En
+Clientes, el filtro "De baja" lista las fichas inactivas con fecha y
+motivo, y "Reactivar" con su confirmación. En el portal, una clienta de baja
+ve "Tu ficha está dada de baja" con el WhatsApp del estudio, y no "tu
+cuenta no está vinculada".
+
+**Verificado**: 36 comprobaciones en el Postgres local
+(`casafe-harness/prueba-0097.sql`) —permisos de los cuatro roles y anon,
+cada cosa que suelta, la deuda con y sin anular, el período futuro cobrado,
+reservar y tomar fijo después de la baja, reactivar, el duplicado, la
+restrictiva de la 0013 intacta, perm_diff y consumo_control en cero— y la
+de humo. tsc y next build.
 
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock. *(La consignación —sin variantes ni inventario físico— es la `0090`.)*

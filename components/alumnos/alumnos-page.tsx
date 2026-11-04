@@ -8,6 +8,7 @@ import { credencial } from '@/lib/api'
 import type { Student } from '@/lib/types'
 import { FichaAlumno } from './ficha-alumno'
 import { AlumnoFormModal } from './alumno-form-modal'
+import { ClientesDeBaja } from './clientes-de-baja'
 
 const STATUS_CONFIG = {
   activa: { label: 'Activa', class: 'bg-exito-suave text-exito-fuerte' },
@@ -93,7 +94,10 @@ function StudentCard({
 }
 
 export function AlumnosPage() {
-  const { canWrite } = useData()
+  const { canWrite, can } = useData()
+  // "De baja" (0097) sólo para quien puede dar de baja y reactivar.
+  const veBajas = can('alumnos.eliminar')
+  const filtros = ['todos', 'activa', 'por vencer', 'vencida', 'sin_membresia', ...(veBajas ? ['de_baja'] : [])]
   const { students: STUDENTS, reservations: RESERVATIONS, payments: PAYMENTS, settings } = useStudio()
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('todos')
@@ -156,7 +160,7 @@ export function AlumnosPage() {
         {/* Status filter */}
         <div className="flex items-center gap-1.5 flex-wrap">
           <Filter className="w-4 h-4 text-muted-foreground shrink-0" />
-          {(['todos', 'activa', 'por vencer', 'vencida', 'sin_membresia'] as const).map((s) => (
+          {filtros.map((s) => (
             <button
               key={s}
               onClick={() => setFilterStatus(s)}
@@ -171,6 +175,8 @@ export function AlumnosPage() {
                 ? 'Todos'
                 : s === 'sin_membresia'
                 ? 'Sin membresía'
+                : s === 'de_baja'
+                ? 'De baja'
                 : s === 'por vencer'
                 ? 'Por vencer'
                 : s.charAt(0).toUpperCase() + s.slice(1)}
@@ -190,36 +196,40 @@ export function AlumnosPage() {
       </div>
 
       {/* Count */}
-      <div className="px-4 md:px-6 py-3 flex items-center justify-between gap-3 flex-wrap border-b border-border">
-        <p className="text-sm text-muted-foreground">
-          <strong className="text-foreground">{filtered.length}</strong> cliente
-          {filtered.length !== 1 ? 's' : ''}
-        </p>
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <span>
-            <strong className="text-exito-fuerte">
-              {STUDENTS.filter((s) => s.membership?.status === 'activa').length}
-            </strong>{' '}
-            activos
-          </span>
-          <span>
-            <strong className="text-aviso-fuerte">
-              {STUDENTS.filter((s) => s.membership?.status === 'por vencer').length}
-            </strong>{' '}
-            por vencer
-          </span>
-          <span>
-            <strong className="text-destructive-fuerte">
-              {STUDENTS.filter((s) => s.membership?.status === 'vencida').length}
-            </strong>{' '}
-            vencidos
-          </span>
+      {filterStatus !== 'de_baja' && (
+        <div className="px-4 md:px-6 py-3 flex items-center justify-between gap-3 flex-wrap border-b border-border">
+          <p className="text-sm text-muted-foreground">
+            <strong className="text-foreground">{filtered.length}</strong> cliente
+            {filtered.length !== 1 ? 's' : ''}
+          </p>
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <span>
+              <strong className="text-exito-fuerte">
+                {STUDENTS.filter((s) => s.membership?.status === 'activa').length}
+              </strong>{' '}
+              activos
+            </span>
+            <span>
+              <strong className="text-aviso-fuerte">
+                {STUDENTS.filter((s) => s.membership?.status === 'por vencer').length}
+              </strong>{' '}
+              por vencer
+            </span>
+            <span>
+              <strong className="text-destructive-fuerte">
+                {STUDENTS.filter((s) => s.membership?.status === 'vencida').length}
+              </strong>{' '}
+              vencidos
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Grid */}
       <div className="flex-1 overflow-auto p-4 md:p-6">
-        {filtered.length === 0 ? (
+        {filterStatus === 'de_baja' ? (
+          <ClientesDeBaja search={search} />
+        ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
             <Search className="w-10 h-10 mb-3 opacity-30" />
             <p className="text-sm">No se encontraron clientes</p>

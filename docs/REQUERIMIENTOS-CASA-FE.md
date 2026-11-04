@@ -8,7 +8,7 @@
 > **¿Buscás qué falta? Está en la §0, acá abajo.** Es la única lista al día; el
 > resto del documento es el análisis y la historia.
 
-## 0. LO QUE FALTA — la lista viva  ·  al 08/10/2026
+## 0. LO QUE FALTA — la lista viva  ·  al 03/11/2026
 
 > **Esta es la única lista al día.** Las secciones de abajo son el análisis y la
 > historia de cómo se llegó acá, y varias quedaron viejas a propósito: son la
@@ -229,6 +229,16 @@ un feriado reabre las clases y avisa, pero las reservas canceladas no
 vuelven solas. Queda latente: si se vuelve a prender el tope de devoluciones
 (0076), cuenta una cancelación a tiempo de un día que después se cerró.
 
+El **19/10** el front se mudó de Vercel a la VPS (la base sigue en
+Supabase). El **23 y 28/10** entraron `0095` y `0096`, corridas: cambiar de
+plan desde hoy, y renovar antes cuando el período está agotado.
+
+El **03/11** se escribió la `0097`, **que falta correr**: **dar de baja a un
+cliente**. Es una baja y no un borrado —la ficha conserva su historia y se
+reactiva desde Clientes → De baja—, y en el mismo paso suelta lo que
+ocupaba: reservas por delante, turnos fijos, ofertas de renovación y
+períodos sin empezar; la deuda, sólo si se elige. El detalle, en `PLAN.md`.
+
 ### Lo que falta construir
 
 | | Qué | Tamaño |
@@ -261,7 +271,7 @@ vuelven solas. Queda latente: si se vuelve a prender el tope de devoluciones
 | **§1** | Cambio de horario por fecha. La tabla lo soporta desde la `0018`; falta la pantalla | chico |
 | — | Foto del comprobante de gasto (primer uso de Storage) · avisos de caja en el proceso diario | chico |
 | — | **Fichaje de entrada y salida** de las profesoras. Se apoya en `staff_work_logs` sin rehacer nada, pero necesita que tengan cuenta | chico |
-| — | Congelar la membresía (`freeze_max_days` existe y no rige) · baja de clienta con motivo · cumpleaños del mes | mediano |
+| — | Congelar la membresía (`freeze_max_days` existe y no rige) · cumpleaños del mes *(la baja con motivo es la `0097`)* | mediano |
 | — | **Productos, fase 2** (después de correr la `0090`): las ventas en "Cobrado en el turno" del cierre y en "Cobrado hoy" del tablero (hoy suman en el cajón y en el esperado, pero el desglose por medio es sólo de cobros, y sumarlas toca `cerrar_caja`); stock por aroma, si el estudio lo pide; y un aviso en "Otro cobro" para que una venta de producto no se cargue ahí, donde no entra en la rendición al proveedor | chico |
 
 ### Lo que falta encender, y no es desarrollo
