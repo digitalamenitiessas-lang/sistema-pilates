@@ -1790,6 +1790,102 @@ export async function cambiarPlanDesdeHoy(membresiaId: string, planId: string): 
   }
 }
 
+/** Lo que hizo la baja (0097), para decirlo con números al terminar. */
+export interface BajaDeCliente {
+  reservasCanceladas: number
+  turnosLiberados: number
+  ofertasAnuladas: number
+  periodosCancelados: number
+  deudaAnulada: number
+  /** Períodos futuros ya cobrados: la baja no los toca y hay que avisarlo */
+  periodosCobradosFuturos: number
+}
+
+/**
+ * Dar de baja a un cliente (0097). Es una baja, no un borrado: la ficha
+ * queda inactiva con su historia, y todo lo que ocupaba —reservas por
+ * delante, turnos fijos— se libera en la misma transacción.
+ */
+export async function darDeBajaCliente(
+  studentId: string,
+  motivo: string,
+  anularDeuda: boolean
+): Promise<BajaDeCliente> {
+  const { data, error } = await supabase.rpc('dar_de_baja_cliente', {
+    p_student: studentId,
+    p_motivo: motivo,
+    p_anular_deuda: anularDeuda,
+  })
+  if (error?.code === 'PGRST202' || error?.code === '42883') {
+    throw new Error('Para dar de baja falta correr la migración 0097.')
+  }
+  if (error) throw errorDeLaBase(error, 'No se pudo dar de baja')
+  const f = (Array.isArray(data) ? data[0] : data) as Record<string, unknown>
+  return {
+    reservasCanceladas: Number(f.reservas_canceladas ?? 0),
+    turnosLiberados: Number(f.turnos_liberados ?? 0),
+    ofertasAnuladas: Number(f.ofertas_anuladas ?? 0),
+    periodosCancelados: Number(f.periodos_cancelados ?? 0),
+    deudaAnulada: Number(f.deuda_anulada ?? 0),
+    periodosCobradosFuturos: Number(f.periodos_cobrados_futuros ?? 0),
+  }
+}
+
+export async function reactivarCliente(studentId: string): Promise<void> {
+  const { error } = await supabase.rpc('reactivar_cliente', { p_student: studentId })
+  if (error?.code === 'PGRST202' || error?.code === '42883') {
+    throw new Error('Para reactivar falta correr la migración 0097.')
+  }
+  if (error) throw errorDeLaBase(error, 'No se pudo reactivar')
+}
+
+export interface ClienteDeBaja {
+  id: string
+  name: string
+  phone: string
+  dni: string
+  /** null en las bajas de antes de la 0097, que se hicieron por SQL */
+  bajaAt: string | null
+  bajaMotivo: string | null
+}
+
+/**
+ * Las fichas inactivas, para la lista "De baja" de Clientes. Se piden
+ * aparte y sólo al abrir esa lista: `fetchStudioData` trae únicamente las
+ * activas, que es justamente lo que la baja aprovecha para sacarlas de
+ * todos lados.
+ */
+export async function fetchClientesDeBaja(): Promise<ClienteDeBaja[]> {
+  const { data, error } = await supabase.from('students').select('*').eq('active', false).order('name')
+  if (error) throw errorDeLaBase(error, 'No se pudo traer la lista')
+  return (data ?? [])
+    .map((s) => ({
+      id: s.id,
+      name: s.name,
+      phone: s.phone ?? '',
+      dni: s.dni ?? '',
+      // `select('*')`: antes de la 0097 estas columnas no vienen.
+      bajaAt: s.baja_at ?? null,
+      bajaMotivo: s.baja_motivo ?? null,
+    }))
+    .sort((a, b) => (b.bajaAt ?? '').localeCompare(a.bajaAt ?? '') || a.name.localeCompare(b.name))
+}
+
+/**
+ * Si la ficha de quien entra al portal está dada de baja. Hace falta
+ * porque el portal sólo recibe fichas activas y, sin esto, a una clienta
+ * de baja le decía "tu cuenta no está vinculada", que es falso.
+ */
+export async function miFichaEstaDeBaja(userId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('students')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('active', false)
+    .limit(1)
+  return (data ?? []).length > 0
+}
+
 export interface NewPaymentInput {
   studentId: string
   membershipId?: string

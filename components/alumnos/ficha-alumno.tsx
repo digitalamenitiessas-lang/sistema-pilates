@@ -23,6 +23,7 @@ import {
   HeartPulse,
   X,
   KeyRound,
+  UserX,
 } from 'lucide-react'
 import { cn, nombreDelDia } from '@/lib/utils'
 import { useData } from '@/lib/data-context'
@@ -51,6 +52,7 @@ import type {
 import { AlumnoFormModal } from './alumno-form-modal'
 import { AsignarPlanModal } from './asignar-plan-modal'
 import { CambiarPlanModal } from './cambiar-plan-modal'
+import { DarDeBajaModal } from './dar-de-baja-modal'
 import { ComprasDeCliente } from '@/components/productos/compras-de-cliente'
 
 /**
@@ -866,6 +868,7 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
   const [aCancelar, setACancelar] = useState<Membership | null>(null)
   const [aDeshacer, setADeshacer] = useState<Membership | null>(null)
   const [savingAutoRenew, setSavingAutoRenew] = useState(false)
+  const [dandoDeBaja, setDandoDeBaja] = useState(false)
   const ms = student.membership
   // El formato lo pone el estudio en Configuración, así que se deriva acá
   // y no viene armado desde la base (0067).
@@ -978,15 +981,28 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
                     Cliente desde {new Date(student.joinDate).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}
                   </p>
                 </div>
-                {canWrite && (
-                  <button
-                    onClick={() => setShowEdit(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shrink-0"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                    Editar
-                  </button>
-                )}
+                <div className="flex items-center gap-2 shrink-0">
+                  {canWrite && (
+                    <button
+                      onClick={() => setShowEdit(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shrink-0"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      Editar
+                    </button>
+                  )}
+                  {/* La baja (0097). La pide la base igual; esconderla es para
+                      no ofrecer un botón que va a fallar. */}
+                  {can('alumnos.eliminar') && (
+                    <button
+                      onClick={() => setDandoDeBaja(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive-fuerte hover:border-destructive/30 transition-colors shrink-0"
+                    >
+                      <UserX className="w-3.5 h-3.5" />
+                      Dar de baja
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="flex flex-wrap gap-3 mt-3">
@@ -1745,6 +1761,15 @@ export function FichaAlumno({ student, reservations, payments, onBack }: FichaAl
       </div>
 
       {showEdit && <AlumnoFormModal student={student} onClose={() => setShowEdit(false)} />}
+      {dandoDeBaja && (
+        <DarDeBajaModal
+          student={student}
+          reservations={reservations}
+          payments={payments}
+          onClose={() => setDandoDeBaja(false)}
+          onHecho={onBack}
+        />
+      )}
       {showAssignPlan && <AsignarPlanModal student={student} onClose={() => setShowAssignPlan(false)} />}
       {cambiandoPlan && (
         <CambiarPlanModal student={student} membresia={cambiandoPlan} onClose={() => setCambiandoPlan(null)} />

@@ -63,6 +63,7 @@ import {
   ordenDeCobro,
   hoyISO,
   fetchCuentasParaTransferir,
+  miFichaEstaDeBaja,
   type CuentaParaTransferir,
 } from '@/lib/api'
 import type { Discipline, Membership, Reservation, Student } from '@/lib/types'
@@ -1375,6 +1376,16 @@ export function PortalPage() {
   const escribirAlEstudio = (texto: string) =>
     waEstudio ? `https://wa.me/${waEstudio}?text=${encodeURIComponent(texto)}` : null
 
+  // Sin ficha activa puede ser que no esté vinculada o que la hayan dado de
+  // baja (0097): el portal sólo recibe fichas activas, así que hay que
+  // preguntar aparte para no decirle "no estás vinculada" a quien sí lo
+  // estaba.
+  const [deBaja, setDeBaja] = useState(false)
+  useEffect(() => {
+    if (me || !profile?.id) return
+    miFichaEstaDeBaja(profile.id).then(setDeBaja)
+  }, [me, profile?.id])
+
   // A dónde transferir (0089). Se pide una vez: son datos del estudio.
   const [cuentasParaTransferir, setCuentasParaTransferir] = useState<CuentaParaTransferir[]>([])
   useEffect(() => {
@@ -1904,13 +1915,35 @@ export function PortalPage() {
   }
 
   if (!me) {
+    const volver = deBaja ? escribirAlEstudio('¡Hola! Quiero volver a las clases.') : null
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center gap-3">
         <XCircle className="w-10 h-10 text-muted-foreground opacity-40" />
-        <p className="text-sm font-semibold text-foreground">Tu cuenta no está vinculada a una ficha de cliente</p>
-        <p className="text-xs text-muted-foreground max-w-xs">
-          Pedile a recepción que te genere el acceso desde tu ficha. Si ya lo hicieron, probá salir y volver a entrar.
-        </p>
+        {deBaja ? (
+          <>
+            <p className="text-sm font-semibold text-foreground">Tu ficha está dada de baja en el estudio</p>
+            <p className="text-xs text-muted-foreground max-w-xs">
+              Si querés volver a reservar clases, escribinos y te la reactivamos.
+            </p>
+            {volver && (
+              <a
+                href={volver}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90"
+              >
+                Escribir por WhatsApp
+              </a>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="text-sm font-semibold text-foreground">Tu cuenta no está vinculada a una ficha de cliente</p>
+            <p className="text-xs text-muted-foreground max-w-xs">
+              Pedile a recepción que te genere el acceso desde tu ficha. Si ya lo hicieron, probá salir y volver a entrar.
+            </p>
+          </>
+        )}
         <button
           onClick={() => signOut()}
           className="mt-2 px-5 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted"
