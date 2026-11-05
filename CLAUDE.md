@@ -148,10 +148,12 @@ resultado contra la base — no contra la pantalla.
 
 ## Git
 
-- Se trabaja en la rama **`matias`** y Matías mergea a `main` por PR.
+- **Se trabaja directo en `main`** (decisión de Matías, 05/11/2026): commit,
+  push y deploy, sin rama ni PR. GitHub es sólo el control de versiones;
+  lo que llega a las clientas es lo que corre en la VPS.
 - **El deploy ya no es automático.** Desde el 19/10/2026 el front corre en
   nuestra VPS (Vercel dio de baja el plan gratis); la base sigue en
-  Supabase. Después de cada merge a `main` hay que correr
+  Supabase. Después de cada push a `main` hay que correr
   `ssh root@2.25.185.242 casafe-redeploy` (copia en `deploy/redeploy.sh`):
   actualiza, compila y reinicia, y si el build falla deja la versión vieja.
   La VPS es **compartida con otros sistemas** (Citify, Countrify, Malala,
