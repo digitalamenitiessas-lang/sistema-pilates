@@ -3331,6 +3331,24 @@ reservar y tomar fijo después de la baja, reactivar, el duplicado, la
 restrictiva de la 0013 intacta, perm_diff y consumo_control en cero— y la
 de humo. tsc y next build.
 
+### ✅ Las profes se pagan por hora (05/11) — SQL, sin migración
+
+El estudio avisó que la liquidación pagaba sólo las clases (Ivana: 36 clases,
+43 h cargadas, $360.000) y que se paga por hora, con las horas muertas
+entre clases incluidas. No era un error de cálculo: las tres tenían sólo
+tarifa `por_clase` $10.000 desde el 01/10, así que las horas cargadas no
+sumaban plata. Por SQL (con guarda): `por_clase` pasó a $0 y se cargó
+`por_hora` $10.000, las dos desde el 01/10, con nota en cada fila. Ivana ya
+tenía octubre pagado: la diferencia (7 h, $70.000) entra como ajuste en
+noviembre. Giuliana tenía octubre cerrado sin pagar: lo anula y lo vuelve a
+cerrar el estudio. Verificado en Personal: octubre recalculado da $700.000
+y $430.000.
+
+En pantalla angosta la tabla escondía Horas, Por horas, Mensual y Ajustes,
+y mostraba "Por clases $0" junto a un total que no cerraba. Ahora se ven
+las columnas que alguien cobra, y lo que está en cero para todos queda para
+la pantalla ancha.
+
 ### ⏸️ Etapa 4 — Mostrador *(cuando el estudio opere con el sistema)*
 - [ ] Inventario y venta de productos (POS) con stock. *(La consignación —sin variantes ni inventario físico— es la `0090`.)*
 - [ ] Metas de venta con tablero.

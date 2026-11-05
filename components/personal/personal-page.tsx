@@ -402,6 +402,23 @@ function Liquidacion({
    */
   const noTermino = regla === 'con_anotados' && hasta >= hoyISO()
 
+  /**
+   * Qué columnas entran en una pantalla angosta. Antes iban siempre las
+   * clases y las horas quedaban para la compu, y desde el 05/11 el estudio
+   * paga por hora: en el celular se leía "Por clases $0" al lado de un
+   * total de $700.000, sin nada que lo explicara. Ahora se muestra lo que
+   * se paga; lo que está en cero para todos queda para la pantalla ancha.
+   * Mensual y ajustes, igual: un ajuste escondido deja un total que no
+   * cierra con las columnas que se ven.
+   */
+  const pagaPorClase = filas.some((f) => f.montoClases !== 0)
+  const pagaPorHora = filas.some((f) => f.horas > 0 || f.montoHoras !== 0)
+  const soloAncha = (enChica: boolean) => (enChica ? '' : ' hidden md:table-cell')
+  const colClases = soloAncha(pagaPorClase || !pagaPorHora)
+  const colHoras = soloAncha(pagaPorHora)
+  const colMensual = filas.some((f) => f.mensual !== 0) ? '' : ' hidden lg:table-cell'
+  const colAjustes = filas.some((f) => f.ajustes !== 0) ? '' : ' hidden lg:table-cell'
+
   /** Lo que `porQueNoSeCierra` necesita saber de las clases que no se pagan. */
   const noSePagan = (id: string) =>
     regla !== 'con_anotados'
@@ -422,12 +439,12 @@ function Liquidacion({
           <thead>
             <tr className="border-b border-border bg-muted/30 text-xs text-muted-foreground uppercase tracking-wide">
               <th className="text-left px-4 py-3 font-semibold">Profesora/or</th>
-              <th className="text-right px-4 py-3 font-semibold">Clases</th>
-              <th className="text-right px-4 py-3 font-semibold">Por clases</th>
-              <th className="text-right px-4 py-3 font-semibold hidden md:table-cell">Horas</th>
-              <th className="text-right px-4 py-3 font-semibold hidden md:table-cell">Por horas</th>
-              <th className="text-right px-4 py-3 font-semibold hidden lg:table-cell">Mensual</th>
-              <th className="text-right px-4 py-3 font-semibold hidden lg:table-cell">Ajustes</th>
+              <th className={'text-right px-4 py-3 font-semibold' + colClases}>Clases</th>
+              <th className={'text-right px-4 py-3 font-semibold' + colClases}>Por clases</th>
+              <th className={'text-right px-4 py-3 font-semibold' + colHoras}>Horas</th>
+              <th className={'text-right px-4 py-3 font-semibold' + colHoras}>Por horas</th>
+              <th className={'text-right px-4 py-3 font-semibold' + colMensual}>Mensual</th>
+              <th className={'text-right px-4 py-3 font-semibold' + colAjustes}>Ajustes</th>
               <th className="text-right px-4 py-3 font-semibold">Total</th>
               <th className="px-4 py-3" />
             </tr>
@@ -464,7 +481,7 @@ function Liquidacion({
                     </button>
                   )}
                 </td>
-                <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                <td className={'px-4 py-3 text-right tabular-nums text-muted-foreground' + colClases}>
                   {f.clases}
                   {/* Las que la grilla tenía y no se pagan (0091). Sin esto
                       el número baja de un día para el otro y no se entiende
@@ -486,15 +503,15 @@ function Liquidacion({
                     </span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-right tabular-nums">{plata(f.montoClases)}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-muted-foreground hidden md:table-cell">{f.horas}</td>
-                <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">{plata(f.montoHoras)}</td>
-                <td className="px-4 py-3 text-right tabular-nums hidden lg:table-cell">{plata(f.mensual)}</td>
+                <td className={'px-4 py-3 text-right tabular-nums' + colClases}>{plata(f.montoClases)}</td>
+                <td className={'px-4 py-3 text-right tabular-nums text-muted-foreground' + colHoras}>{f.horas}</td>
+                <td className={'px-4 py-3 text-right tabular-nums' + colHoras}>{plata(f.montoHoras)}</td>
+                <td className={'px-4 py-3 text-right tabular-nums' + colMensual}>{plata(f.mensual)}</td>
                 {/* En cero no se escribe un $0 que no dice nada: un guion se
                     lee como "acá no hubo ajuste". Y si hubo, el signo importa
                     más que el color, así que va el número con su menos. */}
                 <td className={cn(
-                  'px-4 py-3 text-right tabular-nums hidden lg:table-cell',
+                  'px-4 py-3 text-right tabular-nums' + colAjustes,
                   f.ajustes < 0 ? 'text-destructive-fuerte' : f.ajustes > 0 ? 'text-exito-fuerte' : 'text-muted-foreground'
                 )}>
                   {f.ajustes === 0
@@ -631,6 +648,12 @@ function Liquidacion({
             liquidación.
           </>
         )}{' '}
+        {pagaPorHora && (
+          <>
+            Las horas son las cargadas en <span className="font-semibold">Horas trabajadas</span>, y
+            se pagan con la tarifa por hora que regía cada día.{' '}
+          </>
+        )}
         <span className="font-semibold">Liquidar no es pagar</span>: primero se
         cierra el período y después se usa <span className="font-semibold">Registrar el pago</span>,
         que carga el gasto en el libro por vos. No hace falta cargarlo a mano en Gastos — si lo
